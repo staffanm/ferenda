@@ -105,25 +105,60 @@ def _terms_listing(docs):
           "described": bool(d.get("short_title"))} for d in docs])
 
 
-# the DV browse buckets group into these forms, in this reading order; a bucket
-# with only one present shows no headers (nothing to distinguish)
+def _split(docs):
+    """Whether a listing is all split titles (sfs, an EU treaty: `key` set) --
+    one column of dt -- rather than the two-column dt/dd definition list (the
+    bold id left, its name/description right)."""
+    return all(d.get("key") is not None for d in docs)
+
+
+def _grouped_listing(docs, forms):
+    """A bucket's entries under headings: `forms` is the ordered (variant,
+    heading) list, and every entry carries one of its variants (stamped by
+    facets._browse_doc; one it does not know is a programming error). A bucket
+    with one form present shows no heading (nothing to distinguish); a form
+    whose heading is None never shows one. Entries keep their order within a
+    form."""
+    groups = {k: [] for k, _ in forms}
+    for d in docs:
+        groups[d["variant"]].append(d)
+    present = [(k, head) for k, head in forms if groups[k]]
+    return Markup("").join(
+        LISTS.listing_group(head if len(present) > 1 else None,
+                            Markup("").join(_browse_item(d) for d in groups[k]),
+                            _split(groups[k]))
+        for k, head in present)
+
+
+# the DV browse buckets group into these forms, in this reading order
 _DV_VARIANTS = (("dom", "Domar"), ("referat", "Referat"), ("notis", "Notiser"))
 
 
 def _dv_listing(docs):
-    """A court+year bucket's cases, grouped Domar / Referat / Notiser (headed only
-    when more than one form is present). Referat and Notiser keep their referat-
-    number order (facets._id_doc_sort); bare Domar are re-sorted by avgörandedatum,
-    newest first (R2)."""
-    groups = {k: [] for k, _ in _DV_VARIANTS}
-    for d in docs:
-        groups.get(d.get("variant") or "referat", groups["referat"]).append(d)
-    groups["dom"].sort(key=lambda d: d.get("date") or "", reverse=True)
-    present = [(k, label) for k, label in _DV_VARIANTS if groups[k]]
-    return Markup("").join(
-        LISTS.dv_group(label if len(present) > 1 else None,
-                        Markup("").join(_browse_item(d) for d in groups[k]))
-        for k, label in present)
+    """A court+year bucket's cases, grouped Domar / Referat / Notiser. Referat
+    and Notiser keep their referat-number order (facets._id_doc_sort); bare
+    Domar are re-sorted by avgörandedatum, newest first (R2)."""
+    domar = sorted((d for d in docs if d.get("variant") == "dom"),
+                   key=lambda d: d.get("date") or "", reverse=True)
+    return _grouped_listing(
+        domar + [d for d in docs if d.get("variant") != "dom"],
+        _DV_VARIANTS)
+
+
+# What an eurlex bucket groups under, per document type (the group keys come
+# stamped on each entry as `variant`, facets._eu_variant). An act by who
+# enacted it: a year holds 80 Europaparlamentets och rådets förordningar among
+# 1 000, and those are the ones a reader is usually after, so they lead and the
+# kommissionens genomförande- och delegerade förordningar follow. A court
+# decision by court. A treaty by `facets.TREATY_FORMS`. Övriga rättsakter
+# (recommendations and the like, 139) and AG opinions list flat.
+_EU_ACT_PLURAL = {"regulation": "förordningar", "directive": "direktiv",
+                  "decision": "beslut"}
+_EU_FORMS = {"treaty": facets.TREATY_FORMS,
+             "judgment": facets.COURT_FORMS,
+             **{kind: tuple((k, head % plural if "%s" in head else head)
+                            for k, head in facets.ISSUER_FORMS)
+                for kind, plural in _EU_ACT_PLURAL.items()}}
 
 
 def _facet_links(source, buckets, parent_slugs, active_keys, depth):
@@ -149,15 +184,18 @@ def _facet_nav(source, view, active_keys, primary_in_banner=False):
     repeating them below is the same choice offered twice. So on a guidance page
     the banner takes the Utgivare axis and the loop below renders Serie and År.
     The years of what a myndighet issues never list here either
-    (`YEAR_SPLIT_SOURCES`): a large bucket's year axis rides on top of the list
+    (`YEAR_AXIS_ON_TOP`): a large bucket's year axis rides on top of the list
     (F4), and a small one has no year split at all (F3) -- listing them here
-    would offer a reader years that are not pages."""
+    would offer a reader years that are not pages. eurlex splits by the same
+    rule but keeps its years here, its top being the EU-rätt type selector;
+    `generate_browse` hands this a view in which a collapsed bucket has no
+    children, so no year links to pages it does not write."""
     levels, buckets = view["levels"], view["buckets"]
     parts = ([{"axis": levels[0]},
               {"axis": None,
                "links": _facet_links(source, buckets, [], active_keys, 0)}]
              if len(buckets) > 1 and not primary_in_banner else [])
-    if source in YEAR_SPLIT_SOURCES:
+    if source in YEAR_AXIS_ON_TOP:
         return LISTS.facet_nav(parts)
     # `active_keys` is a leaf path of this very `view` (`render_facet_page`
     # reads it off the nodes), so the bucket at each depth must be there -- a
@@ -172,7 +210,7 @@ def _facet_nav(source, view, active_keys, primary_in_banner=False):
         if not cur["children"]:
             break
         parent_slugs.append(cur["slug"])
-        parts.append({"axis": _axis_heading(source, active_keys[0], levels[depth])})
+        parts.append({"axis": levels[depth]})
         parts.append({"axis": None,
                       "links": _facet_links(source, cur["children"],
                                             parent_slugs, active_keys, depth)})
@@ -180,17 +218,9 @@ def _facet_nav(source, view, active_keys, primary_in_banner=False):
     return LISTS.facet_nav(parts)
 
 
-def _axis_heading(source, primary_key, default):
-    """The heading for a facet axis below the primary one. Usually the level's own
-    name ('År'), but the eurlex Fördrag are grouped by treaty family, not year
-    (E1), so that branch is headed neutrally instead of mislabelled 'År'."""
-    return "Kategori" if source == "eurlex" and primary_key == "treaty" else default
-
-
 def _bucket_heading(source, levels, nodes):
     """The reading heading for a leaf bucket -- 'Författningar som börjar på A',
-    'NJA – Högsta domstolen 2024', 'Förordningar 2016'. The eurlex Fördrag family
-    label is self-describing, so it stands alone rather than trailing 'Fördrag'.
+    'NJA – Högsta domstolen 2024', 'Förordningar 2016'.
     A författningssamling heads by its official name + designation --
     'Åklagarmyndighetens författningssamling (ÅFS)' (F2).
 
@@ -205,8 +235,6 @@ def _bucket_heading(source, levels, nodes):
         return "%s %s" % (series, nodes[1]["label"]) if len(nodes) > 1 else series
     if len(levels) == 1:
         return "%s som börjar på %s" % (SOURCE_LABEL.get(source, source), nodes[0]["key"])
-    if source == "eurlex" and nodes[0]["key"] == "treaty":
-        return nodes[1]["label"]
     return " ".join(n["label"] for n in nodes)
 
 
@@ -254,12 +282,17 @@ _EU_TYPE_NOTE = {
                  "svensk lag eller förordning.",
     "decision": "Ett beslut är bindande i alla sina delar, men bara för dem som "
                 "det riktar sig till.",
+    # a case files under the year it was registered (its number's year, C-1/23),
+    # not the year of the judgment -- a /23 case may be decided in 2025 -- and the
+    # note says so, since every other year axis on the site is the document's own
     "judgment": "EU-domstolens avgöranden. Domstolen tolkar EU-rätten med "
                 "bindande verkan, oftast sedan en nationell domstol har begärt "
-                "förhandsavgörande.",
+                "förhandsavgörande. Året är det år målet registrerades, och "
+                "målen listas efter målnummer.",
     "opinion": "Generaladvokatens förslag till avgörande är en fristående "
                "rättsutredning inför domstolens dom. Det binder inte domstolen, "
-               "men följs ofta och används för att förstå domskälen.",
+               "men följs ofta och används för att förstå domskälen. Året är "
+               "det år målet registrerades.",
     "act": "Rekommendationer, yttranden och andra rättsakter som inte binder på "
            "samma sätt som förordningar, direktiv och beslut.",
     "riktlinjer": "Europeiska dataskyddsstyrelsens riktlinjer om hur "
@@ -280,8 +313,12 @@ def _bucket_note(source, nodes):
     is and whom it binds (N2). '' where the bucket has nothing to add."""
     if source == "foreskrift":
         return _fs_series_note(nodes[0])
-    if source in ("eurlex", "guidance"):
+    if source == "eurlex":
         return _EU_TYPE_NOTE.get(nodes[0]["key"], "")
+    if source == "guidance":
+        # keyed on the series (the second level, Utgivare -> Serie -> År); a
+        # body's Serie leaf sits at nodes[1], the ECB's year leaves below it
+        return _EU_TYPE_NOTE.get(nodes[1]["key"], "") if len(nodes) > 1 else ""
     return ""
 
 
@@ -301,12 +338,11 @@ def render_facet_page(source, view, nodes, banner="", primary_in_banner=False):
         listing = _dv_listing(docs)
     elif source == "begrepp":                            # a column-flowed glossary
         listing = _terms_listing(docs)
+    elif source == "eurlex" and nodes[0]["key"] in _EU_FORMS:
+        listing = _grouped_listing(docs, _EU_FORMS[nodes[0]["key"]])
     else:
-        # SFS is a dt-only split title (single column); every other source is a
-        # two-column dt/dd definition list (the bold id left, its name/desc right)
-        css = "browse-list" if source == "sfs" else "browse-list def"
-        listing = Markup('<dl class="%s">%s</dl>') % (
-            css, Markup("").join(_browse_item(d) for d in docs))
+        listing = LISTS.listing_group(
+            None, Markup("").join(_browse_item(d) for d in docs), _split(docs))
     body = LISTS.facet_page_body(
         Markup(banner), _facet_nav(source, view, [n["key"] for n in nodes],
                                    primary_in_banner),
@@ -315,36 +351,6 @@ def render_facet_page(source, view, nodes, banner="", primary_in_banner=False):
     discovery = (Markup('<link rel="alternate" type="application/atom+xml" '
                         'href="/dataset/%s/feed.atom">') % alias) if alias else ""
     return page(heading, "Bläddra", "", body, solo=True, head=discovery,
-                body_class=" browse", own_h1=True)
-
-
-# How many second-level buckets a landing lists under a type before it stops:
-# enough to show the shape of the branch (the newest years, the treaty
-# families), not the 60-year run of a case-law series.
-LANDING_CHILDREN = 12
-
-
-def render_landing(source, view, banner=""):
-    """A source's root page: what the corpus holds, by primary bucket.
-
-    The root used to be a byte copy of the first leaf page, which is how
-    /eurlex/ came to open as "Fördraget om Europeiska unionen, 8 dokument" --
-    50 000 acts introduced by one treaty's consolidated versions (V4, old N2).
-    A reader arriving at a source needs its extent and its branches, and one
-    branch's leaf is neither."""
-    groups = [{"url": browse_url(source, [b["slug"]]), "label": b["label"],
-               "count": b["count"],
-               "children": [{"url": browse_url(source, [b["slug"], c["slug"]]),
-                             "label": c["label"], "count": c["count"]}
-                            for c in (b["children"] or [])[:LANDING_CHILDREN]]}
-              for b in view["buckets"]]
-    heading = SOURCE_LABEL.get(source, source)
-    # the total counts the *buckets*, not the rendered rows: `groups` holds
-    # display values of several types, so summing one of its keys asks the type
-    # checker to pick an overload out of a union it cannot narrow
-    body = LISTS.source_landing_body(
-        Markup(banner), heading, sum(b["count"] for b in view["buckets"]), groups)
-    return page(heading, "Bläddra", "", body, solo=True,
                 body_class=" browse", own_h1=True)
 
 
@@ -443,10 +449,17 @@ YEAR_SPLIT_MIN = 200
 
 # The sources that collapse a small primary bucket, rather than always paging by
 # year: what a myndighet issues (its föreskrifter, its avgöranden, its rättsliga
-# ställningstaganden), where a small agency's whole output is a short list.
-# Every other faceted source is left paging as it does today -- the rule is a
-# display policy, and widening it changes URLs that already exist.
-YEAR_SPLIT_SOURCES = frozenset({"foreskrift", "avg", "rs"})
+# ställningstaganden), where a small agency's whole output is a short list, and
+# the EU-rätt types -- the 49 Fördrag were nine pages of one treaty's
+# consolidated versions each, and the 139 övriga rättsakter forty pages of a
+# few. Every other faceted source is left paging as it does today -- the rule
+# is a display policy, and widening it changes URLs that already exist.
+YEAR_SPLIT_SOURCES = frozenset({"foreskrift", "avg", "rs", "eurlex"})
+
+# Where a split bucket's year axis renders: on top of the list for what a
+# myndighet issues (F4). eurlex's top carries the EU-rätt type selector, so its
+# years stay in the rail (`_facet_nav`).
+YEAR_AXIS_ON_TOP = frozenset({"foreskrift", "avg", "rs"})
 
 
 def _listed(sec):
@@ -489,6 +502,8 @@ def generate_browse(client, source, out_root, cross_axis=None):
     plus the landing copies: a primary bucket's directory shows its first
     (default) child, and the source root shows the overall default bucket -- so
     /dom/, /dom/nja/ and /dom/nja/2025/ all resolve without a redirect or JS.
+    (/eurlex/ was for a while a landing over the types instead; the Fördrag page
+    it opens on now holds the three current treaties, not nine versions of one.)
     `generate_all` already skips the sources the API does not facet -- kommentar,
     plus the four folkrätt instrument sources listed in full on their own
     landing -- so every `source` reaching here is faceted. `cross_axis` (a
@@ -501,31 +516,41 @@ def generate_browse(client, source, out_root, cross_axis=None):
     choice twice.
 
     A small primary bucket collapses its year buckets into one listing (F3); a
-    large one keeps year pages, with the year selector as a top banner on each
-    (F4). That holds for what a myndighet issues -- föreskrifter, avgöranden,
-    rättsliga ställningstaganden (`YEAR_SPLIT_SOURCES`)."""
+    large one keeps year pages (`YEAR_SPLIT_SOURCES`), with the year selector as
+    a top banner on each for what a myndighet issues (F4, `YEAR_AXIS_ON_TOP`)
+    and in the rail for eurlex.
+
+    The EU-rätt selector is one row of document types with the guidance as one
+    entry, so a guidance page marks that entry current whichever body's series
+    it lists, and its rail -- unlike eurlex's -- starts with the primary axis
+    (Utgivare), which the banner does not carry."""
     resp = client.get("/api/v1/browse", params={"source": source})
     view = resp.json()
     root_html = None
     written = set()
     landed = set()          # ancestor directories already given a landing copy
     for prim in view["buckets"]:
-        banner = (cross_nav(cross_axis, "%s:%s" % (source, prim["slug"]))
-                  if cross_axis else "")
+        active = source if source == "guidance" else "%s:%s" % (source, prim["slug"])
+        banner = cross_nav(cross_axis, active) if cross_axis else ""
         year_axis = None
         if source in YEAR_SPLIT_SOURCES and prim["children"]:
             if sum(_listed(sec) for sec in prim["children"]) < YEAR_SPLIT_MIN:
                 prim = dict(prim, children=None,
                             documents=[d for sec in prim["children"]
                                        for d in sec.get("documents") or []])
-            else:
+                # the rail reads the tree, so the collapsed bucket stands in for
+                # its own there: no year links to pages this run does not write
+                view = dict(view, buckets=[prim if b["key"] == prim["key"] else b
+                                           for b in view["buckets"]])
+            elif source in YEAR_AXIS_ON_TOP:
                 year_axis = _year_axis(source, view, prim)
         for nodes in _leaf_paths(prim):
             slugs = [n["slug"] for n in nodes]
             if year_axis:
                 banner = cross_nav(year_axis, nodes[1]["key"])
-            html = render_facet_page(source, view, nodes, banner=banner,
-                                     primary_in_banner=cross_axis is not None)
+            html = render_facet_page(
+                source, view, nodes, banner=banner,
+                primary_in_banner=cross_axis is not None and source != "guidance")
             written.add(_write_browse(out_root, source, slugs, html))
             # every directory above a leaf lands on its own first leaf, so
             # /eurlex/vagledning/ecb/ and /ecb/con/ resolve as well as
@@ -540,17 +565,9 @@ def generate_browse(client, source, out_root, cross_axis=None):
                     written.add(_write_browse(out_root, source,
                                               slugs[:depth], html))
             if root_html is None:                # overall default = first leaf
+                # for eurlex that is the Fördrag page: the current TEU, TFEU
+                # and Charter, which is how the EU-rätt corpus opens
                 root_html = html
-    # eurlex's root is a landing over all its types rather than a copy of the
-    # first leaf: its first leaf is one treaty's eight consolidated versions,
-    # which is no way to open a corpus of 50 000 acts (V4). The other sources
-    # keep the default-bucket root until each has a landing worth the swap.
-    if source == "eurlex":
-        # no bucket is current here: the landing stands above all of them, so
-        # marking the first one would tell a reader they are inside Fördrag
-        # while the page lists every type
-        root_html = render_landing(source, view, banner=cross_nav(cross_axis, None)
-                                   if cross_axis else "")
     written.add(_write_browse(out_root, source, [], root_html))
     if source == "foreskrift":
         written |= _write_succeeded_series(out_root, source, view)

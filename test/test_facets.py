@@ -145,11 +145,20 @@ def test_eurlex_treaty_groups_by_family_not_year():
     assert facets._eu_second_order(["2016", "2019", "2011"]) == ["2019", "2016", "2011"]
 
 
-def test_eurlex_treaty_bucket_sorts_newest_first():
-    # the current consolidated version tops its family (E1)
-    old = row(U + "celex/11992M/TXT", kind="treaty")
-    new = row(U + "celex/12016M/TXT", kind="treaty")
-    assert sorted([old, new], key=facets._eu_doc_sort) == [new, old]
+def test_eu_material_reads_newest_first():
+    # by date descending, then by number descending: a year's förordningar open
+    # on December's, an EDPB series on what it published last; undated last
+    rows = [Row(U + "celex/32024R0436", "celex/32024R0436", "regulation",
+                "32024R0436", "t", "t", "2024-01-05", "(EU) 2024/436"),
+            Row(U + "celex/32024R1364", "celex/32024R1364", "regulation",
+                "32024R1364", "t", "t", "2024-03-14", "(EU) 2024/1364"),
+            Row(U + "celex/32024R0999", "celex/32024R0999", "regulation",
+                "32024R0999", "t", "t", None, "(EU) 2024/999"),
+            Row(U + "celex/32024R1000", "celex/32024R1000", "regulation",
+                "32024R1000", "t", "t", "2024-03-14", "(EU) 2024/1000")]
+    facets.sort_rows("eurlex", rows)
+    assert [r.short_id for r in rows] == [
+        "(EU) 2024/1364", "(EU) 2024/1000", "(EU) 2024/436", "(EU) 2024/999"]
 
 
 def test_foreskrift_series_and_year():
@@ -168,15 +177,19 @@ def test_slug_keeps_swedish_letters():
 # --------------------------------------------------------------------------
 
 def _catalog(tmp_path, rows):
-    """rows are (uri, source, kind, label, title[, display]); `display` (the
-    reader-facing heading the browse listing shows) defaults to the title -- the
-    display_title result for an artifact with no short name/acronym."""
+    """rows are (uri, source, kind, label, title[, display[, short_id[,
+    short_title]]]); `display` (the reader-facing heading the browse listing
+    shows) defaults to the title -- the display_title result for an artifact
+    with no short name/acronym -- and the two label columns to empty."""
+    def values(uri, src, kind, label, title, display=None, short_id="",
+               short_title=""):
+        return (uri, src, kind, label, title, display or title, short_id,
+                short_title)
     con = catalog.connect(tmp_path / "cat.sqlite")
     con.executemany(
-        "INSERT INTO documents (uri, source, kind, label, title, path, display) "
-        "VALUES (?,?,?,?,?,'',?)",
-        [(uri, src, kind, label, title, rest[0] if rest else title)
-         for (uri, src, kind, label, title, *rest) in rows])
+        "INSERT INTO documents (uri, source, kind, label, title, path, display, "
+        "short_id, short_title) VALUES (?,?,?,?,?,'',?,?,?)",
+        [values(*row) for row in rows])
     con.commit()
     return con
 
@@ -284,9 +297,10 @@ def test_numbered_series_list_by_number_not_by_subject(tmp_path):
         (U + "guidance/edpb/riktlinjer/1-2019", "guidance", "riktlinjer",
          "Riktlinjer 1/2019", "Riktlinjer 1/2019 om uppförandekoder"),
     ])
+    # (newest first: the later number leads)
     assert [r.label for r in
             facets.group(con, "guidance")[("edpb", "riktlinjer", "2019")]] \
-        == ["Riktlinjer 1/2019", "Riktlinjer 2/2019"]
+        == ["Riktlinjer 2/2019", "Riktlinjer 1/2019"]
 
 
 def test_a_subject_bucket_still_lists_by_subject(tmp_path):
@@ -332,8 +346,8 @@ def test_browse_view_attaches_documents_to_a_leaf_above_the_last_level(tmp_path)
     assert serier["riktlinjer"]["children"] is None
     assert serier["riktlinjer"]["count"] == 2
     assert [d["display"] for d in serier["riktlinjer"]["documents"]] == [
-        "Riktlinjer 03/2019 om videoövervakning",
-        "Riktlinjer 05/2020 om samtycke"]
+        "Riktlinjer 05/2020 om samtycke",              # newest first
+        "Riktlinjer 03/2019 om videoövervakning"]
     assert len(serier["rekommendationer"]["documents"]) == 1
     # the utgivare above them is not a leaf and carries no documents of its own
     assert "documents" not in edpb
@@ -480,3 +494,114 @@ def test_an_expired_document_leaves_the_browse(tmp_path):
     assert listed == {"https://lagen.nu/rs/skv/8-1",
                       "https://lagen.nu/rs/skv/8-3"}, listed
     con.close()
+
+
+# --------------------------------------------------------------------------
+# eurlex: what a year page lists, in what order, under which heading
+# --------------------------------------------------------------------------
+
+def _eu_catalog(tmp_path, rows):
+    """rows are (celex, kind, title, short_id[, short_title]) -- the columns of
+    an eurlex row the browse reads; label is the CELEX, as relate stamps it."""
+    return _catalog(tmp_path, [
+        (U + "celex/" + celex, "eurlex", kind, celex, title, title, short_id,
+         rest[0] if rest else "")
+        for celex, kind, title, short_id, *rest in rows])
+
+
+def test_eurlex_year_lists_by_number_not_by_title(tmp_path):
+    """An EU year bucket is a numbered series: acts by act number, cases by
+    case number, newest first. It listed by the subject key read off the title,
+    which put (EU) 2024/1364 before (EU) 2024/436 and read as random."""
+    con = _eu_catalog(tmp_path, [
+        ("32024R1364", "regulation", "Commission Delegated Regulation (EU) "
+         "2024/1364 of 14 March 2024 on the first phase", "(EU) 2024/1364"),
+        ("32024R0436", "regulation", "Kommissionens delegerade förordning (EU) "
+         "2024/436 av den 20 december 2023 om revisioner", "(EU) 2024/436"),
+        ("32024R1689", "regulation", "Europaparlamentets och rådets förordning "
+         "(EU) 2024/1689 av den 13 juni 2024 om AI", "(EU) 2024/1689"),
+        ("62023CJ0010", "judgment", "C-10/23", "C-10/23"),
+        ("62023CJ0002", "judgment", "C-2/23", "C-2/23"),
+    ])
+    buckets = facets.group(con, "eurlex")
+    assert [r.short_id for r in buckets[("regulation", "2024")]] \
+        == ["(EU) 2024/1689", "(EU) 2024/1364", "(EU) 2024/436"]
+    assert [r.short_id for r in buckets[("judgment", "2023")]] \
+        == ["C-10/23", "C-2/23"]
+
+
+def test_eurlex_issuer_is_read_off_the_head_of_the_title():
+    def issuer(title, label="3XXXX"):
+        return facets._eu_issuer(row(U + "celex/" + label, "regulation", label, title))
+    assert issuer("Europaparlamentets och rådets förordning (EU) 2024/1689 av den "
+                  "13 juni 2024 om harmoniserade regler") == "ep"
+    assert issuer("Directive 98/31/EC of the European Parliament and of the "
+                  "Council of 22 June 1998 amending Council Directive 93/6/EEC") == "ep"
+    assert issuer("Rådets förordning (EEG) nr 1408/71 av den 14 juni 1971 om "
+                  "tillämpningen av systemen för social trygghet") == "council"
+    assert issuer("Regulation (EEC) No 1612/68 of the Council of 15 October 1968 "
+                  "on freedom of movement for workers") == "council"
+    # the enacting body stands before the date; who is named after it (the act
+    # amended) does not count -- with a double "den" in the date too
+    assert issuer("Kommissionens förordning (EG) nr 1109/2008 av den den 6 "
+                  "november 2008 om ändring av rådets förordning") == "commission"
+    assert issuer("93/51/EEG: Kommissionens beslut av den 15 december 1992 om "
+                  "de mikrobiologiska kriterierna") == "commission"
+    assert issuer("Komissionens förordning (EG) nr 2426/94 av den 6 oktober 1994 "
+                  "om ändring av förordning (EEG) nr 1727/92") == "commission"
+    assert issuer("Europeiska centralbankens förordning (EU) 2021/378 av den "
+                  "22 januari 2021 om tillämpningen av minimireserver") == "other"
+    # an act held only as a scanned PDF: the catalog stores its CELEX as title
+    assert issuer("31978R2962", "31978R2962") == "untitled"
+
+
+def test_eurlex_entries_carry_what_the_listing_groups_them_under(tmp_path):
+    con = _eu_catalog(tmp_path, [
+        ("32024R1689", "regulation", "Europaparlamentets och rådets förordning "
+         "(EU) 2024/1689 av den 13 juni 2024 om AI", "(EU) 2024/1689"),
+        ("62023CJ0002", "judgment", "C-2/23", "C-2/23"),
+        ("62004TJ0201", "judgment", "T-201/04", "T-201/04"),
+        ("62025CC0063", "opinion", "Förslag till avgörande", "C-63/25"),
+    ])
+    docs = {d["short_id"]: d
+            for b in facets.browse_view(con, "eurlex")["buckets"]
+            for year in b["children"] for d in year["documents"]}
+    assert docs["(EU) 2024/1689"]["variant"] == "ep"
+    assert docs["C-2/23"]["variant"] == "cj"
+    assert docs["T-201/04"]["variant"] == "gc"
+    assert docs["C-63/25"]["variant"] is None
+
+
+def test_treaties_list_once_each_as_their_current_consolidation(tmp_path):
+    """The Fördrag page holds the current TEU, TFEU and Charter -- not nine
+    consolidated versions of the TEU (its earlier wordings are previous versions
+    of one text) -- and the distinct instruments under their family. CELLAR
+    serves a treaty under two ids ('12010M', '12010M/TXT'), parsed as two
+    artifacts of the same text: the named one lists, the twin does not."""
+    teu = "Fördraget om Europeiska unionen (konsoliderad version %s)"
+    con = _eu_catalog(tmp_path, [
+        ("12016M/TXT", "treaty", "12016M/TXT", "12016M/TXT", teu % 2016),
+        ("12012M/TXT", "treaty", "12012M/TXT", "12012M/TXT", teu % 2012),
+        ("12010M", "treaty", "12010M", "12010M", teu % 2010),
+        ("12010M/TXT", "treaty", "12010M/TXT", "12010M/TXT"),
+        ("12016E/TXT", "treaty", "12016E/TXT", "12016E/TXT",
+         "Fördraget om Europeiska unionens funktionssätt (konsoliderad version 2016)"),
+        ("12007L/TXT", "treaty", "12007L/TXT", "12007L/TXT", "Lissabonfördraget (2007)"),
+        ("11986U", "treaty", "11986U", "11986U", "Europeiska enhetsakten (1986)"),
+        ("11986U/TXT", "treaty", "11986U/TXT", "11986U/TXT"),
+    ])
+    buckets = facets.group(con, "eurlex")
+    assert [r.local for r in buckets[("treaty", "teu")]] == ["celex/12016M/TXT"]
+    assert [r.local for r in buckets[("treaty", "tfeu")]] == ["celex/12016E/TXT"]
+    assert [r.local for r in buckets[("treaty", "amending")]] \
+        == ["celex/12007L/TXT", "celex/11986U"]
+    docs = {d["short_id"]: d
+            for b in facets.browse_view(con, "eurlex")["buckets"]
+            for fam in b["children"] for d in fam["documents"]}
+    # the entry is the curated name alone, set like a statute's title
+    assert docs["12016M/TXT"]["key"] == teu % 2016
+    assert docs["12016M/TXT"]["pre"] == ""
+    assert docs["12016M/TXT"]["variant"] == "current"
+    assert docs["12007L/TXT"]["variant"] == "amending"
+    assert facets.TREATY_FORMS[0] == ("current", None)
+    assert ("amending", "Ändringsfördrag") in facets.TREATY_FORMS

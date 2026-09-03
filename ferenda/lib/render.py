@@ -640,29 +640,30 @@ def cross_nav(groups, active_id):
 # but they belong beside the förordning they interpret, which is what this
 # selector is for (the folkrätt landing's selector, second use).
 #
-# One group per issuing body rather than one flat row of document types: a
-# listing of riktlinjer is the EDPB's, not the union legislator's, and a reader
-# who cannot see whose document it is has no way to weigh it -- a riktlinje
-# binds nobody, a förordning binds everyone. The heading is what says so, and
-# the three EDPB series sit under it as the series they are.
+# One row of document types: the seven kinds of rättsakt, then the guidance as
+# one entry. Whose guidance a listing holds is the next choice, made in the
+# rail (the Utgivare axis) and said by the page heading -- a listing of
+# riktlinjer is the EDPB's, and a reader who cannot see whose document it is
+# has no way to weigh it. The row used to spell that out by listing the twelve
+# issuing bodies as a second banner group, which put half a screen of agency
+# names above every EU-rätt page.
 #
-# eurlex takes its SOURCE_LABEL unchanged. edpb overrides it, and the override
-# is the point: SOURCE_LABEL names that source by what most of it is ("EU:s
-# dataskyddsriktlinjer", which is what the frontpage row wants), while this
-# heading stands over all three of its series -- and the artikel 29-gruppens
-# vägledningar are not riktlinjer. What a group heading has to say is who
-# issued what is under it.
-_EU_AXIS_LABEL = {"eurlex": SOURCE_LABEL["eurlex"],
-                  "guidance": "EU-organens vägledningar"}
+# The guidance entry does not take SOURCE_LABEL: that names the source by what
+# most of it is ("EU-vägledning", which is what the frontpage row wants),
+# while this entry stands over every body's every series.
+GUIDANCE_AXIS_LABEL = "EU-organens vägledningar"
 
 
 def eurlex_axis(con):
-    return [(_EU_AXIS_LABEL[source],
-             [("%s:%s" % (source, bucket["slug"]), bucket["label"],
-               browse_url(source, [bucket["slug"]]), bucket["count"])
-              for bucket in facets.tree(con, source)["buckets"]])
-            for source in ("eurlex", "guidance")
-            if catalog.document_count(con, source)]
+    entries = ([("eurlex:%s" % bucket["slug"], bucket["label"],
+                 browse_url("eurlex", [bucket["slug"]]), bucket["count"])
+                for bucket in facets.tree(con, "eurlex")["buckets"]]
+               if catalog.document_count(con, "eurlex") else [])
+    guidance = catalog.document_count(con, "guidance")
+    if guidance:
+        entries.append(("guidance", GUIDANCE_AXIS_LABEL,
+                        browse_url("guidance", []), guidance))
+    return [("Dokumenttyp", entries)] if entries else []
 
 
 def render_folkratt(con):

@@ -773,12 +773,10 @@ def test_edpb_browses_under_the_eu_ratt_masthead_entry():
                    for e in render.ENV.globals["MAST_NAV"])
 
 
-def test_the_eu_selector_names_the_body_each_group_of_documents_comes_from(
-        tmp_path):
-    """A listing of riktlinjer is the EDPB's, not the union legislator's, and the
-    shared EU-rätt selector has to say so: one labelled group per issuing body,
-    rather than one flat row of document types in which "Riktlinjer" sat beside
-    "Förordningar" with nothing saying who wrote which."""
+def test_the_eu_selector_offers_the_guidance_as_one_document_type(tmp_path):
+    """The EU-rätt selector is one row of document types: eurlex's kinds, then
+    the guidance as one entry. Whose guidance a page lists is the rail's
+    Utgivare axis and the heading, not twelve agency names in the banner."""
     db = str(tmp_path / "catalog.sqlite")
     paths = []
     for serie, nummer in (("riktlinjer", "05/2020"),
@@ -789,15 +787,10 @@ def test_the_eu_selector_names_the_body_each_group_of_documents_comes_from(
         paths.append(path)
     catalog.rebuild(db, "guidance", paths)
     con = catalog.connect(db)
-    groups = render.eurlex_axis(con)
-    # eurlex is empty in this catalog, so only the guidance group is offered --
+    # eurlex is empty in this catalog, so the guidance entry is the whole row --
     # the selector is built from what the corpus holds, not from a fixed list
-    assert [axis for axis, _entries in groups] == ["EU-organens vägledningar"]
-    # and its entries are the issuing bodies, not their series. With one body
-    # the series read as a flat list of document types; with two, "Riktlinjer"
-    # would appear twice with nothing saying whose.
-    assert [label for _key, label, _url, _count in groups[0][1]] == [
-        "Europeiska dataskyddsstyrelsen (EDPB)"]
+    assert render.eurlex_axis(con) == [("Dokumenttyp", [
+        ("guidance", "EU-organens vägledningar", "/eurlex/vagledning/", 3)])]
 
 
 # --------------------------------------------------------------------------

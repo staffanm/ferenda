@@ -161,8 +161,10 @@ every source is faceted; an unfaceted one is a `404`. Returns a
 **`GET /api/v1/browse`** — the same tree, but every leaf bucket's `documents` are
 populated (each a `BrowseDoc`: `{ uri, url, display, short_id?, short_title?,
 description?, … }`, plus per-source listing extras — `pre`/`key`/`subdued`/`year`
-for statutes, `variant`/`date` for case law, `amendments`/`consolidated` for
-agency regulations). This is the full browse model the static site is generated
+for statutes, `variant`/`date` for case law, `variant` for an EU act (enacting
+body), a court ruling (court) or a treaty (`current` for a consolidated text,
+else its family) and `pre`/`key` for a treaty,
+`amendments`/`consolidated` for agency regulations). This is the full browse model the static site is generated
 from; `/openapi.json` has the field-by-field description.
 
 ### Get one document — `GET /api/v1/document?uri=…`

@@ -47,10 +47,9 @@
 {%- endmacro -%}
 {%- macro top_axis_nav(groups, active_id) -%}
 {#- a full-width selector above a listing: one or more labelled axes, each a
-    row of buckets. One group for the folkrätt Dokumenttyp axis and for the
-    year axis of a large författningssamling (F4); two for the EU-rätt
-    selector, which names the rättsakter and the EDPB's guidance separately so
-    a reader can see whose document a listing holds -#}
+    row of buckets: the folkrätt Dokumenttyp axis, the EU-rätt selector (the
+    rättsakter's kinds and the guidance as one entry), the year axis of a
+    large författningssamling (F4) -#}
 <nav class="facets">
 {%- for axis, entries in groups -%}
 <h2 class="facet-axis">{{ axis }}</h2><ul class="facet-list">
@@ -169,9 +168,13 @@
 {%- macro browse_items(docs) -%}
 {%- for d in docs %}{{ browse_item(d) }}{% endfor -%}
 {%- endmacro -%}
-{%- macro dv_group(head, items) -%}
-{%- if head %}<h2 class="dv-variant">{{ head }}</h2>{% endif -%}
-<dl class="browse-list def">{{ items }}</dl>
+{%- macro listing_group(head, items, split) -%}
+{#- one run of a listing, headed when it is one group of several: a dv
+    bucket's Domar/Referat/Notiser, an EU year's acts by who enacted them, the
+    Fördrag page's families. A run of split titles (sfs, a treaty) is one
+    column of dt; every other is the two-column dt/dd definition list -#}
+{%- if head %}<h2 class="listing-head">{{ head }}</h2>{% endif -%}
+<dl class="browse-list{% if not split %} def{% endif %}">{{ items }}</dl>
 {%- endmacro -%}
 {%- macro facet_links(items) -%}
 <ul class="facet-list">
@@ -197,23 +200,6 @@
 {{ banner }}<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main browse-group"><h1>{{ heading }} <span class="c">{{ count }}</span></h1>
 {%- if note %}<p class="browse-note">{{ note }}</p>{% endif -%}
 {{ listing }}</section></div>
-{%- endmacro -%}
-{%- macro source_landing_body(banner, heading, count, groups) -%}
-{#- A source's own root. It used to be a byte copy of the first leaf, so
-    /eurlex/ opened titled "Fördraget om Europeiska unionen, 8 dokument" -- a
-    corpus of 50 000 acts introduced by one treaty's consolidated versions.
-    This lists what the source *holds*: every primary bucket with its size, and
-    under each the buckets a reader would go to next. -#}
-{{ banner }}<section class="browse-main browse-group"><h1>{{ heading }} <span class="c">{{ count }}</span></h1>
-<div class="landing-groups">
-{%- for g in groups %}
-<div class="landing-group"><h2><a href="{{ g.url }}">{{ g.label }}</a> <span class="c">{{ g.count }}</span></h2>
-{%- if g.children %}<ul class="landing-children">
-{%- for c in g.children %}<li><a href="{{ c.url }}">{{ c.label }}</a> <span class="c">{{ c.count }}</span></li>{% endfor -%}
-</ul>{% endif -%}
-</div>
-{%- endfor -%}
-</div></section>
 {%- endmacro -%}
 {%- macro empty() -%}
 <p class="empty">Inga dokument.</p>

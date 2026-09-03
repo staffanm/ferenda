@@ -508,15 +508,19 @@ class BrowseDoc(BaseModel):
         None, description="the source's one-line description -- a case's "
         "sammanfattning")
     variant: str | None = Field(
-        None, description="dv only: the case-law form (dom/referat/notis) the "
-        "listing groups under")
+        None, description="what the listing groups the entry under: dv's "
+        "case-law form (dom/referat/notis); eurlex's enacting body for an act "
+        "(ep/council/commission/other/untitled), court for a ruling "
+        "(cj/gc/cst), and for a treaty `current` (a consolidated text) or its "
+        "family (amending/accession/withdrawal/other)")
     date: str | None = Field(
         None, description="dv only: the avgörandedatum bare domar sort by")
     pre: str | None = Field(
-        None, description="sfs only: the subdued designation/number prefix of "
-        "the title")
+        None, description="sfs: the subdued designation/number prefix of the "
+        "title; an EU treaty: empty")
     key: str | None = Field(
-        None, description="sfs only: the emphasised sort subject of the title")
+        None, description="sfs: the emphasised sort subject of the title; an "
+        "EU treaty: its curated name (the entry is the name alone)")
     subdued: bool | None = Field(
         None, description="sfs only: false for primary law, true for the rest "
         "(rendered subdued)")

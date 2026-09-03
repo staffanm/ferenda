@@ -134,37 +134,6 @@ def test_reap_still_works_for_a_source_nested_inside_another(tmp_path):
     assert (keep / "index.html").exists()
 
 
-def test_source_landing_lists_every_type_not_one_leaf():
-    """/eurlex/ used to be a byte copy of its first leaf page, so a corpus of
-    50 000 acts opened titled "Fördraget om Europeiska unionen, 8 dokument"
-    (V4). The root now names the source and lists what it holds."""
-    view = {"levels": ["Typ", "År"], "buckets": [
-        {"slug": "fordrag", "key": "treaty", "label": "Fördrag", "count": 40,
-         "children": [{"slug": "eu", "key": "eu", "label": "EU-fördraget",
-                       "count": 8}]},
-        {"slug": "forordningar", "key": "regulation", "label": "Förordningar",
-         "count": 23754, "children": [{"slug": "2026", "key": "2026",
-                                       "label": "2026", "count": 702}]},
-    ]}
-    html = browse.render_landing("eurlex", view)
-    assert "<h1>EU-rättsakter" in html
-    assert ">23794<" in html                       # the whole corpus, summed
-    for expected in ("Fördrag", "Förordningar", "EU-fördraget", "2026"):
-        assert expected in html
-    # the leaf that used to *be* this page is now one link among the branches
-    assert html.count('href="/eurlex/') >= 4
-
-
-def test_source_landing_caps_the_children_it_lists():
-    view = {"levels": ["Typ", "År"], "buckets": [
-        {"slug": "d", "key": "d", "label": "Direktiv", "count": 3808,
-         "children": [{"slug": str(y), "key": str(y), "label": str(y),
-                       "count": 1} for y in range(2026, 1980, -1)]}]}
-    html = browse.render_landing("eurlex", view)
-    assert html.count("<li>") == browse.LANDING_CHILDREN
-    assert ">2026<" in html and ">1990<" not in html   # newest kept, tail dropped
-
-
 # --------------------------------------------------------------------------
 # the year split: a bucket small enough to read at once is one page (F3/F4)
 # --------------------------------------------------------------------------
@@ -182,9 +151,11 @@ class _FakeClient:
         return self.view
 
 
-def _agency_view(source, level, buckets):
+def _agency_view(source, level, buckets, variant=None):
     """A two-level browse view: one primary bucket per agency, each split by
-    year, in the shape `/api/v1/browse` returns."""
+    year, in the shape `/api/v1/browse` returns. `variant` is what a grouped
+    listing (dv, an EU type) files every entry under -- one value, or one per
+    primary bucket."""
     return {"source": source, "levels": [level, "År"], "default": [],
             "buckets": [
                 {"key": key, "slug": key, "label": key.upper(),
@@ -194,7 +165,10 @@ def _agency_view(source, level, buckets):
                       "children": None,
                       "documents": [{"url": "/%s/%s/%d" % (key, y, i),
                                      "short_id": "%s %s:%d" % (key, y, i),
-                                     "short_title": "T"}
+                                     "short_title": "T",
+                                     "variant": (variant.get(key)
+                                                 if isinstance(variant, dict)
+                                                 else variant)}
                                     for i in range(n)]}
                      for y, n in years.items()]}
                 for key, years in buckets.items()]}
@@ -271,12 +245,15 @@ def test_a_large_agency_keeps_its_year_pages(tmp_path):
 
 
 def test_the_split_applies_to_what_a_myndighet_issues(tmp_path):
-    """One policy, three sources -- föreskrifter, avgöranden and rättsliga
-    ställningstaganden. Every other faceted source keeps paging by year: the
-    rule is a display policy, and widening it would change addresses that
-    already exist."""
-    assert browse.YEAR_SPLIT_SOURCES == {"foreskrift", "avg", "rs"}
-    view = _agency_view("dv", "Domstol", {"nja": {"2024": 3, "2025": 2}})
+    """One policy, four sources -- föreskrifter, avgöranden, rättsliga
+    ställningstaganden and the EU-rätt types. Every other faceted source keeps
+    paging by year: the rule is a display policy, and widening it would change
+    addresses that already exist. The year axis rides on top only for what a
+    myndighet issues; eurlex's top is the type selector."""
+    assert browse.YEAR_SPLIT_SOURCES == {"foreskrift", "avg", "rs", "eurlex"}
+    assert browse.YEAR_AXIS_ON_TOP == {"foreskrift", "avg", "rs"}
+    view = _agency_view("dv", "Domstol", {"nja": {"2024": 3, "2025": 2}},
+                        variant="referat")
     browse.generate_browse(_FakeClient(view), "dv", tmp_path)
     assert _written_dirs(tmp_path, "dom") == ["nja", "nja/2024", "nja/2025"]
 
@@ -324,3 +301,72 @@ def test_every_ancestor_of_a_deeper_leaf_gets_a_landing(tmp_path):
     # a landing shows the directory's own first leaf, not its sibling's
     assert "yttranden 2023:0" in _page_text(root / "edps" / "yttranden")
     assert "riktlinjer 2024:0" in _page_text(root / "edps")
+
+
+# --------------------------------------------------------------------------
+# the EU-rätt pages: one type row on top, the years in the rail, a small type
+# on one page, a year's acts grouped by who enacted them
+# --------------------------------------------------------------------------
+
+_EU_AXIS = [("Dokumenttyp", [
+    ("eurlex:treaty", "Fördrag", "/eurlex/treaty/", 5),
+    ("eurlex:regulation", "Förordningar", "/eurlex/regulation/", 250),
+    ("guidance", "EU-organens vägledningar", "/eurlex/vagledning/", 3)])]
+
+
+def test_a_small_eu_type_is_one_page_and_the_root_opens_on_it(tmp_path):
+    view = _agency_view("eurlex", "Typ", {"treaty": {"2016": 3, "2012": 2},
+                                          "regulation": {"2024": 150, "2023": 100}},
+                        variant={"treaty": "current", "regulation": "ep"})
+    browse.generate_browse(_FakeClient(view), "eurlex", tmp_path, cross_axis=_EU_AXIS)
+    assert _written_dirs(tmp_path, "eurlex") \
+        == ["regulation", "regulation/2023", "regulation/2024", "treaty"]
+    treaty = _page_text(tmp_path / "eurlex" / "treaty")
+    assert _page_text(tmp_path / "eurlex") == treaty       # /eurlex/ is the Fördrag page
+    assert 'href="/eurlex/treaty/2016/"' not in treaty     # no year links to pages not written
+    assert 'aria-current="page">Fördrag' in treaty          # the type row marks it
+    reg = _page_text(tmp_path / "eurlex" / "regulation" / "2024")
+    assert 'href="/eurlex/regulation/2023/"' in reg          # the split type's years, in the rail
+    assert '<h2 class="facet-axis">År</h2>' in reg
+    assert 'aria-current="page">Förordningar' in reg
+
+
+def test_a_guidance_page_marks_the_guidance_entry_and_lists_the_bodies_in_the_rail(tmp_path):
+    view = _agency_view("guidance", "Utgivare", {"edpb": {"2020": 2}, "ecb": {"2021": 1}})
+    browse.generate_browse(_FakeClient(view), "guidance", tmp_path, cross_axis=_EU_AXIS)
+    html = _page_text(tmp_path / "eurlex" / "vagledning" / "edpb" / "2020")
+    assert 'aria-current="page">EU-organens vägledningar' in html
+    assert html.count('aria-current="page"') == 3     # the type, the body, the year
+    assert '<h2 class="facet-axis">Utgivare</h2>' in html
+    assert 'href="/eurlex/vagledning/ecb/"' in html
+
+
+def test_an_eu_year_groups_its_acts_by_who_enacted_them():
+    docs = [{"url": "/celex/32024R0436", "short_id": "(EU) 2024/436",
+             "short_title": "Revisioner", "variant": "commission"},
+            {"url": "/celex/32024R1689", "short_id": "(EU) 2024/1689",
+             "short_title": "AI-förordningen", "variant": "ep"},
+            {"url": "/celex/31978R2962", "short_id": "31978R2962",
+             "short_title": "", "variant": "untitled"}]
+    html = browse._grouped_listing(docs, browse._EU_FORMS["regulation"])
+    assert re.findall(r'listing-head">([^<]+)<', html) == [
+        "Europaparlamentets och rådets förordningar", "Kommissionens förordningar",
+        "Utan titel"]
+    assert html.index("2024/1689") < html.index("2024/436")
+    # one form present: no heading
+    assert "listing-head" not in browse._grouped_listing(docs[:1], browse._EU_FORMS["regulation"])
+    # a treaty entry is the name alone, so its run is the one-column list
+    treaties = [{"url": "/celex/12016M/TXT", "key": "EU-fördraget", "pre": "",
+                 "short_id": "12016M/TXT", "variant": "current"},
+                {"url": "/celex/12007L/TXT", "key": "Lissabonfördraget", "pre": "",
+                 "short_id": "12007L/TXT", "variant": "amending"}]
+    html = browse._grouped_listing(treaties, browse._EU_FORMS["treaty"])
+    assert re.findall(r'listing-head">([^<]+)<', html) == ["Ändringsfördrag"]
+    assert html.startswith('<dl class="browse-list">')
+    assert ">EU-fördraget</a>" in html and "<strong>" not in html
+
+
+def test_a_guidance_series_page_carries_its_note():
+    nodes = [{"key": "edpb", "label": "EDPB"}, {"key": "riktlinjer", "label": "Riktlinjer"}]
+    assert browse._bucket_note("guidance", nodes).startswith("Europeiska dataskyddsstyrelsens riktlinjer")
+    assert browse._bucket_note("guidance", nodes[:1]) == ""

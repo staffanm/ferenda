@@ -939,13 +939,13 @@ def test_dv_listing_groups_sorts_and_formats():
          "short_title": None, "description": None, "variant": "dom", "date": "2026-01-01"},
     ]
     html = browse._dv_listing(docs)
-    assert re.findall(r'dv-variant">([^<]+)<', html) == ["Domar", "Referat", "Notiser"]
+    assert re.findall(r'listing-head">([^<]+)<', html) == ["Domar", "Referat", "Notiser"]
     assert html.index("Ö 1-25") < html.index("B 2-25")        # domar newest first
     assert "<dd>Fotbollsmatchen: Om ansvar.</dd>" in html      # named -> namn: desc
     assert "<dd>J.A. mot HSB.</dd>" in html                    # unnamed -> just desc
     # a single-variant bucket shows no headers
     solo = browse._dv_listing([docs[0]])
-    assert "dv-variant" not in solo and solo.startswith('<dl class="browse-list def">')
+    assert "listing-head" not in solo and solo.startswith('<dl class="browse-list def">')
 
 
 def test_repealed_foreskrift_is_subdued_in_the_browse_listing(tmp_path):

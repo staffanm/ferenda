@@ -404,12 +404,14 @@ def _eu_year(r):
 # EU primary law groups by treaty family, not year (E1): the CELEX document-type
 # letter after the 4-digit year identifies the family. E = TEC/TFEU, M = TEU,
 # P = the Charter, A = Euratom; U/D/C/L are the amending treaties (Single European
-# Act, Amsterdam, Nice, Lisbon), V the never-ratified Constitution; W a withdrawal
-# agreement; the enlargement letters (B/H/I/N/T/S/J) are accession treaties; 'ME'
-# the combined consolidated publication. Anything unrecognised falls to 'other'.
+# Act, Amsterdam, Nice, Lisbon) and R the 1975 treaty amending the financial
+# provisions, V the never-ratified Constitution; W a withdrawal agreement; the
+# enlargement letters (B/H/I/N/T/S/J) are accession treaties; 'ME' the combined
+# consolidated publication. Anything unrecognised falls to 'other'.
 _TREATY_FAMILY = {"E": "tfeu", "M": "teu", "P": "charter", "A": "euratom",
                   "U": "amending", "D": "amending", "C": "amending",
-                  "L": "amending", "V": "other", "W": "withdrawal", "G": "other",
+                  "L": "amending", "R": "amending", "V": "other",
+                  "W": "withdrawal", "G": "other",
                   "B": "accession", "H": "accession", "I": "accession",
                   "N": "accession", "T": "accession", "S": "accession",
                   "J": "accession"}
@@ -431,9 +433,64 @@ _TREATY_LABEL = {
 }
 
 
+# the families that are one consolidated text republished after each amending
+# treaty: their browse entry is the latest consolidation alone, the earlier ones
+# being previous versions of the same text (see _keep_latest_consolidation).
+# The rest are distinct instruments, each listed
+_TREATY_CONSOLIDATED = frozenset({"teu", "tfeu", "charter", "combined", "euratom"})
+
+# what the Fördrag page groups under (site/browse reads it): the current
+# consolidated treaties lead as one unheaded run -- each entry's curated name
+# says which treaty it is -- then the distinct instruments under their family
+TREATY_FORMS = ((("current", None),)
+                + tuple((k, _TREATY_LABEL[k]) for k in _TREATY_ORDER
+                        if k not in _TREATY_CONSOLIDATED))
+
+
 def _treaty_family(celex):
     """The treaty family bucket for a sector-1 CELEX (see _TREATY_FAMILY)."""
     return "combined" if celex[5:7] == "ME" else _TREATY_FAMILY.get(celex[5:6], "other")
+
+
+def _treaty_variant(row):
+    """What the Fördrag listing groups a treaty under (`TREATY_FORMS`): a
+    consolidated text is `current` (only the latest lists), an instrument its
+    family."""
+    family = _treaty_family(_eu_celex(row))
+    return "current" if family in _TREATY_CONSOLIDATED else family
+
+
+def _twin_celex(local):
+    # CELLAR serves a treaty under two ids, '12010M' and '12010M/TXT'
+    return local[:-4] if local.endswith("/TXT") else local + "/TXT"
+
+
+def _drop_treaty_twins(rows):
+    """One entry per treaty where CELLAR served it under two ids -- '12010M' and
+    '12010M/TXT' are downloaded and parsed as two artifacts of the same text
+    (seven such pairs). The twin the curated name is keyed on (labels'
+    treaties.json) lists; the unnamed one stays reachable by its own URL."""
+    named = {r.local for r in rows if r.kind == "treaty" and r.short_title}
+    return [r for r in rows
+            if not (r.kind == "treaty" and not r.short_title
+                    and _twin_celex(r.local) in named)]
+
+
+def _keep_latest_consolidation(rows):
+    """A consolidated treaty text lists once, as its newest consolidation: the
+    2016 TEU, not nine versions of it. The earlier ones are previous wordings of
+    the same text -- what the versioning of an act carries on the act's own page
+    -- and they stay reachable by their own URL and by search."""
+    latest = {}
+    for r in rows:
+        if r.kind == "treaty":
+            family = _treaty_family(_eu_celex(r))
+            if family in _TREATY_CONSOLIDATED:
+                latest[family] = max(latest.get(family, ""), _eu_year(r))
+    return [r for r in rows
+            if r.kind != "treaty"
+            or _treaty_family(_eu_celex(r)) not in _TREATY_CONSOLIDATED
+            or _eu_year(r) == latest[_treaty_family(_eu_celex(r))]]
 
 
 def _eu_second(r):
@@ -452,6 +509,58 @@ def _eu_second_order(keys):
 
 def _eu_second_label(key):
     return _TREATY_LABEL.get(key, key)
+
+
+# Who enacted an act, read off the head of its official title -- the words
+# before the date: "Europaparlamentets och rådets förordning (EU) 2024/792 av
+# den 29 februari 2024 om …", "93/51/EEG: Kommissionens beslut av den …",
+# "Regulation (EEC) No 1612/68 of the Council of 15 October 1968 on …". The
+# CELEX carries no issuer and the CELLAR notice kept per document is three
+# triples, so the title is the one place it is written. Measured over the
+# catalog (2026-09-03): of 64 000 titled regulations 49 fell to `other`
+# ("Komissionens" misspelt, the 1960s "Rådens förordning" of two Councils, an
+# ECB act -- the misspellings are matched below), of 2 000 decisions 2. An act
+# held only as a scanned PDF has no title at all (67 000 regulations, every one
+# pre-2005): those file as `untitled`, since nothing says who enacted them.
+# Parliament is tested first: its acts name the Council too.
+_EU_TITLE_DATE = re.compile(
+    r"\b(?:av den(?: den)?|of)\s+\d{1,2}(?:\s+\w+\s+|\.\d{1,2}\.)\d{4}\b", re.I)
+_EU_ISSUERS = (("ep", re.compile(r"parl(?:ia|a|e)ment", re.I)),
+               ("council", re.compile(r"\bcouncils?\b|\bråde(?:ts?|ns)\b", re.I)),
+               ("commission", re.compile(r"\bcomm?ission|\bkomm?ission", re.I)))
+# the site's listing groups, in reading order, for an act type; `%s` takes the
+# type's plural ("förordningar"). An act with no title files last under a
+# heading that says why its entry is a bare CELEX
+ISSUER_FORMS = (("ep", "Europaparlamentets och rådets %s"), ("council", "Rådets %s"),
+                ("commission", "Kommissionens %s"), ("other", "Övriga %s"),
+                ("untitled", "Utan titel"))
+# the CELEX court letter -> the site's listing group for a court decision
+_EU_COURTS = {"C": "cj", "T": "gc", "F": "cst"}
+COURT_FORMS = (("cj", "EU-domstolen"), ("gc", "Tribunalen"),
+               ("cst", "Personaldomstolen"))
+
+
+def _eu_issuer(row):
+    """Who enacted an act (`ISSUER_FORMS` keys), from the head of its title."""
+    if not row.title or row.title == row.label:      # the catalog stores the CELEX as title of an untitled act
+        return "untitled"
+    m = _EU_TITLE_DATE.search(row.title)
+    head = row.title[:m.start()] if m else row.title[:120]
+    return next((key for key, pat in _EU_ISSUERS if pat.search(head)), "other")
+
+
+def _eu_variant(row):
+    """What an eurlex listing groups an entry under (dv's `variant`, second
+    use): an act by who enacted it, a court decision by which court, a treaty
+    by `_treaty_variant`. None for an AG opinion (all the Court's) and for
+    anything else."""
+    if row.kind == "treaty":
+        return _treaty_variant(row)
+    if row.kind in ("judgment", "order"):
+        return _EU_COURTS[_eu_celex(row)[5:6]]     # a sector-6 CELEX is C/T/F
+    if row.kind in ("regulation", "directive", "decision"):
+        return _eu_issuer(row)
+    return None
 
 
 # a CELEX corrigendum (…R(NN)) corrects an act rather than being one; it is left
@@ -728,9 +837,8 @@ SOURCE_LABELS = {
     "sfs": "Författningar", "dv": "Rättsfall", "forarbete": "Förarbeten",
     "foreskrift": "Myndighetsföreskrifter", "avg": "Myndighetsavgöranden",
     "rs": "Rättsliga ställningstaganden", "eurlex": "EU-rättsakter",
-    # the EU-rätt browse selector overrides this one heading; see
-    # `render._EU_AXIS_LABEL` for why a group standing over all three EDPB
-    # series cannot call them all riktlinjer
+    # the EU-rätt browse selector names the source `render.GUIDANCE_AXIS_LABEL`
+    # instead: a heading over every body's series cannot call them riktlinjer
     "guidance": "EU-vägledning",
     "hudoc": "Europadomstolens praxis", "coe": "Europarådets fördrag",
     "icrc": "Internationell humanitär rätt", "untc": "FN-fördrag",
@@ -866,6 +974,13 @@ def _browse_doc(source, row, repealed=frozenset()):
                    year=row.local.split(":", 1)[0])
     elif source == "dv":
         doc.update(variant=_dv_variant(row.local), date=row.date)
+    elif source == "eurlex":
+        doc["variant"] = _eu_variant(row)
+        if row.kind == "treaty":
+            # the curated name is the handle a reader knows a treaty by; its
+            # CELEX ("12016M/TXT") says nothing to them, so the entry is the
+            # name alone, set the way a statute's title is (dt-only)
+            doc.update(pre="", key=row.short_title or doc["display"])
     elif row.uri in repealed:
         doc["subdued"] = True
     return doc
@@ -918,6 +1033,7 @@ def _rows(con, source):
     if source == "eurlex":
         rows = _keep_latest_eu_revision(rows)
         rows = _drop_opinions_with_judgment(rows)
+        rows = _keep_latest_consolidation(_drop_treaty_twins(rows))
     yield from rows
 
 
@@ -952,22 +1068,25 @@ def group(con, source):
     # so the number is what a reader scans (R3). `_doc_sort` -- the subject order
     # -- is for the sources whose buckets are subject buckets (sfs, begrepp) and
     # for those whose documents are known by name rather than by number (a hudoc
-    # case, a treaty). Sorting a numbered series by subject read as random and
-    # sometimes was: `_sfs_sortname` finds the digits in an EDPB title, so
-    # "Riktlinjer 3/2018" about förordning (EU) 2016/679 sorted on 1679
+    # case). Sorting a numbered series by subject read as random and sometimes
+    # was: `_sfs_sortname` finds the digits in an EDPB title, so "Riktlinjer
+    # 3/2018" about förordning (EU) 2016/679 sorted on 1679. The EU material --
+    # eurlex and the guidance -- reads newest first instead (`_recent_first`)
     for rows in buckets.values():
-        rows.sort(key=_row_sort(source))
+        sort_rows(source, rows)
     return buckets
 
 
-def _row_sort(source):
-    """How one bucket's documents are ordered for display. Shared with
-    `browse_view`, which re-collects a leaf that spans several buckets and has
-    to put the result back in this order."""
-    return {"dv": _id_doc_sort, "forarbete": _id_doc_sort,
-            "foreskrift": _id_doc_sort, "rs": _id_doc_sort,
-            "avg": _id_doc_sort, "guidance": _id_doc_sort,
-            "eurlex": _eu_doc_sort}.get(source, _doc_sort)
+def sort_rows(source, rows):
+    """Order one bucket's documents for display, in place. Shared by `group`
+    and `browse_view`, which re-collects a leaf that spans several buckets and
+    has to put the result back in this order."""
+    key, reverse = {"dv": (_id_doc_sort, False), "forarbete": (_id_doc_sort, False),
+                    "foreskrift": (_id_doc_sort, False), "rs": (_id_doc_sort, False),
+                    "avg": (_id_doc_sort, False),
+                    "guidance": (_recent_first, True),
+                    "eurlex": (_recent_first, True)}.get(source, (_doc_sort, False))
+    rows.sort(key=key, reverse=reverse)
 
 
 def _natural(s):
@@ -990,14 +1109,15 @@ def _doc_sort(row):
     return (_natural(primary), _natural(row.local))
 
 
-def _eu_doc_sort(row):
-    """Within a bucket: a treaty reads newest-first (the current consolidated
-    version tops its family), so it sorts by CELEX year descending; an undated
-    entry falls last. Everything else keeps the shared identifier order."""
-    if row.kind == "treaty":
-        m = re.match(r"\d(\d{4})", _eu_celex(row))
-        return (-int(m.group(1)) if m else 0, _natural(row.local))
-    return _doc_sort(row)
+def _recent_first(row):
+    """The newest-first order of the EU material, sorted descending: by the
+    document's date, then by the identifier the listing prints (natural order,
+    so (EU) 2024/1364 precedes (EU) 2024/436 and Riktlinjer 2/2019 precedes
+    1/2019). A year's förordningar open on December's, a year's cases on the
+    latest judgment, an EDPB series on what it published last; a treaty family
+    on its current consolidation. An undated entry (an empty date sorts last
+    descending) falls to the end -- 21 of 3 910 guidance rows, no eurlex row."""
+    return (row.date or "", _natural(row.short_id or row.label or row.local))
 
 
 def _id_doc_sort(row):
@@ -1174,7 +1294,7 @@ def browse_view(con, source):
                 continue
             rows = [r for path, under in grouped.items()
                     if path[:len(keypath)] == keypath for r in under]
-            rows.sort(key=_row_sort(source))
+            sort_rows(source, rows)
             n["documents"] = [entry(r) for r in rows]
 
     attach(view["buckets"], ())
