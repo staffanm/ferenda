@@ -333,18 +333,38 @@ def test_status_opens_a_fresh_nested_bar_even_when_the_new_stage_s_total_matches
         assert util._inner is not first_bar
 
 
-def test_invocation_bar_step_advances_by_real_elapsed_time(monkeypatch):
+def test_invocation_bar_fill_tracks_step_count_not_seconds(monkeypatch):
+    # a highly lopsided plan (several sources skip in milliseconds, one runs
+    # for hours) left the old seconds-paced fill looking stuck through
+    # several real, completed steps -- the bar now fills to the step count
+    # itself, the same number already printed beside it
     clock = FakeClock()
     monkeypatch.setattr(util.time, "perf_counter", clock)
     with util.invocation_bar(10.0, 2) as ib:
         ib.start("syn parse")
+        assert ib.bar.n == 1                # filled the moment the step starts
         clock.now += 3.0
         ib.finish()
-        assert ib.bar.n == pytest.approx(3.0)
+        assert ib.bar.n == 1                # finish() doesn't move the fill again
         ib.start("syn relate")
+        assert ib.bar.n == 2
         clock.now += 2.0
         ib.finish()
-        assert ib.bar.n == pytest.approx(5.0)
+        assert ib.bar.n == 2
+
+
+def test_invocation_bar_eta_is_still_paced_on_predicted_seconds(monkeypatch):
+    # the fill is step-based now, but the ETA a reader actually waits on is
+    # still paced on the plan's cost model, same as before the fill changed
+    clock = FakeClock()
+    monkeypatch.setattr(util.time, "perf_counter", clock)
+    with util.invocation_bar(10.0, 2) as ib:
+        ib.start("syn parse")
+        clock.now += 5.0
+        ib.finish()                          # 5s real for a step costed at 5s of the 10s plan
+        assert ib.secs_done == pytest.approx(5.0)
+        # rate 5s-done/5s-elapsed = 1.0; 5s of the 10s plan remain -> ETA 5s
+        assert ib._eta_str() == "00:05"
 
 
 def test_invocation_bar_tracks_step_count():
@@ -376,6 +396,20 @@ def test_both_bars_columns_line_up():
         util.status(12, 8326, "eurlex parse  ran 12  err 0  62022TJ0082")
         inner, outer = str(util._inner), str(ib.bar)
     assert inner.index("|") == outer.index("|")
+
+
+def test_outer_bar_measures_ncols_the_same_way_as_the_inner_bar():
+    # the outer bar's tqdm construction used to omit dynamic_ncols=True,
+    # unlike the inner bar's -- tqdm then measures the terminal once, at
+    # bar-open time, and never again, so the two bars' lines could end up
+    # different widths (right edges out of line with each other) on an
+    # unresized terminal, wherever that one-time measurement landed
+    with util.invocation_bar(10.0, 1) as ib:
+        assert ib.bar.dynamic_ncols
+        assert util._inner is None or util._inner.dynamic_ncols
+        ib.start("eurlex parse")
+        util.status(1, 5, "item")
+        assert util._inner.dynamic_ncols
 
 
 def test_status_refreshes_the_outer_bar_between_steps():

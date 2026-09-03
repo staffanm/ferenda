@@ -632,7 +632,7 @@ def _status_nested(done, total, message, *, work=None):
         with _tqdm.tqdm.external_write_mode(file=_real_streams[1]):
             pass
     _inner.refresh()
-    _outer.bar.refresh()
+    _outer.refresh()
 
 
 class _TqdmRedirect:
@@ -734,36 +734,64 @@ class _NullInvocationBar:
 
 
 class InvocationBar:
-    """The outer whole-invocation bar `cmd_all` drives: one `step()` call per
-    `PlannedStep` as it starts and finishes, advancing by that step's actual
-    elapsed seconds (not its predicted one) -- so the bar's progress is always
-    honest even when a prediction is off, and only the *remaining* total
-    (summed predictions) is approximate. `total_secs` is that sum, and
-    `total_steps` the step count -- both from `corpus.build_invocation_plan`.
+    """The outer whole-invocation bar `cmd_all` drives: one `start()`/`finish()`
+    pair per `PlannedStep`. `total_secs` (the plan's summed predictions) and
+    `total_steps` -- both from `corpus.build_invocation_plan` -- pace the ETA
+    and the step count respectively.
 
     Rendered at `position=1`, *below* the current stage's own nested counter
     (`position=0`): the stage line is what changes moment to moment and reads
     first; this one is the slower-moving "how far through the whole run" context
     beneath it. Its description is padded to the same `_desc_width()` as the
     nested bar's, so the two bars' `|bar|` columns start at the same place --
-    computed fresh each `start()`, not a fixed width (see `_desc_width`).
+    computed fresh each `start()`, not a fixed width (see `_desc_width`), and
+    `dynamic_ncols=True` matches the nested bar's own construction: without it
+    tqdm measures the terminal once, at bar-open time, and never again, so the
+    two bars' lines can end up different widths (and their right edges out of
+    line with each other) even on an unchanged, unresized terminal, wherever
+    that one-time measurement happened to land.
 
-    `n`/`total` (real predicted-vs-actual *seconds*, unlike the nested bar's
-    own cost-paced mode) still drive the bar's fill/rate/ETA, but the
-    *printed* count is the step number instead -- "4/25", not "12/8326s": a
-    reader wants to know how far through the run's steps they are, not a
-    seconds total nobody predicted with any precision (see
-    `corpus.build_invocation_plan`)."""
+    `n`/`total` are the step count itself ("4/25" fills the bar to 4/25,
+    exactly what a reader reads next to it) -- *not* predicted-vs-actual
+    seconds, which a highly lopsided plan (a handful of sources skip in
+    milliseconds, one runs for hours) made worse than the problem it solved:
+    a bar that had barely moved through several real, completed steps because
+    they cost almost none of the plan's predicted total time. The ETA is
+    still paced on that cost model (`secs_done`/`total_secs`, real elapsed vs.
+    predicted), computed by hand (`_eta_str`) and baked into `bar_format` as
+    literal text on every refresh, exactly as the nested bar already bakes in
+    its own real done/total beside a cost-paced fill (see `_status_nested`)."""
 
     def __init__(self, total_secs, total_steps, desc, *, file=None):
         self._t0 = 0.0
+        self._run_t0 = time.perf_counter()
         self._file = file
         self.total_steps = total_steps
+        self.total_secs = total_secs
+        self.secs_done = 0.0
         self.step_no = 0
         self.current_label = ""
         self.bar = _tqdm.tqdm(
-            total=max(total_secs, 0.001), desc=desc, position=1, leave=True,
-            file=file)
+            total=total_steps, desc=desc, position=1, leave=True,
+            dynamic_ncols=True, file=file)
+
+    def _eta_str(self):
+        elapsed = time.perf_counter() - self._run_t0
+        if self.secs_done <= 0 or elapsed <= 0:
+            return "?"
+        rate = self.secs_done / elapsed
+        remaining = self.total_secs - self.secs_done
+        return _tqdm.tqdm.format_interval(remaining / rate) if remaining > 0 else "0:00"
+
+    def refresh(self):
+        """Recompute the ETA text and redraw -- called on every nested-bar
+        refresh too (see `_status_nested`), the same piggyback that keeps the
+        nested bar's own elapsed time ticking between step boundaries; this
+        is what makes the ETA keep counting down between them as well,
+        instead of only updating at `start()`/`finish()`."""
+        self.bar.bar_format = ("{elapsed}: {desc} |{bar}| %d/%d, ETA %s"
+                              % (self.step_no, self.total_steps, self._eta_str()))
+        self.bar.refresh()
 
     def start(self, label):
         """Announce the step about to run -- the "current source+command" and
@@ -774,11 +802,10 @@ class InvocationBar:
         self.step_no += 1
         self._t0 = time.perf_counter()
         self.current_label = label
-        self.bar.bar_format = ("{elapsed}: {desc} |{bar}| %d/%d, ETA {remaining}"
-                              % (self.step_no, self.total_steps))
+        self.bar.n = self.step_no
         w = _desc_width(self._file)
         self.bar.set_description_str(label[:w].ljust(w))
-        self.bar.refresh()
+        self.refresh()
         # prime the nested bar right away, at 0/? -- a source's own setup
         # before its first status() call (parse's per-basefile freshness
         # gate, in particular, on a source like forarbete with a lot of
@@ -790,10 +817,13 @@ class InvocationBar:
         _status_nested(0, None, "")
 
     def finish(self):
-        """Advance by this step's real elapsed time, whatever its prediction
-        said -- a step that ran fast (a skip the plan could not predict) or
-        slow never desyncs the bar from wall-clock reality."""
-        self.bar.update(time.perf_counter() - self._t0)
+        """Add this step's real elapsed time to the ETA's cost tally,
+        whatever its prediction said -- a step that ran fast (a skip the plan
+        could not predict) or slow never desyncs the ETA from wall-clock
+        reality. The bar's own fill already advanced in `start()`, since it
+        tracks completed steps, not this step's own duration."""
+        self.secs_done += time.perf_counter() - self._t0
+        self.refresh()
 
     def close(self):
         global _inner
