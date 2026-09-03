@@ -23,7 +23,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote
 
 from .. import config
-from . import compress
+from . import compress, datasets
 from .catalog import BASE, local, strip_fragment
 from .eu_structure import revision_base
 from .util import basefile_slug, confine
@@ -112,6 +112,8 @@ REMISSER_DOWNLOADED = DOWNLOADED / "remisser"
 # tree is layout's; guidance_discover imports GUIDANCE_INDEX rather than the
 # reverse (lib must not import a vertical).
 DOM_INDEX = ARTIFACT / "dom" / "identity-index.json"        # case-law identity index
+# beside it: datasets.CASENUMBERS, the case-number index `dv casenumbers` writes
+# (spelled there, not here -- see its comment for why)
 GUIDANCE_INDEX = ARTIFACT / "kommentar" / "guidance-index.json"  # AI-guidance index
 
 
@@ -371,7 +373,8 @@ def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
 # sfs `.versions.json` historical-consolidation sidecars and the föreskrift
 # `.grund.json` as-enacted sidecars -- extra *pages*, not corpus documents, so
 # relate/dump must never see them.
-_NON_ARTIFACT_NAMES = frozenset({DOM_INDEX.name, GUIDANCE_INDEX.name})
+_NON_ARTIFACT_NAMES = frozenset({DOM_INDEX.name, datasets.CASENUMBERS.name,
+                                 GUIDANCE_INDEX.name})
 
 
 def _is_document_artifact(path, root):

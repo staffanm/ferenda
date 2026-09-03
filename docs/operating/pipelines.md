@@ -168,7 +168,7 @@ uv run python -m ferenda.build dv parse                                       # 
 uv run python -m ferenda.dv.legacy --index site/data/artifact/dom/identity-index.json   # legacy path, batch report
 uv run python -m ferenda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # one Word file -> artifact
 
-# rewrite dv/data/casenumbers.json from the parsed artifacts. A full-source
+# rewrite artifact/dom/casenumbers.json from the parsed artifacts. A full-source
 # `dv parse` already ends with this; run it by hand after a targeted parse, or
 # to see what the snapshot holds
 uv run python -m ferenda.build dv casenumbers

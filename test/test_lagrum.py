@@ -162,7 +162,8 @@ def test_malnummer_resolves_a_decision_cited_before_its_referat():
     # a decision is cited by case number for the months before its referat is
     # published, and afterwards in law review articles: SvJT 2010 s. 94 calls
     # NJA 2009 s. 672 "Högsta domstolens dom 2009-11-03 T 3-08". Resolved
-    # through the committed casenumbers snapshot, never from the number alone.
+    # through the casenumbers snapshot (the fixture in test/files/dv), never
+    # from the number alone.
     parser = LagrumParser({}, basefile="x",
                           parse_types=[MALNUMMER, RATTSFALL])
     refs = parser.parse_text("Högsta domstolens dom 2009-11-03 T 3-08")

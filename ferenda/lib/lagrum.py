@@ -111,8 +111,8 @@ EMDRATTSFALL = 'EMDRATTSFALL'
 # its referat exists: "Högsta domstolens dom 2009-11-03 T 3-08" is what SvJT
 # 2010 s. 94 calls NJA 2009 s. 672. Not a grammar type either, for the same
 # reason as EMDRATTSFALL: the number resolves to a document only through the
-# held corpus, so lib.malnummer matches it over the committed snapshot
-# (dv/data/casenumbers.json) and parse_text merges those spans beside the
+# held corpus, so lib.malnummer matches it over the case-number snapshot
+# (datasets.CASENUMBERS, in the data root) and parse_text merges those spans beside the
 # grammar's.
 MALNUMMER = 'MALNUMMER'
 # SFS citations as English-language text writes them: the register's own

@@ -142,9 +142,10 @@ def test_a_printed_date_narrows_but_does_not_veto(snapshot, monkeypatch):
 
 def test_the_court_phrases_name_courts_the_corpus_files_under():
     # a typo in the phrase table would silently unlink a whole court, so this
-    # reads the committed snapshot itself -- which must be there to read
+    # reads the snapshot fixture (test/files/dv/casenumbers.json, the corpus's
+    # own court table) -- which must be there to read
     held = datasets.load_casenumbers()["courts"]
-    assert held, "the committed casenumbers snapshot names no courts"
+    assert held, "the casenumbers snapshot names no courts"
     for phrase, codes in COURT_PHRASES.items():
         for code in codes:
             assert code in held, "%s -> %s" % (phrase, code)

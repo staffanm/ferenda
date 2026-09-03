@@ -1,5 +1,5 @@
-"""Held decisions by the case number they were filed under: the committed
-snapshot.
+"""Held decisions by the case number they were filed under: the snapshot in
+the data root.
 
 A decision is cited two ways. Once it is published it has a referat number
 ("NJA 2009 s. 672"), which the citation engine reads straight off the text. For
@@ -10,9 +10,11 @@ string says which referat it became, so the citation engine can only resolve it
 against the corpus.
 
 `lib` may not read a vertical's stored documents (rule:lib-never-imports-
-vertical), so the join surface ships the way the JO ämbetsberättelse index and
-DV's named precedents do: this module writes ``dv/data/casenumbers.json`` from
-the artifacts on disk and `lib.datasets` reads it back as pure JSON.
+vertical), so the join surface is a plain JSON file: this module writes
+``artifact/dom/casenumbers.json`` (`datasets.CASENUMBERS`, beside the case-law
+identity index -- a derived index of the same artifacts, so it lives with the
+data rather than in the package like the hand-curated datasets) and
+`lib.datasets` reads it back as pure JSON.
 
 A decision with no recorded date carries an empty one (19 of the 23,739
 artifacts), so the candidate lists stay sortable and comparable as data.
@@ -81,5 +83,6 @@ def write(path=CASENUMBERS):
     changed = (not path.exists()
                or path.read_text(encoding="utf-8") != serialized)
     if changed:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(serialized, encoding="utf-8")
     return len(snapshot["numbers"]), len(snapshot["courts"]), refused, changed

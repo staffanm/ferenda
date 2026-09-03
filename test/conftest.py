@@ -46,6 +46,12 @@ os.environ["WIKI_ROOT"] = os.path.join(_ROOT, "wiki")
 # every redaction. An empty one gives each test the same answer -- no patch --
 # on a fresh checkout and on a machine that has the real corpus.
 os.makedirs(os.path.join(_ROOT, "wiki", "patches"), exist_ok=True)
+# the case-number snapshot is a data-root index (datasets.CASENUMBERS) that the
+# citation engine refuses to run without; the fixture holds the corpus's court
+# table and the one number the parser tests resolve
+os.makedirs(os.path.join(_ROOT, "artifact", "dom"), exist_ok=True)
+shutil.copy(os.path.join(os.path.dirname(__file__), "files", "dv", "casenumbers.json"),
+            os.path.join(_ROOT, "artifact", "dom", "casenumbers.json"))
 
 atexit.register(shutil.rmtree, _ROOT, True)
 

@@ -82,7 +82,7 @@ def query_numbers(query):
 
 
 # What a citation calls each court, mapped onto the court codes the dv corpus
-# files decisions under (`dv/data/casenumbers.json` "courts"). Editorial, and
+# files decisions under (the casenumbers snapshot's "courts", datasets.CASENUMBERS). Editorial, and
 # the reason it is not derived from those names: a citation writes "HD:s dom",
 # never "Högsta domstolen"; and "Svea hovrätts beslut" covers two codes, since
 # the court's hyresrättsliga avgöranden are a series of their own.
@@ -159,7 +159,7 @@ DATE_GAP = 3
 
 @functools.cache
 def _index():
-    """The committed snapshot, read once. `spans` runs per text node -- once per
+    """The snapshot (datasets.CASENUMBERS), read once. `spans` runs per text node -- once per
     block and once per table cell (`lib/artifact.py`) -- and the file is 1.3 MB,
     so re-reading it there tripled the cost of the whole citation scan.
     `lib/emdref.py` caches its own snapshot the same way."""

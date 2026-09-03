@@ -13,9 +13,6 @@ these). Each dataset is co-located with the vertical that owns and curates it:
   * ``NAMEDCASES`` -- HD cases by nickname ("Instagrambilden" -> NJA referat).
     Auto-harvested from Högsta domstolen's official list (dv.namedcases), with
     the harvested JSON committed as the shipped snapshot.
-  * ``CASENUMBERS`` -- held decisions by the case number they were filed under
-    ("T 3-08" -> NJA 2009 s. 672), how a citation names a decision before its
-    referat exists. Auto-generated from the parsed dv artifacts (dv.casenumbers).
   * ``NAMEDEUCASES`` -- EU cases by usual name ("Schrems II" -> CELEX). The Court
     assigns no such name as data, so it is auto-harvested from Wikidata
     (eurlex.casenames), with the harvested JSON committed as the shipped snapshot.
@@ -31,6 +28,8 @@ A single source of truth for these paths, so the ~7 parse-time callers and the
 
 import json
 from pathlib import Path
+
+from .. import config
 
 _PKG = Path(__file__).resolve().parent.parent
 
@@ -58,15 +57,19 @@ EMD_CASES = _PKG / "hudoc" / "data" / "casenames.json"
 # maps to every key it has borne ("Turkiet" -> ["turkey", "türkiye"]).
 EMD_RESPONDENTS = _PKG / "hudoc" / "data" / "respondents_sv.json"
 FS_SERIES = _PKG / "foreskrift" / "data" / "series.json"
+# held court decisions by the case number they were filed under ("T 3-08" ->
+# NJA 2009 s. 672), for the citation engine's "Högsta domstolens dom 2009-11-03
+# T 3-08" resolution. The one path here that is NOT in the package: it is a
+# derived index of the parsed dv artifacts (dv.casenumbers writes it) and lives
+# in the data root beside the case-law identity index. The artifact tree is
+# `layout`'s, but layout sits in catalog's import chain, which ends in
+# `malnummer` -- the parse-time reader of this file -- so the one segment is
+# spelled here; test_dv_casenumbers pins it to layout.DOM_INDEX's directory.
+CASENUMBERS = config.DATA / "artifact" / "dom" / "casenumbers.json"
 # JO ämbetsberättelse pages ("2005/06 s. 171") mapped onto the diarienummer
 # that mints the decision's URI. Auto-generated from the JO artifacts
 # (avg.arsberattelse), committed as the shipped snapshot.
 JO_ARSBERATTELSE = _PKG / "avg" / "data" / "arsberattelse.json"
-# held court decisions by the case number they were filed under ("T 3-08" ->
-# NJA 2009 s. 672), for the citation engine's "Högsta domstolens dom 2009-11-03
-# T 3-08" resolution. Auto-generated from the parsed dv artifacts
-# (dv.casenumbers), committed as the shipped snapshot.
-CASENUMBERS = _PKG / "dv" / "data" / "casenumbers.json"
 
 
 def load_emd_cases(path=EMD_CASES):
@@ -94,13 +97,16 @@ def load_casenumbers(path=CASENUMBERS):
     uri], …]}, "courts": {court code: its name}} -- candidates, not pre-picked
     winners, because 298 of the held numbers name more than one decision and
     only the citation's own court and date tell them apart. Pure JSON load with
-    no source dependency. The snapshot is committed and ships in the wheel, so a
-    missing file is a broken checkout and raises rather than silently unlinking
-    every case-number citation of a whole parse run (rule:fail-fast) -- the same
-    call `load_jo_arsberattelse` makes for the same kind of snapshot. An empty
-    dict here would be doubly quiet: `build.hash_files` skips a missing path, so
-    the parse recipe would not notice either, and `malnummer._index` caches, so
-    the emptiness would outlive a snapshot written mid-run."""
+    no source dependency. Unlike the shipped snapshots it is written into the
+    data root by `lagen dv casenumbers` (see CASENUMBERS), so a missing file
+    means that has not run on this data root, and raises rather than silently
+    unlinking every case-number citation of a whole parse run (rule:fail-fast).
+    An empty dict here would be doubly quiet: `build.hash_files` skips a missing
+    path, so the parse recipe would not notice either, and `malnummer._index`
+    caches, so the emptiness would outlive a snapshot written mid-run."""
+    assert path.exists(), (
+        "%s is missing -- run `lagen dv casenumbers` (or rsync the artifact "
+        "tree) before parsing sources that resolve case numbers" % path)
     return json.loads(path.read_text(encoding="utf-8"))
 
 

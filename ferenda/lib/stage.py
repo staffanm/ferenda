@@ -38,7 +38,10 @@ CITATION_DATA = (datasets.NAMEDLAWS, datasets.EMD_CASES,
 # rs, lawreview, wiki). Kept out of CITATION_DATA because the sfs/eurlex/foreskrift/
 # guidance parsers never ask for that parse type, and listing it there would
 # reparse those four corpora in full every time `lagen dv casenumbers` rewrites
-# the snapshot, for output that cannot change.
+# the snapshot, for output that cannot change. The snapshot is a data-root file
+# (datasets.CASENUMBERS), the one recipe input outside the package: hash_files
+# reads its content, so a refreshed snapshot re-stales those parses on whichever
+# machine holds it, and a machine without it hashes as if the entry were absent.
 CASENUMBER_CODE = (PKG / "lib" / "malnummer.py", datasets.CASENUMBERS)
 
 

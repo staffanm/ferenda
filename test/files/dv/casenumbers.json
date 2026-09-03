@@ -1,0 +1,80 @@
+{
+ "courts": {
+  "ADO": [
+   "Arbetsdomstolen"
+  ],
+  "HDO": [
+   "Högsta domstolen"
+  ],
+  "HFD": [
+   "Högsta förvaltningsdomstolen"
+  ],
+  "HGO": [
+   "Göta hovrätt"
+  ],
+  "HNN": [
+   "Hovrätten för Nedre Norrland"
+  ],
+  "HON": [
+   "Hovrätten för Övre Norrland"
+  ],
+  "HSB": [
+   "Hovrätten över Skåne och Blekinge"
+  ],
+  "HSV": [
+   "Svea hovrätt"
+  ],
+  "HVS": [
+   "Hovrätten för Västra Sverige"
+  ],
+  "HYOD": [
+   "Svea hovrätts hyresrättsliga avgöranden"
+  ],
+  "KGG": [
+   "Kammarrätten i Göteborg"
+  ],
+  "KJO": [
+   "Kammarrätten i Jönköping"
+  ],
+  "KST": [
+   "Kammarrätten i Stockholm"
+  ],
+  "KSU": [
+   "Kammarrätten i Sundsvall"
+  ],
+  "MDO": [
+   "Marknadsdomstolen"
+  ],
+  "MIOD": [
+   "Migrationsöverdomstolen"
+  ],
+  "MMOD": [
+   "Mark- och miljööverdomstolen"
+  ],
+  "MOD": [
+   "Mark- och miljööverdomstolen",
+   "Miljööverdomstolen"
+  ],
+  "PBR": [
+   "Patentbesvärsrätten"
+  ],
+  "PMOD": [
+   "Patent- och marknadsöverdomstolen"
+  ],
+  "REGR": [
+   "Regeringsrätten"
+  ],
+  "RHN": [
+   "Rättshjälpsnämnden"
+  ]
+ },
+ "numbers": {
+  "T 3-08": [
+   [
+    "HDO",
+    "2009-11-03",
+    "dom/nja/2009s672"
+   ]
+  ]
+ }
+}

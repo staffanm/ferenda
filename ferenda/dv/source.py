@@ -224,7 +224,7 @@ def dv_namedcases(args=()):
 
 def dv_casenumbers(args=()):
     """Refresh the case-number snapshot (`lagen dv casenumbers`): sweep the dv
-    artifacts' målnummer and rewrite dv/data/casenumbers.json, which the citation
+    artifacts' målnummer and rewrite artifact/dom/casenumbers.json, which the citation
     engine reads to resolve "Högsta domstolens dom 2009-11-03 T 3-08" onto the
     referat it became. Reads artifacts already on disk -- no network, no
     per-document chain. Run it after a parse run that added decisions, or their

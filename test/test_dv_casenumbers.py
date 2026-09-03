@@ -4,7 +4,10 @@ parse reports on, since the snapshot is a parse input for five sources."""
 
 import json
 
+import pytest
+
 from ferenda.dv import casenumbers
+from ferenda.lib import datasets, layout
 
 
 def _artifact(uri, court, namn, date, numbers):
@@ -91,3 +94,15 @@ def test_write_reports_whether_the_file_changed(monkeypatch, tmp_path):
     written = path.read_text(encoding="utf-8")
     assert casenumbers.write(path)[3] is False         # same tree, same bytes
     assert path.read_text(encoding="utf-8") == written  # and left untouched
+
+
+def test_the_snapshot_lives_beside_the_identity_index():
+    # datasets spells the one artifact-tree path layout cannot own (the import
+    # chain, see datasets.CASENUMBERS); this keeps the two from drifting apart
+    assert datasets.CASENUMBERS.parent == layout.DOM_INDEX.parent
+    assert datasets.CASENUMBERS.name in layout._NON_ARTIFACT_NAMES
+
+
+def test_a_missing_snapshot_raises_instead_of_unlinking_every_citation(tmp_path):
+    with pytest.raises(AssertionError, match="lagen dv casenumbers"):
+        datasets.load_casenumbers(tmp_path / "casenumbers.json")
