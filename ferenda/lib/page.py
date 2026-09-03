@@ -1172,6 +1172,7 @@ class Rail:
                             "Avsnittet")
                         + margins.genomfor_margin(self.site, self.doc_uri, anchor)
                         + margins.eu_caselaw_margin(self.site, self.doc_uri, anchor)
+                        + margins.eu_corresponding_cases_margin(self.site, uri)
                         + margins._bemyndigande_margin(self.site, uri)
                         + margins.corresponding_cases_margin(self.site, uri)
                         + margins.renumbered_refs_margin(self.site, uri)

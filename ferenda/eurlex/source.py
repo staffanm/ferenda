@@ -37,7 +37,17 @@ from ..lib.stage import (
     sum_scope_totals,
     write_artifact,
 )
-from . import annotate, asgit, bulk, casenames, download, parse, render, versions
+from . import (
+    annotate,
+    asgit,
+    bulk,
+    casenames,
+    correspond,
+    download,
+    parse,
+    render,
+    versions,
+)
 from .parse import content_file
 
 HERE = Path(__file__).parent
@@ -381,6 +391,17 @@ def eurlex_extra_pages(only):
         sorted(layout.artifact_dir("eurlex").glob("*/*.versions.json")))
 
 
+def eurlex_relate_cross(con):
+    """eurlex's part of relate's cross-document block: load the hand-authored
+    `.corr` layers (a recast with no jämförelsetabell of its own, e.g. GDPR
+    against 95/46/EC) into `directive_correspondence`, beside the rows
+    `correspondence` extracts mechanically at parse time."""
+    rows = correspond.hand_rows()
+    catalog.add_directive_correspondence(con, rows)
+    return ({"hand-authored directive lineage edges loaded from .corr layers":
+             len(rows)}, [])
+
+
 def eurlex_intermediate(basefile):
     """eurlex's intermediate is the main act's Formex XML (or the OJ HTML for the
     older acts that have no Formex manifestation), normalised to one element per
@@ -426,9 +447,12 @@ SOURCES: tuple[Source, ...] = (Source("eurlex", lambda: download.list_basefiles(
    intermediate=(eurlex_intermediate,
                  "Formex XML (pre-Formex acts: the OJ HTML)"),
    artifacts=functools.partial(layout.artifacts, "eurlex"),
-   extra_pages=eurlex_extra_pages,
-   # the ai-annotate .ann layers and the versions-stage sidecars (lydelser)
+   extra_pages=eurlex_extra_pages, relate_cross=eurlex_relate_cross,
+   cross_code=(HERE / "correspond.py",),
+   # the ai-annotate .ann layers, the hand-authored .corr lineage layers and
+   # the versions-stage sidecars (lydelser)
    layers=lambda: (sorted(annstore.tree("eurlex").rglob("*.ann"))
+                   + sorted(annstore.tree("eurlex").glob("*/*.corr"))
                    + sorted(layout.artifact_dir("eurlex").glob("*/*.versions.json"))),
    scopes=frozenset(download.SECTORS),
    actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,

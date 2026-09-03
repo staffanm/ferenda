@@ -38,7 +38,7 @@ Two properties of the source decide the shape of the reader:
 
 import re
 
-from ..lib import lagrum, layout
+from ..lib import annstore, lagrum, layout
 from ..lib.eu_structure import flatten
 from ..lib.text import runs_text
 
@@ -267,3 +267,48 @@ def correspondence(art):
     stats["emitted"] = len(edges)
     stats["oldLaws"] = len({e["oldLaw"] for e in edges.values()})
     return list(edges.values()), stats
+
+
+# --- the hand-authored route: a recast with no jämförelsetabell of its own --
+#
+# GDPR replaces 95/46/EC but states no correlation table in its own text (0 of
+# its structure's tables, checked 2026-09), so `correspondence` above finds
+# nothing to extract. A human reads the two acts and writes the lineage by
+# hand instead, as a `.corr` layer in the curated store (lib.annstore) --
+# `sfs.correspond`'s discipline, not this module's own "mechanical, not
+# authored" one: a misread table has a source patch to fix; an act with no
+# table at all has nothing to patch, so the map is authored data, hand-edited
+# and reviewed like the .corr layers sfs writes.
+
+# a handful of `.corr` files under this tree (32014L0024, 32004L0018, ...)
+# predate the current design and cache what `correspondence` above now writes
+# straight into the artifact's own `correspondence` key -- `meta.model
+# == "jamforelsetabell"` tags them. Reading them back here would let a stale
+# 2026-07 snapshot overwrite that act's current, freshly-extracted rows on
+# every relate; they are dead weight, not hand-authored input, and are
+# excluded on that marker.
+_MECHANICAL_CACHE_MODEL = "jamforelsetabell"
+
+
+def hand_rows():
+    """Every hand-authored `.corr` layer's edges, as
+    `[(new_uri, new_article, old_uri, old_article, new_pinpoint,
+    old_pinpoint), ...]` -- the row shape `catalog.add_directive_correspondence`
+    inserts into `directive_correspondence`, the same table `correspondence`
+    above feeds mechanically. The envelope's `correspondence.newLaw` names the
+    act the layer curates (not derived from the file's path, so a layer
+    survives being renamed or migrated); each edge names its own `oldLaw`,
+    since one layer could in principle carry lineage to more than one
+    predecessor act (sfs's `.corr` payload shape, minus the paragraf-specific
+    `relation`/`scope`/`proposition` fields that have no article-level
+    counterpart here). Skips the legacy mechanical-cache layers (see above)."""
+    rows = []
+    for _p, layer in annstore.read_corr("eurlex"):
+        if layer["meta"].get("model") == _MECHANICAL_CACHE_MODEL:
+            continue
+        c = layer["correspondence"]
+        new_uri = c["newLaw"]
+        for e in c["edges"]:
+            rows.append((new_uri, e["newArticle"], e["oldLaw"], e["oldArticle"],
+                         e.get("newPinpoint"), e.get("oldPinpoint")))
+    return rows

@@ -2,10 +2,13 @@
 annex into article<->article correspondence, and the transitive walk the
 statute rail resolves its case law through."""
 
+import json
+
 import pytest
 
 from ferenda.eurlex import correspond as C
-from ferenda.lib import catalog
+from ferenda.eurlex import source as eurlex_source
+from ferenda.lib import annstore, catalog
 
 BASE = "https://lagen.nu/celex/"
 
@@ -388,3 +391,145 @@ def test_caselaw_anchored_cascades_past_an_anchor_the_law_no_longer_has(
     assert set(got) == {"K12P17"}
     (_row, provenance), = got["K12P17"]
     assert provenance == {(BASE + "32014L0024", "83.1", "83.6", 0)}
+
+
+# --------------------------------------------------------------------------
+# is_cj_judgment
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("celex, expected", [
+    ("62001CJ0101", True),     # Lindqvist -- a Court of Justice judgment
+    ("62015TJ0512", True),     # General Court (Tribunal) judgment
+    ("61994FJ0001", True),     # Civil Service Tribunal judgment
+    ("62001CC0101", False),    # an Advocate General opinion, not settled practice
+    ("62001CO0101", False),    # an order
+    ("32016R0679", False),     # not a sector-6 document at all (GDPR itself)
+])
+def test_is_cj_judgment(celex, expected):
+    assert catalog.is_cj_judgment(BASE + celex) is expected
+
+
+# --------------------------------------------------------------------------
+# hand_rows -- the hand-authored `.corr` route for a recast with no
+# jämförelsetabell of its own
+# --------------------------------------------------------------------------
+
+def _write_corr(root, source, relpath, new_law, edges, model="hand-authored"):
+    p = root / source / relpath
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({
+        "meta": {"status": "generated", "model": model, "generated": "2026-09-02",
+                 "inputs": {}},
+        "correspondence": {"newLaw": new_law, "edges": edges},
+    }))
+    return p
+
+
+def test_hand_rows_reads_every_layer_as_directive_correspondence_rows(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _write_corr(annstore.ROOT, "eurlex", "2016/32016R0679.corr",
+                BASE + "32016R0679",
+                [{"newArticle": "9", "oldLaw": BASE + "31995L0046",
+                  "oldArticle": "8", "quote": "…"}])
+    assert C.hand_rows() == [
+        (BASE + "32016R0679", "9", BASE + "31995L0046", "8", None, None)]
+
+
+def test_hand_rows_keeps_pinpoints_when_given(tmp_path, monkeypatch):
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _write_corr(annstore.ROOT, "eurlex", "2016/32016R0679.corr",
+                BASE + "32016R0679",
+                [{"newArticle": "5", "oldLaw": BASE + "31995L0046",
+                  "oldArticle": "6", "newPinpoint": "5.1", "oldPinpoint": "6.1"}])
+    assert C.hand_rows() == [
+        (BASE + "32016R0679", "5", BASE + "31995L0046", "6", "5.1", "6.1")]
+
+
+def test_hand_rows_skips_the_legacy_mechanical_cache(tmp_path, monkeypatch):
+    # a handful of `.corr` files predate this route and cache exactly what
+    # `correspondence` (the mechanical extractor) now writes into the
+    # artifact's own `correspondence` key -- reading them back here would let
+    # a stale snapshot overwrite that act's current, freshly-extracted rows
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _write_corr(annstore.ROOT, "eurlex", "2014/32014L0024.corr",
+                BASE + "32014L0024",
+                [{"newArticle": "1", "oldLaw": BASE + "32004L0018",
+                  "oldArticle": "10"}],
+                model="jamforelsetabell")
+    _write_corr(annstore.ROOT, "eurlex", "2016/32016R0679.corr",
+                BASE + "32016R0679",
+                [{"newArticle": "9", "oldLaw": BASE + "31995L0046",
+                  "oldArticle": "8"}])
+    assert C.hand_rows() == [
+        (BASE + "32016R0679", "9", BASE + "31995L0046", "8", None, None)]
+
+
+def test_hand_rows_empty_store_yields_nothing(tmp_path, monkeypatch):
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    assert C.hand_rows() == []
+
+
+# --------------------------------------------------------------------------
+# catalog.add_directive_correspondence
+# --------------------------------------------------------------------------
+
+def _dircorr_rows(con, new_uri):
+    return con.execute(
+        "SELECT new_article, old_uri, old_article, new_pinpoint, old_pinpoint "
+        "FROM directive_correspondence WHERE new_uri = ? ORDER BY new_article",
+        (new_uri,)).fetchall()
+
+
+def test_add_directive_correspondence_only_replaces_named_new_uris(tmp_path):
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    # a mechanically-extracted row for an unrelated act, as _index_document
+    # would already have written it
+    con.execute("INSERT INTO directive_correspondence VALUES (?,?,?,?,?,?)",
+                (BASE + "32014L0024", "1", BASE + "32004L0018", "10", "1.3", "10"))
+    con.commit()
+    catalog.add_directive_correspondence(con, [
+        (BASE + "32016R0679", "9", BASE + "31995L0046", "8", None, None)])
+    assert _dircorr_rows(con, BASE + "32014L0024") == [
+        ("1", BASE + "32004L0018", "10", "1.3", "10")]
+    assert _dircorr_rows(con, BASE + "32016R0679") == [
+        ("9", BASE + "31995L0046", "8", None, None)]
+
+
+def test_add_directive_correspondence_rerun_does_not_duplicate(tmp_path):
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    rows = [(BASE + "32016R0679", "9", BASE + "31995L0046", "8", None, None)]
+    catalog.add_directive_correspondence(con, rows)
+    catalog.add_directive_correspondence(con, rows)
+    assert _dircorr_rows(con, BASE + "32016R0679") == [
+        ("9", BASE + "31995L0046", "8", None, None)]
+
+
+def test_add_directive_correspondence_edit_replaces_the_old_edges(tmp_path):
+    # a curator revises the layer (a corrected pinpoint) -- the rerun must
+    # show only the new edge, not both
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    catalog.add_directive_correspondence(con, [
+        (BASE + "32016R0679", "9", BASE + "31995L0046", "8", None, "8.1")])
+    catalog.add_directive_correspondence(con, [
+        (BASE + "32016R0679", "9", BASE + "31995L0046", "8", None, "8.5")])
+    assert _dircorr_rows(con, BASE + "32016R0679") == [
+        ("9", BASE + "31995L0046", "8", None, "8.5")]
+
+
+# --------------------------------------------------------------------------
+# eurlex.source.eurlex_relate_cross -- the relate-cross wiring
+# --------------------------------------------------------------------------
+
+def test_eurlex_relate_cross_loads_hand_rows(tmp_path, monkeypatch):
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _write_corr(annstore.ROOT, "eurlex", "2016/32016R0679.corr",
+                BASE + "32016R0679",
+                [{"newArticle": "9", "oldLaw": BASE + "31995L0046",
+                  "oldArticle": "8"}])
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    counts, warnings = eurlex_source.eurlex_relate_cross(con)
+    assert warnings == []
+    assert list(counts.values()) == [1]
+    assert _dircorr_rows(con, BASE + "32016R0679") == [
+        ("9", BASE + "31995L0046", "8", None, None)]

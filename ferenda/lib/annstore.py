@@ -69,6 +69,16 @@ def for_artifact(art_path, suffix=".ann"):
     return ROOT / rel.with_suffix(suffix)
 
 
+def read_corr(source):
+    """Every `.corr` layer under one source's subtree, parsed, as `(path,
+    layer)` pairs in path order -- the file-walk-and-parse both `sfs`'s
+    cross-pass (LLM/mechanical old->new paragraf edges) and `eurlex`'s
+    (hand-authored article lineage) share; each caller pulls its own payload
+    keys out of `layer`."""
+    return [(p, json.loads(p.read_text()))
+            for p in sorted(tree(source).glob("*/*.corr"))]
+
+
 def path(source, basefile, suffix=".ann"):
     """The store path of one document's layer, from its (source, basefile)
     identity -- the ai-* writers' and identity-keyed readers' entry point."""

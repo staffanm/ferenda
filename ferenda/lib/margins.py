@@ -159,6 +159,47 @@ def eu_caselaw_margin(site, sfs_uri, anchor):
                         page._capped_list(items, EU_CASELAW_CAP, "till"))]
 
 
+def eu_corresponding_cases_margin(site, uri):
+    """EU-act article margin: the CJ/TJ/FJ judgments decided under the
+    predecessor(s) this article's own recast lineage traces back to (
+    `catalog.predecessor_atoms`) -- one section per predecessor generation,
+    headed "Äldre praxis om motsvarande bestämmelse (<the predecessor
+    article, linked>)", the `corresponding_cases_margin` pattern carried over
+    from sfs paragrafs to EU articles. Kept apart from the page's own
+    "EU-domstolens praxis" section (`page._inbound_groups`), which shows only
+    judgments citing *this* article: Lindqvist (C-101/01) cites 95/46/EG
+    artikel 8, not GDPR artikel 9, so it belongs in this section, not that
+    one, even though GDPR artikel 9 is where a reader looks for it.
+
+    The lineage can come from an act's own jämförelsetabell (`correspondence`)
+    or a hand-authored `.corr` layer (`eurlex.correspond.hand_rows`) for one
+    that states none -- this margin does not care which. The predecessor's own
+    citation (`directive_link`) falls back to EUR-Lex when we hold no page for
+    it, the common case for a recast's older generations."""
+    base, _, atom = uri.partition("#")
+    if not atom:
+        return []
+    out = []
+    for old_uri, old_atom, _hop in catalog.predecessor_atoms(site.con, base, atom):
+        old_full = old_uri + "#" + old_atom
+        rows = [r for r in catalog.inbound(site.con, old_full)
+                if r[4] == "eurlex" and catalog.is_cj_judgment(r[0])]
+        if not rows:
+            continue
+        old_label = "artikel %s %s" % (old_atom, _act_short_id(site, old_uri))
+        cite = "artikel %s i %s" % (escape(old_atom), directive_link(site, old_uri, old_full))
+        links = ['<li><a href="%s">%s</a></li>'
+                 % (escape(page.href(from_uri + ("#" + a if a else ""))),
+                    escape(page.describe_citer(from_uri, a, label, title, source)))
+                 for from_uri, a, label, title, source in rows]
+        out.append(page.RailSection(
+            "eu-aldre-praxis",
+            "Äldre praxis om motsvarande bestämmelse (%s)" % old_label,
+            len(links), '<div class="rail-prov">%s</div>%s'
+            % (cite, page._capped_list(links, EU_CASELAW_CAP, "till"))))
+    return out
+
+
 def _bemyndigande_margin(site, uri):
     """Statute-paragraf margin: the agency föreskrifter issued (meddelade) with
     stöd av this paragraf -- the inbound side of the bemyndigande edge, mirror of

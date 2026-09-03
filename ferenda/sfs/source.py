@@ -564,8 +564,8 @@ def sfs_relate_cross(con):
     Omfattning magnitude across the laws it amends, and load the authored
     old->new paragraf correspondences (the `.corr` layers) into the catalog."""
     omfattning_rows = resolve_omfattning(con)
-    corr = [row for path in annstore.tree("sfs").glob("*/*.corr")
-            for row in correspond.corr_rows(json.loads(path.read_text()))]
+    corr = [row for _p, layer in annstore.read_corr("sfs")
+            for row in correspond.corr_rows(layer)]
     catalog.set_correspondence(con, corr)
     return ({"propositions' Omfattning magnitude summarized across the laws "
              "they amend": omfattning_rows,

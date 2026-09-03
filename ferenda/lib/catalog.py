@@ -1512,6 +1512,16 @@ def _atomize(pinpoint, article):
     return atoms or [article]
 
 
+def is_cj_judgment(uri):
+    """Whether `uri` names a CJ/TJ/FJ judgment -- settled practice, not an AG
+    opinion (CC) or order (CO/TO). The Python twin of the inline sector/doctype
+    check `caselaw_anchored` runs in SQL over the whole links table; a per-row
+    string check is simplest wherever the row set is already small (one old
+    article's own inbound, in `margins.eu_corresponding_cases_margin`)."""
+    celex = uri.rpartition("/celex/")[2]
+    return len(celex) >= 7 and celex[0] == "6" and celex[5:7] in ("CJ", "TJ", "FJ")
+
+
 def predecessor_atoms(con, act, atom, depth=LINEAGE_DEPTH):
     """The `(act uri, atom, hops)` an EU-act article atom (a dotted pinpoint,
     "57.4", or a bare article) traces back to through the recasts' own
@@ -1776,6 +1786,35 @@ def correspondence_for_new(con, new_uri):
         "SELECT old_uri, relation, scope, prop_uri, ikrafttrader "
         "FROM correspondence WHERE new_uri = ? ORDER BY old_uri",
         (new_uri,)).fetchall()
+
+
+# --------------------------------------------------------------------------
+# hand-authored EU-act lineage (a recast that states no jämförelsetabell of
+# its own -- eurlex/correspond.py's hand_rows, a `.corr` layer in annstore)
+# --------------------------------------------------------------------------
+
+def add_directive_correspondence(con, rows):
+    """Merge hand-authored lineage edges into `directive_correspondence`. Each
+    row is (new_uri, new_article, old_uri, old_article, new_pinpoint,
+    old_pinpoint) -- the same shape `_index_document` writes from an act's own
+    jämförelsetabell. Only the named new_uris are replaced, so this never
+    touches the mechanically-extracted rows of every other eurlex act, and a
+    rerun with an unchanged layer never accumulates duplicates.
+
+    This scoped delete, unlike `set_correspondence`'s full-table replace, has
+    no way to notice a `.corr` file that was deleted outright rather than
+    edited: nothing revisits that new_uri afterwards, so a retracted lineage
+    claim keeps serving its old rows until something else changes that act's
+    artifact. A full wipe-and-reload would fix that but would also erase the
+    mechanically-extracted rows of every one of the ~64k other eurlex acts on
+    every relate -- not done here; retracting a hand-authored layer today
+    needs a `--force` re-relate of the acts it named, not just deleting the
+    file."""
+    con.executemany("DELETE FROM directive_correspondence WHERE new_uri = ?",
+                     {(new_uri,) for new_uri, *_rest in rows})
+    con.executemany("INSERT INTO directive_correspondence VALUES (?,?,?,?,?,?)",
+                     rows)
+    con.commit()
 
 
 # --------------------------------------------------------------------------

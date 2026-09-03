@@ -15,11 +15,13 @@ from ferenda.lib.margins import (
     _reassigned_before,
     corresponding_cases_margin,
     corresponds_margin,
+    eu_corresponding_cases_margin,
     renumbered_refs_margin,
 )
 from ferenda.lib.page import _inbound_groups, render_rail_sections
 
 L = "https://lagen.nu/"
+C = "https://lagen.nu/celex/"
 
 
 def _site():
@@ -182,3 +184,109 @@ def test_renumbered_chain_stays_on_lineage():
     # today's 13 kap. 2 § (the moved 12 kap. 2 §) gets the 12 kap. citer
     html13 = render_rail_sections(renumbered_refs_margin(site, L + "1974:152#K13P2"))
     assert "2005:2" in html13 and "2005:1" not in html13
+
+
+# --------------------------------------------------------------------------
+# eu_corresponding_cases_margin -- the EU-article counterpart, walking
+# catalog.predecessor_atoms instead of a paragraf's own correspondence rows
+# --------------------------------------------------------------------------
+
+def _gdpr_site(tmp_path, name="gdpr.sqlite"):
+    """GDPR artikel 9 with a hand-authored lineage to 95/46/EG artikel 8
+    (catalog.add_directive_correspondence's row shape) and Lindqvist
+    (C-101/01) citing the old article. 95/46/EG itself carries no documents
+    row -- the corpus holds no page for most of a recast's older
+    generations, and the margin's citation must still work (EUR-Lex
+    fallback, not a crash).
+
+    `catalog.connect` (not a bare `executescript(SCHEMA)`), because
+    `directive_link` reads `documents.display`, a migrated column the other
+    fixtures in this file never touch."""
+    con = catalog.connect(str(tmp_path / name))
+    docs = [
+        (C + "32016R0679", "eurlex", "regulation", "32016R0679", "GDPR"),
+        (C + "62001CJ0101", "eurlex", "judgment", "C-101/01", "C-101/01 (Lindqvist)"),
+    ]
+    con.executemany(
+        "INSERT INTO documents (uri, source, kind, label, title, path) "
+        "VALUES (?,?,?,?,?,'x')", docs)
+    links = [(C + "62001CJ0101", None, "dcterms:references", C + "31995L0046#8")]
+    con.executemany(
+        "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, to_root) "
+        "VALUES (?,?,?,?,?)",
+        [(f, a, p, t, t.partition("#")[0]) for f, a, p, t in links])
+    con.commit()
+    catalog.add_directive_correspondence(con, [
+        (C + "32016R0679", "9", C + "31995L0046", "8", None, None)])
+    known = {C + "32016R0679", C + "62001CJ0101"}
+    return page.Site(con, known)
+
+
+def test_eu_corresponding_cases_margin_finds_lindqvist_under_predecessor_article(
+        tmp_path):
+    site = _gdpr_site(tmp_path)
+    html = render_rail_sections(eu_corresponding_cases_margin(site, C + "32016R0679#9"))
+    assert 'data-sec="eu-aldre-praxis"' in html
+    assert "Äldre praxis om motsvarande bestämmelse" in html
+    assert "artikel 8" in html
+    assert "Lindqvist" in html or "C-101/01" in html
+
+
+def test_eu_corresponding_cases_margin_links_out_to_eur_lex_when_not_held(tmp_path):
+    # 95/46/EG carries no documents row in this fixture -- the predecessor
+    # citation must fall back to an external EUR-Lex link (directive_link),
+    # not drop the link or crash
+    site = _gdpr_site(tmp_path)
+    html = render_rail_sections(eu_corresponding_cases_margin(site, C + "32016R0679#9"))
+    assert 'class="ext"' in html
+    assert "eur-lex.europa.eu" in html
+
+
+def test_eu_corresponding_cases_margin_excludes_an_advocate_general_opinion(tmp_path):
+    # an AG opinion (CC) on the same old article is not settled practice and
+    # must not join Lindqvist's section
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    con.executemany(
+        "INSERT INTO documents (uri, source, kind, label, title, path) "
+        "VALUES (?,?,?,?,?,'x')",
+        [(C + "32016R0679", "eurlex", "regulation", "32016R0679", "GDPR"),
+         (C + "62001CC0101", "eurlex", "opinion", "C-101/01 AG", "AG opinion")])
+    con.execute(
+        "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, to_root) "
+        "VALUES (?,?,?,?,?)",
+        (C + "62001CC0101", None, "dcterms:references", C + "31995L0046#8",
+         C + "31995L0046"))
+    con.commit()
+    catalog.add_directive_correspondence(con, [
+        (C + "32016R0679", "9", C + "31995L0046", "8", None, None)])
+    site = page.Site(con, {C + "32016R0679", C + "62001CC0101"})
+    assert eu_corresponding_cases_margin(site, C + "32016R0679#9") == []
+
+
+def test_eu_corresponding_cases_margin_empty_without_lineage(tmp_path):
+    site = _gdpr_site(tmp_path)
+    assert eu_corresponding_cases_margin(site, C + "32016R0679#1") == []
+
+
+def test_eu_corresponding_cases_margin_ignores_a_citer_of_the_current_article(
+        tmp_path):
+    # a case citing GDPR artikel 9 directly belongs in the page's own
+    # "EU-domstolens praxis" section (page._inbound_groups), not here -- this
+    # margin only ever surfaces citers of the *predecessor* article, never of
+    # the article whose own page it renders on
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    con.executemany(
+        "INSERT INTO documents (uri, source, kind, label, title, path) "
+        "VALUES (?,?,?,?,?,'x')",
+        [(C + "32016R0679", "eurlex", "regulation", "32016R0679", "GDPR"),
+         (C + "62021CJ0001", "eurlex", "judgment", "C-1/21", "C-1/21")])
+    con.execute(
+        "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, to_root) "
+        "VALUES (?,?,?,?,?)",
+        (C + "62021CJ0001", None, "dcterms:references", C + "32016R0679#9",
+         C + "32016R0679"))
+    con.commit()
+    catalog.add_directive_correspondence(con, [
+        (C + "32016R0679", "9", C + "31995L0046", "8", None, None)])
+    site = page.Site(con, {C + "32016R0679", C + "62021CJ0001"})
+    assert eu_corresponding_cases_margin(site, C + "32016R0679#9") == []
