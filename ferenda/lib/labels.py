@@ -26,7 +26,7 @@ import json
 import re
 from typing import NamedTuple
 
-from . import datasets
+from . import datasets, eucasenaming
 from .text import sentences
 
 # labels sits *below* catalog (catalog imports labels to stamp the `descriptive`
@@ -170,12 +170,24 @@ def _eurlex(art):
         # an unnamed judgment stamps shortname == case number; no name to show
         short_title = named if named and named != short_id else ""
         return Labels(short_id, short_title, title or short_id, label or short_id)
+    if doctype in ("opinion", "order"):
+        # an AG opinion or a court order: its title names the author and the
+        # date ("Förslag till avgörande av generaladvokat Andrea Biondi
+        # föredraget den 4 juni 2026"), which is no identifier -- a listing
+        # sorted on it read as random and the eyebrow showed the raw CELEX. The
+        # case number is the identity, the same one its judgment carries; the
+        # citing form says which of the case's documents this is
+        number = eucasenaming.case_number(celex)
+        what = "Förslag till avgörande" if doctype == "opinion" else "Beslut"
+        return Labels(number, "", title or number, "%s i mål %s" % (what, number))
     if doctype == "treaty":
         # a founding/consolidated treaty carries no extractable short title -- the
         # raw CELEX is all the artifact holds -- so a curated Swedish name stands in
-        # as both the short title and the official title (E1); short_id is the CELEX
+        # as both the short title and the official title (E1). It has no short id:
+        # the CELEX ("12016M/TXT") is nothing a reader cites a treaty by, and as
+        # short_id it headed the page's eyebrow, its TOC and its title tag
         name = _treaty_names().get(_EU_TREATY_SUFFIX.sub("", celex))
-        return Labels(celex, name or "", name or title or celex,
+        return Labels("", name or "", name or title or celex,
                       name or title or celex)
     in_label = _EU_DESIGNATION.search(label)
     m = in_label or _EU_DESIGNATION.search(title)

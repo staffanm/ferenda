@@ -16,7 +16,7 @@ imports back, so the pair stays acyclic.
 import re
 from functools import partial
 
-from . import labels, text
+from . import eu_structure, labels, text
 from .markdown import begrepp_uri
 from .pinpoint import pinpoint_label
 
@@ -324,6 +324,18 @@ def _document_description(art, source):
     short_title alone."""
     if source == "dv":
         return art.get("metadata", {}).get("sammanfattning")
+    if source == "eurlex" and art.get("doctype") in eu_structure.CASELAW:
+        # the Court's own subject line: the keywords that head a judgment
+        # ("Begäran om förhandsavgörande – Skydd för enskilda personer … –
+        # Förordning (EU) 2016/679 – Artikel 45"), which is what a listing of
+        # case numbers needs beside each number. Every judgment from the 2010s
+        # on carries them (2020s: 31 of 31 sampled); the legacy pages of older
+        # case law open straight into the parties and carry none, so those
+        # entries stay bare. Cut like a snippet: a long one runs 700 characters
+        return cut_snippet(" – ".join(
+            text.runs_text(node.get("text") or []).strip()
+            for node in art.get("structure") or []
+            if node.get("type") == "keyword")) or None
     return None
 
 
@@ -478,8 +490,7 @@ def _document_snippet(art, source):
     decision's first paragraph past the bench roster; a journal article's
     first paragraph capped at 50 words; and the opening prose for everyone
     else."""
-    described = _document_description(art, source)
-    if described:
+    if source == "dv" and (described := _document_description(art, source)):
         return described
     if source in ("sfs", "foreskrift"):
         return _paragraf_prose(art) or first_prose(art)

@@ -89,12 +89,14 @@ def test_eurlex_named_judgment_splits_number_and_name():
 
 def test_eurlex_treaty_uses_the_curated_name():
     # a founding/consolidated treaty carries no extractable short title, so the
-    # curated Swedish name stands in as both short and official title; short_id is
-    # the CELEX, and the revision '(NN)' suffix is stripped before the lookup (E1)
+    # curated Swedish name stands in as both short and official title; it has no
+    # short id -- the CELEX is nothing a reader cites it by, and it headed the
+    # eyebrow, the TOC and the title tag -- and the revision '(NN)' suffix is
+    # stripped before the lookup (E1)
     art = {"uri": "https://lagen.nu/celex/12016M/TXT", "celex": "12016M/TXT",
            "doctype": "treaty", "title": "12016M/TXT"}
     lb = labels.document_labels("eurlex", art)
-    assert lb.short_id == "12016M/TXT"
+    assert lb.short_id == ""
     assert lb.short_title == "Fördraget om Europeiska unionen (konsoliderad version 2016)"
     assert lb.official_title == lb.short_title
     revised = {**art, "celex": "12019W/TXT(02)",
@@ -232,3 +234,19 @@ def test_hudoc_captions_are_deshouted_for_readers():
     assert lb.descriptive_label == "Vlasov v. Russia"
     assert lb.official_title == "CASE OF VLASOV v. RUSSIA"
     assert lb.short_id == "no. 78146/01"
+
+
+def test_eurlex_opinion_is_identified_by_its_case_number():
+    # its title names the advocate general and the date, which is no identifier:
+    # a listing sorted on it read as random and the eyebrow showed the raw CELEX
+    art = {"uri": "https://lagen.nu/celex/62025CC0063", "celex": "62025CC0063",
+           "doctype": "opinion",
+           "title": "Förslag till avgörande av generaladvokat Andrea Biondi "
+                    "föredraget den 4 juni 2026",
+           "label": "Förslag till avgörande av generaladvokat Andrea Biondi "
+                    "föredraget den 4 juni 2026"}
+    lb = labels.document_labels("eurlex", art)
+    assert lb.short_id == "C-63/25"
+    assert lb.short_title == ""
+    assert lb.official_title.startswith("Förslag till avgörande av generaladvokat")
+    assert lb.descriptive_label == "Förslag till avgörande i mål C-63/25"

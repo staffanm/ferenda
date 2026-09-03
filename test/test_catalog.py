@@ -654,3 +654,30 @@ def test_document_snippet_uses_what_each_source_has():
     assert art50.endswith("ord49 …") and len(art50.split()) == 51
     assert catalog_rows._document_snippet({"structure": [{"type": "stycke",
         "text": [long]}]}, "lawreview") == long
+
+
+def test_an_eu_judgment_is_described_by_its_keywords_and_snippeted_by_its_ground():
+    """The Court's own subject line -- the keywords heading a judgment -- is
+    what a listing of case numbers needs beside each number. The card keeps the
+    first numbered ground as its opening words; the description shortcut that
+    hands a dv sammanfattning to the snippet is dv's alone."""
+    dom = {"uri": "https://lagen.nu/celex/62023CJ0001", "doctype": "judgment",
+           "structure": [
+               {"type": "keyword", "text": ["Begäran om förhandsavgörande"]},
+               {"type": "keyword", "text": ["Rätt till familjeåterförening"]},
+               {"type": "paragraph", "num": "1", "text": [
+                   "Begäran om förhandsavgörande avser tolkningen av artikel 5.1 "
+                   "i rådets direktiv 2003/86/EG om rätt till familjeåterförening "
+                   "och artiklarna 7 och 24 i stadgan."]}]}
+    assert catalog_rows._document_description(dom, "eurlex") \
+        == "Begäran om förhandsavgörande – Rätt till familjeåterförening"
+    assert catalog_rows._document_snippet(dom, "eurlex") \
+        .startswith("Begäran om förhandsavgörande avser tolkningen")
+    # the legacy pages of older case law carry no keywords: no description
+    old = {"uri": "https://lagen.nu/celex/61979CJ0155", "doctype": "judgment",
+           "structure": [{"type": "paragraph", "text": ["Mål 155/79"]}]}
+    assert catalog_rows._document_description(old, "eurlex") is None
+    # an act is not described this way
+    act = {"uri": "https://lagen.nu/celex/32016R0679", "doctype": "regulation",
+           "structure": [{"type": "keyword", "text": ["x"]}]}
+    assert catalog_rows._document_description(act, "eurlex") is None
