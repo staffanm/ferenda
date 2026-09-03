@@ -609,11 +609,16 @@ def _status_nested(done, total, message, *, work=None):
     if _inner is None or key != _inner_key:
         if _inner is not None:
             _inner.close()
-        n_total = work[1] if work else total
         _inner = _tqdm.tqdm(
-            total=n_total, position=0, leave=False, dynamic_ncols=True,
-            file=_real_streams[1])
+            total=work[1] if work else total, position=0, leave=False,
+            dynamic_ncols=True, file=_real_streams[1])
         _inner_key = key
+    else:
+        # refreshed on every call, not only at creation: InvocationBar.start()
+        # primes this bar with an unknown total (0, None, "") before the
+        # step's own first status() call arrives, so the real total must
+        # still take effect on that first call despite reusing this same bar
+        _inner.total = work[1] if work else total
     _inner.n = work[0] if work else done
     count = "%s/%s" % (done, "?" if total is None else total)
     _inner.bar_format = "{elapsed}: {desc} |{bar}| %s, ETA {remaining}" % count
@@ -774,6 +779,15 @@ class InvocationBar:
         w = _desc_width(self._file)
         self.bar.set_description_str(label[:w].ljust(w))
         self.bar.refresh()
+        # prime the nested bar right away, at 0/? -- a source's own setup
+        # before its first status() call (parse's per-basefile freshness
+        # gate, in particular, on a source like forarbete with a lot of
+        # never-built basefiles) can take long enough that the second line
+        # would otherwise sit blank for a while, reading as hung rather than
+        # merely not-yet-reporting. _status_nested rebases on step_no, just
+        # incremented above, so the real first status() call of this step
+        # reuses this same bar instead of rebuilding it.
+        _status_nested(0, None, "")
 
     def finish(self):
         """Advance by this step's real elapsed time, whatever its prediction

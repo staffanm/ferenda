@@ -265,6 +265,34 @@ def test_status_renders_nested_while_an_invocation_bar_is_open():
     assert util._inner is None                  # closed with the outer bar
 
 
+def test_invocation_bar_start_primes_the_nested_bar_before_any_status_call():
+    # a source's own setup before its first status() call (parse's
+    # per-basefile freshness gate, especially on a source with many
+    # never-built basefiles) can take long enough that the second line
+    # would otherwise sit blank -- reading as hung, not merely quiet.
+    # start() must show something immediately, before the caller ever
+    # calls status() for this step.
+    with util.invocation_bar(10.0, 1) as ib:
+        ib.start("forarbete parse")
+        assert util._inner is not None
+        assert util._inner.n == 0
+        assert util._inner.total is None
+
+
+def test_priming_does_not_stick_the_total_once_real_progress_arrives():
+    # the nested bar primed by start() carries an unknown (None) total;
+    # the step's real first status() call reuses that same bar (same
+    # step_no) rather than rebuilding it, so the total must still take
+    # effect there, not stay stuck at the priming value forever
+    with util.invocation_bar(10.0, 1) as ib:
+        ib.start("forarbete parse")
+        primed = util._inner
+        util.status(1, 25018, "item 1")
+        assert util._inner is primed              # same bar, not rebuilt
+        assert util._inner.total == 25018
+        assert util._inner.n == 1
+
+
 def test_status_nested_paces_on_work_like_the_plain_line_does():
     with util.invocation_bar(10.0, 1) as _ib:
         util.status(1, 5, "item 1", work=(2.0, 8.0))
