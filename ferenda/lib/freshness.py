@@ -326,6 +326,11 @@ def _worker_init(run_options: protocol.RunOptions):
     # initargs: each worker re-imports the module fresh and load_manifest opens
     # its own read connection there, seeing the parent's checkpointed commits.
     protocol.set_run(run_options)
+    # a forked worker is a COW copy of the parent, not a fresh interpreter --
+    # it inherits the parent's tqdm bar objects and _TqdmRedirect-wrapped
+    # streams verbatim, neither safe nor meaningful in this process (see
+    # util.reset_worker_state)
+    util.reset_worker_state()
     # a worker that dies hard in a C extension leaves the parent little to go
     # on; faulthandler dumps the crashing worker's Python stack (and thus the
     # basefile in flight) to stderr before it dies
@@ -406,9 +411,9 @@ def _rebuild_isolated(source, action, basefile, options):
                 return pool.submit(_worker,
                                    (source.name, action, basefile)).result()[1]
             except BrokenProcessPool:
-                print("\n%s %s: isolated rebuild of %s crashed (attempt %d/%d)"
-                      % (source.name, action, basefile, attempt,
-                         REBUILD_ATTEMPTS), file=sys.stderr)
+                util.write("%s %s: isolated rebuild of %s crashed (attempt %d/%d)"
+                          % (source.name, action, basefile, attempt,
+                             REBUILD_ATTEMPTS), err=True)
     res = Result()
     # the evidence is the child's faulthandler stack on this run's stderr (see
     # _worker_init) -- the error record can only name where to find it, since
@@ -485,9 +490,9 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
                     slot.unlink()          # attribute a corpse only once
                     if bf in outstanding and bf not in lost:
                         lost.add(bf)
-                        print("\n%s %s: worker died building %s; queued "
-                              "for an isolated rebuild once the pool drains"
-                              % (source.name, action, bf), file=sys.stderr)
+                        util.write("%s %s: worker died building %s; queued "
+                                  "for an isolated rebuild once the pool drains"
+                                  % (source.name, action, bf), err=True)
                 if quiet >= LOST_RESULT_TIMEOUT:
                     raise RuntimeError(
                         "%s %s: no worker result in %d s with %d document(s) "

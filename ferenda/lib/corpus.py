@@ -21,10 +21,12 @@ the subdomain projections) are the one thing a caller must still supply, as
 
 import hashlib
 import os
+import statistics
 import sys
 import time
 import traceback
 from collections import Counter
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -644,6 +646,114 @@ def run_phase(sources, names, verb, jobs):
     return had_errors
 
 
+@dataclass(frozen=True)
+class PlannedStep:
+    """One step of an upfront `build_invocation_plan` -- a source's parse, or
+    one of the corpus-wide verbs, before it runs. `skip` is a best-effort
+    prediction: for parse/versions, whether the run ledger's last recorded
+    segment for this (step, source) was itself a skip (a heuristic, not the
+    real gate -- see `build_invocation_plan`); always False for relate/index/
+    dump/generate, which are always planned as "will run". `secs` is the
+    predicted duration if it runs, 0.0 if predicted to skip."""
+    source: str      # "" for a step naming no single source (a whole-corpus generate)
+    verb: str
+    skip: bool
+    secs: float
+
+    @property
+    def label(self):
+        return "%s %s" % (self.source, self.verb) if self.source else self.verb
+
+
+PLANNER_DEFAULT_SECS = 5.0   # a (verb, source) the ledger has never timed
+
+
+def _history_secs(history, verb, source):
+    """A step's predicted duration: the run ledger's own median *raw* seconds
+    for this exact (verb, source) key (`runlog.duration_history`'s `secs`
+    list, not its rate-scaled `median`/`vals` -- those need a fresh document
+    count to turn back into seconds, and getting one cheaply is exactly what
+    this plan cannot do; see the module docstring), or `PLANNER_DEFAULT_SECS`
+    for a step that has never run. An estimate for the outer bar's *initial*
+    total, not a promise -- `InvocationBar.finish` advances it by each step's
+    real elapsed time regardless, so the total self-corrects as the run plays
+    out, and a corpus that has grown since the last measurement just means
+    this step's slice of the bar reads a little low until it finishes."""
+    entry = history.get((verb, source))
+    return statistics.median(entry["secs"]) if entry else PLANNER_DEFAULT_SECS
+
+
+def build_invocation_plan(sources, names, *, whole_corpus):
+    """The step sequence `cmd_all` is about to run over `names`, predicted up
+    front for the outer invocation bar: which steps its own freshness gates
+    will skip, and how long the rest are likely to take. One `PlannedStep` per
+    call `cmd_all` actually makes -- per-(name, parse/versions) and
+    per-(name, generate) when not `whole_corpus`, matching the granularity
+    `cmd_all` already loops at; one aggregate step each for relate/index/dump
+    (each a single call over every name) and for a whole-corpus generate.
+
+    This function's own cost is the point: it runs *before* the first line of
+    a `lagen all rebuild` prints, so every one of its checks has to be cheap
+    regardless of corpus size, or the plan itself becomes the reason a run
+    sits there doing nothing visible. Two things that look cheap are not, and
+    neither is used here:
+
+    * `stage_fingerprint` (parse/versions' own gate) walks every basefile and
+      stats every one of its input files -- exactly what makes it trustworthy
+      for the real run's skip decision, and exactly why calling it a second
+      time, for every source, before printing anything, was a felt delay
+      (further, doubling a cost `_run_stage_gated` already pays once for
+      real). Skip prediction here instead reads `runlog.last_segments`: was
+      the most recent recorded run of this (step, source) a skip? A stale
+      heuristic (a code edit or a newly-downloaded document since that run
+      would flip the real answer) is the trade for a lookup in an
+      already-loaded dict instead of a disk pass -- and a wrong prediction
+      only skews the bar's total, per `_history_secs`.
+    * `source.artifacts()` (relate's own gate, and the document-count divisor
+      `expected_secs`-style rate scaling would need for index/dump/generate)
+      walks the parsed-artifact tree on disk. Also not called: relate/index/
+      dump/generate are planned as "will run" unconditionally, timed from
+      `_history_secs`'s *raw* ledger seconds, which needs no document count
+      at all -- see its own docstring.
+
+    Download is not planned: it is network-bound and its cost has nothing to
+    do with the corpus on disk."""
+    last = runlog.last_segments(freshness.RUNS)
+    history = runlog.duration_history(freshness.RUNS)
+    steps = []
+    for step in ("parse", "versions"):
+        for name in names:
+            source = sources[name]
+            if step not in source.stages:
+                continue
+            seg = last.get((step, name))
+            if seg is not None and seg["status"] == "skipped":
+                steps.append(PlannedStep(name, step, True, 0.0))
+                continue
+            steps.append(PlannedStep(name, step, False,
+                                     _history_secs(history, step, name)))
+    steps.append(PlannedStep("", "relate", False,
+                             sum(_history_secs(history, "relate", name)
+                                for name in names)))
+    for verb in ("index", "dump"):
+        steps.append(PlannedStep("", verb, False,
+                                 sum(_history_secs(history, verb, name)
+                                    for name in names)))
+    if whole_corpus:
+        steps.append(PlannedStep("", "generate", False,
+                                 _history_secs(history, "generate", "__site__")))
+    else:
+        # every named source gets a generate call regardless of `artifacts`
+        # (site/stats/remisser have none but still write pages -- see
+        # `Source.artifacts`'s docstring), unlike relate/index/dump above,
+        # which cmd_all's own loops (inside cmd_relate/cmd_index/cmd_dump)
+        # skip for exactly those sources
+        for name in names:
+            steps.append(PlannedStep(name, "generate", False,
+                                     _history_secs(history, "generate", name)))
+    return steps
+
+
 def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
     """Run the build pipeline for the named sources. The offline core (action
     `rebuild`) is parse -> relate -> index -> dump -> generate; action `all`
@@ -659,50 +769,76 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
     A source hangs its own work off any of these verbs: a per-document stage
     whose `phase` names the verb (run right after it), and an `after[verb]`
     hook (run once per source). Both are fields on the registration; this
-    function knows neither what they do nor which source has one."""
+    function knows neither what they do nor which source has one.
+
+    The offline pipeline (everything below the download) runs inside a
+    `util.invocation_bar`, opened over `build_invocation_plan`'s predicted
+    total: a second, outer progress line naming the current source+step,
+    steps remaining, and a whole-invocation ETA -- next to the existing
+    per-document line each step already draws (which nests beneath it
+    automatically; see `util.status`). Download stays outside it: its cost is
+    network-bound, not a function of the corpus on disk, so a plan cannot
+    usefully predict it."""
     had_errors = False
     if download:
         had_errors = cmd_download_all(sources, names, jobs)
     store = freshness.load_fingerprints()
-    for step in ("parse", "versions"):
-        for name in names:
-            source = sources[name]
-            if step not in source.stages:
-                continue
-            errs, recorded = _run_stage_gated(source, step, jobs, store)
-            had_errors |= errs
-            # save as soon as a source records, not once the whole loop is
-            # through: a kill during a later source's parse used to discard the
-            # gate for every source that had already finished cleanly, so the
-            # next run re-scanned (and re-hashed the inputs of) all of them for
-            # nothing. The artifacts themselves were never at risk -- the
-            # per-document manifest checkpoints every SAVE_EVERY docs and
-            # flushes in a finally -- but the wasted scan is minutes on a
-            # 100k-document source. The store is a handful of keys per source,
-            # so writing it per source is free.
-            if recorded:
-                freshness.save_fingerprints(store)
-            run_after(sources, [name], step)
-    cmd_relate(sources, names)
-    run_after(sources, names, "relate")
-    # a bulk item the cluster rejected is a *unit missing from search*, so it
-    # belongs in the run's verdict like a failed parse -- one rebuild dropped
-    # 1,497 eurlex and 241 förarbete documents from the index and still exited 0
-    had_errors |= cmd_index(sources, names, jobs)
-    run_after(sources, names, "index")
-    cmd_dump(sources, names)
-    run_after(sources, names, "dump")
-    # a stage that must run after the catalog and the dumps exist, not in the
-    # parse loop above -- it reads what relate and dump have just written. The
-    # stage says so itself (`phase="dump"`); a run that does not name its source
-    # never pays for it (see the stats registration for the worked example).
-    had_errors |= run_phase(sources, names, "dump", jobs)
-    if whole_corpus:
-        cmd_generate(sources, jobs=jobs, aggregates=aggregates)
-    else:
-        for name in names:
-            cmd_generate(sources, source=name, jobs=jobs, aggregates=aggregates)
-    run_after(sources, names, "generate")
+    plan = build_invocation_plan(sources, names, whole_corpus=whole_corpus)
+    plan_by = {(s.source, s.verb): s for s in plan}
+    with util.invocation_bar(sum(s.secs for s in plan), len(plan),
+                             desc="lagen all %s" % ("rebuild" if not download
+                                                    else "all")) as ib:
+        for step in ("parse", "versions"):
+            for name in names:
+                source = sources[name]
+                if step not in source.stages:
+                    continue
+                ib.start(plan_by[(name, step)].label)
+                errs, recorded = _run_stage_gated(source, step, jobs, store)
+                had_errors |= errs
+                # save as soon as a source records, not once the whole loop is
+                # through: a kill during a later source's parse used to discard the
+                # gate for every source that had already finished cleanly, so the
+                # next run re-scanned (and re-hashed the inputs of) all of them for
+                # nothing. The artifacts themselves were never at risk -- the
+                # per-document manifest checkpoints every SAVE_EVERY docs and
+                # flushes in a finally -- but the wasted scan is minutes on a
+                # 100k-document source. The store is a handful of keys per source,
+                # so writing it per source is free.
+                if recorded:
+                    freshness.save_fingerprints(store)
+                run_after(sources, [name], step)
+                ib.finish()
+        ib.start("relate")
+        cmd_relate(sources, names)
+        run_after(sources, names, "relate")
+        ib.finish()
+        # a bulk item the cluster rejected is a *unit missing from search*, so it
+        # belongs in the run's verdict like a failed parse -- one rebuild dropped
+        # 1,497 eurlex and 241 förarbete documents from the index and still exited 0
+        ib.start("index")
+        had_errors |= cmd_index(sources, names, jobs)
+        run_after(sources, names, "index")
+        ib.finish()
+        ib.start("dump")
+        cmd_dump(sources, names)
+        run_after(sources, names, "dump")
+        ib.finish()
+        # a stage that must run after the catalog and the dumps exist, not in the
+        # parse loop above -- it reads what relate and dump have just written. The
+        # stage says so itself (`phase="dump"`); a run that does not name its source
+        # never pays for it (see the stats registration for the worked example).
+        had_errors |= run_phase(sources, names, "dump", jobs)
+        if whole_corpus:
+            ib.start("generate")
+            cmd_generate(sources, jobs=jobs, aggregates=aggregates)
+            ib.finish()
+        else:
+            for name in names:
+                ib.start(plan_by[(name, "generate")].label)
+                cmd_generate(sources, source=name, jobs=jobs, aggregates=aggregates)
+                ib.finish()
+        run_after(sources, names, "generate")
     return had_errors
 
 

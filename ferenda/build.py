@@ -484,7 +484,53 @@ def _help(name):
     print("\nglobal options: `lagen -h`")
 
 
+FAILURE_SUMMARY_ERRORS_CAP = 10   # detail lines shown per failed step
+
+
+def _print_failure_summary(run_id):
+    """The reason `lagen` is about to exit non-zero, once, at the very end --
+    not just the exit code, which is all `lagen all rebuild && sync-up` sees
+    when the failure was a step scrolled off screen long before the run's
+    last line. Reads `run_detail`'s segments (every verb emits one, with a
+    pass/fail status and an error count, uniformly) for *which* steps failed
+    this run, and `errors.json`'s per-basefile entries (parse/versions/dump-
+    phase stages only -- the per-document ones; index/dump/generate report a
+    count but not a message per failure) for *what went wrong* where that
+    detail exists.
+
+    A `run_ok=False` with no failed segment at all means the process crashed
+    outright (an uncaught exception, not a per-document failure) before
+    anything could be tallied -- said explicitly, since an empty step list
+    would otherwise read as "nothing failed" beside a non-zero exit code."""
+    detail = runlog.run_detail(freshness.RUNS, run_id)
+    failed = [s for s in (detail or {}).get("segments", []) if s["status"] == "errors"]
+    if not failed:
+        util.write("lagen exited with errors, but recorded no failed step -- "
+                  "the traceback above is the reason.", err=True)
+        return
+    util.write("lagen exited with errors -- %d step(s) failed this run:"
+              % len(failed), err=True)
+    this_run = {k: v for k, v in runlog.read_errors(freshness.ERRORS).items()
+               if v["run"] == run_id}
+    for seg in failed:
+        util.write("  %s %s: %d error(s)" % (seg["step"], seg["source"],
+                                             seg["errors"]), err=True)
+        prefix = "%s/%s/" % (seg["source"], seg["step"])
+        detail_keys = sorted(k for k in this_run if k.startswith(prefix))
+        for key in detail_keys[:FAILURE_SUMMARY_ERRORS_CAP]:
+            util.write("    %s: %s" % (key[len(prefix):], this_run[key]["error"]),
+                      err=True)
+        if len(detail_keys) > FAILURE_SUMMARY_ERRORS_CAP:
+            util.write("    ... and %d more"
+                      % (len(detail_keys) - FAILURE_SUMMARY_ERRORS_CAP), err=True)
+
+
 def main(argv=None):
+    # a dependency's warnings.warn (cryptography, lxml, ...) must not tear an
+    # active progress line -- see util.write. Installed here, not at import
+    # time, so importing ferenda for a test or a one-off script never changes
+    # process-wide warning behaviour underneath it.
+    util.install_warnings_hook()
     argv = list(sys.argv[1:] if argv is None else argv)
     # contextual help: `lagen <source> [action] -h` -> that source's help
     if "-h" in argv or "--help" in argv:
@@ -638,8 +684,15 @@ def main(argv=None):
             # ok from the success flag, folded with THIS run's error total
             # (RUN_ERRORS) -- not the corpus-wide currently-failing count, which
             # lives in errors.json and the /ops overview
-            runlog.emit_run_end(freshness.RUNS, freshness.RUN_ID, time.perf_counter() - t0,
-                                ok and freshness.RUN_ERRORS == 0, freshness.RUN_ERRORS)
+            run_ok = ok and freshness.RUN_ERRORS == 0
+            runlog.emit_run_end(freshness.RUNS, freshness.RUN_ID,
+                                time.perf_counter() - t0, run_ok, freshness.RUN_ERRORS)
+            if not run_ok:
+                # `lagen all rebuild` scrolls the actual failure off screen long
+                # before the run's last line -- and that line, on its own, only
+                # says a step somewhere failed. Print what and where, once, here,
+                # so the exit code has a reason attached beside it.
+                _print_failure_summary(freshness.RUN_ID)
 
 
 def _cmd_runs(limit):

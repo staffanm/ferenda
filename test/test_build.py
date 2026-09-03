@@ -33,6 +33,7 @@ from ferenda.lib import (
     layout,
     runlog,
     stage,
+    util,
 )
 from ferenda.lib.errors import SkipDocument
 from ferenda.lib.freshness import build_one, is_fresh
@@ -690,6 +691,36 @@ def test_failing_recipe_lands_in_errors_and_clears(wire, tmp_path):
     fail.clear()
     build.main(["syn", "parse", "-j1"])
     assert "syn/parse/b" not in runlog.read_errors(freshness.ERRORS)
+
+
+def test_failing_run_prints_a_closing_summary_naming_the_failure(wire, tmp_path,
+                                                                capsys):
+    # `lagen all rebuild && sync-up` sees only the exit code once the actual
+    # failure has scrolled off screen -- the closing summary is what answers
+    # "why" without having to scroll back or open errors.json by hand
+    wire(build_source(tmp_path, fail={"b"}))
+    with pytest.raises(SystemExit):
+        build.main(["syn", "parse", "-j1"])
+    err = capsys.readouterr().err
+    assert "lagen exited with errors -- 1 step(s) failed this run:" in err
+    assert "parse syn: 1 error(s)" in err
+    assert "b: ValueError: boom b" in err
+
+
+def test_closing_summary_says_nothing_failed_when_a_crash_left_no_segment(
+        wire, tmp_path, monkeypatch, capsys):
+    # an uncaught exception before any step could be tallied must not print an
+    # empty (and misleadingly reassuring) step list beside the non-zero exit
+    wire(build_source(tmp_path))
+
+    def _boom(*a, **kw):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(build, "_dispatch", _boom)
+    with pytest.raises(RuntimeError):
+        build.main(["syn", "parse", "-j1"])
+    err = capsys.readouterr().err
+    assert "recorded no failed step" in err
 
 
 def test_dry_run_writes_no_state_files(wire, tmp_path):
@@ -1401,6 +1432,21 @@ def test_a_rebuild_that_crashes_once_is_retried_in_a_new_subprocess(monkeypatch)
     # the job tuple's field order is what the child indexes into SOURCES with:
     # swap two fields and production raises KeyError inside the child
     assert jobs == [(freshness._worker, ("syn", "parse", "b"))] * 2
+
+
+def test_worker_init_resets_the_inherited_invocation_bar_state(monkeypatch):
+    # on Linux (this codebase's fork start method), a worker started mid-run
+    # is a COW copy of the parent -- it inherits util's bar-state globals
+    # verbatim unless _worker_init resets them (util.reset_worker_state).
+    # invocation_bar only opens the real bar on a tty; pretend it is one.
+    monkeypatch.setattr(util, "_stderr_is_a_tty", lambda: True)
+    with util.invocation_bar(10.0, 1) as ib:
+        ib.start("syn parse")
+        util.status(1, 5, "item")
+        assert util._outer is not None            # what a fork would inherit
+        freshness._worker_init(stage.RunOptions())
+        assert util._outer is None
+        assert util._real_streams is None
 
 
 def test_a_rebuild_that_always_crashes_is_an_error_not_a_dead_run(monkeypatch):

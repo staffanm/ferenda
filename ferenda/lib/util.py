@@ -5,13 +5,18 @@ import multiprocessing
 import os
 import re
 import shutil
+import signal
 import sys
 import threading
 import time
 import unicodedata
+import warnings
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
+
+import tqdm as _tqdm
 
 
 def text_slug(text: str, *, sep: str = "-", maxlen: int | None = None) -> str:
@@ -328,7 +333,16 @@ def status(done, total, message="", *, actual=None, work=None, prefix="",
     ``(done, total)`` in expected seconds, which paces the ETA on work rather
     than on job count -- pass it wherever per-item cost estimates exist, since
     the two are wildly disproportionate on a corpus dispatched slowest-first
-    (see `_eta_suffix`)."""
+    (see `_eta_suffix`).
+
+    When `invocation_bar` has opened a whole-invocation bar (a `lagen all
+    parse`/`rebuild`), this stage's counter renders as a nested tqdm bar
+    beneath it instead -- see `_status_nested`. Every other caller (a single
+    `lagen <source> parse`, a harvest) is untouched: this branch is the only
+    thing `invocation_bar` adds to `status`."""
+    if _outer is not None:
+        _status_nested(done, total, message, work=work)
+        return
     line = "%s(%d/%s) %s%s" % (prefix, done, "?" if total is None else total,
                                message, tail)
     eta = _eta_suffix(done, total, actual, work)
@@ -395,6 +409,450 @@ def progress_break(stream=sys.stderr):
     finished segment (a harvest year / page sweep) persists above the live one."""
     stream.write("\n")
     stream.flush()
+
+
+def write(msg, *, err=False, stream=None):
+    """Print one persistent line without tearing whatever live progress line is
+    on screen -- the one safe way to interleave a warning, a per-item audit
+    line (`aireport.Report`) or a worker-crash notice with an active counter,
+    instead of the two-call `progress_break()` + `print()` idiom (easy to
+    reach for and easy to get wrong, since nothing enforces the order).
+
+    Routed through `tqdm.write` when a nested invocation bar is open (it knows
+    how to clear and redraw a registered bar around the line, on whichever
+    stream each bar lives on); otherwise a bare newline first -- exactly
+    `progress_break()` -- then the message, which is enough because the *next*
+    `status()` call redraws the plain `\\r` counter fresh below it. `err` picks
+    stderr over stdout for `msg` (matching `print`'s `file=sys.stderr` idiom);
+    the break itself always targets real stderr unless `stream` is given
+    explicitly, since that is where the live counter is regardless of which
+    stream `msg` targets -- an explicit `stream` (tests; a caller that
+    redirected both) breaks and prints on that one stream instead."""
+    target = stream or (sys.stderr if err else sys.stdout)
+    if _outer is not None:
+        _tqdm.tqdm.write(msg, file=target)
+    else:
+        brk = stream or sys.stderr
+        brk.write("\n")
+        brk.flush()
+        print(msg, file=target, flush=True)
+
+
+def install_warnings_hook():
+    """Route every `warnings.warn` (ours or a dependency's -- ferenda itself
+    never calls it, but cryptography/lxml/etc. do) through `write`, so a
+    warning surfaces as a clean persistent line instead of tearing an active
+    progress counter mid-row. Called once, from the CLI entry point
+    (`build.main`); never from a library import, so a test importing
+    `ferenda.lib.util` does not silently change process-wide warning
+    behaviour."""
+    default = warnings.formatwarning
+
+    def _show(message: Warning | str, category: type[Warning], filename: str,
+             lineno: int, file: TextIO | None = None,
+             line: str | None = None) -> None:
+        write(default(message, category, filename, lineno, line).rstrip("\n"),
+              err=True)
+
+    # ty flags this despite an identical signature -- reassigning a stdlib
+    # function is inherently this shape, not a real type mismatch
+    warnings.showwarning = _show  # ty: ignore[invalid-assignment]
+
+
+# --------------------------------------------------------------------------
+# the whole-invocation bar (`lagen all parse`/`rebuild`): an outer tqdm bar
+# over the corpus.build_invocation_plan() step sequence, with the current
+# stage's own `status()` counter nested beneath it as a second tqdm bar. Only
+# `cmd_all` opens one; every other caller of `status`/`progress` is
+# unaffected (see `status`'s `_outer is not None` branch above).
+# --------------------------------------------------------------------------
+
+_outer = None       # the open whole-invocation tqdm bar, or None
+_inner = None       # the nested per-stage tqdm bar status() drives while open
+_inner_key = object()   # the outer step_no (or total/work-total, unwrapped) status() last rebased on
+_real_streams = None    # (real stdout, real stderr), captured before redirecting
+_resize_pending = False   # set by the SIGWINCH handler, acted on in _status_nested
+
+_DESC_WIDTH_MAX = 45   # description width on a wide-enough terminal
+_DESC_WIDTH_MIN = 10   # never shrink the description below this
+# everything in a nested bar's rendered line other than {desc} and {bar}
+# itself: "elapsed: " + " |" + "|" + " " + "n/total, ETA remaining", sized
+# for the widest realistic case (hours-long elapsed/ETA, 7-digit counts) plus
+# a few columns of margin so a *slightly* wider case still doesn't tip into
+# tqdm's raw-truncation fallback
+_DESC_RESERVE = 40
+
+
+def _desc_width(stream):
+    """How wide a nested bar's description may be right now, so the *whole*
+    rendered line (elapsed + desc + bar + count + ETA) fits the terminal.
+
+    Below `_DESC_RESERVE` + `_DESC_WIDTH_MIN` columns, `format_meter` cannot
+    fit everything even with the bar's own fill shrunk to nothing, and falls
+    back to a raw `line[:ncols]` truncation -- not graceful degradation, a
+    mid-number cut ("6167" -> "616") whose exact cutpoint shifts frame to
+    frame as elapsed/count digits change width. That, not a cursor-position
+    bug, is what a terminal narrower than ~80 columns actually hit: this
+    file's own fixed 45-column description left no way to ever fit under
+    it. A tmux pane split well under 80 columns hits this reliably even in a
+    wide outer window, independent of any resize signal at all -- this is
+    the same bug at ncols=60 whether or not the terminal was ever resized
+    live."""
+    try:
+        if stream is not None and stream.isatty():
+            cols = os.get_terminal_size(stream.fileno()).columns
+        else:
+            cols = shutil.get_terminal_size((80, 24)).columns
+    except OSError:
+        cols = shutil.get_terminal_size((80, 24)).columns
+    return max(_DESC_WIDTH_MIN, min(_DESC_WIDTH_MAX, cols - _DESC_RESERVE))
+
+
+def _status_nested(done, total, message, *, work=None):
+    """The nested-bar counterpart of status()'s plain-line rendering: rebases
+    on the outer bar's own step count (`_outer.step_no`, incremented once per
+    `InvocationBar.start()`) rather than on `total`/`work[1]` changing, since
+    two different steps can share a total (see the rebasing comment inline);
+    same two ETA modes as the plain line, rendered as tqdm's own bar/rate/ETA
+    instead of `_eta_suffix`'s. `_outer is not None` is `status`'s only entry
+    point here. Rendered at `position=0`, *above* the outer bar (see
+    `InvocationBar`).
+
+    A fixed `bar_format` (no bare tqdm default): "elapsed: desc |bar| n/total,
+    ETA remaining". Elapsed leads (plain wall-clock time since this stage
+    began, so it reads as what it is, not buried at the end inside tqdm's own
+    `[elapsed<remaining]` idiom -- a person has to already know tqdm to parse
+    `<` as "versus", not an inequality); the bar needs no percentage beside
+    it, a redundant third way of saying what the fill already shows; and the
+    ETA is a labelled field, not the second half of that same unlabelled pair.
+
+    `n`/`total` shown are always the real document count (`done`/`total`, the
+    same pair every other caller of `status` sees) -- *never* the cost-paced
+    `work` totals, which are the per-document expected-*seconds* weights
+    summed across a whole stage: an internal number this rail was already
+    using to compute an ETA before this bar existed (`_eta_suffix`'s `work=`
+    branch), not a count of anything real. `work[0]`/`work[1]` still drive the
+    bar's own fill/percentage/rate/ETA when given (pacing on cost, not job
+    count, is the entire point of `work=` -- see `_eta_suffix`), but the
+    *printed* count is baked into the format string as plain text instead of
+    tqdm's own `{n}`/`{total}` fields, decoupling "what paces the bar" from
+    "what number a reader sees": showing `172927/178333` (the cost weights)
+    beside `ETA 00:03` reads as broken (172927 of what, in three seconds?);
+    showing the real `done`/`total` next to that same ETA does not. (The
+    default bar_format's own flaws stay fixed either way: raw floats --
+    `166212.63500000146` -- whose digit count jitters the bar's rendered
+    width, and a `{rate_fmt}` of `4988.53s/s` that reads as nothing a person
+    asked for.)
+
+    The description gets the same fixed-width treatment, for the same reason:
+    `message` is `"<source> <verb>  ran N  err N  <basefile>"`
+    (`freshness._progress`), and a basefile ranges from "a" to a sö/lr
+    förarbete slug dozens of characters long, so the raw message left the
+    bar's own fill width visibly resizing update to update. The leading
+    "<source> <verb>" is dropped first when it matches the outer bar's
+    current step (`_outer.current_label`) -- `InvocationBar` already names
+    that beneath this one, so repeating it here is pure width lost to
+    something the reader can already see. What remains is padded/truncated to
+    `_desc_width()` -- the same call `InvocationBar` makes for its own
+    description, so the two bars' `|bar|` columns line up -- not a fixed
+    width: see `_desc_width`'s own docstring for why a constant one is a
+    second bug in this same area, distinct from the resize-cursor one.
+
+    Also refreshes the outer bar on every call (cheap): `status()` is called
+    far more often than `InvocationBar.start`/`finish` (per document, not per
+    stage), so piggybacking its redraw here is what makes the outer bar's own
+    elapsed time tick continuously instead of jumping only at stage
+    boundaries -- a value that visibly holds still between ticks does not
+    read as "elapsed", it reads as stuck.
+
+    Also where a pending `SIGWINCH` gets acted on (`invocation_bar`'s handler
+    only sets `_resize_pending` -- a signal handler must never do I/O, since it
+    can fire mid-write to the very stream it would try to write to next, and
+    that reentrant call is a hard `RuntimeError`, not a rare race). Found here
+    rather than needing its own poll loop because `status()` already runs
+    this often.
+
+    The recovery is `tqdm.external_write_mode()` around an empty block, not
+    calling `.clear()` on each bar by hand: `clear()`/`refresh()` move the
+    cursor with *relative* jumps (`moveto()` -- `\\n` down, an ANSI cursor-up
+    up), correct only when the cursor is exactly where that one bar's own
+    bookkeeping expects it, given every other active bar was cleared in the
+    same coordinated pass first. Two independent `.clear()` calls, in
+    whatever order this function happens to make them, do not honour that --
+    proven the hard way: it desynced the two bars' cursor math permanently
+    after a single resize, so every following refresh (using that same
+    relative math) kept opening a new line instead of overwriting, forever,
+    not just for the one stale frame. `external_write_mode` is tqdm's own
+    answer to "clear every active bar, do something, put them all back" (it
+    is what `tqdm.write` itself uses) -- the coordinated version of the same
+    idea, under the one lock and in the order tqdm's own bookkeeping expects."""
+    global _inner, _inner_key, _resize_pending
+    # status()'s own `if _outer is not None:` is the only entry point here,
+    # and invocation_bar()/reset_worker_state() only ever set _outer and
+    # _real_streams together -- both are guaranteed non-None below, not
+    # merely likely: an `X if _outer else fallback` around every use would
+    # be a branch this function can never actually take, hiding exactly the
+    # bug rule:fail-fast asks a plain attribute access to surface instead.
+    assert _outer is not None and _real_streams is not None, (
+        "_status_nested reached with no invocation_bar open")
+    # rebased on the outer bar's own step count, not on `total`/`work[1]`
+    # changing: two different steps can share the same total (a fresh
+    # corpus's never-built sources, or two steps costed by the same
+    # PLANNER_DEFAULT_SECS fallback -- routine, not a corner case), and a
+    # collision there left `_inner` un-rebuilt across the boundary, so its
+    # `start_t` kept ticking from the *previous* stage -- a stale elapsed
+    # clock and a nonsensical ETA at the moment a new stage actually began.
+    # `_outer.step_no` increments exactly once per `InvocationBar.start()`,
+    # which brackets every real step in `corpus.cmd_all` -- an unambiguous
+    # step-boundary signal `total` never was.
+    key = _outer.step_no
+    if _inner is None or key != _inner_key:
+        if _inner is not None:
+            _inner.close()
+        n_total = work[1] if work else total
+        _inner = _tqdm.tqdm(
+            total=n_total, position=0, leave=False, dynamic_ncols=True,
+            file=_real_streams[1])
+        _inner_key = key
+    _inner.n = work[0] if work else done
+    count = "%s/%s" % (done, "?" if total is None else total)
+    _inner.bar_format = "{elapsed}: {desc} |{bar}| %s, ETA {remaining}" % count
+    label = _outer.current_label
+    if label and message.startswith(label + "  "):
+        message = message[len(label) + 2:]
+    w = _desc_width(_real_streams[1])
+    _inner.set_description_str(message[:w].ljust(w))
+    if _resize_pending:
+        _resize_pending = False
+        with _tqdm.tqdm.external_write_mode(file=_real_streams[1]):
+            pass
+    _inner.refresh()
+    _outer.bar.refresh()
+
+
+class _TqdmRedirect:
+    """A file-like standing in for `sys.stdout`/`sys.stderr` for the lifetime
+    of an open invocation bar, so a plain `print()` anywhere in the pipeline
+    -- "parse sfs: up to date -- skipped", a source's own diagnostic -- lands
+    through `tqdm.write` instead of tearing a bar mid-row the way a foreign
+    write does. Line-oriented like `print`'s own writes: a bare `\\n` (its
+    `end` argument, written separately from the content) is dropped rather
+    than opening a blank line, since `tqdm.write` appends its own.
+
+    `tqdm.write` only clears and redraws a bar when its own check --
+    `inst.fp is file` or "both `file` and `inst.fp` are `sys.stdout`/
+    `sys.stderr`" -- passes, and it reads `sys.stdout`/`sys.stderr` *at call
+    time*. While this wrapper is installed, those names hold the wrapper
+    itself, not the real streams the bars were built against, so that check
+    silently fails and every bar goes uncleared -- exactly the corruption
+    this class exists to prevent. `write` restores the real pair for the
+    duration of the call so tqdm's own check sees what it expects."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def write(self, s):
+        if s and s != "\n":
+            # a _TqdmRedirect instance only exists while sys.stdout/sys.stderr
+            # hold one -- invocation_bar() installs and clears both together
+            # with _real_streams, so this is never None here
+            assert _real_streams is not None, (
+                "_TqdmRedirect.write reached with no invocation_bar open")
+            cur = sys.stdout, sys.stderr
+            sys.stdout, sys.stderr = _real_streams
+            try:
+                _tqdm.tqdm.write(s.rstrip("\n"), file=self._real)
+            finally:
+                sys.stdout, sys.stderr = cur
+
+    def flush(self):
+        self._real.flush()
+
+    def isatty(self):
+        return self._real.isatty()
+
+    def fileno(self):
+        return self._real.fileno()
+
+
+def reset_worker_state():
+    """Undo whatever bar/redirect state a forked build worker inherited from
+    the parent process at fork time: on Linux (this codebase's only fork
+    start method today), a `multiprocessing.Pool` worker is a COW copy of the
+    parent's whole address space, not a fresh interpreter -- `_outer`/
+    `_real_streams` name the *parent's* tqdm bar objects and streams, and
+    `sys.stdout`/`sys.stderr` are still the parent's `_TqdmRedirect` wrappers.
+    None of that is safe or meaningful in a child: a warning firing mid-parse
+    (`install_warnings_hook`'s hook calls `write`, which calls `tqdm.write` on
+    `_outer is not None`) would touch tqdm bar objects that do not track this
+    process's own writes, racing the parent's concurrent writes to the same
+    fd. Resetting to `None`/the real streams makes `write` take its plain
+    print-and-break path instead, on this process's own stdout/stderr.
+
+    Called once, from `freshness._worker_init` -- the one place a forked
+    worker already resets other inherited process-global state
+    (`protocol.set_run`)."""
+    global _outer, _inner, _real_streams
+    _outer = None
+    _inner = None
+    _real_streams = None
+    sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
+
+
+def _stderr_is_a_tty():
+    """Whether the real stderr (`sys.stderr` at call time -- before any
+    `invocation_bar` redirect) is a tty; a `contextmanager`-testable seam
+    rather than an inline `sys.stderr.isatty()`, since a test that also uses
+    `capsys` swaps `sys.stderr` for its own capture object *after* an
+    ordinary `monkeypatch.setattr(sys.stderr, ...)` on the pre-swap instance
+    would have taken effect, silently reverting it."""
+    return sys.stderr.isatty()
+
+
+class _NullInvocationBar:
+    """Stand-in `invocation_bar` yields when the real stderr is not a tty:
+    `start`/`finish` are no-ops and `_outer` is never set, so every `status()`
+    call keeps rendering through its own plain, already tty-agnostic
+    single-line form instead of the two-bar tqdm overlay. tqdm's stacked
+    `position=0`/`1` bars write raw cursor-up ANSI codes (`\\x1b[A`) on every
+    refresh regardless of the target's tty-ness -- harmless to a real
+    terminal, escape-code soup mixed into a `lagen all rebuild > log 2>&1`
+    file. A run nobody is watching live gains nothing from the bar; the
+    closing failure summary (`build._print_failure_summary`) is what such a
+    run actually needs to explain itself."""
+
+    def start(self, label):
+        pass
+
+    def finish(self):
+        pass
+
+
+class InvocationBar:
+    """The outer whole-invocation bar `cmd_all` drives: one `step()` call per
+    `PlannedStep` as it starts and finishes, advancing by that step's actual
+    elapsed seconds (not its predicted one) -- so the bar's progress is always
+    honest even when a prediction is off, and only the *remaining* total
+    (summed predictions) is approximate. `total_secs` is that sum, and
+    `total_steps` the step count -- both from `corpus.build_invocation_plan`.
+
+    Rendered at `position=1`, *below* the current stage's own nested counter
+    (`position=0`): the stage line is what changes moment to moment and reads
+    first; this one is the slower-moving "how far through the whole run" context
+    beneath it. Its description is padded to the same `_desc_width()` as the
+    nested bar's, so the two bars' `|bar|` columns start at the same place --
+    computed fresh each `start()`, not a fixed width (see `_desc_width`).
+
+    `n`/`total` (real predicted-vs-actual *seconds*, unlike the nested bar's
+    own cost-paced mode) still drive the bar's fill/rate/ETA, but the
+    *printed* count is the step number instead -- "4/25", not "12/8326s": a
+    reader wants to know how far through the run's steps they are, not a
+    seconds total nobody predicted with any precision (see
+    `corpus.build_invocation_plan`)."""
+
+    def __init__(self, total_secs, total_steps, desc, *, file=None):
+        self._t0 = 0.0
+        self._file = file
+        self.total_steps = total_steps
+        self.step_no = 0
+        self.current_label = ""
+        self.bar = _tqdm.tqdm(
+            total=max(total_secs, 0.001), desc=desc, position=1, leave=True,
+            file=file)
+
+    def start(self, label):
+        """Announce the step about to run -- the "current source+command" and
+        the steps-remaining count the outer line names while its own inner
+        counter is still at 0/?. `current_label` is read by `_status_nested`
+        to drop this same "source verb" prefix from its own description,
+        which would otherwise just repeat what this line already says."""
+        self.step_no += 1
+        self._t0 = time.perf_counter()
+        self.current_label = label
+        self.bar.bar_format = ("{elapsed}: {desc} |{bar}| %d/%d, ETA {remaining}"
+                              % (self.step_no, self.total_steps))
+        w = _desc_width(self._file)
+        self.bar.set_description_str(label[:w].ljust(w))
+        self.bar.refresh()
+
+    def finish(self):
+        """Advance by this step's real elapsed time, whatever its prediction
+        said -- a step that ran fast (a skip the plan could not predict) or
+        slow never desyncs the bar from wall-clock reality."""
+        self.bar.update(time.perf_counter() - self._t0)
+
+    def close(self):
+        global _inner
+        if _inner is not None:
+            _inner.close()
+            _inner = None
+        self.bar.close()
+
+
+@contextmanager
+def invocation_bar(total_secs, total_steps, desc="lagen all"):
+    """Open the whole-invocation bar for the run's lifetime: `cmd_all` calls
+    `ib.start(label)` / `ib.finish()` around each planned step. Every `status()`
+    call made while this is open renders nested beneath it instead of as the
+    lone overwriting line (see `status`).
+
+    Also redirects `sys.stdout`/`sys.stderr` to `_TqdmRedirect` for the same
+    lifetime (restored in `finally`, so a crash or Ctrl-C never leaves the
+    process talking through the wrapper): the two tqdm bars are built against
+    the *real* streams first, captured in `_real_streams`, so they draw
+    directly and never round-trip through their own redirect.
+
+    Also installs a `SIGWINCH` handler for the same lifetime (Unix only; a
+    no-op where the signal does not exist), restored in `finally`. tqdm's
+    `dynamic_ncols` re-measures the terminal lazily, on the *next* update it
+    was going to draw anyway -- fine when the terminal grows (the old, shorter
+    frame is simply overwritten), not when it shrinks: the stale frame is
+    still on screen at the old, wider layout, and the terminal itself wraps
+    it onto an extra row the instant it gets narrower, before tqdm's cursor
+    math (one row per bar, fixed) has any way to know. `SIGWINCH` forces both
+    bars to redraw immediately, at the point the resize actually happened,
+    which is the standard mitigation -- not a guarantee against every
+    resize-timing race, but the difference between "self-heals on the next
+    tick" and "silently corrupted until the run ends".
+
+    Yields a `_NullInvocationBar` instead, with none of the above, when the
+    real stderr is not a tty (`lagen all rebuild > log 2>&1`, a cron job): a
+    stacked-position tqdm bar writes raw cursor-up ANSI codes to *any* file it
+    is given, tty or not, and a run nobody is watching live gains nothing
+    from the bar to offset that."""
+    real = (sys.stdout, sys.stderr)
+    if not _stderr_is_a_tty():
+        yield _NullInvocationBar()
+        return
+    global _outer, _real_streams
+    _real_streams = real
+    ib = InvocationBar(total_secs, total_steps, desc, file=real[1])
+    _outer = ib
+    sys.stdout, sys.stderr = _TqdmRedirect(real[0]), _TqdmRedirect(real[1])
+    global _resize_pending
+    _resize_pending = False
+    prior_handler = None
+    if hasattr(signal, "SIGWINCH"):
+        def _on_resize(signum, frame):
+            # a signal handler must never do I/O: it can fire between any two
+            # bytecodes, including mid-write to the very stream a bar's own
+            # refresh() would write to next, and re-entering a buffered
+            # writer from inside itself is a hard RuntimeError, not a race
+            # that only sometimes shows up. Set a flag; the actual refresh
+            # happens from _status_nested, ordinary code that runs only
+            # between writes, never inside one.
+            global _resize_pending
+            _resize_pending = True
+        prior_handler = signal.signal(signal.SIGWINCH, _on_resize)
+    try:
+        yield ib
+    finally:
+        if prior_handler is not None:
+            signal.signal(signal.SIGWINCH, prior_handler)
+        sys.stdout, sys.stderr = real
+        ib.close()
+        _outer = None
+        _real_streams = None
 
 
 def harvest_start(label: str, url: str) -> None:

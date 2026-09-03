@@ -75,6 +75,10 @@ dependencies = [
     "rdflib",
     "requests",
     "ruamel-yaml>=0.19.1",
+    # the CLI's progress bars (lib/util.status): nested bars for a whole-invocation
+    # `lagen all rebuild` next to the current stage, and write() to print a
+    # persistent line (or a routed warnings.warn) without tearing an active bar
+    "tqdm>=4.66",
     "urllib3",
     # >=0.31: FORWARDED_ALLOW_IPS is matched with `ipaddress` from that
     # release on. Earlier versions compare the peer address as a literal

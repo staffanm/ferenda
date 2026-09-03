@@ -95,12 +95,15 @@ class Report:
         self._counter_shown = True
 
     def _persist(self, line, *, err=False):
-        # a persistent line must not land on the overwriting counter's row.
-        # sys.stdout is looked up at call time (a capturing test swaps it)
+        # a persistent line must not land on the overwriting counter's row
+        # (util.write breaks it, or -- inside a lagen all invocation bar --
+        # clears and redraws it around the line); nothing to protect when no
+        # counter has been drawn yet, so a plain print skips the blank line
         if self._counter_shown:
-            util.progress_break()
+            util.write(line, err=err)
             self._counter_shown = False
-        print(line, file=sys.stderr if err else sys.stdout, flush=True)
+        else:
+            print(line, file=sys.stderr if err else sys.stdout, flush=True)
 
     def wrote(self, label, path=None, *, note="", layers=None):
         """Record a written item: `path` is one layer file or a list of them

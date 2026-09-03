@@ -217,7 +217,13 @@ lagen all serve      # serve generated/ + the REST API on one uvicorn process
 ```
 
 `rebuild`/`all` re-do only what changed; the first full build over the
-~200K-document corpus is slow (see §6 for the rsync shortcut).
+~200K-document corpus is slow (see §6 for the rsync shortcut). Both draw a
+whole-invocation progress bar (current step, steps remaining, ETA) above the
+per-document counter each step already shows, on a real terminal; a run
+piped to a file or a cron log (`docker compose exec ferenda lagen all
+rebuild >> log 2>&1`) keeps the plain per-document line only, since the bar
+is for someone watching live and would otherwise write raw cursor-control
+bytes into the log.
 
 ### From fresh checkout to `serve` (dev)
 
@@ -329,6 +335,11 @@ Status and instrumentation:
 lagen <source> status    # per-stage health for one source (writes the snapshot cell)
 lagen all runs [N]        # recent runs from the ledger
 ```
+
+A `rebuild`/`all` run that exits non-zero prints a closing summary naming
+which step(s) failed and, where recorded, the per-basefile error — since that
+detail otherwise scrolls off screen long before a multi-hour run ends. Full
+tracebacks are still `/ops/failures` or `/ops/runs/{id}` (§6).
 
 ## 6. Operations
 
