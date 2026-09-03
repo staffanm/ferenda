@@ -65,6 +65,7 @@ from .icj import source as icj_source
 from .icrc import source as icrc_source
 from .lawreview import source as lawreview_source
 from .lib import (
+    aireport,
     annstore,
     catalog,
     compress,
@@ -209,22 +210,25 @@ def sfs_ai_correspond(basefiles):
     old_sfs = old_uri.rsplit("/", 1)[-1]
     old_art = compress.read_json(layout.artifact("sfs", old_sfs))
     out = annstore.path("sfs", new_sfs, ".corr")
-    if protocol.RUN.dry_run:
-        print("sfs ai-correspond: would map %s <- %s via %s -> %s"
-              % (new_sfs, old_sfs, prop, out))
-        return
-    annstore.guard(out, protocol.RUN.force)     # a verified layer refuses, pre-LLM-spend
-    # reading the proposition's författningskommentar is förarbete's job; build
-    # composes the two verticals (sfs.correspond no longer imports forarbete)
-    fk = fa_kommentar.fk_section(
-        prop_art, new_art["metadata"]["properties"]["dcterms:title"])
-    sidecar, stats = sfs_correspond.correspond(new_art, prop_art, old_art, fk)
-    annstore.write(out, sidecar,
-                   {**annstore.artifact_input("sfs", new_sfs),
-                    **annstore.artifact_input("sfs", old_sfs),
-                    **annstore.artifact_input("forarbete", prop)}, protocol.RUN.force)
-    print("sfs ai-correspond %s: %d edges from %d (%d rejected), wrote %s"
-          % (new_sfs, stats["emitted"], stats["raw"], stats["rejected"], out))
+    with aireport.Report("sfs", "ai-correspond", 1) as report:
+        if protocol.RUN.dry_run:
+            report.plan(new_sfs, "map <- %s via %s -> %s" % (old_sfs, prop, out))
+            return report
+        if report.verified(new_sfs, out):     # pre-LLM-spend; write guards again
+            return report
+        report.item(new_sfs)
+        # reading the proposition's författningskommentar is förarbete's job; build
+        # composes the two verticals (sfs.correspond no longer imports forarbete)
+        fk = fa_kommentar.fk_section(
+            prop_art, new_art["metadata"]["properties"]["dcterms:title"])
+        sidecar, stats = sfs_correspond.correspond(new_art, prop_art, old_art, fk)
+        annstore.write(out, sidecar,
+                       {**annstore.artifact_input("sfs", new_sfs),
+                        **annstore.artifact_input("sfs", old_sfs),
+                        **annstore.artifact_input("forarbete", prop)}, protocol.RUN.force)
+        report.wrote(new_sfs, out, note="%d edges from %d, %d rejected, old law %s"
+                     % (stats["emitted"], stats["raw"], stats["rejected"], old_sfs))
+    return report
 
 
 
@@ -944,8 +948,11 @@ def _dispatch(args, p, jobs):
             # scopes are document ids -> fall through to the per-doc download stage
         if args.action in source.actions:
             t0 = time.perf_counter()
-            source.actions[args.action](args.basefiles)
-            freshness._emit_segment(args.action, name, time.perf_counter() - t0, status="ok")
+            report = source.actions[args.action](args.basefiles)
+            if not isinstance(report, aireport.Report):
+                # an ai-* action reports itself (counts, status.json); the rest
+                # get the bare "it ran" segment
+                freshness._emit_segment(args.action, name, time.perf_counter() - t0, status="ok")
             continue
         if args.action not in source.stages:
             # an "all" sweep visits every source; one that lacks the action

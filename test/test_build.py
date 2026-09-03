@@ -1554,8 +1554,8 @@ def test_remisser_ai_analyze_survives_one_unanalyzable_answer(monkeypatch, tmp_p
     assert exc.value.code == 1
     assert seen == answers                       # b's failure did not stop c
     out = capsys.readouterr().out
-    assert "1 of 3 failed" in out
-    assert "sou/2026:21/b" in out
+    assert "2 layer(s) written, 1 failed in" in out
+    assert "failed: sou/2026:21/b" in out
     # no layer for the failure, so a plain re-run retries exactly that one
     assert not annstore.path("remisser", "sou/2026:21/b").exists()
 

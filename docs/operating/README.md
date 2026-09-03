@@ -294,7 +294,23 @@ lagen kommentar ai-annotate <basefile>    # link an act's articles to external g
 lagen remisser ai-analyze <case>/<org>    # map one remiss answer onto the referred förarbete's sections
 lagen sfs ai-hierarki 2018:585            # author regleringshierarki rows for one lag's chain component
 lagen sfs ai-hierarki --all               # every lag whose chain reaches a föreskrift
+lagen sfs ai-correspond 2018:585 prop/2017-18-89   # old->new paragraf map of a restructured act (.corr)
+lagen sfs ai-includegraphics 2007:90      # place the graphics the consolidated text drops (.graphics)
+lagen forarbete ai-genomforande prop/2025-26-28    # directive->paragraf transposition map of a prop
 ```
+
+All seven report the same way (`lib/aireport.py`): the live counter the
+stages use, one persistent line per layer written, and a closing line --
+`sfs ai-hierarki: 12 layer(s) written over 3 item(s), 400 skipped (layers
+present 380, no graphic gaps 20), 1 failed in 2h05m`, the failed ids listed
+after it since they are what to re-run. The run ledger (`lagen all runs`)
+gets a segment with those counts, and a run that enumerated the whole
+eligible set itself (`sfs ai-hierarki --all`) writes its coverage to
+`status.json` under the action's name: how many of the ids it enumerated
+carry a layer. A subset run (`--update`, `--matching`, named ids) writes no
+cell.
+A hand-verified layer is skipped and counted, never overwritten without
+`--force`.
 
 These calls go to Berget by default, and are metered. Pointing them at a local,
 vision-capable model instead (Qwen3.6-35B-A3B on llama.cpp, one 24 GB GPU) is a

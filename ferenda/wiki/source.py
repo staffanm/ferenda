@@ -12,7 +12,7 @@ import functools
 import sys
 from pathlib import Path
 
-from ..lib import annstore, catalog, compress, layout, llm, util
+from ..lib import aireport, annstore, catalog, compress, layout, llm, util
 from ..lib import stage as protocol
 from ..lib.stage import (
     CASENUMBER_CODE,
@@ -113,14 +113,19 @@ def kommentar_ai_annotate(basefiles):
     id: the LLM is never called from parse/relate/generate."""
     if not basefiles:
         sys.exit("usage: lagen kommentar ai-annotate <basefile> [<basefile> ...]")
-    for basefile in basefiles:
-        llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
-        if protocol.RUN.dry_run:
-            print("kommentar ai-annotate: would annotate %s -> %s"
-                  % (basefile, annstore.path("kommentar", basefile)))
-            continue
-        out = annotate.annotate(basefile, WIKI_ROOT, force=protocol.RUN.force)
-        print("kommentar ai-annotate %s: wrote %s" % (basefile, out))
+    with aireport.Report("kommentar", "ai-annotate", len(basefiles)) as report:
+        for basefile in basefiles:
+            llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
+            out = annstore.path("kommentar", basefile)
+            if protocol.RUN.dry_run:
+                report.plan(basefile, "annotate -> %s" % out)
+                continue
+            if report.verified(basefile, out):
+                continue
+            report.item(basefile)
+            report.wrote(basefile, annotate.annotate(basefile, WIKI_ROOT,
+                                                     force=protocol.RUN.force))
+    return report
 
 
 def kommentar_discover_guidance(args):

@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from ..lib import (
+    aireport,
     annstore,
     catalog,
     cellar,
@@ -259,14 +260,18 @@ def eurlex_ai_annotate(basefiles):
     never called from parse/relate/generate, only from this explicit action."""
     if not basefiles:
         sys.exit("usage: lagen eurlex ai-annotate <CELEX> [<CELEX> ...]")
-    for celex in basefiles:
-        llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
-        if protocol.RUN.dry_run:
-            print("eurlex ai-annotate: would annotate %s -> %s"
-                  % (celex, annstore.path("eurlex", celex)))
-            continue
-        out = annotate.annotate(celex, force=protocol.RUN.force)
-        print("eurlex ai-annotate %s: wrote %s" % (celex, out))
+    with aireport.Report("eurlex", "ai-annotate", len(basefiles)) as report:
+        for celex in basefiles:
+            llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
+            out = annstore.path("eurlex", celex)
+            if protocol.RUN.dry_run:
+                report.plan(celex, "annotate -> %s" % out)
+                continue
+            if report.verified(celex, out):
+                continue
+            report.item(celex)
+            report.wrote(celex, annotate.annotate(celex, force=protocol.RUN.force))
+    return report
 
 
 def eurlex_backfill(args):

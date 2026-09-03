@@ -11,7 +11,7 @@ import functools
 import sys
 from pathlib import Path
 
-from ..lib import annstore, compress, layout
+from ..lib import aireport, annstore, compress, layout
 from ..lib import stage as protocol
 from ..lib.pdftext import pdf_intermediate
 from ..lib.stage import Source, Stage, record_inputs, write_artifact
@@ -118,20 +118,25 @@ def remisser_ai_analyze(basefiles):
                  "       lagen remisser ai-analyze --update\n"
                  "       lagen remisser ai-analyze --matching <prefix>")
     if not basefiles:
-        return
-    targets = ai_analyze.select(basefiles, force=protocol.RUN.force,
-                                dry_run=protocol.RUN.dry_run)
-    failed = ai_analyze.analyze_all(targets, force=protocol.RUN.force,
+        return None
+    # never corpus_wide: --update and --matching each select a subset (the open
+    # ärenden, one basefile prefix), so no remisser run proves the corpus's
+    # coverage and none may write the status.json cell
+    with aireport.Report("remisser", "ai-analyze") as report:
+        targets = ai_analyze.select(basefiles, report, force=protocol.RUN.force,
                                     dry_run=protocol.RUN.dry_run)
-    if failed:
+        report.total = report.done + len(targets)
+        ai_analyze.analyze_all(targets, report, force=protocol.RUN.force,
+                               dry_run=protocol.RUN.dry_run)
+    if report.failed:
         # sampling is stochastic (llm_temperature 1.0), so re-running genuinely
         # retries rather than reproducing: the usual failure is the model
         # paraphrasing where it was told to quote, and it quotes correctly next
         # time often enough to be worth another pass
-        print("remisser ai-analyze: %d of %d failed, no layer written -- re-run "
-              "to retry just these: %s" % (len(failed), len(targets),
-                                           " ".join(failed)))
+        print("remisser ai-analyze: no layer written for a failed answer -- "
+              "re-run those to retry", file=sys.stderr)
         sys.exit(1)
+    return report
 
 # No per-document download stage (the avg/foreskrift rule): answers arrive only
 # through the bulk `remisser_harvest` sweep, so parse runs over whatever is on

@@ -441,9 +441,11 @@ def analyze(basefile, force=False):
                            **annstore.artifact_input("forarbete", fa_slug)}, force)
 
 
-def select(basefiles, *, force, dry_run):
+def select(basefiles, report, *, force, dry_run):
     """The answers one `ai-analyze` run should analyze, out of the ärenden and
-    answers its arguments name, reporting each ärende's expansion as it goes.
+    answers its arguments name, reporting each ärende's expansion as it goes;
+    the answers it leaves out are counted on `report` (an `aireport.Report`),
+    by reason, so the closing line and the coverage cell see them.
 
     An expanded ärende skips answers that already carry a layer -- a remiss
     collects answers over months, so the second run over one is normally "the
@@ -470,6 +472,11 @@ def select(basefiles, *, force, dry_run):
         short = set() if force else {
             b for b in fresh if answer_chars(b) < MIN_ANSWER_CHARS}
         fresh = [b for b in fresh if b not in short]
+        for b in expanded:
+            if b in short:
+                report.skip(b, "under %d chars" % MIN_ANSWER_CHARS)
+            elif b not in fresh:
+                report.skip(b, "already analysed", present=True)
         print("remisser ai-analyze %s: %d answers, %d already analysed, "
               "%d under %d chars, %d to analyze"
               % (arg, len(expanded), len(expanded) - len(fresh) - len(short),
@@ -482,23 +489,22 @@ def select(basefiles, *, force, dry_run):
     return targets
 
 
-def analyze_all(targets, *, force, dry_run):
-    """Analyze every answer in `targets`, returning those the model twice failed
-    to answer usably about. No layer is written for a failure, so a re-run
-    retries exactly those."""
-    failed = []
+def analyze_all(targets, report, *, force, dry_run):
+    """Analyze every answer in `targets`; an answer the model twice failed to
+    answer usably about is a `report.fail` (no layer is written for it, so a
+    re-run retries exactly those)."""
     for basefile in targets:
         if dry_run:
-            print("remisser ai-analyze: would analyze %s -> %s"
-                  % (basefile, annstore.path("remisser", basefile)))
+            report.plan(basefile, "analyze -> %s" % annstore.path("remisser", basefile))
             continue
+        report.item(basefile)
         # one provenance window per answer, opened here rather than left to
         # `annstore.write`'s rearm: an Unanalyzable answer below writes no layer,
         # and its spent calls must not be stamped onto the next answer's
         llm.start_record()
         try:
             out = analyze(basefile, force=force)
-        except Unanalyzable:
+        except Unanalyzable as exc:
             # Exactly one failure is tolerated here: the model twice failing to
             # answer usably about one answer, which must not abandon the other 50
             # of its ärende. No layer is written, so a re-run retries exactly
@@ -509,7 +515,6 @@ def analyze_all(targets, *, force, dry_run):
             # reporting those as "re-run to retry" would promise a retry that can
             # never succeed (rule:narrow-what-you-catch).
             traceback.print_exc()
-            failed.append(basefile)
+            report.fail(basefile, exc)
             continue
-        print("remisser ai-analyze %s: wrote %s" % (basefile, out))
-    return failed
+        report.wrote(basefile, out)

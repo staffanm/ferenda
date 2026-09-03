@@ -11,7 +11,7 @@ import functools
 import sys
 from pathlib import Path
 
-from ..lib import annstore, compress, layout, llm
+from ..lib import aireport, annstore, compress, layout, llm
 from ..lib import stage as protocol
 from ..lib.datasets import COE_NAMES, TREATY_NAMES
 from ..lib.errors import SkipDocument
@@ -318,30 +318,31 @@ def fa_ai_genomforande(basefiles):
         sys.exit("forarbete ai-genomforande %s: no directive to map "
                  "(none named/detected, or none parsed in eurlex)" % prop)
     out = annstore.path("forarbete", prop, ".ann")
-    if protocol.RUN.dry_run:
-        print("forarbete ai-genomforande: would map %s onto %s -> %s"
-              % (",".join(present), prop, out))
-        return
-    annstore.guard(out, protocol.RUN.force)     # a verified layer refuses, pre-LLM-spend
+    with aireport.Report("forarbete", "ai-genomforande", 1) as report:
+        if protocol.RUN.dry_run:
+            report.plan(prop, "map %s onto it -> %s" % (",".join(present), out))
+            return report
+        if report.verified(prop, out):       # pre-LLM-spend; write guards again
+            return report
 
-    def progress(i, n, label):
-        # live view on stderr (rule:one-line-progress); stdout keeps only the
-        # one-shot summary below. Persistent lines, not util.status -- a batch
-        # is minutes on a local endpoint.
-        print("  [batch %d/%d] %s" % (i + 1, n, label), file=sys.stderr,
-              flush=True)
+        def progress(i, n, label):
+            # the shared counter, redrawn per batch: one is minutes on a local
+            # endpoint, and a silent terminal reads as a hang
+            report.item(prop, "batch %d/%d %s" % (i + 1, n, label))
 
-    payload, stats = aigenomforande.annotate(prop_art, present, progress)
-    annstore.write(out, payload,
-                   {**annstore.artifact_input("forarbete", prop),
-                    **{k: v for c in present
-                       for k, v in annstore.artifact_input("eurlex", c).items()}},
-                   protocol.RUN.force)
-    print("forarbete ai-genomforande %s <- %s: %d edges over %d paragrafer "
-          "(%d batch, %d+%d tokens), %d direktivartiklar täckta, wrote %s"
-          % (prop, ",".join(present), stats["edges"], stats["mapped_paragrafer"],
-             stats["batches"], llm.USAGE["prompt_tokens"],
-             llm.USAGE["completion_tokens"], stats["articles_covered"], out))
+        report.item(prop)
+        payload, stats = aigenomforande.annotate(prop_art, present, progress)
+        annstore.write(out, payload,
+                       {**annstore.artifact_input("forarbete", prop),
+                        **{k: v for c in present
+                           for k, v in annstore.artifact_input("eurlex", c).items()}},
+                       protocol.RUN.force)
+        report.wrote(prop, out, note="<- %s: %d edges over %d paragrafer, %d batch, "
+                     "%d+%d tokens, %d direktivartiklar täckta"
+                     % (",".join(present), stats["edges"], stats["mapped_paragrafer"],
+                        stats["batches"], llm.USAGE["prompt_tokens"],
+                        llm.USAGE["completion_tokens"], stats["articles_covered"]))
+    return report
 
 
 def fa_relate_cross(con):

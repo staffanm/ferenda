@@ -22,13 +22,13 @@ from pathlib import Path
 from .. import config
 from ..lib import (
     aihierarki,
+    aireport,
     annstore,
     catalog,
     compress,
     freshness,
     layout,
     llm,
-    util,
 )
 from ..lib import stage as protocol
 from ..lib.datasets import NAMEDLAWS
@@ -277,8 +277,10 @@ def sfs_ai_includegraphics(basefiles):
     have run. The LLM is never called from parse/relate/generate."""
     if not basefiles:
         sys.exit("usage: lagen sfs ai-includegraphics <basefile> [...]")
-    for basefile in basefiles:
-        _sfs_includegraphics_one(basefile)
+    with aireport.Report("sfs", "ai-includegraphics", len(basefiles)) as report:
+        for basefile in basefiles:
+            _sfs_includegraphics_one(basefile, report)
+    return report
 
 
 def _sfs_roadsign_index(basefile, register):
@@ -309,16 +311,16 @@ def _sfs_roadsign_index(basefile, register):
         [(s, layout.sfs_pdf(s)) for s in read], log=freshness.vlog), read
 
 
-def _sfs_includegraphics_one(basefile):
+def _sfs_includegraphics_one(basefile, report):
     art = compress.read_json(layout.artifact("sfs", basefile))
     register = compress.read_json(sfs_source(basefile))
     gaps = graphics.collect_gaps(art["structure"])
     out = annstore.path("sfs", basefile, ".graphics")
     if not gaps:
-        print("sfs ai-includegraphics %s: no graphic gaps" % basefile)
+        report.skip(basefile, "no graphic gaps")
         return
     if basefile in graphics.ROADSIGN_DOCS:
-        _sfs_roadsigns_one(basefile, art, register, gaps, out)
+        _sfs_roadsigns_one(basefile, art, register, gaps, out, report)
         return
     # keep verified+provenance-current entries; (re)localize the rest, grouped by
     # source PDF. A verified crop whose bilaga has since been amended (its `sfs`
@@ -339,15 +341,16 @@ def _sfs_includegraphics_one(basefile):
                          "localized" % (basefile, ", ".join(missing)))
     todo_n = sum(len(g) for g in todo.values())
     if protocol.RUN.dry_run:
-        print("sfs ai-includegraphics %s: %d gap(s); keep %d verified, localize "
-              "%d from source PDF(s) %s -> %s"
-              % (basefile, len(gaps), len(keep), todo_n, sorted(todo), out))
+        report.plan(basefile, "keep %d of %d gap(s) verified, localize %d from "
+                    "source PDF(s) %s -> %s"
+                    % (len(keep), len(gaps), todo_n, sorted(todo), out))
         return
     if not todo:
-        print("sfs ai-includegraphics %s: all %d gap(s) localized and current "
-              "(%d verified) -- nothing to do" % (basefile, len(gaps), len(keep)))
+        report.skip(basefile, "all gaps localized and current", present=True)
         return
-    annstore.guard(out, protocol.RUN.force)     # a verified layer refuses, pre-LLM-spend
+    if report.verified(basefile, out):     # pre-LLM-spend; the write guards again
+        return
+    report.item(basefile, "%d gap(s) across %d source PDF(s)" % (todo_n, len(todo)))
     freshness.vlog("sfs ai-includegraphics %s: localizing %d gap(s) across %d source PDF(s): %s"
          % (basefile, todo_n, len(todo), ", ".join(sorted(todo))))
     payload = dict(keep)
@@ -358,8 +361,8 @@ def _sfs_includegraphics_one(basefile):
     _sfs_write_graphics(basefile, art, register, out, payload,
                         list(todo) + [e["sfs"] for e in keep.values()],
                         config.VISION_MODEL)
-    print("sfs ai-includegraphics %s: localized %d gap(s) (kept %d verified), "
-          "wrote %s" % (basefile, todo_n, len(keep), out))
+    report.wrote(basefile, out, note="localized %d gap(s), kept %d verified"
+                 % (todo_n, len(keep)))
 
 
 def _sfs_write_graphics(basefile, art, register, out, payload, sources, model,
@@ -394,7 +397,7 @@ def _sfs_write_graphics(basefile, art, register, out, payload, sources, model,
                    meta_extra=meta, status=status)
 
 
-def _sfs_roadsigns_one(basefile, art, register, gaps, out):
+def _sfs_roadsigns_one(basefile, art, register, gaps, out, report):
     """The road-sign path: no vision call, no register-note provenance.
 
     A road-sign statute prints no omission marker and carries no per-row change
@@ -420,17 +423,16 @@ def _sfs_roadsigns_one(basefile, art, register, gaps, out):
         if gap["code"] in index else basefile)
     todo_gaps = [gap for group in todo.values() for gap in group]
     if protocol.RUN.dry_run:
-        print("sfs ai-includegraphics %s: %d road-sign gap(s); keep %d "
-              "verified, place %d from %d published PDF(s) -> %s"
-              % (basefile, len(gaps), len(keep), len(todo_gaps),
-                 len(todo), out))
+        report.plan(basefile, "keep %d of %d road-sign gap(s) verified, place %d "
+                    "from %d published PDF(s) -> %s"
+                    % (len(keep), len(gaps), len(todo_gaps), len(todo), out))
         return
     if not todo:
-        print("sfs ai-includegraphics %s: all %d road-sign gap(s) placed and "
-              "current (%d verified) -- nothing to do"
-              % (basefile, len(gaps), len(keep)))
+        report.skip(basefile, "all road-sign gaps placed and current", present=True)
         return
-    annstore.guard(out, protocol.RUN.force)
+    if report.verified(basefile, out):
+        return
+    report.item(basefile, "%d road-sign gap(s)" % len(todo_gaps))
     placed, unprinted = graphics.localize_roadsigns(todo_gaps, index)
     if not placed:
         raise ValueError("%s: not one of %d road-sign gap(s) is printed in any "
@@ -442,8 +444,8 @@ def _sfs_roadsigns_one(basefile, art, register, gaps, out):
               "placeholder(s)" % (basefile, ", ".join(unprinted)))
     _sfs_write_graphics(basefile, art, register, out, dict(keep) | placed,
                         sources, "roadsign", status=annstore.DERIVED)
-    print("sfs ai-includegraphics %s: placed %d road-sign gap(s) (kept %d "
-          "verified), wrote %s" % (basefile, len(placed), len(keep), out))
+    report.wrote(basefile, out, note="placed %d road-sign gap(s), kept %d verified"
+                 % (len(placed), len(keep)))
 
 
 def sfs_ai_hierarki(basefiles):
@@ -458,7 +460,8 @@ def sfs_ai_hierarki(basefiles):
     parse/relate/generate, and a verified layer refuses regeneration without
     --force."""
     con = catalog.connect(layout.CATALOG)
-    if not basefiles and protocol.RUN.every:
+    corpus_wide = not basefiles and protocol.RUN.every
+    if corpus_wide:
         # every gällande lag whose component reaches a föreskrift, plus the
         # EU-pair tier (an EU rung above, nothing below) -- 524 of 1,768
         # lagar, measured 2026-08-29
@@ -471,61 +474,52 @@ def sfs_ai_hierarki(basefiles):
                  "reaches a föreskrift -- one component per lag")
     llm.start_record()
     eligible = aihierarki.layer_sources(con)
-    t0 = time.perf_counter()
-    paid = 0            # components actually run (skips are instant)
-    for i, bf in enumerate(basefiles, 1):
-        docs, clauses = aihierarki.component(con, catalog.BASE + bf)
-        if protocol.RUN.dry_run:
-            print("would run %s: %d documents, %d pinned delegation clauses"
-                  % (bf, len(docs), len(clauses)))
-            continue
-        # resume: a component whose documents all carry a hierarki layer is
-        # done -- a restarted corpus run (this one runs for weeks) must never
-        # re-pay finished components. --force re-runs them.
-        if not protocol.RUN.force and all(d not in eligible
-                                 or aihierarki.layer_path(eligible[d],
-                                                          d).exists()
-                                 for d in docs):
-            util.status(i, len(basefiles),
-                        "sfs ai-hierarki %s: layers present, skipped" % bf,
-                        actual=paid or None)
-            continue
-        ncalls = [0]
+    tasks = ("a", "b1", "b2", "c", "d")
+    with aireport.Report("sfs", "ai-hierarki", len(basefiles),
+                         corpus_wide=corpus_wide) as report:
+        for bf in basefiles:
+            docs, clauses = aihierarki.component(con, catalog.BASE + bf)
+            if protocol.RUN.dry_run:
+                report.plan(bf, "run %d documents, %d pinned delegation clauses"
+                            % (len(docs), len(clauses)))
+                continue
+            # resume: a component whose documents all carry a hierarki layer is
+            # done -- a restarted corpus run (this one runs for weeks) must never
+            # re-pay finished components. --force re-runs them.
+            if not protocol.RUN.force and all(d not in eligible
+                                     or aihierarki.layer_path(eligible[d],
+                                                              d).exists()
+                                     for d in docs):
+                report.skip(bf, "layers present", present=True)
+                continue
+            ncalls = [0]
 
-        def progress(task, i=i, bf=bf, ncalls=ncalls, paid=paid):
-            # the standard overwriting status line (util.status: \r + erase,
-            # width-clipped, right-aligned ETA paced on run components): a
-            # 70-document component takes hours before its completion line,
-            # and a silent terminal reads as a hang
-            ncalls[0] += 1
-            util.status(i, len(basefiles),
-                        "sfs ai-hierarki %s  call %d (task %s), %dk+%dk tok"
-                        % (bf, ncalls[0], task,
-                           llm.USAGE["prompt_tokens"] // 1000,
-                           llm.USAGE["completion_tokens"] // 1000),
-                        actual=paid + 1)
+            def progress(task, bf=bf, ncalls=ncalls):
+                # the shared counter redrawn per LLM call: a 70-document
+                # component takes hours before its completion line, and a
+                # silent terminal reads as a hang. Its ETA is paced on the
+                # components actually run (the skips are instant)
+                ncalls[0] += 1
+                report.item(bf, "call %d (task %s), %dk+%dk tok"
+                            % (ncalls[0], task,
+                               llm.USAGE["prompt_tokens"] // 1000,
+                               llm.USAGE["completion_tokens"] // 1000))
 
-        rows, stats = aihierarki.run_component(con, docs, clauses,
-                                               batched=True,
-                                               progress=progress)
-        util.progress_break()
-        written = aihierarki.write_layers(con, rows, force=protocol.RUN.force,
-                                          all_docs=docs)
-        paid += 1
-        # rough ETA: elapsed over the components actually run, extrapolated
-        # to what remains -- component sizes vary widely, so read it as an
-        # order of magnitude, not a promise
-        remaining = (time.perf_counter() - t0) / paid * (len(basefiles) - i)
-        tasks = ("a", "b1", "b2", "c", "d")
-        print("(%d/%d) %s: %d rows over %d documents -> %d layers "
-              "(%d calls, %d discarded, %d+%d tokens)  ETA %dh%02dm"
-              % (i, len(basefiles), bf, len(rows), len(docs), written,
-                 sum(stats[t + "_calls"] for t in tasks),
-                 sum(stats[t + "_discarded"] for t in tasks),
-                 llm.USAGE["prompt_tokens"], llm.USAGE["completion_tokens"],
-                 remaining // 3600, remaining % 3600 // 60),
-              flush=True)
+            report.item(bf, "%d documents" % len(docs))
+            rows, stats = aihierarki.run_component(con, docs, clauses,
+                                                   batched=True,
+                                                   progress=progress)
+            written = aihierarki.write_layers(con, rows, force=protocol.RUN.force,
+                                              all_docs=docs)
+            report.wrote(bf, layers=written,
+                         note="%d rows over %d documents, %d calls, %d discarded, "
+                         "%d+%d tokens"
+                         % (len(rows), len(docs),
+                            sum(stats[t + "_calls"] for t in tasks),
+                            sum(stats[t + "_discarded"] for t in tasks),
+                            llm.USAGE["prompt_tokens"], llm.USAGE["completion_tokens"]))
     con.close()
+    return report
 
 
 def sfs_version_pages(sidecars):
