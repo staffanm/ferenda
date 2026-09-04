@@ -74,7 +74,8 @@ entirely if you only run the API-backed DV path (the default).
 
 Search (`lagen … index`, the `/api/v1/search` endpoint, and the ⌘K palette)
 needs OpenSearch 3.7 reachable at `opensearch_url` (default
-`http://localhost:9200`). The repo ships a compose file that starts it:
+`http://localhost:9200`); `/api/v1/resolve` answers from the catalog alone and
+does not. The repo ships a compose file that starts it:
 
 ```sh
 docker compose -f docker-compose.dev.yml up -d

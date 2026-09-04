@@ -16,7 +16,7 @@ The two things to know first:
 
 ## Contents
 
-- [The REST API](#the-rest-api) — search, list, get, derived views
+- [The REST API](#the-rest-api) — search, resolve, list, get, derived views
 - [Bulk download](#bulk-download) — NDJSON dumps
 - [The JSON artifact format](#the-json-artifact-format) — the parsed-document schema
 - [Derived and editorial layers](#derived-and-editorial-layers) — sidecars and the catalog
@@ -58,8 +58,9 @@ needs it: whatever the site can read there, it reads from `/api/v1` too.
 
 ### Search — `GET /api/v1/search`
 
-Full-text search with a citation-aware twist. This is also the ⌘K resolver —
-there is no separate `/resolve` endpoint.
+Full-text search with a citation-aware twist. This is also the ⌘K resolver;
+`GET /api/v1/resolve` (below) runs the same resolver on its own, without the
+full-text search.
 
 | Param | Default | Notes |
 |---|---|---|
@@ -125,6 +126,48 @@ fail search.
 filters (a facet's own aggregation ignores its own restriction, so its bucket
 counts stay usable for widening the filter), and each aggregation runs over
 `source`/`kind`/`year`.
+
+### Resolve a citation — `GET /api/v1/resolve`
+
+The citation resolver on its own: a citation-shaped query becomes its exact
+document, and its exact provision when the citation names one. Use it when
+only the resolved target is wanted — a citation read as a bag of words also
+matches many loosely related documents in `/api/v1/search`. Answers from the
+catalog alone; OpenSearch is not involved.
+
+| Param | Default | Notes |
+|---|---|---|
+| `q` | (required) | the citation: a law name or abbreviation with a pinpoint (`avtalslagen 36 §`, `BrB 12:1`), an EU act with an article or recital (`GDPR artikel 32`), a CJEU case number (`C-199/24`), a treaty article (`EKMR 6`) or a case nickname (`Instagrambilden`) |
+| `source` | — | restrict to one source |
+| `kind` | — | restrict to a document kind within that source |
+
+The answer has two lists. `results` holds the documents the corpus has, in
+the same row shape as a search hit (`score` is null, `pin` marks the
+provision). `recognized` holds the citations the query was read as whose
+document the corpus does **not** hold — a well-formed case number of a
+judgment not decided yet, or not harvested. Such an entry is an identity, not
+a document: no page answers its `uri`, and it must not be cited as a source.
+Both lists empty means the query does not read as a known citation; that is
+not an error, `/api/v1/search` is the right call then.
+
+```jsonc
+// GET /api/v1/resolve?q=C-199/24
+{
+  "query": "C-199/24",
+  "results": [ { "uri": "https://lagen.nu/celex/62024CJ0199", "url": "/celex/62024CJ0199",
+                 "identifier": "62024CJ0199", "title": "C-199/24", "source": "eurlex",
+                 "kind": "judgment", "score": null, "inbound_count": 10,
+                 "highlight": [], "pin": null, "fragments": [] } ],
+  "recognized": []
+}
+
+// GET /api/v1/resolve?q=C-744/28  — well formed, not held
+{
+  "query": "C-744/28",
+  "results": [],
+  "recognized": [ { "uri": "https://lagen.nu/celex/62028CJ0744", "source": "eurlex" } ]
+}
+```
 
 ### List documents
 
@@ -411,7 +454,7 @@ expect a slow response on a big document.
 | I want to… | Endpoint |
 |---|---|
 | search | `GET /api/v1/search` |
-| resolve a citation (⌘K) | `GET /api/v1/search` (first page pins the resolved hit) |
+| resolve a citation (⌘K) | `GET /api/v1/resolve`; `GET /api/v1/search` also pins the resolved hit first on its first page |
 | list sources + counts | `GET /api/v1/sources` |
 | enumerate documents | `GET /api/v1/documents` |
 | browse by facet | `GET /api/v1/facets`, `GET /api/v1/browse` |

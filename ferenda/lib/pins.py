@@ -9,7 +9,10 @@ can't reach (the name is nowhere in the document). `resolve.resolve` proposes
 the target(s); each is confirmed against the catalog (so an alias for a
 not-yet-parsed document doesn't surface) and honours the same source/kind
 filter, and the document's own label/title/inbound_count are attached so a
-pinned hit ranks and renders like any other search hit.
+pinned hit ranks and renders like any other search hit. A target the catalog
+does not confirm is still reported, apart from the hits (`resolve_query`'s
+`recognized`), so a client can tell a well-formed citation of a document we do
+not hold from a query that is no citation at all.
 """
 
 import re
@@ -23,10 +26,32 @@ SNIPPET_CHARS = 240
 
 
 def resolved_results(con, q, source=None, kind=None):
-    """The resolver's hits for `q`, each shaped like a SearchResult dict
-    (uri, url, identifier, title, display, source, kind, inbound_count, pin,
-    fragments). Empty when `q` reads as no known citation."""
-    out = []
+    """The resolver's hits for `q` that the catalog confirms, each shaped like
+    a SearchResult dict (uri, url, identifier, title, display, source, kind,
+    inbound_count, pin, fragments). Empty when `q` reads as no known citation,
+    or names only documents the corpus does not hold -- `resolve_query` tells
+    those two apart; this is its first half, for the callers (the search
+    endpoints' leading pin) that only place hits."""
+    return resolve_query(con, q, source, kind)[0]
+
+
+def resolve_query(con, q, source=None, kind=None):
+    """`(results, recognized)` for a citation-shaped query. `results` is
+    `resolved_results`' list. `recognized` names the citations the resolver
+    read but the catalog does not hold -- `{"uri", "source"}` per citation:
+    the document uri the citation mints and the source it would belong to.
+    A client can then tell a well-formed citation of a document we do not
+    have ("C-744/28": not decided yet, or not harvested) from a query that is
+    no citation at all ("blahonga"), where both lists are empty.
+
+    Kept apart from `results` rather than flagged inside it: a row there is a
+    document a client can fetch and link to, and a minted identifier with no
+    document behind it, sitting among the hits, is an invitation to cite what
+    we cannot show. The document uri, not the pinpointed one: a provision of
+    a document we do not hold cannot be confirmed either. A source filter
+    applies to both lists; a kind filter only to the held rows, since an
+    unheld citation has no kind to check."""
+    out, recognized = [], []
     for hit in resolve.resolve(q):
         if source and hit["source"] != source:
             continue
@@ -39,6 +64,7 @@ def resolved_results(con, q, source=None, kind=None):
             if row:
                 root = row[0]
         if not row:
+            recognized.append({"uri": root, "source": hit["source"]})
             continue
         _uri, src, kind_, label, title, _path, descriptive, _url = row
         if kind and kind_ != kind:
@@ -79,7 +105,7 @@ def resolved_results(con, q, source=None, kind=None):
             "pin": pin,
             "fragments": [],
         })
-    return out
+    return out, recognized
 
 
 # an article heading that opens with the article's own designation, as a treaty

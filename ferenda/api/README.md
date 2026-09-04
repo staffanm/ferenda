@@ -237,7 +237,13 @@ utlösta träffen behövs.
 | `source` | sträng | begränsa till en källa |
 | `kind` | sträng | begränsa till en dokumenttyp inom källan |
 
-Svaret har samma träffform som `/api/v1/search` (`query` + `results`). Kräver
+Svaret har samma träffform som `/api/v1/search` (`query` + `results`), plus
+`recognized`: de hänvisningar som lästes ur frågan men vars dokument
+samlingen inte innehåller — ett välformat målnummer på en dom som ännu inte
+meddelats eller inte hämtats. En sådan post är bara en identitet (`uri`,
+`source`); ingen sida svarar på den, och den ska inte citeras som en källa.
+Är både `results` och `recognized` tomma läses frågan inte som en känd
+hänvisning — inte ett fel; fråga `/api/v1/search` då i stället. Kräver
 **inte** OpenSearch, bara ett byggt corpus-index (`lagen all relate`).
 
 ```sh
@@ -261,6 +267,23 @@ curl -G http://127.0.0.1:8001/api/v1/resolve --data-urlencode "q=C-199/24"
       "pin": null,
       "fragments": []
     }
+  ],
+  "recognized": []
+}
+```
+
+Ett välformat målnummer som samlingen inte har:
+
+```sh
+curl -G http://127.0.0.1:8001/api/v1/resolve --data-urlencode "q=C-744/28"
+```
+
+```json
+{
+  "query": "C-744/28",
+  "results": [],
+  "recognized": [
+    {"uri": "https://lagen.nu/celex/62028CJ0744", "source": "eurlex"}
   ]
 }
 ```

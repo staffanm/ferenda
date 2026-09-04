@@ -744,7 +744,21 @@ def test_resolve_pins_a_pinpoint_citation_with_its_provision(client):
 def test_resolve_empty_when_the_query_is_not_a_citation(client):
     r = client.get("/api/v1/resolve", params={"q": "mord"})
     assert r.status_code == 200
-    assert r.json() == {"query": "mord", "results": []}
+    assert r.json() == {"query": "mord", "results": [], "recognized": []}
+
+
+def test_resolve_names_a_recognized_citation_the_corpus_does_not_hold(client):
+    # a well-formed case number of a judgment we do not hold is not the same
+    # answer as "not a citation": the resolver mints its identity, the catalog
+    # has no row, and the client is told so -- apart from the hits, so it is
+    # never cited as a document
+    body = client.get("/api/v1/resolve", params={"q": "C-744/28"}).json()
+    assert body["results"] == []
+    assert body["recognized"] == [{"uri": "https://lagen.nu/celex/62028CJ0744",
+                                   "source": "eurlex"}]
+    # the source filter applies to the recognized list too
+    assert client.get("/api/v1/resolve", params={
+        "q": "C-744/28", "source": "sfs"}).json()["recognized"] == []
 
 
 def test_resolve_source_filter_narrows(client):

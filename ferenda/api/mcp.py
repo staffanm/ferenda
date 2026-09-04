@@ -362,9 +362,14 @@ class ResolvedCitations(TypedDict):
     block cannot be half-read.
 
     `results` rather than `citations`: these rows are the same shape `search`
-    returns under that name, so a client can reuse the same handler."""
+    returns under that name, so a client can reuse the same handler.
+    `recognized` is the other list `pins.resolve_query` answers with -- the
+    citations read from the query whose document the corpus does not hold,
+    kept out of `results` so a model never quotes a minted identifier as a
+    document it can fetch."""
 
     results: list[dict]
+    recognized: list[dict]
 
 
 class OutgoingCitations(TypedDict):
@@ -499,16 +504,25 @@ def resolve_citation(citation: CitationArg) -> ResolvedCitations:
     Använd det när källan redan är namngiven. Gäller frågan ett bredare ämne och
     rätt bestämmelse ännu inte är känd, använd `search` i stället.
 
-    Svaret är en `results`-lista (oftast en post, tom när inget löses ut) med
-    samma radform som `search` ger: id, uri, url, identifier, title, source,
-    kind, inbound_count, pin och fragments. Avsåg hänvisningen en paragraf eller
-    artikel är `pin.uri` den utpekade delen, och `id` -- det `fetch` tar -- är
-    samma utpekade URI.
+    Svaret är en `results`-lista (oftast en post) med samma radform som
+    `search` ger: id, uri, url, identifier, title, source, kind, inbound_count,
+    pin och fragments. Avsåg hänvisningen en paragraf eller artikel är `pin.uri`
+    den utpekade delen, och `id` -- det `fetch` tar -- är samma utpekade URI.
+
+    `recognized` listar hänvisningar som lästes ur frågan men vars dokument
+    samlingen inte innehåller -- t.ex. ett välformat målnummer på en dom som
+    ännu inte meddelats eller inte hämtats: `uri` är den identitet dokumentet
+    skulle ha här, `source` källan. En sådan post är en identitet, inte ett
+    dokument: den kan inte hämtas med `fetch` och ska inte citeras som en
+    källa. Är både `results` och `recognized` tomma lästes frågan inte som
+    någon känd hänvisning -- använd `search`.
     """
     with _con() as con:
-        return ResolvedCitations(results=[
-            {**r, "id": _hit_id(r)}
-            for r in _absolute_page_urls(pins.resolved_results(con, citation))])
+        results, recognized = pins.resolve_query(con, citation)
+        return ResolvedCitations(
+            results=[{**r, "id": _hit_id(r)}
+                     for r in _absolute_page_urls(results)],
+            recognized=recognized)
 
 
 @mcp.tool(title="Hämta ett dokuments text och metadata", annotations=READ_ONLY)

@@ -349,6 +349,16 @@ class SearchResponse(BaseModel):
     results: list[SearchResult]
 
 
+class RecognizedCitation(BaseModel):
+    """A citation the resolver read, naming a document the corpus does not
+    hold: well formed, but not fetchable here -- and not known to exist."""
+
+    uri: str = Field(description="the document uri the citation names -- the "
+                     "identity the document would have here; no page answers "
+                     "it")
+    source: str = Field(description="the source the document would belong to")
+
+
 class ResolveResponse(BaseModel):
     """The answer to /api/v1/resolve: a citation-shaped query's resolved
     target(s), with no full-text search involved."""
@@ -356,6 +366,10 @@ class ResolveResponse(BaseModel):
     query: str = Field(description="the query as asked, echoed back")
     results: list[SearchResult] = Field(
         description="the resolved target(s) the corpus holds, usually one hit")
+    recognized: list[RecognizedCitation] = Field(
+        description="citations read from the query whose document the corpus "
+        "does not hold (\"C-744/28\": not decided yet, or not harvested). "
+        "Both lists empty: the query does not read as a known citation")
 
 
 class Citation(BaseModel):
@@ -677,12 +691,19 @@ def resolve_endpoint(
     alongside it (a citation-shaped query, read as a bag of words, tends to
     match many loosely-related documents there).
 
+    `recognized` lists the citations the query was read as whose document the
+    corpus does not hold: a well-formed case number of a judgment not decided
+    yet, or not harvested. Such an entry is an identity, not a document -- it
+    cannot be fetched and must not be cited as if it could. Both lists empty
+    means the query does not read as a known citation -- that is not an error,
+    it means `/api/v1/search` is the right tool instead.
+
     Answers from the catalog alone -- no OpenSearch involved, so this endpoint
     stays up even when full-text search is unavailable."""
     kind_label = facets.kind_labels(singular=True)   # one hit, not a bucket
-    results = pins.resolved_results(con, q, source, kind)
+    results, recognized = pins.resolve_query(con, q, source, kind)
     return ResolveResponse(
-        query=q,
+        query=q, recognized=recognized,
         results=[{**r, "kind_label": kind_label.get(r.get("kind"))}
                  for r in results])
 

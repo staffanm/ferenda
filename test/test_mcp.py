@@ -154,6 +154,18 @@ def test_resolve_citation_bare_sfs_number(corpus):
     assert hits[0]["pin"]["uri"] == "https://lagen.nu/1904:48_s.1#P3"
 
 
+def test_resolve_citation_names_an_unheld_citation_apart_from_the_hits(corpus):
+    # a well-formed case number the corpus does not hold: an identity under
+    # `recognized`, never a row under `results` (which a model would cite)
+    answer = mcpmod.resolve_citation("C-744/28")
+    assert answer["results"] == []
+    assert answer["recognized"] == [{"uri": "https://lagen.nu/celex/62028CJ0744",
+                                     "source": "eurlex"}]
+    # and a query that is no citation at all leaves both lists empty
+    assert mcpmod.resolve_citation("blahonga") == {"results": [],
+                                                   "recognized": []}
+
+
 def test_get_document_full_and_pinpoint(corpus):
     doc = mcpmod.get_document("https://lagen.nu/1962:700")
     assert doc["title"] == "Brottsbalk (1962:700)"
