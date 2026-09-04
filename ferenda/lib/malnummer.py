@@ -1,4 +1,6 @@
-"""Swedish court case numbers -- the printed shape, and one spelling for it.
+"""Court case numbers -- the printed shape, and one spelling for it. Swedish
+målnummer ("T 3-08") throughout; the CJEU's case numbers ("C-199/24") for the
+search query side (`eu_query_numbers`).
 
 A decision carries a case number ("målnummer") from the day it is filed, and a
 referat number only when it is published: "T 3-08" was decided 2009-11-03 and
@@ -79,6 +81,35 @@ def query_numbers(query):
     return [_canonical(m) for m in CASE_NUMBER.finditer(query)
             if m.group(1) or RE_MAL.search(query[:m.start()])
             or m.group() == query.strip()]
+
+
+# A CJEU case number: the court letter (C the Court, T the General Court, F
+# the Civil Service Tribunal), the serial and the two-digit year, with the
+# hyphen variants EU texts print (incl. U+2011) and an optional "Case"/"mål"
+# marker in front -- the same shape lagrum.py's EURATTSFALL grammar reads
+# inside document bodies. Before 1989 there was no court letter ("mål 31/87"),
+# so that form counts only behind the marker word: a bare "31/87" is as often
+# a riksmöte or a page reference.
+EU_CASE_NUMBER = re.compile(
+    r"(?<![\w-])((?:Case|[Mm]ål)\s+)?(?:([CTFctf])[-‑‐–—]\s?)?(\d{1,4})/(\d{2,4})(?![\d/])")
+
+
+def eu_query_numbers(query):
+    """The CJEU case numbers a *search query* asks for, spelled as the index
+    titles them ("C-199/24": upper-case letter, ASCII hyphen) -- what
+    `lib/search.py` builds its title-phrase clause from. An eurlex judgment is
+    titled by its case number, and the standard analyzer splits that into
+    "c", "199", "24", so per-term matching ranked every document holding
+    those two numbers over the judgment itself; as a phrase the whole number
+    has to stand in the title."""
+    out = []
+    for m in EU_CASE_NUMBER.finditer(query):
+        marker, letter, serial, year = m.groups()
+        if letter:
+            out.append("%s-%s/%s" % (letter.upper(), serial, year))
+        elif marker:
+            out.append("%s/%s" % (serial, year))
+    return out
 
 
 # What a citation calls each court, mapped onto the court codes the dv corpus

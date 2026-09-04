@@ -451,10 +451,20 @@ def case_number_queries(q):
     the way the indexed field is spelled, so ``T3-08`` and ``T 3-08`` are one
     query. It is stricter than the printed shape on purpose: "17 kap. 17-18 §§"
     holds no case number, though the corpus does hold a decision numbered 17-18.
+
+    A CJEU case number (``C-199/24``, ``mål C‑199/24``) is the same failure
+    class on the eurlex side: the standard analyzer splits it into "c", "199"
+    and "24", each an ordinary token, so the judgment itself drowned under
+    every document holding those two numbers. There is no separate field to
+    phrase over -- an eurlex judgment is *titled* by its case number -- so the
+    clause is a phrase on `title` (`lib/malnummer.eu_query_numbers`).
     """
-    return [{"match_phrase": {"malnummer": {"query": number,
-                                            "boost": CASE_NUMBER_BOOST}}}
-            for number in malnummer.query_numbers(q)]
+    return ([{"match_phrase": {"malnummer": {"query": number,
+                                             "boost": CASE_NUMBER_BOOST}}}
+             for number in malnummer.query_numbers(q)]
+            + [{"match_phrase": {"title": {"query": number,
+                                           "boost": CASE_NUMBER_BOOST}}}
+               for number in malnummer.eu_query_numbers(q)])
 
 
 def _text_query(q):

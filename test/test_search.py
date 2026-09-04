@@ -354,6 +354,30 @@ def test_case_number_query_is_a_phrase_over_what_the_query_names():
     # case number matches answers even when its body does not carry the words
     should = search._text_query("T 3-08")["bool"]["should"]
     assert should[-1] == clause and len(should) == 3
+
+
+def test_eu_case_number_query_is_a_phrase_on_the_title():
+    # an eurlex judgment is titled by its case number, and the analyzer splits
+    # "C-199/24" into "c", "199", "24" -- ordinary tokens that ranked every
+    # document holding those two numbers over the judgment itself; the phrase
+    # over the title is the same answer the målnummer field gives a Swedish
+    # case number
+    clause = {"match_phrase": {"title": {
+        "query": "C-199/24", "boost": search.CASE_NUMBER_BOOST}}}
+    assert search.case_number_queries("C-199/24") == [clause]
+    # the marker word, a non-breaking hyphen, a lower-case letter: one number
+    for q in ("mål C-199/24", "Case C‑199/24", "c-199/24", "dom i mål C-199/24"):
+        assert search.case_number_queries(q) == [clause], q
+    # joined cases: one clause each
+    assert [c["match_phrase"]["title"]["query"] for c in
+            search.case_number_queries("C-199/24 och C-200/24")] \
+        == ["C-199/24", "C-200/24"]
+    # pre-1989 numbering counts only behind the marker word -- a bare "31/87"
+    # is as often a riksmöte or a page reference
+    assert search.case_number_queries("mål 31/87") == [{"match_phrase": {
+        "title": {"query": "31/87", "boost": search.CASE_NUMBER_BOOST}}}]
+    for q in ("31/87", "prop. 2001/02:5", "artikel 24", "C-199"):
+        assert search.case_number_queries(q) == [], q
     # a query that cannot be a case number keeps the two text branches alone
     assert len(search._text_query("mord")["bool"]["should"]) == 2
 
@@ -790,6 +814,43 @@ def test_index_and_search_round_trip(tmp_path):
         assert index.search("mor")["total"] == 1
         # a scoped query still works
         assert index.search("brottsbalken", source="sfs")["total"] >= 1
+    finally:
+        if index.client.indices.exists(index="lagen-test"):
+            index.client.indices.delete(index="lagen-test")
+
+
+@pytest.mark.skipif(not os.environ.get("OPENSEARCH_URL"),
+                    reason="needs a running OpenSearch (set OPENSEARCH_URL)")
+def test_eu_case_number_finds_the_judgment(tmp_path):
+    """Against a live cluster: a CJEU judgment, titled by its case number, leads
+    for that number -- ahead of an act whose body carries the same two numbers
+    many times over, which per-term matching ranked first (2026-09-04)."""
+    art = tmp_path / "artifact"
+    art.mkdir()
+    judgment = art / "judgment.json"
+    judgment.write_text(json.dumps({
+        # a judgment's catalog title is its case citation, stamped at parse
+        # as `label` (catalog_rows._eurlex_document), not its Formex title
+        "uri": "https://lagen.nu/celex/62024CJ0199", "doctype": "judgment",
+        "celex": "62024CJ0199", "label": "C-199/24",
+        "title": "Domstolens dom (första avdelningen) av den 4 september 2026",
+        "structure": [{"type": "paragraf", "id": "P1",
+                       "text": ["Domstolen meddelar följande dom."]}]}))
+    act = art / "act.json"
+    act.write_text(json.dumps({
+        "uri": "https://lagen.nu/celex/32024R0001", "doctype": "regulation",
+        "celex": "32024R0001", "title": "Förordning (EU) 2024/1",
+        "structure": [{"type": "paragraf", "id": "P1",
+                       "text": [" ".join(["artikel 24 c punkt 199"] * 20)]}]}))
+    cat = tmp_path / "catalog.sqlite"
+    catalog.rebuild(cat, "eurlex", [judgment, act])
+    con = catalog.connect(cat)
+    index = search.SearchIndex(index="lagen-test")
+    try:
+        index.index_source(con, "eurlex")
+        for q in ("C-199/24", "c-199/24", "mål C‑199/24"):
+            res = index.search(q, limit=5)
+            assert res["results"][0]["uri"] == "https://lagen.nu/celex/62024CJ0199", q
     finally:
         if index.client.indices.exists(index="lagen-test"):
             index.client.indices.delete(index="lagen-test")
