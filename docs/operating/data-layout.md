@@ -7,7 +7,7 @@ committed):
 site/data/downloaded/sfs/                     # SFS raw (beta JSON + legacy sfst/sfsr HTML)
 site/data/downloaded/sfs/pdf/                 # mirrored official SFS PDFs (1998–; the graphic-crop source)
 site/data/artifact/sfs/                       # parsed JSON artifacts (+ .versions.json sidecars)
-site/data/{downloaded,artifact}/sfs/archive/  # superseded consolidations, raw + parsed
+site/data/{downloaded,artifact}/sfs/archive/  # superseded consolidations, raw + parsed (a raw JSON with a `_reconstructed` key is ferenda's own reconstruction, not a download)
 site/data/downloaded/eurlex/                  # CELLAR harvest: {year}/{celex}/notice.ttl + content per language
 site/data/downloaded/eurlex/*/*/.versions/    # consolidated wordings (CONSLEG), one dated dir per version
 site/data/downloaded/eurlex/*/*/.versions/*/.no-content  # dated: CELLAR had no swe/eng text for this wording (re-asked when stale)

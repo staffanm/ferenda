@@ -306,9 +306,10 @@ lagen sfs ai-hierarki --all               # every lag whose chain reaches a för
 lagen sfs ai-correspond 2018:585 prop/2017-18-89   # old->new paragraf map of a restructured act (.corr)
 lagen sfs ai-includegraphics 2007:90      # place the graphics the consolidated text drops (.graphics)
 lagen forarbete ai-genomforande prop/2025-26-28    # directive->paragraf transposition map of a prop
+lagen sfs cover-consolidation-gap --all            # no LLM: reconstruct missing archived consolidations from the amendment PDFs
 ```
 
-All seven report the same way (`lib/aireport.py`): the live counter the
+All eight report the same way (`lib/aireport.py`): the live counter the
 stages use, one persistent line per layer written, and a closing line --
 `sfs ai-hierarki: 12 layer(s) written over 3 item(s), 400 skipped (layers
 present 380, no graphic gaps 20), 1 failed in 2h05m`, the failed ids listed

@@ -1,5 +1,6 @@
-"""The shared run report of the `ai-*` actions -- the three things a build
-stage's loop has and each of the seven LLM actions used to improvise:
+"""The shared run report of the one-shot actions -- the seven `ai-*` LLM
+passes and `sfs cover-consolidation-gap` -- the three things a build
+stage's loop has and each of them used to improvise:
 
 * the live one-line counter (`util.status`, the same line parse and generate
   overwrite), so a component that takes an hour is not a silent terminal;
