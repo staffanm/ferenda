@@ -44,7 +44,16 @@ from ..lib.stage import (
     patch_input,
     write_artifact,
 )
-from . import correspond, download, graphics, load_inputs, pdfmirror, render, versions
+from . import (
+    correspond,
+    coverage,
+    download,
+    graphics,
+    load_inputs,
+    pdfmirror,
+    render,
+    versions,
+)
 from .extract import extract_body
 from .nf import to_normalform
 from .register import resolve_omfattning
@@ -374,6 +383,77 @@ def sfs_mirror_pdf(basefiles):
     pdfmirror.mirror(protocol.session(download),
                      targets or pdfmirror.corpus_beteckningar(sfs_list()),
                      force=protocol.RUN.force, dry_run=protocol.RUN.dry_run)
+
+
+def sfs_cover_consolidation_gap(basefiles):
+    """`lagen sfs cover-consolidation-gap <sfs> [...]` -- mechanically cover
+    gaps in a statute's consolidation history: walk its full amendment chain
+    (`andringsforfattningar`, the authoritative record -- not just what has
+    ever been archived, by us or by anyone: 1,028 of 11,247 statutes carry
+    at least one real gap, measured 2026-09-04). For each gap whose
+    immediate predecessor is already covered, apply the amendment's own
+    published PDF to it, as the register's Omfattning says it changed the
+    act: a provision replaced ("ändr."), added ("ny"), repealed ("upph.",
+    the government's own "Har upphävts genom" note), a heading before a
+    provision replaced, added or removed, the act's title, and a word
+    substitution ("ordet X ska bytas ut mot Y"); pending variants an
+    earlier amendment left in the base are settled up to the amendment's
+    own effective date first. A renumbering, a bilaga, a whole chapter, a
+    moment, an amendment whose own effective date is still in the future,
+    or any disagreement between the register, the enacting clause and the
+    printed body, is left open and reported, never guessed at
+    (`sfs.coverage`). The nearest prior
+    consolidation may be either legacy HTML generation or the beta-API JSON
+    -- read via `extract.extract_body` for the former, the same plain-text
+    reader `sfs.versions.parse_version` already trusts for that shape --
+    but every reconstruction is always written forward as JSON, regardless
+    of which shape the base came in.
+
+    Every reconstructed archive file says so in its own metadata (the
+    `_reconstructed` key, first in the file, naming the exact command that
+    reproduces it) -- this is ferenda's own reconstruction, never the
+    government's published wording. The text itself is unmarked: the
+    parsed artifact, a generated page and the history-as-git export read
+    it as any other archived consolidation.
+
+    One statute's gaps are covered in chain order, stopping at the first
+    one triage can't clear -- a later, independent gap in the same
+    statute's chain waits for the next run. --all covers every statute with
+    at least one attemptable gap corpus-wide; --dry-run reports without
+    writing."""
+    if not basefiles and not protocol.RUN.every:
+        sys.exit("usage: lagen sfs cover-consolidation-gap <sfs> [...], or "
+                 "--all for every statute with an attemptable gap")
+    targets = basefiles or [bf for bf in sfs_list() if coverage.pending_gaps(bf)]
+    with aireport.Report("sfs", "cover-consolidation-gap", len(targets),
+                         corpus_wide=not basefiles) as report:
+        for basefile in targets:
+            report.item(basefile)
+            written = []
+            while True:
+                gaps = coverage.pending_gaps(basefile)
+                if not gaps:
+                    break
+                base_beteckning, base_path, target = gaps[0]
+                status, detail = coverage.cover_gap(
+                    basefile, base_beteckning, base_path, target,
+                    dry_run=protocol.RUN.dry_run)
+                if status != "wrote":
+                    freshness.vlog("sfs cover-consolidation-gap %s: %s -> %s "
+                                   "(%s): %s" % (basefile, base_beteckning,
+                                                 target, status, detail))
+                    if not written:
+                        report.skip(basefile, status)
+                    break
+                if protocol.RUN.dry_run:
+                    report.plan(basefile, "cover %s -> %s"
+                               % (base_beteckning, target))
+                    break
+                written.append((detail, target))
+            if written:
+                report.wrote(basefile, [path for path, _target in written],
+                             note=", ".join(target for _path, target in written))
+    return report
 
 
 def sfs_ai_includegraphics(basefiles):
@@ -719,7 +799,8 @@ SOURCES: tuple[Source, ...] = (Source("sfs", sfs_list, {
    actions={"ai-hierarki": sfs_ai_hierarki,
             "renumber-correspond": sfs_renumber_correspond,
             "mirror-pdf": sfs_mirror_pdf,
-            "ai-includegraphics": sfs_ai_includegraphics},
+            "ai-includegraphics": sfs_ai_includegraphics,
+            "cover-consolidation-gap": sfs_cover_consolidation_gap},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
          "paragraf correspondence map into a .corr layer (WIKI_ROOT/ann)\n"
          "ai-hierarki <lag> [...]: LLM-author the regleringshierarki rows for "
@@ -746,4 +827,15 @@ SOURCES: tuple[Source, ...] = (Source("sfs", sfs_list, {
          "ai-includegraphics <basefile> [...]: vision-localize the dropped "
          "graphics to page+bbox in the provenance-correct published PDF into a "
          ".graphics layer (mirroring any source PDF it still needs); per-entry "
-         "verified flags survive reruns, --force overrides a verified layer"),)
+         "verified flags survive reruns, --force overrides a verified layer\n"
+         "cover-consolidation-gap <sfs> [...]: mechanically reconstruct a "
+         "missing archived consolidation by applying the amendment's own "
+         "published PDF to the nearest available prior one, as the "
+         "register's Omfattning says: provisions replaced, added and "
+         "repealed, headings, the title, word substitutions, with earlier "
+         "pending variants settled first (sfs.coverage); a renumbering, a "
+         "bilaga, a still-future effective date or any disagreement "
+         "between register, clause and print is left open and reported, "
+         "never guessed at. Every reconstructed file says so in its own metadata "
+         "(the _reconstructed key); the text itself is unmarked. --all = "
+         "every statute with an attemptable gap"),)
