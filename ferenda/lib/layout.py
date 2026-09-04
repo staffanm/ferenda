@@ -499,8 +499,16 @@ def sfs_version_downloads(basefile):
     for path in sorted(compress.glob(root, "*/*")) + sorted(compress.glob(root, "*")):
         if path.is_dir() or path.suffix not in (".html", ".json"):
             continue   # junk (editor backups) never becomes a version
-        version = ("%s:%s" % (path.parent.name, path.stem.replace("_", " "))
-                   if path.parent != root else path.stem.replace("_", " "))
+        # a *leading* underscore is a stray download artifact (2 confirmed
+        # corpus-wide, 2026-09-04: "_1190.html", "_915.html") and is
+        # stripped, not turned into a space -- that corrupted the version id
+        # ("2006: 1190" instead of "2006:1190"). An underscore anywhere else
+        # in the stem is a real supplement letter ("235_B" -> "235 B",
+        # matching the basefile's own "1971:235_B") and still becomes a space.
+        stem = path.stem.lstrip("_") if path.stem.startswith("_") \
+            else path.stem.replace("_", " ")
+        version = ("%s:%s" % (path.parent.name, stem)
+                   if path.parent != root else stem)
         if version not in found or path.suffix == ".json":
             found[version] = path
     return sorted(found.items())

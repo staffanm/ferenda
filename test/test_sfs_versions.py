@@ -63,6 +63,36 @@ def test_version_downloads_empty_without_archive(tmp_path, monkeypatch):
     assert layout.sfs_version_downloads("1998:204") == []
 
 
+def test_version_downloads_strips_a_leading_underscore_in_a_year_subdir(
+        tmp_path, monkeypatch):
+    # a real download artifact (confirmed corpus-wide, 2026-09-04:
+    # "_1190.html" under 1991:1472/.versions/2006/, "_915.html" under
+    # 1992:1300/.versions/2005/) -- stripped, not turned into a space (which
+    # corrupted the version id: "2006: 1190" instead of "2006:1190"). A
+    # non-leading underscore is a real supplement letter, see the next test.
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
+    root = tmp_path / "downloaded" / "archive" / "1991" / "1472" / ".versions"
+    (root / "2006").mkdir(parents=True)
+    (root / "2006" / "_1190.html").write_text("stray leading underscore")
+    assert layout.sfs_version_downloads("1991:1472") == \
+        [("2006:1190", root / "2006" / "_1190.html")]
+
+
+def test_version_downloads_keeps_a_supplement_letter_as_a_space(
+        tmp_path, monkeypatch):
+    # a year subdir's stem is not *always* a plain number: 1971:235_B's own
+    # current version is filed at .versions/1971/235_B.html (matching its
+    # own year) -- an underscore that isn't leading is a real supplement
+    # letter, not a download artifact, so it still becomes a space
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
+    root = (tmp_path / "downloaded" / "archive" / "1971" / "235_B"
+            / ".versions" / "1971")
+    root.mkdir(parents=True)
+    (root / "235_B.html").write_text("own current version")
+    assert layout.sfs_version_downloads("1971:235_B") == \
+        [("1971:235 B", root / "235_B.html")]
+
+
 # --------------------------------------------------------------------------
 # header parsing + version-id recovery, one fixture per raw generation
 # --------------------------------------------------------------------------

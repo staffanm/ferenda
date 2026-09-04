@@ -54,8 +54,12 @@ PAGE_DELAY = 1.0           # seconds between pages -- conservative vs. throttlin
 WATERMARK = ".watermark"   # file under destdir: max uppdateradDateTime harvested
 FETCHED = ".fetched.json"  # file under destdir: {beteckning: "YYYY-MM-DD"} last fetch
 
-# fulltext.andringInford looks like "t.o.m. SFS 2026:764"; pull the SFS nr
-RE_VERSION = re.compile(r"(\d+:\s?\d+)")
+# fulltext.andringInford looks like "t.o.m. SFS 2026:764"; pull the SFS nr.
+# The source occasionally types a dot for the colon ("SFS 2026.1467", 2007:1175
+# confirmed live 2026-09-04) -- versions.py's header_cutoff already tolerates
+# this same typo, so this regex does too, rather than mislabeling the next
+# archived version of that act under its own base number.
+RE_VERSION = re.compile(r"(\d+)\s*[:.]\s?(\d+)")
 
 
 def _es(session, esquery):
@@ -146,15 +150,16 @@ def version_id(source):
     """The consolidation's identity: the last amending act folded in. An
     un-amended base act has no andringInford and is its own version.
 
-    Version ids are space-free by construction (the `.replace(" ", "")` below);
-    `layout.sfs_version_file` relies on this -- its single .versions/ path
-    grammar slugs both the colon and legacy-counter branches identically, so a
-    spaceful id can never split the writer and reader trees."""
+    Version ids are space-free by construction (the two groups join with a
+    bare ":", no whitespace ever captured); `layout.sfs_version_file` relies
+    on this -- its single .versions/ path grammar slugs both the colon and
+    legacy-counter branches identically, so a spaceful id can never split the
+    writer and reader trees."""
     andring = (source.get("fulltext") or {}).get("andringInford")
     if andring:
         match = RE_VERSION.search(andring)
         if match:
-            return match.group(1).replace(" ", "")
+            return "%s:%s" % match.groups()
     return source["beteckning"]
 
 

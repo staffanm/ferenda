@@ -28,6 +28,21 @@ def test_version_id_unamended_act_is_its_own_version():
     assert d.version_id(src("2018:585", None, "x")) == "2018:585"
 
 
+def test_version_id_tolerates_a_dot_for_the_colon():
+    # a real source typing slip (2007:1175, confirmed live 2026-09-04): the
+    # old regex fell back to the act's own beteckning here, which would have
+    # archived the next real amendment under the wrong key -- versions.py's
+    # header_cutoff already tolerates this same typo
+    assert d.version_id(src("2007:1175", "t.o.m. SFS 2026.1467", "x")) == \
+        "2026:1467"
+
+
+def test_version_id_yearless_cutoff_is_unresolvable():
+    # "SFS 1043" (2009:264): no year to key on, so falling back to the act's
+    # own beteckning is correct, not a bug
+    assert d.version_id(src("2009:264", "t.o.m. SFS 1043", "x")) == "2009:264"
+
+
 def test_paths():
     dest = d.Path("/data/downloaded/sfs")
     assert d.source_path(dest, "2018:585") == dest / "2018/585.json"
