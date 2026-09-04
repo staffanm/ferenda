@@ -465,6 +465,16 @@ def content_file(doc_dir, languages=LANG_PREFERENCE):
     return None, None, None
 
 
+def base_preamble_for(doc_dir, celex):
+    """The base act's own preamble blocks, parsed once for a whole history
+    -- every version artifact splices the same recitals in front, exactly as
+    the main artifact does."""
+    path, lang, route = content_file(doc_dir)
+    if path is None:
+        return ()
+    return base_preamble(parse_content(path, route, celex, lang))
+
+
 def parse_content(path, route, celex, lang):
     """Dispatch a content file to its format's parser -> EurlexDoc."""
     if route == "fmx4":

@@ -6,7 +6,9 @@ amendment in; the superseded consolidation is preserved under
 that archive exist in three raw forms: the latin-1 SFST pages of the original
 rättsdatabaser, the utf-8 pages of its successor, and the new beta-API JSON.
 This module gives every archived consolidation the same treatment the current
-one gets from the parse stage -- extract → assemble → normal form -- writing
+one gets from the parse stage -- extract → assemble → normal form. The versions
+stage (`sfs.source`: one dispatch key per archived consolidation, then a
+per-source hook that assembles each statute's index) writes
 
   archive/artifact/{y}/{n}/.versions/{vy}/{vn}.json   one artifact per version
   artifact/{y}/{n}.versions.json                      the per-statute index
@@ -24,8 +26,7 @@ twice and is skipped.
 import html
 import re
 
-from ..lib import compress, layout, util
-from ..lib.errors import SkipDocument
+from ..lib import compress, util
 from . import parse_sfs, parse_sfs_source
 from . import register as register_mod
 from .extract import sniff_encoding
@@ -129,47 +130,3 @@ def parse_version(basefile, version, path, refparser=None):
     art["uri"] = konsolidering_uri(basefile, recovered)
     art["version"] = recovered
     return recovered, art
-
-
-
-
-def build(basefile, refparser=None):
-    """The versions stage recipe: parse every archived consolidation of
-    `basefile` into a version artifact and write the sidecar index (always,
-    even empty -- an existing sidecar is what marks the stage's output built).
-    Returns the sidecar dict."""
-    versions, skipped = [], []
-    seen = set()
-    # explicitly-keyed (SFS-number) archives first, so a counter-keyed
-    # duplicate of the same consolidation loses to the authoritative key
-    files = sorted(layout.sfs_version_downloads(basefile),
-                   key=lambda vp: (":" not in vp[0], vp[0]))
-    # a long history is minutes of work (1999:1229: 1,454 s), so the live
-    # line moves per version, not per statute
-    rep = util.stage_reporter()
-    for i, (version, path) in enumerate(files, 1):
-        rep.update(i, len(files), scope=basefile, note=version)
-        try:
-            recovered, art = parse_version(basefile, version, path, refparser)
-        except SkipDocument as exc:
-            skipped.append({"version": version, "error": str(exc)})
-            continue
-        except Exception as exc:  # noqa: BLE001 — per-version resilience point, mirroring the driver's per-document one: a corrupt decades-old archive file becomes a recorded skip, not a permanently stale stage (rule:no-catch-log-continue)
-            skipped.append({"version": version, "error": "%s: %s"
-                            % (type(exc).__name__, exc)})
-            continue
-        if recovered in seen:
-            skipped.append({"version": version, "duplicate_of": recovered})
-            continue
-        seen.add(recovered)
-        compress.write_json(layout.sfs_version_artifact(basefile, recovered),
-                            art)
-        entry = {"version": recovered, "uri": art["uri"]}
-        if recovered != version:
-            entry["archived_as"] = version
-        versions.append(entry)
-    rep.clear()          # the driver's own per-statute line takes over
-    versions.sort(key=lambda e: layout.sfs_version_key(e["version"]))
-    sidecar = {"versions": versions, "skipped": skipped}
-    util.write_json_atomic(layout.sfs_versions_sidecar(basefile), sidecar)
-    return sidecar

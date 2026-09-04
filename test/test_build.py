@@ -38,7 +38,13 @@ from ferenda.lib import (
 )
 from ferenda.lib.errors import SkipDocument
 from ferenda.lib.freshness import build_one, is_fresh
-from ferenda.lib.stage import RunOptions, Source, Stage
+from ferenda.lib.stage import (
+    RunOptions,
+    Source,
+    Stage,
+    split_fanout_key,
+    stage_basefiles,
+)
 from ferenda.remisser import ai_analyze
 from ferenda.remisser import source as remisser_source
 from ferenda.sfs import source as sfs_source
@@ -85,6 +91,23 @@ def make_source(tmp_path, version_file=None):
 
 def apply(manifest, res):
     manifest.update(res.updates)
+
+
+def test_stage_basefiles_defaults_to_the_source_s_own_lister(tmp_path):
+    _, src = make_source(tmp_path)
+    assert stage_basefiles(src, "parse") == sorted(("a", "b"))
+
+
+def test_stage_basefiles_uses_the_stage_s_own_override_when_set():
+    # a stage whose real unit of work is finer than "one basefile" (sfs/eurlex
+    # versions: one archived consolidation, not one statute) dispatches over
+    # its own key instead -- every other stage is unaffected (see the test
+    # above, which has no override and falls through to the source's)
+    src = Source("syn", lambda: ["should-not-be-used"], {
+        "versions": Stage("versions", lambda k: None, lambda k: k,
+                          list_basefiles=lambda: ["a@1", "a@2", "b@1"]),
+    })
+    assert stage_basefiles(src, "versions") == ["a@1", "a@2", "b@1"]
 
 
 def test_manifest_get_update_and_json_migration(tmp_path, monkeypatch):
@@ -168,6 +191,37 @@ def test_stage_gate_skips_when_fingerprint_unchanged(tmp_path, monkeypatch, caps
     (tmp_path / "dl" / "a.txt").write_text("CHANGED")
     errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
     assert (errs, recorded) == (False, True)
+
+
+def test_stage_gate_fires_after_hooks_only_when_the_stage_ran(tmp_path, monkeypatch,
+                                                              capsys):
+    """A skipped stage left every artifact as it was, so its `after` hook
+    (dv's case-number sweep) can only rewrite what it wrote last time -- it
+    used to run on every "up to date -- skipped" rebuild. A hook that crashes
+    leaves the stage unmarked, so the next run runs both again."""
+    _, src = make_source(tmp_path)
+    _isolate_manifest(tmp_path, monkeypatch)
+    freshness.run_action(src, "parse", src.list_basefiles(), 1)
+    fired = []
+    src = dataclasses.replace(src, after={"parse": (lambda: fired.append("parse"),)})
+    store = {}
+
+    assert corpus._run_stage_gated(src, "parse", 1, store) == (False, True)
+    assert fired == ["parse"]
+    assert corpus._run_stage_gated(src, "parse", 1, store) == (False, False)
+    assert fired == ["parse"]                                # skipped: no hook
+    assert "parse syn: up to date -- skipped" in capsys.readouterr().out
+
+    (tmp_path / "dl" / "a.txt").write_text("CHANGED")
+
+    def crash():
+        raise RuntimeError("hook crashed")
+
+    src = dataclasses.replace(src, after={"parse": (crash,)})
+    before = dict(store)
+    with pytest.raises(RuntimeError, match="hook crashed"):
+        corpus._run_stage_gated(src, "parse", 1, store)
+    assert store == before                                   # not marked
 
 
 def test_stage_gate_is_not_recorded_by_a_dry_run(tmp_path, monkeypatch, capsys):
@@ -343,6 +397,27 @@ def test_targeted_generate_skips_relate_when_catalog_current(tmp_path, monkeypat
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
     assert src.stages["parse"].output("a").read_text() == "HELLO"
+
+
+def test_targeted_generate_expands_a_fan_out_stage_and_runs_its_hook(
+        tmp_path, monkeypatch):
+    # `lagen sfs generate 1999:1229` refreshes the versions prerequisite over
+    # the statute's own fan-out keys, never the bare name (whose inputs
+    # callable cannot even split it -- it raised ValueError before rendering
+    # anything), and then assembles the sidecar through the source's hook
+    _, src = make_source(tmp_path)
+    _isolate_manifest(tmp_path, monkeypatch)
+    built, hooked = [], []
+    src.stages["versions"] = Stage(
+        "versions", lambda k: built.append(k),
+        lambda k: tmp_path / "out" / (k.replace("@", "_") + ".v"),
+        inputs=lambda k: [tmp_path / "dl" / ("%s.txt" % split_fanout_key(k)[0])],
+        list_basefiles=lambda: ["a@1", "a@2", "b@1"])
+    src.after = {"versions": (lambda: hooked.append(1),)}
+    monkeypatch.setattr(build, "SOURCES", {"syn": src})
+    assert not build._prepare_targeted_generate(src, ["a"], 1)
+    assert sorted(built) == ["a@1", "a@2"]
+    assert hooked == [1]
 
 
 def test_catalog_current_for_matches_rows_against_artifacts(tmp_path, monkeypatch):
@@ -795,6 +870,51 @@ def test_skipdocument_counted_as_skipdoc(wire, tmp_path):
     # a deliberate skip is not a failure and leaves no errors.json entry
     assert "syn/parse/b" not in runlog.read_errors(freshness.ERRORS)
     assert runlog.read_status(freshness.STATUS)["syn"]["parse"]["empty"] == 1
+
+
+def test_cli_expands_a_bare_name_to_a_fan_out_stage_s_own_keys(wire, tmp_path):
+    # "lagen sfs versions 1999:1229" names a statute, not a literal dispatch
+    # key -- a fan-out stage's real keys are "<statute>@<version>" (see
+    # Stage.list_basefiles), so the CLI must expand the given name to every
+    # one of that stage's own keys under it, not dispatch the literal string
+    built = []
+    src = Source("syn", lambda: ["1999:1229", "2003:466"], {
+        "versions": Stage(
+            "versions", lambda k: built.append(k),
+            lambda k: tmp_path / (k.replace("@", "_") + ".out"),
+            list_basefiles=lambda: ["1999:1229@a", "1999:1229@b", "2003:466@a"]),
+    })
+    wire(src)
+    build.main(["syn", "versions", "1999:1229", "-f", "-j1"])
+    assert sorted(built) == ["1999:1229@a", "1999:1229@b"]
+
+
+def test_cli_rejects_a_name_a_fan_out_stage_has_no_document_for(wire, tmp_path):
+    # a typo ("1999:122") matches no key; before, the one missing input
+    # failed its document -- it must not become a clean zero-document run
+    src = Source("syn", lambda: ["1999:1229"], {
+        "versions": Stage("versions", lambda k: None, lambda k: tmp_path / "x",
+                          list_basefiles=lambda: ["1999:1229@a"]),
+    })
+    wire(src)
+    with pytest.raises(SystemExit) as exc_info:
+        build.main(["syn", "versions", "1999:122", "-j1"])
+    assert "no such document(s): 1999:122" in str(exc_info.value)
+
+
+def test_after_hooks_do_not_run_under_dry_run(wire, tmp_path):
+    # a dry run does no work at all -- the versions hooks parse and write
+    # whatever the (unbuilt) fan-out left missing, so under -n they would do
+    # the whole stage's work serially in the main process
+    hooked = []
+    src = build_source(tmp_path)
+    src.after = {"parse": (lambda: hooked.append(1),)}
+    wire(src)
+    _materialise_downloads(src)
+    build.main(["syn", "parse", "-n", "-j1"])
+    assert hooked == []
+    build.main(["syn", "parse", "-j1"])
+    assert hooked == [1]
 
 
 def test_targeted_run_leaves_status_cell_untouched(wire, tmp_path):

@@ -35,7 +35,7 @@ never silently skipped). The one exception is an archived SFS consolidation (the
 lydelse (a conflict there is the normal case, not a broken patch) but keeps a
 **redaction** fatal — republishing unredacted personal data because an older
 wording didn't line up is exactly the harm, so that version is recorded as
-skipped rather than published (`sfs.versions.build`). Patches live committed in
+skipped rather than published (the sidecar's `skipped` list). Patches live committed in
 the **content repo** at `patches/<source>/<relpath>.patch` (or `.rot18.patch`),
 keyed by the same rule as the artifact tree (`layout.patch` — `PATCHES`, which
 is `config.WIKI_ROOT/patches`);

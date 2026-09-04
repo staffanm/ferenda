@@ -1,16 +1,18 @@
-"""The eurlex versions stage (ferenda/eurlex/versions.py), the generalized
+"""The eurlex versions stage (ferenda/eurlex/source.py), the generalized
 version endpoints' eurlex branches, and the konsolidering rendering."""
 
 import json
+import os
 
 import pytest
 from fastapi import HTTPException
 
 from ferenda.api.app import _validate_version_id, _versioned_document
 from ferenda.eurlex import render as eurlex_render
-from ferenda.eurlex import versions as eurlex_versions
+from ferenda.eurlex import source
 from ferenda.eurlex.parse import parse_dir
 from ferenda.lib import catalog, compress, layout, page
+from ferenda.lib.errors import SkipDocument
 
 # a minimal base act with a preamble (spliced into every consolidated wording)
 BASE_XML = """<ACT>
@@ -92,8 +94,30 @@ def roots(tmp_path, monkeypatch):
     return doc_dir
 
 
+def _write_main_artifact(basefile, art):
+    compress.write_json(layout.artifact("eurlex", basefile), art)
+
+
+def _build(roots, basefile):
+    """parse + the versions stage over one act, serially: the main artifact
+    (which decides the wording the stage excludes), every fan-out key, then
+    the sidecar hook -- what `lagen eurlex parse` / `versions` run. A key's
+    SkipDocument leaves the driver's empty placeholder, as ensure() does.
+    Returns the sidecar dict."""
+    _write_main_artifact(basefile, parse_dir(roots, basefile))
+    for key in source.eurlex_version_list():
+        out = source.eurlex_version_output(key)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            source.eurlex_version_run(key)
+        except SkipDocument:
+            compress.write_bytes(out, b"", encodings=compress.ARTIFACT_ENCODINGS)
+    source.eurlex_versions_rebuild_sidecars()
+    return json.loads(layout.eurlex_versions_sidecar(basefile).read_text())
+
+
 def test_versions_stage_builds_sidecar_and_lydelse_artifacts(roots):
-    sidecar = eurlex_versions.build("32014R0910")
+    sidecar = _build(roots, "32014R0910")
     # the newest Formex version is the main artifact, not a lydelse; the
     # PDF-only tail is recorded, not parsed
     assert [e["version"] for e in sidecar["versions"]] == ["2014-09-17"]
@@ -146,7 +170,7 @@ def test_consolidated_page_renders_provenance(roots, tmp_path, monkeypatch):
 
 def test_lydelse_page_banner_matches_its_temporality(roots, tmp_path,
                                                      monkeypatch):
-    eurlex_versions.build("32014R0910")
+    _build(roots, "32014R0910")
     monkeypatch.setattr(eurlex_render.history, "versions",
                         lambda source, bf: [])
     art = compress.read_json(
@@ -174,8 +198,116 @@ def test_a_broken_newest_version_is_skipped_and_the_older_serves(roots,
     (broken / "notice.ttl").write_bytes(NOTICE)
     art = parse_dir(roots, "32014R0910")
     assert art["consolidation"]["date"] == "2024-10-18"    # the older serves
-    sidecar = eurlex_versions.build("32014R0910")
+    sidecar = _build(roots, "32014R0910")
     assert [e["version"] for e in sidecar["versions"]] == ["2014-09-17"]
     errors = {s["version"]: s["error"] for s in sidecar["skipped"]}
     assert "XMLSyntaxError" in errors["2025-01-01"]
     assert errors["2003-01-01"].startswith("no Formex")
+
+
+# --------------------------------------------------------------------------
+# the fan-out dispatch (Stage.list_basefiles): one superseded consolidation
+# per key instead of one job per act, the eurlex counterpart of sfs's. "Main"
+# (the wording parse_dir already presents, excluded from the fan-out) is read
+# back off the already-built main artifact, not re-derived by retrying
+# parses -- that decision is parse_dir's alone, made before versions ever
+# runs. `_build` above runs the two phases serially over one act.
+# --------------------------------------------------------------------------
+
+def test_version_list_excludes_the_main_wording(roots):
+    _write_main_artifact("32014R0910", parse_dir(roots, "32014R0910"))
+    keys = source.eurlex_version_list()
+    # the newest (2024-10-18, main) is excluded; the older and the PDF-only
+    # tail are both real dispatch keys -- the PDF-only one's own skip is the
+    # per-item recipe's job, not the listing's
+    assert keys == ["32014R0910@2003-01-01", "32014R0910@2014-09-17"]
+
+
+def test_version_list_excludes_nothing_before_parse_has_ever_run(roots):
+    # no main artifact yet (parse hasn't run) -- nothing to exclude, every
+    # archived consolidation is a real key
+    keys = source.eurlex_version_list()
+    assert keys == ["32014R0910@2003-01-01", "32014R0910@2014-09-17",
+                    "32014R0910@2024-10-18"]
+
+
+def test_version_list_tolerates_an_empty_main_artifact(roots):
+    # ensure() writes an empty placeholder artifact for ANY stage's
+    # SkipDocument, unconditionally -- an UNCARRIED act or one with no
+    # swe/eng content leaves parse's own output empty, not absent. An empty
+    # file is not valid JSON; this must not crash reading it back, real
+    # corpus data hit exactly this the first time this ran (2026-09-04)
+    layout.artifact("eurlex", "32014R0910").parent.mkdir(parents=True, exist_ok=True)
+    compress.write_bytes(layout.artifact("eurlex", "32014R0910"), b"",
+                        encodings=compress.ARTIFACT_ENCODINGS)
+    keys = source.eurlex_version_list()
+    assert keys == ["32014R0910@2003-01-01", "32014R0910@2014-09-17",
+                    "32014R0910@2024-10-18"]
+
+
+def test_version_run_writes_the_predicted_output_path(roots):
+    _write_main_artifact("32014R0910", parse_dir(roots, "32014R0910"))
+    key = "32014R0910@2014-09-17"
+    source.eurlex_version_run(key)
+    out = source.eurlex_version_output(key)
+    assert compress.exists(out)
+    assert compress.read_json(out)["version"] == "2014-09-17"
+
+
+def test_version_run_raises_skipdocument_for_pdf_only(roots):
+    _write_main_artifact("32014R0910", parse_dir(roots, "32014R0910"))
+    with pytest.raises(SkipDocument, match="no Formex"):
+        source.eurlex_version_run("32014R0910@2003-01-01")
+
+
+def test_version_run_raises_skipdocument_for_a_broken_consolidation(roots):
+    broken = roots / ".versions" / "2025-01-01"
+    broken.mkdir(parents=True)
+    (broken / "swe.fmx4").write_bytes(b"II*\x00 not xml at all")
+    (broken / "notice.ttl").write_bytes(NOTICE)
+    _write_main_artifact("32014R0910", parse_dir(roots, "32014R0910"))
+    with pytest.raises(SkipDocument, match="XMLSyntaxError"):
+        source.eurlex_version_run("32014R0910@2025-01-01")
+
+
+def test_rebuild_sidecars_records_a_failed_version_without_reparsing(
+        roots, monkeypatch):
+    # a key the fan-out raised on has no artifact at all (the driver holds
+    # the traceback in the errors ledger); the hook must record it, not run
+    # the same parse again outside the per-document isolation -- a second
+    # raise there used to end the whole run before relate
+    _build(roots, "32014R0910")
+    compress.resolve(layout.eurlex_version_artifact("32014R0910",
+                                                    "2014-09-17")).unlink()
+    os.utime(layout.eurlex_versions_sidecar("32014R0910"), ns=(0, 0))
+
+    def only_the_benign_skip(vdir, celex, version, preamble=()):
+        assert version == "2003-01-01", "re-parsed a failed version"
+        return None            # what the real parse says of the PDF-only one
+
+    monkeypatch.setattr(source, "parse_consolidation", only_the_benign_skip)
+    source.eurlex_versions_rebuild_sidecars()
+    sidecar = json.loads(layout.eurlex_versions_sidecar("32014R0910").read_text())
+    assert sidecar["versions"] == []
+    errors = {s["version"]: s["error"] for s in sidecar["skipped"]}
+    assert errors["2014-09-17"].startswith("no version artifact")
+    assert errors["2003-01-01"].startswith("no Formex")
+
+
+def test_rebuild_sidecars_skips_an_act_untouched_since_its_last_build(
+        roots, monkeypatch):
+    _write_main_artifact("32014R0910", parse_dir(roots, "32014R0910"))
+    for key in source.eurlex_version_list():
+        try:
+            source.eurlex_version_run(key)
+        except SkipDocument:
+            pass
+    source.eurlex_versions_rebuild_sidecars()
+    before = layout.eurlex_versions_sidecar("32014R0910").stat().st_mtime_ns
+
+    def boom(*a, **kw):
+        raise AssertionError("rebuilt a sidecar nothing changed under")
+    monkeypatch.setattr(source.util, "write_json_atomic", boom)
+    source.eurlex_versions_rebuild_sidecars()
+    after = layout.eurlex_versions_sidecar("32014R0910").stat().st_mtime_ns
+    assert after == before

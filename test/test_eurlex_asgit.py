@@ -9,7 +9,7 @@ import subprocess
 
 import pytest
 
-from ferenda.eurlex import versions as eurlex_versions
+from ferenda.eurlex import source as eurlex_source
 from ferenda.eurlex.asgit import (
     _act_name,
     _emit_commits,
@@ -77,6 +77,16 @@ def _write_main_artifact(basefile, art):
                         encodings=compress.ARTIFACT_ENCODINGS)
 
 
+def _build_versions(doc_dir, basefile):
+    """parse + the versions stage over one act, serially -- the main
+    artifact first (it decides which wording the stage excludes), then every
+    fan-out key, then the sidecar hook."""
+    _write_main_artifact(basefile, parse_dir(doc_dir, basefile))
+    for key in eurlex_source.eurlex_version_list():
+        eurlex_source.eurlex_version_run(key)
+    eurlex_source.eurlex_versions_rebuild_sidecars()
+
+
 def _corpus(tmp_path, monkeypatch):
     """eIDAS with two consolidations (an older and the newer, amending one)
     -- the same shape test_eurlex_versions.py uses, built here so this
@@ -90,8 +100,7 @@ def _corpus(tmp_path, monkeypatch):
     (doc_dir / "notice.ttl").write_bytes(NOTICE)
     _version(doc_dir, "2014-09-17", CONS_XML.format(date="20140917"))
     _version(doc_dir, "2024-10-18", CONS_XML.format(date="20241018"))
-    eurlex_versions.build("32014R0910")
-    _write_main_artifact("32014R0910", parse_dir(doc_dir, "32014R0910"))
+    _build_versions(doc_dir, "32014R0910")
     return doc_dir
 
 
@@ -208,8 +217,7 @@ def test_export_appends_only_a_genuinely_new_version(tmp_path, monkeypatch):
     # becomes an archived version -- the file content changes, but the two
     # already-committed wordings themselves do not
     _version(doc_dir, "2025-06-01", CONS_XML.format(date="20250601"))
-    eurlex_versions.build("32014R0910")
-    _write_main_artifact("32014R0910", parse_dir(doc_dir, "32014R0910"))
+    _build_versions(doc_dir, "32014R0910")
 
     assert export(repo, ["32014R0910"]) == 1
     new_log = _git(repo, "log", "--format=%H", "main").splitlines()
@@ -264,8 +272,7 @@ def test_export_requires_rebuild_when_a_committed_version_changes(tmp_path,
     _version(doc_dir, "2014-09-17",
             CONS_XML.format(date="20140917").replace(
                 "Konsoliderad text", "Rättad konsoliderad text"))
-    eurlex_versions.build("32014R0910")
-    _write_main_artifact("32014R0910", parse_dir(doc_dir, "32014R0910"))
+    _build_versions(doc_dir, "32014R0910")
 
     with pytest.raises(RebuildRequired, match="32014R0910 changed"):
         export(repo, ["32014R0910"])

@@ -876,15 +876,29 @@ def _prepare_targeted_generate(source, basefiles, jobs):
     for stage in ("parse", "versions"):
         if stage not in source.stages:
             continue
-        result = freshness.run_action(source, stage, basefiles, jobs, force=False)
-        corpus.report(source, stage, result, len(basefiles), full_source=False)
+        # expanded per stage, after the one before ran: eurlex's versions keys
+        # depend on the main artifact parse just wrote
+        keys = _stage_keys(source, stage, basefiles)
+        result = freshness.run_action(source, stage, keys, jobs, force=False)
+        corpus.report(source, stage, result, len(keys), full_source=False)
         had_errors |= bool(result.errors)
+        if source.stages[stage].list_basefiles:
+            corpus.run_after(SOURCES, [source.name], stage)
     if not had_errors and not protocol.RUN.dry_run and source.artifacts \
             and not _catalog_current_for(source.name, basefiles):
         # a --force meant for one page's generate must not re-extract every
         # artifact of its source
         corpus.cmd_relate(SOURCES, [source.name], force=False)
     return had_errors
+
+
+def _stage_keys(source, stage_name, basefiles):
+    """`protocol.stage_keys` for the command line: a name the source does not
+    list ends the run with the message, not a traceback."""
+    try:
+        return protocol.stage_keys(source, stage_name, basefiles)
+    except ValueError as exc:
+        sys.exit(str(exc))
 
 
 def _dispatch(args, p, jobs):
@@ -1026,14 +1040,25 @@ def _dispatch(args, p, jobs):
                                                      store)
             if recorded:
                 freshness.save_fingerprints(store)
-            corpus.run_after(SOURCES, [name], args.action)
             had_errors |= errs
             continue
-        basefiles = args.basefiles or source.list_basefiles()
+        stage = source.stages[args.action]
+        # a fan-out stage's real dispatch keys are finer than what a user
+        # names on the command line ("lagen sfs versions 1999:1229" means
+        # every version of it, not the literal string "1999:1229") --
+        # protocol.stage_keys expands each given name to every key under it
+        basefiles = (_stage_keys(source, args.action, args.basefiles)
+                     if args.basefiles
+                     else protocol.stage_basefiles(source, args.action))
         result = freshness.run_action(source, args.action, basefiles, jobs)
         corpus.report(source, args.action, result, len(basefiles),
                       full_source=not args.basefiles)
         had_errors |= bool(result.errors)
+        if stage.list_basefiles:
+            # a fan-out stage's per-source hook assembles what its keys
+            # produced (the versions sidecars) -- the per-item recipe no
+            # longer writes it, so a targeted run needs the hook too
+            corpus.run_after(SOURCES, [name], args.action)
     if had_errors:                 # report every source first, then signal failure
         sys.exit(1)
 

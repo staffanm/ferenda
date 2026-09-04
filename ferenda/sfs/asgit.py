@@ -163,7 +163,7 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
     An unusable *archived* consolidation is a **gap** (`gaps`): the archive is
     already known to be incomplete, and a transition that folds several
     amendments is the ordinary case the commit message names. It is recorded
-    and dropped, the same answer `versions.build` gives a corrupt archive file.
+    and dropped, the same answer the versions stage gives a corrupt archive file.
     Three shapes turn up: junk the old downloader saved instead of the document
     (a rkrattsbaser search-results page, a FELMEDDELANDE page), a snapshot whose
     own Rubrik names another act (`misfiled_as`), and a cutoff whose year is not
@@ -181,7 +181,8 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
     if not compress.exists(current):
         current = layout.sfs_sfst(basefile)
     # explicitly-keyed archives first, so a counter-keyed duplicate of the
-    # same consolidation loses to the authoritative key (as in versions.build)
+    # same consolidation loses to the authoritative key (as in the versions
+    # stage's sidecar hook, sfs.source.sfs_versions_rebuild_sidecars)
     archive = sorted(layout.sfs_version_downloads(basefile),
                      key=lambda vp: (":" not in vp[0], vp[0]))
     snapshots = {}
@@ -207,7 +208,7 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
             gaps.append({"kind": "archive", "basefile": basefile,
                          "file": str(path), "error": str(exc)})
             continue
-        except Exception as exc:  # noqa: BLE001 — per-snapshot resilience point, mirroring versions.build's: a corrupt decades-old archive file becomes a recorded gap, not an aborted corpus export (rule:no-catch-log-continue)
+        except Exception as exc:  # noqa: BLE001 — per-snapshot resilience point, mirroring the versions stage's sidecar hook: a corrupt decades-old archive file becomes a recorded gap, not an aborted corpus export (rule:no-catch-log-continue)
             gaps.append({"kind": "archive", "basefile": basefile,
                          "file": str(path),
                          "error": "%s: %s" % (type(exc).__name__, exc)})

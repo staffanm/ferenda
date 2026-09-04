@@ -152,6 +152,13 @@ def exists(path: Path | str) -> bool:
     return resolve(path) is not None
 
 
+def newest_mtime_ns(paths) -> int:
+    """The newest mtime among the logical `paths` that exist, 0 when none does
+    -- make's "is any prerequisite newer than the target" question, which the
+    versions sidecar hooks ask of one statute's or act's files."""
+    return max((stat(p).st_mtime_ns for p in paths if exists(p)), default=0)
+
+
 def stat(path: Path | str) -> os.stat_result:
     """`os.stat` of the on-disk file backing a logical `path` (its real size +
     mtime -- what the freshness watermarks fingerprint). Raises like `os.stat`

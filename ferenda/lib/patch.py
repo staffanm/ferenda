@@ -165,7 +165,8 @@ def apply_if_fits(source, basefile, text):
     exists to remove, because a diff did not line up against an older wording,
     is precisely the harm; a conflict there stays fatal, and the versions
     stage records it as a skipped version rather than publishing one
-    (`sfs.versions.build`). Which of the two a patch is, is exactly what
+    (`sfs.source.sfs_versions_rebuild_sidecars`). Which of the two a patch
+    is, is exactly what
     `find_patch` already reports.
 
     Deliberately *not* the default: for the document a patch was authored

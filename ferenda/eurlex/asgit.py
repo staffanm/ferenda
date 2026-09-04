@@ -5,7 +5,7 @@ One file per act (`32016/R0679.md`: sector+year directory, type+number
 filename), one commit per consolidated wording CELLAR has already published
 under `.versions/{date}/` -- the eurlex counterpart of `sfs.asgit`, reading
 the artifacts the `parse` and `versions` build stages already produced
-(`ferenda/eurlex/versions.py`) rather than parsing Formex/xhtml/PDF again. A
+(`eurlex.source`) rather than parsing Formex/xhtml/PDF again. A
 wording the versions stage could not parse (the pre-2005 PDF-only tail) is
 already recorded as skipped there and produces no commit here: this export
 never synthesizes a consolidated version CELLAR did not itself publish.

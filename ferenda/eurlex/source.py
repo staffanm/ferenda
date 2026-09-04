@@ -12,6 +12,8 @@ import json
 import sys
 from pathlib import Path
 
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
+
 from ..lib import (
     aireport,
     annstore,
@@ -33,8 +35,10 @@ from ..lib.stage import (
     POLITENESS,
     Source,
     Stage,
+    fanout_key,
     origin,
     patch_input,
+    split_fanout_key,
     sum_scope_totals,
     write_artifact,
 )
@@ -47,9 +51,14 @@ from . import (
     download,
     parse,
     render,
-    versions,
 )
-from .parse import content_file
+from .parse import (
+    base_preamble_for,
+    content_file,
+    parse_consolidation,
+    to_artifact,
+    version_dirs,
+)
 
 HERE = Path(__file__).parent
 
@@ -107,7 +116,9 @@ def eurlex_parse_run(basefile):
     write_artifact("eurlex", basefile, art)
 
 
-EURLEX_VERSIONS_CODE = EURLEX_CODE + (HERE / "versions.py",)
+# the per-consolidation recipe is parse_consolidation + to_artifact -- the
+# parser's own code, nothing beyond EURLEX_CODE
+EURLEX_VERSIONS_CODE = EURLEX_CODE
 
 
 def eurlex_version_contents(basefile):
@@ -122,23 +133,161 @@ def eurlex_version_contents(basefile):
     return inputs
 
 
-def eurlex_versions_sidecar(basefile):
-    return layout.eurlex_versions_sidecar(basefile)
+def _eurlex_main_version(basefile):
+    """The consolidation date `parse_dir` chose as the act's own current
+    wording, if it has run yet -- read back off the already-built main
+    artifact (`parse` always runs before `versions`), not re-derived by
+    retrying parses here: that decision (newest-first, first to succeed) is
+    already made and recorded in `art["consolidation"]["date"]`. None when
+    the act has no archived consolidations, hasn't been parsed yet, or parse
+    recorded it as a SkipDocument (an empty placeholder artifact -- ensure()
+    writes one for any stage's SkipDocument, unconditionally; e.g. an
+    UNCARRIED act, or one with no swe/eng content -- caught directly rather
+    than by exception, since an empty file is not even valid JSON)."""
+    art_path = layout.artifact("eurlex", basefile)
+    if not compress.exists(art_path) or not compress.stat(art_path).st_size:
+        return None
+    consolidation = compress.read_json(art_path).get("consolidation")
+    return consolidation["date"] if consolidation else None
 
 
-def eurlex_versions_inputs(basefile):
-    """Freshness inputs of the eurlex versions stage: every consolidation's
-    content file, plus the base act's own (its preamble is spliced into every
-    version artifact)."""
-    return eurlex_content(basefile) + eurlex_version_contents(basefile)
+def eurlex_version_list():
+    """Every superseded consolidation across the whole corpus, as
+    "<basefile>@<version>" dispatch keys -- the versions stage's real,
+    parallelizable unit of work (`Stage.list_basefiles`), the eurlex
+    counterpart of `sfs.source.sfs_version_list`: a heavily-amended act's
+    history spreads across the whole pool instead of one worker parsing it
+    alone. The one consolidation `parse_dir` already chose as the act's own
+    current wording is excluded -- it is not a lydelse, it *is* the main
+    artifact -- known without retrying any parse (`_eurlex_main_version`)."""
+    keys = []
+    for bf in download.list_basefiles(layout.EURLEX_DOWNLOADED):
+        dirs = version_dirs(layout.eurlex_dir(bf))
+        if not dirs:
+            continue    # most acts (164,443 of 172,047 on dev, 2026-09-03):
+                        # no history, so no main artifact to read either
+        main = _eurlex_main_version(bf)
+        keys.extend(fanout_key(bf, version)
+                    for version, _vdir in dirs if version != main)
+    return sorted(keys)
 
 
-def eurlex_versions_run(basefile):
-    """Parse every superseded consolidation of one act into per-version
-    artifacts + the sidecar index (see eurlex.versions). The sidecar is
-    written even when the act has no consolidations, marking the stage
-    built."""
-    versions.build(basefile)
+def eurlex_version_output(key):
+    basefile, version = split_fanout_key(key)
+    return layout.eurlex_version_artifact(basefile, version)
+
+
+def eurlex_version_inputs(key):
+    """Freshness inputs of one superseded consolidation: its own content
+    file, plus the base act's own (its preamble is spliced into every
+    version artifact) and the statute's patch."""
+    basefile, version = split_fanout_key(key)
+    vdir = dict(version_dirs(layout.eurlex_dir(basefile))).get(version)
+    path, _lang, _route = content_file(vdir) if vdir else (None, None, None)
+    return (([path] if path else []) + eurlex_content(basefile)
+           + patch_input("eurlex", basefile))
+
+
+def eurlex_version_run(key):
+    """Parse one superseded consolidation into its version artifact -- the
+    versions stage's per-item dispatch recipe (see `eurlex_version_list`).
+    The two exception classes `parse_dir` itself tolerates, for the same
+    reason (CELLAR's scanned-era consolidations: a TIFF-in-.xml packet, a
+    corrigendum-only member, 13 of 172,043 measured), are the only ones
+    caught here -- anything else is a real bug and must surface at the
+    driver, not be buried as a skip (rule:no-catch-log-continue)."""
+    basefile, version = split_fanout_key(key)
+    doc_dir = layout.eurlex_dir(basefile)
+    vdir = dict(version_dirs(doc_dir)).get(version)
+    if vdir is None:
+        raise SkipDocument("%s: consolidation %s no longer present"
+                          % (basefile, version))
+    preamble = base_preamble_for(doc_dir, basefile)
+    try:
+        cons = parse_consolidation(vdir, basefile, version, preamble=preamble)
+    except (ValueError, etree.XMLSyntaxError) as exc:
+        raise SkipDocument("%s: %s" % (type(exc).__name__, exc)) from exc
+    if cons is None:
+        raise SkipDocument("no Formex manifestation (pre-Formex "
+                          "consolidations are PDF-only)")
+    compress.write_json(layout.eurlex_version_artifact(basefile, version),
+                        to_artifact(cons))
+
+
+def eurlex_versions_rebuild_sidecars():
+    """Assemble every act's versions-stage sidecar from the fan-out stage's
+    own already-parsed artifacts, re-deriving directly only the small, rare
+    set the driver's own SkipDocument handling cannot preserve an error
+    message for (a benign skip -- a broken or non-Formex consolidation --
+    still gets an empty placeholder artifact from `ensure`, same as any
+    other stage, but not the original message; re-parsing it here to recover
+    that is rare in practice, 13 of 172,043 measured corpus-wide). A version
+    with no artifact at all failed in the fan-out (the driver holds the
+    traceback) and is recorded as such, never re-parsed here. Runs once
+    per source, after the fan-out's own per-version dispatch
+    (`source.after["versions"]`), skipping any act untouched since its own
+    sidecar was last built -- the eurlex counterpart of
+    `sfs.source.sfs_versions_rebuild_sidecars`."""
+    for basefile in download.list_basefiles(layout.EURLEX_DOWNLOADED):
+        doc_dir = layout.eurlex_dir(basefile)
+        downloads = version_dirs(doc_dir)
+        sidecar_path = layout.eurlex_versions_sidecar(basefile)
+        if compress.exists(sidecar_path) \
+                and compress.stat(sidecar_path).st_mtime_ns >= compress.newest_mtime_ns(
+                    # which wording is main is read off the main artifact, so
+                    # a re-parse of the act can move it (an act with no
+                    # history has nothing to move -- its sidecar is empty
+                    # either way)
+                    ([layout.artifact("eurlex", basefile)] if downloads else [])
+                    + [p for p in (content_file(vdir)[0] for _v, vdir in downloads) if p]
+                    + [layout.eurlex_version_artifact(basefile, v)
+                       for v, _d in downloads]):
+            continue    # nothing under this act changed since
+        versions_out, skipped = [], []
+        preamble = None
+        main = _eurlex_main_version(basefile) if downloads else None
+        for version, vdir in downloads:
+            if version == main:
+                continue
+            art_path = layout.eurlex_version_artifact(basefile, version)
+            if not compress.exists(art_path):
+                # no artifact at all: the fan-out raised on this key (the
+                # driver holds the traceback), or the key has not been
+                # dispatched yet (a targeted run opened this act's gate).
+                # Re-running the parse here, outside the per-document
+                # isolation, would end the run -- record what is known
+                skipped.append({"version": version, "error": "no version "
+                                "artifact -- the versions stage has not "
+                                "built this key"})
+                continue
+            if compress.stat(art_path).st_size:
+                art = compress.read_json(art_path)
+                versions_out.append({"version": version, "uri": art["uri"]})
+                continue
+            # an empty placeholder: a benign skip the driver could not keep
+            # the message for -- re-derive it directly
+            if preamble is None:
+                preamble = base_preamble_for(doc_dir, basefile)
+            try:
+                cons = parse_consolidation(vdir, basefile, version,
+                                           preamble=preamble)
+            except (ValueError, etree.XMLSyntaxError) as exc:
+                skipped.append({"version": version, "error": "%s: %s"
+                                % (type(exc).__name__, exc)})
+                continue
+            if cons is None:
+                skipped.append({"version": version, "error": "no Formex "
+                                "manifestation (pre-Formex consolidations "
+                                "are PDF-only)"})
+                continue
+            art = to_artifact(cons)
+            compress.write_json(layout.eurlex_version_artifact(basefile, version),
+                                art)
+            versions_out.append({"version": version, "uri": art["uri"]})
+        versions_out.sort(key=lambda e: e["version"])
+        skipped.sort(key=lambda e: e["version"])
+        util.write_json_atomic(sidecar_path,
+                              {"versions": versions_out, "skipped": skipped})
 
 
 def eurlex_download_run(basefile):
@@ -443,11 +592,16 @@ SOURCES: tuple[Source, ...] = (Source("eurlex", lambda: download.list_basefiles(
                    depends="download", code=EURLEX_CODE),
     # superseded consolidated wordings (CONSLEG) -> per-version artifacts + a
     # sidecar index, feeding the lydelse pages, the compare panel and the diff
-    # view -- the eurlex counterpart of the sfs versions stage
-    "versions": Stage("versions", eurlex_versions_run, eurlex_versions_sidecar,
-                      inputs=eurlex_versions_inputs,
-                      code=EURLEX_VERSIONS_CODE),
+    # view -- the eurlex counterpart of the sfs versions stage. Dispatched per
+    # consolidation, not per act (list_basefiles), so a heavily-amended act's
+    # history spreads across the whole pool instead of one worker parsing it
+    # alone; eurlex_versions_rebuild_sidecars (after) assembles each act's
+    # sidecar once its own versions are all built.
+    "versions": Stage("versions", eurlex_version_run, eurlex_version_output,
+                      inputs=eurlex_version_inputs, code=EURLEX_VERSIONS_CODE,
+                      list_basefiles=eurlex_version_list),
 }, harvest=eurlex_harvest, origin=origin(download.SOAP_ENDPOINT),
+   after={"versions": (eurlex_versions_rebuild_sidecars,)},
    render=render.render,
    intermediate=(eurlex_intermediate,
                  "Formex XML (pre-Formex acts: the OJ HTML)"),

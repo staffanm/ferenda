@@ -145,6 +145,9 @@ class Stage:
     inputs: Callable[[str], list[Path]] = lambda bf: []   # dependency files
     depends: str | None = None          # upstream stage name (make-style)
     code: tuple = ()                    # impl files; their hash = the recipe version
+    list_basefiles: Callable[[], list] | None = None   # override Source's own,
+                                         # for a stage whose real unit of work
+                                         # is finer than one basefile
 
 @dataclass
 class Source:
@@ -211,7 +214,11 @@ parallelisable with `-j`:
   can only re-touch known ids, never discover new ones.
 - `parse` — every source has one; raw → artifact.
 - `versions` — sfs and eurlex only (a second per-doc stage: historical
-  consolidations).
+  consolidations). Dispatched per archived/superseded version, not per
+  document (`Stage.list_basefiles`, `"<basefile>@<version>"` keys), with a
+  `Source.after["versions"]` hook that assembles each document's sidecar once
+  its own versions are built. `lagen <src> versions <basefile>` expands the
+  bare basefile to every key under it.
 
 **Corpus-level verbs** — not Stages, single functions over whole sources:
 `relate` (build the SQLite catalog), `index` (OpenSearch), `dump` (NDJSON),
@@ -243,10 +250,14 @@ runs them knows no source name.
   artifacts `parse` wrote, so it cannot ride the leading parse loop. A rebuild
   that names the source runs it after `dump` and before `generate`.
 - **A corpus-level `Source.after[verb]` hook.** It runs once per source, after
-  that verb's sweep over the source. `dv` registers `after={"parse":
-  (_dv_after_parse,)}`: once a full dv parse is through, it reconciles the
-  artifact tree to the canonical case set and refreshes the case-number
-  snapshot. `lagen dv parse` runs the hook too, not only `lagen all rebuild`.
+  that verb's sweep over the source -- for a gated parse/versions stage only
+  when the stage actually ran, and never under `-n`. `dv` registers
+  `after={"parse": (_dv_after_parse,)}`: once a full dv parse is through, it
+  reconciles the artifact tree to the canonical case set and refreshes the
+  case-number snapshot. `lagen dv parse` runs the hook too, not only `lagen
+  all rebuild`. sfs and eurlex hang their versions-sidecar assembly on
+  `after["versions"]`; a targeted `lagen sfs versions 1999:1229`, and the
+  versions prerequisite of a targeted generate, run it as well.
 
 ### Content-hash freshness
 
@@ -270,6 +281,13 @@ The engine is `lib/freshness.py`; the paths below are its module constants.
    the big manifest at all. This is what makes a no-op `lagen all rebuild`
    cheap. A per-doc watermark is recorded only on a **clean sweep** — a failed
    doc leaves the source unmarked so the next run retries it.
+
+One decision is mtime-based by design: the versions sidecar hooks skip a
+statute or act whose `.versions.json` is newer than every archive file and
+version artifact under it. The artifacts themselves are manifest-governed;
+only the assembly of their index is gated by mtime. (sfs's legacy
+counter-keyed archives, which the hook parses directly rather than through
+a fan-out key, are re-read only when that gate opens.)
 
 Relate's cross-document block (`__corr__`) has its **own recipe**: the lib
 side is `CORR_CODE` (`lib/hierarki.py`), each source adds its own through

@@ -68,6 +68,58 @@ class Stage:
     # it after the dump verb (`stats compute` measures the catalog relate has
     # just rebuilt, so it cannot run in that loop -- see corpus.cmd_all).
     phase: str = "parse"
+    # override the source's own list_basefiles for this stage only -- a stage
+    # whose real unit of work is finer than "one basefile" (sfs/eurlex
+    # versions: one archived consolidation, not one statute/act) dispatches
+    # over its own finer-grained key instead, so each one is independently
+    # freshness-checked and spread across the pool, rather than one worker
+    # serially parsing every consolidation of one document alone (2026-09-04:
+    # sfs versions' worst case, inkomstskattelagen's ~100 versions, measured
+    # 1,454s single-threaded on one worker while 31 others sat idle). None
+    # (the default) means every other stage's behaviour is unchanged. Keys
+    # are "<coarse-name>@<sub-key>" by convention -- build.py's CLI dispatch
+    # expands a bare coarse name given on the command line ("lagen sfs
+    # versions 1999:1229") to every one of this stage's own keys under it.
+    list_basefiles: Callable[[], list[str]] | None = None
+
+
+def stage_basefiles(source: "Source", stage_name: str) -> list[str]:
+    """The keys a corpus verb dispatches over for `source`'s `stage_name`:
+    the stage's own `list_basefiles` if it set one, else the source's."""
+    stage = source.stages[stage_name]
+    return stage.list_basefiles() if stage.list_basefiles else source.list_basefiles()
+
+
+def fanout_key(basefile: str, sub: str) -> str:
+    """The dispatch key of one sub-item of a fan-out stage (`Stage.list_basefiles`):
+    "<basefile>@<sub>" -- an archived consolidation of a statute, a dated
+    consolidation of an EU act."""
+    return "%s@%s" % (basefile, sub)
+
+
+def split_fanout_key(key: str) -> tuple[str, str]:
+    """`(basefile, sub)` of a fan-out key -- the inverse of `fanout_key`."""
+    basefile, sub = key.split("@", 1)
+    return basefile, sub
+
+
+def stage_keys(source: "Source", stage_name: str, basefiles: list[str]) -> list[str]:
+    """The keys `stage_name` dispatches for the named documents -- what a
+    targeted run ("lagen sfs versions 1999:1229", or the versions prerequisite
+    of a targeted generate) expands each given name to: every key under it for
+    a fan-out stage, the names themselves for any other stage. A name the
+    source does not list is an error, not an empty run -- a typo used to fail
+    its one document, and must not become a clean zero-document run
+    (rule:fail-fast)."""
+    stage = source.stages[stage_name]
+    if not stage.list_basefiles:
+        return list(basefiles)
+    unknown = sorted(set(basefiles) - set(source.list_basefiles()))
+    if unknown:
+        raise ValueError("%s: no such document(s): %s"
+                         % (source.name, ", ".join(unknown)))
+    given = set(basefiles)
+    return [k for k in stage.list_basefiles() if split_fanout_key(k)[0] in given]
 
 
 @dataclass

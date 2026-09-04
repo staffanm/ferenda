@@ -29,6 +29,7 @@ from ..lib import (
     freshness,
     layout,
     llm,
+    util,
 )
 from ..lib import stage as protocol
 from ..lib.datasets import NAMEDLAWS
@@ -156,26 +157,155 @@ def sfs_intermediate(basefile):
 SFS_VERSIONS_CODE = SFS_CODE + (HERE / "versions.py",)
 
 
-def sfs_versions_inputs(basefile):
-    """Freshness inputs of the versions stage: every archived consolidation,
-    plus the statute's patch -- the same patch is offered to every archived
-    wording (`patch.apply_if_fits`), so editing it re-stales the whole history.
-    Archive files are immutable once written, so this set otherwise changes only
-    when the downloader supersedes a consolidation (or history is imported)."""
-    return ([path for _, path in layout.sfs_version_downloads(basefile)]
-            + patch_input("sfs", basefile))
+def sfs_version_list():
+    """Every explicitly SFS-numbered archived consolidation across the whole
+    corpus, as "<basefile>@<version>" dispatch keys -- the versions stage's
+    real, parallelizable unit of work (`Stage.list_basefiles`): one worker per
+    archived consolidation instead of one worker serially parsing an entire
+    statute's history alone (inkomstskattelagen's ~100 versions measured
+    1,454s single-threaded while 31 other workers sat idle, 2026-09-04).
+
+    Legacy counter-keyed archives (no ":" in their own filename-derived id)
+    are excluded: their true identity is only known after parsing (a header
+    can name a cutoff the file's own key never suggested), so a key computed
+    here could point at the wrong output path before that parse ever runs --
+    `sfs_versions_rebuild_sidecars` parses that small, fixed set directly
+    instead (274 of 31,609 archived versions corpus-wide, 2026-09-04; no new
+    ones are ever created, the old downloader that produced them is retired)."""
+    return sorted(protocol.fanout_key(bf, version)
+                 for bf in sfs_list()
+                 for version, _path in layout.sfs_version_downloads(bf)
+                 if ":" in version)
 
 
-def sfs_versions_sidecar(basefile):
-    return layout.sfs_versions_sidecar(basefile)
+def _sfs_version_path(basefile, version):
+    return next((p for v, p in layout.sfs_version_downloads(basefile)
+                if v == version), None)
 
 
-def sfs_versions_run(basefile):
-    """Parse every archived consolidation of one statute into per-version
-    artifacts + the sidecar index (see sfs.versions). The sidecar is written
-    even when the statute has no archive, marking the stage built."""
-    versions.build(basefile,
-                           refparser=LagrumParser(_namedlaws(), basefile))
+def sfs_version_output(key):
+    basefile, version = protocol.split_fanout_key(key)
+    return layout.sfs_version_artifact(basefile, version)
+
+
+def sfs_version_inputs(key):
+    """Freshness inputs of one archived consolidation: the archive file
+    itself, plus the statute's patch (offered to every archived wording, so
+    editing it re-stales this version's parse too)."""
+    basefile, version = protocol.split_fanout_key(key)
+    path = _sfs_version_path(basefile, version)
+    return ([path] if path else []) + patch_input("sfs", basefile)
+
+
+def sfs_version_run(key):
+    """Parse one archived, explicitly SFS-numbered consolidation into its
+    version artifact -- the versions stage's per-item dispatch recipe (see
+    `sfs_version_list`). Errors are not caught here: the driver's ordinary
+    per-document isolation already gives every dispatched key that (the same
+    as any other stage's), and `sfs_versions_rebuild_sidecars` records a
+    failed version in the sidecar's `skipped` list when it re-parses it
+    (rule:no-catch-log-continue)."""
+    basefile, version = protocol.split_fanout_key(key)
+    path = _sfs_version_path(basefile, version)
+    if path is None:
+        raise SkipDocument("%s: archived version %s no longer present"
+                          % (basefile, version))
+    recovered, art = versions.parse_version(
+        basefile, version, path, LagrumParser(_namedlaws(), basefile))
+    # a real, pre-existing minority of the archive is mislabeled -- the file
+    # filed under an explicit key's own header names a *different* cutoff
+    # (confirmed directly: 1936:81's own archive file, read raw, carries
+    # "Ändring införd: t.o.m SFS 2020:1028" -- not a parsing bug, the archive
+    # itself). This function must never print: it runs inside a pool worker,
+    # and a worker has no safe way to write beside the parent's open
+    # invocation bar (reset_worker_state() deliberately disconnects it, so a
+    # direct write corrupts the display, not just interleaves badly -- caught
+    # live, 2026-09-04). Writing to the identity the content actually names is
+    # still correct; this key's own freshness bookkeeping predicted the wrong
+    # path, though, so the key is never fresh and re-parses every run -- and
+    # sfs_versions_rebuild_sidecars, finding the predicted artifact missing,
+    # parses the file a second time and records the mismatch as `archived_as`.
+    # Degraded for this document only (two parses per run), never silently
+    # wrong.
+    compress.write_json(layout.sfs_version_artifact(basefile, recovered), art)
+
+
+def sfs_versions_rebuild_sidecars():
+    """Assemble every statute's versions-stage sidecar from the fan-out
+    stage's own already-parsed artifacts, plus a direct parse for whatever
+    the fan-out's own predicted path didn't produce: the fixed, small legacy
+    counter-keyed set (excluded from the fan-out entirely -- see
+    `sfs_version_list`), *and* the real, pre-existing minority of explicitly-
+    keyed archives whose own header names a different cutoff than their
+    filename claims (confirmed directly against the archive, 2026-09-04 --
+    not a parsing bug, the archive itself is mislabeled for these). Either
+    way the predicted artifact is simply missing, so this can't tell the two
+    apart by looking -- and doesn't need to; it re-parses either the same
+    way. Runs once per source, after the fan-out's own per-version dispatch
+    (`source.after["versions"]` -- when the stage ran; an "up to date --
+    skipped" run changed no version artifact, so it fires no hook). Within a
+    run, each statute that has not itself changed is skipped below by the
+    same size+mtime comparison the manifest uses elsewhere, not re-read.
+
+    Reads back the artifact for the common case (predicted path exists)
+    rather than re-parsing; parses directly only where it doesn't. A
+    mislabeled explicit key is the one archive read twice per run (see
+    `sfs_version_run`)."""
+    for basefile in sfs_list():
+        downloads = layout.sfs_version_downloads(basefile)
+        sidecar_path = layout.sfs_versions_sidecar(basefile)
+        if compress.exists(sidecar_path) \
+                and compress.stat(sidecar_path).st_mtime_ns >= compress.newest_mtime_ns(
+                    [path for _v, path in downloads]
+                    + [layout.sfs_version_artifact(basefile, v)
+                       for v, _p in downloads if ":" in v]):
+            continue     # nothing under this statute changed since
+        versions_out, skipped = [], []
+        seen = set()
+        refparser = None
+        # explicit first (authoritative): a counter-keyed duplicate of the
+        # same consolidation loses to it (sfs.asgit keeps the same order)
+        for version, path in sorted(downloads, key=lambda vp: (":" not in vp[0], vp[0])):
+            art = None
+            if ":" in version:
+                art_path = layout.sfs_version_artifact(basefile, version)
+                # size: the driver leaves an *empty* placeholder for a
+                # SkipDocument, which is not an artifact to read back
+                if compress.exists(art_path) and compress.stat(art_path).st_size:
+                    art = compress.read_json(art_path)
+                    recovered = art["version"]
+            if art is None:
+                # either a legacy counter-keyed archive (always lands here),
+                # an explicit one whose predicted path never got written
+                # because its own header named a different cutoff, or one
+                # the fan-out skipped or failed on -- all need the same
+                # direct parse to find out what it really is (a failure
+                # then lands in `skipped` with its error, as before)
+                if refparser is None:
+                    refparser = LagrumParser(_namedlaws(), basefile)
+                try:
+                    recovered, art = versions.parse_version(
+                        basefile, version, path, refparser)
+                except SkipDocument as exc:
+                    skipped.append({"version": version, "error": str(exc)})
+                    continue
+                except Exception as exc:  # noqa: BLE001 — per-version resilience point: a corrupt decades-old archive file becomes a recorded skip in the sidecar, not an aborted hook (rule:no-catch-log-continue)
+                    skipped.append({"version": version, "error": "%s: %s"
+                                    % (type(exc).__name__, exc)})
+                    continue
+                compress.write_json(
+                    layout.sfs_version_artifact(basefile, recovered), art)
+            if recovered in seen:
+                skipped.append({"version": version, "duplicate_of": recovered})
+                continue
+            seen.add(recovered)
+            entry = {"version": recovered, "uri": art["uri"]}
+            if recovered != version:
+                entry["archived_as"] = version
+            versions_out.append(entry)
+        versions_out.sort(key=lambda e: layout.sfs_version_key(e["version"]))
+        util.write_json_atomic(sidecar_path,
+                              {"versions": versions_out, "skipped": skipped})
 
 
 def sfs_list():
@@ -587,10 +717,16 @@ SOURCES: tuple[Source, ...] = (Source("sfs", sfs_list, {
                    inputs=sfs_inputs, code=SFS_CODE),
     # historical consolidations: parse the download archive (superseded
     # versions, incl. two decades of legacy HTML snapshots) into per-version
-    # artifacts + a sidecar index, feeding the lydelse pages and the diff view
-    "versions": Stage("versions", sfs_versions_run, sfs_versions_sidecar,
-                      inputs=sfs_versions_inputs, code=SFS_VERSIONS_CODE),
+    # artifacts + a sidecar index, feeding the lydelse pages and the diff view.
+    # Dispatched per archived consolidation, not per statute (list_basefiles),
+    # so a heavily-amended act's history spreads across the whole pool instead
+    # of one worker parsing it alone; sfs_versions_rebuild_sidecars (after)
+    # assembles each statute's sidecar once its own versions are all built.
+    "versions": Stage("versions", sfs_version_run, sfs_version_output,
+                      inputs=sfs_version_inputs, code=SFS_VERSIONS_CODE,
+                      list_basefiles=sfs_version_list),
 }, harvest=sfs_harvest, origin=origin(download.ENDPOINT),
+   after={"versions": (sfs_versions_rebuild_sidecars,)},
    render=render.render,
    intermediate=(sfs_intermediate, "plain text"),
    artifacts=functools.partial(layout.artifacts, "sfs"),

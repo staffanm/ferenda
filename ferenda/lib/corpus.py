@@ -595,7 +595,16 @@ def _run_stage_gated(source, step, jobs, store):
     date -- skipped"; else run it and, on a clean sweep, record the fingerprint in
     `store` so the next run can skip. Shared by `cmd_all` and the single-source
     dispatch so a direct `lagen <src> parse` gets the same shortcut. Returns
-    (had_errors, recorded) -- `recorded` tells the caller to save `store`."""
+    (had_errors, recorded) -- `recorded` tells the caller to save `store`.
+
+    The source's `after[step]` hooks run here too, and only when the stage
+    ran: a skipped stage left every artifact as it was, so a hook that
+    derives from them (dv's case-number snapshot, the versions sidecars)
+    can only rewrite what it wrote last time -- dv's used to sweep 200k
+    artifacts to do exactly that on every "up to date -- skipped" rebuild.
+    They run before the fingerprint is saved (the caller saves after this
+    returns), so a hook that crashes leaves the stage unmarked and the next
+    run retries both."""
     pcode = source.stages[step].code
     wm = freshness.stage_fingerprint(source, step)
     if freshness.up_to_date(store, step, source.name, wm, pcode):
@@ -604,9 +613,10 @@ def _run_stage_gated(source, step, jobs, store):
         # shows the whole pipeline (§2)
         freshness._emit_segment(step, source.name, 0.0, ran=0, status="skipped")
         return False, False
-    basefiles = source.list_basefiles()
+    basefiles = protocol.stage_basefiles(source, step)
     result = freshness.run_action(source, step, basefiles, jobs)
     report(source, step, result, len(basefiles), full_source=True)
+    _after_hooks(source, step)
     # only fingerprint a clean sweep: a failed doc leaves the source un-marked so
     # the next run retries it (and re-surfaces the error) rather than skipping.
     # A dry run does no work at all, so it must not mark the source either --
@@ -619,15 +629,25 @@ def _run_stage_gated(source, step, jobs, store):
     return False, True
 
 
+def _after_hooks(source, verb):
+    # a dry run does no work at all: the versions hooks parse and write
+    # whatever the (unbuilt) fan-out left missing, so under -n they would do
+    # the whole stage's work serially in the main process
+    if protocol.RUN.dry_run:
+        return
+    for hook in source.after.get(verb, ()):
+        hook()
+
+
 def run_after(sources, names, verb):
     """Run each named source's corpus-level `after[verb]` hooks -- the work a
     source hangs off a standard verb (dv reconciles its artifact tree and
     refreshes the case-number snapshot once its parse sweep is through). Called
-    with one name from the parse/versions loop, and with the whole run's names
-    after each corpus verb."""
+    with the whole run's names after each corpus verb, and with one name after
+    a targeted per-document run; a gated full-source parse/versions run fires
+    its own hooks from `_run_stage_gated`, and only when the stage ran."""
     for name in names:
-        for hook in sources[name].after.get(verb, ()):
-            hook()
+        _after_hooks(sources[name], verb)
 
 
 def run_phase(sources, names, verb, jobs):
@@ -641,7 +661,7 @@ def run_phase(sources, names, verb, jobs):
         for stage_name, stage in source.stages.items():
             if stage.phase != verb:
                 continue
-            basefiles = source.list_basefiles()
+            basefiles = protocol.stage_basefiles(source, stage_name)
             result = freshness.run_action(source, stage_name, basefiles, jobs)
             report(source, stage_name, result, len(basefiles), full_source=True)
             had_errors |= bool(result.errors)
@@ -809,7 +829,6 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
                 # so writing it per source is free.
                 if recorded:
                     freshness.save_fingerprints(store)
-                run_after(sources, [name], step)
                 ib.finish()
         ib.start("relate")
         cmd_relate(sources, names)
