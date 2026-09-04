@@ -64,6 +64,15 @@ def test_flatten_splices_the_quotation_marks_the_oj_prints():
                  '.</TXT>') == "read \u2018a\u2019."
 
 
+def test_flatten_takes_an_empty_quote_code_from_its_partner():
+    # 61977CC0080 prints <QUOT.START CODE=""/>dépassement technique<QUOT.END
+    # CODE="2019"/>: the start names no mark, the end it pairs with does
+    assert flatten(_lxml(
+        '<TXT>the <QUOT.START ID="QS1" REF.END="QE1" CODE=""/>d'
+        '<QUOT.END ID="QE1" REF.START="QS1" CODE="2019"/> to.</TXT>')) \
+        == "the \u2018d\u2019 to."
+
+
 def test_flatten_separates_block_children():
     # adjacent block elements (P) must not glue together
     assert _flat("<TI><P>Directive 2022/2555</P><P>of 14 December</P></TI>") \

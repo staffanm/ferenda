@@ -121,6 +121,11 @@ INLINE = {"HT", "IE", "FT", "DATE", "QUOT.START", "QUOT.END", "QUOT.S",
 # ersättas med ”leverantörer av utlokaliserade driftstjänster”" reads as one
 # unbroken sentence with no sign of where either term begins or ends.
 QUOTE_MARKS = {"QUOT.START", "QUOT.END"}
+# the opening mark that pairs with a closing mark, for the three OJ files
+# (61976CJ0066, 61977CC0001, 61977CC0080) whose QUOT.START carries CODE="" --
+# the closing element it names by REF.END still says which pair was printed.
+# Only the pair those files print; another closing mark is a new case
+QUOTE_PAIRS = {"\u2019": "\u2018"}
 # regions whose inner structure belongs to something other than the act's own
 # outline: the verbatim quotation an amending act inserts (text of *another* act)
 # and a table (a cell's list is the cell's). A list inside one of these is read as
@@ -262,7 +267,7 @@ def flatten(elem, skip=SKIP_INLINE, drop=()):
         if i in drop or child.tag in skip:
             pass
         elif child.tag in QUOTE_MARKS:
-            parts.append(chr(int(child.get("CODE"), 16)))
+            parts.append(_quote_mark(child))
         elif child.tag in ATOMIC:
             # the widened skip stops at an atomic region -- `_sublists` does not
             # descend into one either, so a list in there is neither emitted as a
@@ -276,6 +281,18 @@ def flatten(elem, skip=SKIP_INLINE, drop=()):
             parts.append(" %s" % flatten(child, skip))
         parts.append(child.tail or "")
     return " ".join("".join(parts).split())
+
+
+def _quote_mark(el):
+    """The character a ``QUOT.START``/``QUOT.END`` stands for. A start with an
+    empty ``CODE`` takes the mirror of the mark its ``QUOT.END`` carries."""
+    if el.get("CODE"):
+        return chr(int(el.get("CODE"), 16))
+    assert el.tag == "QUOT.START", "only a QUOT.START prints an empty CODE"
+    partner = el.getroottree().getroot().find(".//*[@ID='%s']" % el.get("REF.END"))
+    assert partner is not None and partner.get("CODE"), \
+        "a QUOT.START with an empty CODE names a QUOT.END that carries one"
+    return QUOTE_PAIRS[chr(int(partner.get("CODE"), 16))]
 
 
 def _text(parent, *tags):
