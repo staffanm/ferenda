@@ -152,9 +152,9 @@ def version_id(source):
 
     Version ids are space-free by construction (the two groups join with a
     bare ":", no whitespace ever captured); `layout.sfs_version_file` relies
-    on this -- its single .versions/ path grammar slugs both the colon and
-    legacy-counter branches identically, so a spaceful id can never split the
-    writer and reader trees."""
+    on this -- its single .versions/ path grammar slugs the colon branch this
+    always produces the same way its defensive colon-less fallback would, so
+    a spaceful id can never split the writer and reader trees."""
     andring = (source.get("fulltext") or {}).get("andringInford")
     if andring:
         match = RE_VERSION.search(andring)

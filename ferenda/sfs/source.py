@@ -158,24 +158,15 @@ SFS_VERSIONS_CODE = SFS_CODE + (HERE / "versions.py",)
 
 
 def sfs_version_list():
-    """Every explicitly SFS-numbered archived consolidation across the whole
-    corpus, as "<basefile>@<version>" dispatch keys -- the versions stage's
-    real, parallelizable unit of work (`Stage.list_basefiles`): one worker per
+    """Every archived consolidation across the whole corpus, as
+    "<basefile>@<version>" dispatch keys -- the versions stage's real,
+    parallelizable unit of work (`Stage.list_basefiles`): one worker per
     archived consolidation instead of one worker serially parsing an entire
     statute's history alone (inkomstskattelagen's ~100 versions measured
-    1,454s single-threaded while 31 other workers sat idle, 2026-09-04).
-
-    Legacy counter-keyed archives (no ":" in their own filename-derived id)
-    are excluded: their true identity is only known after parsing (a header
-    can name a cutoff the file's own key never suggested), so a key computed
-    here could point at the wrong output path before that parse ever runs --
-    `sfs_versions_rebuild_sidecars` parses that small, fixed set directly
-    instead (274 of 31,609 archived versions corpus-wide, 2026-09-04; no new
-    ones are ever created, the old downloader that produced them is retired)."""
+    1,454s single-threaded while 31 other workers sat idle, 2026-09-04)."""
     return sorted(protocol.fanout_key(bf, version)
                  for bf in sfs_list()
-                 for version, _path in layout.sfs_version_downloads(bf)
-                 if ":" in version)
+                 for version, _path in layout.sfs_version_downloads(bf))
 
 
 def _sfs_version_path(basefile, version):
@@ -233,19 +224,16 @@ def sfs_version_run(key):
 def sfs_versions_rebuild_sidecars():
     """Assemble every statute's versions-stage sidecar from the fan-out
     stage's own already-parsed artifacts, plus a direct parse for whatever
-    the fan-out's own predicted path didn't produce: the fixed, small legacy
-    counter-keyed set (excluded from the fan-out entirely -- see
-    `sfs_version_list`), *and* the real, pre-existing minority of explicitly-
-    keyed archives whose own header names a different cutoff than their
-    filename claims (confirmed directly against the archive, 2026-09-04 --
-    not a parsing bug, the archive itself is mislabeled for these). Either
-    way the predicted artifact is simply missing, so this can't tell the two
-    apart by looking -- and doesn't need to; it re-parses either the same
-    way. Runs once per source, after the fan-out's own per-version dispatch
-    (`source.after["versions"]` -- when the stage ran; an "up to date --
-    skipped" run changed no version artifact, so it fires no hook). Within a
-    run, each statute that has not itself changed is skipped below by the
-    same size+mtime comparison the manifest uses elsewhere, not re-read.
+    the fan-out's own predicted path didn't produce: the real, pre-existing
+    minority of explicitly-keyed archives whose own header names a different
+    cutoff than their filename claims (confirmed directly against the
+    archive, 2026-09-04 -- not a parsing bug, the archive itself is
+    mislabeled for these). Runs once per source, after the fan-out's own
+    per-version dispatch (`source.after["versions"]` -- when the stage ran;
+    an "up to date -- skipped" run changed no version artifact, so it fires
+    no hook). Within a run, each statute that has not itself changed is
+    skipped below by the same size+mtime comparison the manifest uses
+    elsewhere, not re-read.
 
     Reads back the artifact for the common case (predicted path exists)
     rather than re-parsing; parses directly only where it doesn't. A
@@ -258,29 +246,23 @@ def sfs_versions_rebuild_sidecars():
                 and compress.stat(sidecar_path).st_mtime_ns >= compress.newest_mtime_ns(
                     [path for _v, path in downloads]
                     + [layout.sfs_version_artifact(basefile, v)
-                       for v, _p in downloads if ":" in v]):
+                       for v, _p in downloads]):
             continue     # nothing under this statute changed since
         versions_out, skipped = [], []
         seen = set()
         refparser = None
-        # explicit first (authoritative): a counter-keyed duplicate of the
-        # same consolidation loses to it (sfs.asgit keeps the same order)
-        for version, path in sorted(downloads, key=lambda vp: (":" not in vp[0], vp[0])):
-            art = None
-            if ":" in version:
-                art_path = layout.sfs_version_artifact(basefile, version)
-                # size: the driver leaves an *empty* placeholder for a
-                # SkipDocument, which is not an artifact to read back
-                if compress.exists(art_path) and compress.stat(art_path).st_size:
-                    art = compress.read_json(art_path)
-                    recovered = art["version"]
-            if art is None:
-                # either a legacy counter-keyed archive (always lands here),
-                # an explicit one whose predicted path never got written
-                # because its own header named a different cutoff, or one
-                # the fan-out skipped or failed on -- all need the same
-                # direct parse to find out what it really is (a failure
-                # then lands in `skipped` with its error, as before)
+        for version, path in downloads:
+            art_path = layout.sfs_version_artifact(basefile, version)
+            # size: the driver leaves an *empty* placeholder for a
+            # SkipDocument, which is not an artifact to read back
+            if compress.exists(art_path) and compress.stat(art_path).st_size:
+                art = compress.read_json(art_path)
+                recovered = art["version"]
+            else:
+                # its own header named a different cutoff than its filename
+                # claims, or the fan-out skipped or failed on it -- either
+                # way needs a direct parse to find out what it really is (a
+                # failure then lands in `skipped` with its error, as before)
                 if refparser is None:
                     refparser = LagrumParser(_namedlaws(), basefile)
                 try:

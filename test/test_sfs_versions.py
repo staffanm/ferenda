@@ -26,7 +26,8 @@ def test_version_artifact_paths():
     assert layout.sfs_version_artifact("1998:204", "2003:466") == (
         layout.SFS_ARTIFACT / "archive" / "1998" / "204" / ".versions"
         / "2003" / "466.json")
-    # a legacy counter id stays a flat file under .versions/
+    # a colon-less id -- never minted in practice, a defensive fallback
+    # only -- stays a flat file under .versions/
     assert layout.sfs_version_artifact("1998:204", "11") == (
         layout.SFS_ARTIFACT / "archive" / "1998" / "204" / ".versions"
         / "11.json")
@@ -53,11 +54,25 @@ def test_version_downloads_enumeration_and_json_preference(tmp_path,
     (root / "2003").mkdir(parents=True)
     (root / "2003" / "466.html").write_text("older html")
     (root / "2003" / "466.json").write_text("{}")      # same version, json wins
-    (root / "11.html").write_text("counter-keyed")
     (root / "11.html~").write_text("editor junk")      # never a version
     found = layout.sfs_version_downloads("1998:204")
-    assert found == [("11", root / "11.html"),
-                     ("2003:466", root / "2003" / "466.json")]
+    assert found == [("2003:466", root / "2003" / "466.json")]
+
+
+def test_version_downloads_refuses_a_stray_counter_keyed_file(tmp_path,
+                                                              monkeypatch):
+    # the legacy counter-keyed form ("11.html", no year to nest under) was
+    # retired 2026-09-04 -- every one renamed to its recovered id or deleted
+    # as a duplicate. A leftover one is not silently dropped like editor
+    # junk: it means this environment's archive was never migrated, and
+    # silently ignoring it would drop a real archived consolidation from the
+    # statute's version history with no diagnostic trail (rule:fail-fast)
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
+    root = tmp_path / "downloaded" / "archive" / "1998" / "204" / ".versions"
+    root.mkdir(parents=True)
+    (root / "11.html").write_text("unmigrated legacy archive file")
+    with pytest.raises(AssertionError, match="never migrated"):
+        layout.sfs_version_downloads("1998:204")
 
 
 def test_version_downloads_empty_without_archive(tmp_path, monkeypatch):
@@ -122,8 +137,9 @@ def test_archival_header_wrapped_key_and_value():
 
 def test_header_cutoff_reads_the_sources_own_typing_slips():
     # refusing these left the act with no cutoff at all and its whole version
-    # history unkeyed. Measured over every header in the corpus: 49 gain a
-    # cutoff, none read differently.
+    # history unkeyed. Measured over every header in the corpus, 2026-09-04:
+    # 40 gain a cutoff from the dropped "SFS", one stops mis-reading a
+    # five-digit year, none else read differently.
     assert versions.header_cutoff(
         {"Ändring införd": "t.o.m SFS 2018:1409"}) == "2018:1409"   # 1962:627
     assert versions.header_cutoff(
@@ -132,9 +148,16 @@ def test_header_cutoff_reads_the_sources_own_typing_slips():
         {"Ändring införd": "t.o.m. SFS1986:1067"}) == "1986:1067"   # 1982:785
     assert versions.header_cutoff(
         {"Ändring införd": "t.o.m. SFS 2003: 466"}) == "2003:466"
+    # the "SFS" token dropped entirely
+    assert versions.header_cutoff(
+        {"Ändring införd": "t.o.m. 2014:1584"}) == "2014:1584"      # 2010:769
     # a yearless cutoff is still unusable -- there is no register to resolve it
     assert versions.header_cutoff({"Ändring införd": "t.o.m. SFS 466"}) is None
     assert versions.header_cutoff({}) is None
+    # a five-digit year is a source typo, not a cutoff -- refused rather than
+    # minting a version id for a year that cannot exist
+    assert versions.header_cutoff(
+        {"Ändring införd": "t.o.m. SFS 20120:354"}) is None         # 1991:1128
 
 
 def test_parse_version_archival_sfst():
@@ -174,9 +197,9 @@ def test_parse_version_keeps_key_without_cutoff(tmp_path):
 
 
 def test_version_sort_key():
-    ordered = sorted(["2010:1969", "11", "2003:466", "1998:204"],
+    ordered = sorted(["2010:1969", "2003:466", "1998:204"],
                      key=layout.sfs_version_key)
-    assert ordered == ["11", "1998:204", "2003:466", "2010:1969"]
+    assert ordered == ["1998:204", "2003:466", "2010:1969"]
 
 
 # --------------------------------------------------------------------------
@@ -186,9 +209,11 @@ def test_version_sort_key():
 @pytest.fixture
 def archive(tmp_path, monkeypatch):
     """A temporary sfs data root with an archive holding one statute's
-    versions: an explicit SFS-keyed file and a counter-keyed duplicate of a
-    different cutoff, plus a corrupt file. The statute's own (current)
-    download is a stub -- sfs_list() needs it to find the statute at all."""
+    versions: an explicit SFS-keyed file, a second explicit key whose own
+    header names that very same cutoff (the same consolidation archived
+    twice under different keys -- a duplicate), and a corrupt file. The
+    statute's own (current) download is a stub -- sfs_list() needs it to
+    find the statute at all."""
     monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path / "downloaded")
     monkeypatch.setattr(layout, "SFS_ARTIFACT", tmp_path / "artifact")
     (tmp_path / "downloaded" / "1998").mkdir(parents=True)
@@ -198,19 +223,27 @@ def archive(tmp_path, monkeypatch):
     (root / "2003").mkdir(parents=True)
     (root / "2003" / "466.html").write_bytes(
         (FILES / "sfst-archival.html").read_bytes())
-    # a counter-keyed copy of the very same consolidation -> duplicate
-    (root / "12.html").write_bytes((FILES / "sfst-archival.html").read_bytes())
-    (root / "13.html").write_bytes(b"<html>not a statute page</html>")
+    # filed under a different key, but its own header names cutoff 2003:466
+    # too -> the same consolidation fetched twice, a duplicate
+    (root / "2003" / "467.html").write_bytes(
+        (FILES / "sfst-archival.html").read_bytes())
+    (root / "2003" / "998.html").write_bytes(b"<html>not a statute page</html>")
     return tmp_path
 
 
 def _build(basefile):
     """The versions stage over one statute, serially: every fan-out key of
     it, then the sidecar hook -- what `lagen sfs versions <basefile>` runs.
-    Returns the sidecar dict."""
+    Mirrors the driver's own per-key isolation (freshness.py's `stage.run`
+    try/except): a key that fails to parse is swallowed here too, exactly as
+    the sidecar hook's own direct-parse fallback expects to find its
+    predicted path still missing. Returns the sidecar dict."""
     for key in source.sfs_version_list():
         if split_fanout_key(key)[0] == basefile:
-            source.sfs_version_run(key)
+            try:
+                source.sfs_version_run(key)
+            except Exception:  # noqa: BLE001,S110 — emulates the driver's own per-doc resilience point (rule:no-catch-log-continue)
+                pass
     source.sfs_versions_rebuild_sidecars()
     return json.loads(layout.sfs_versions_sidecar(basefile).read_text())
 
@@ -222,8 +255,8 @@ def test_build_writes_artifacts_and_sidecar(archive):
         "https://lagen.nu/1998:204/konsolidering/2003:466"
     # the duplicate and the corrupt file are recorded, not retried forever
     skipped = {e["version"]: e for e in sidecar["skipped"]}
-    assert skipped["12"]["duplicate_of"] == "2003:466"
-    assert "error" in skipped["13"]
+    assert skipped["2003:467"]["duplicate_of"] == "2003:466"
+    assert "error" in skipped["2003:998"]
     art_path = layout.sfs_version_artifact("1998:204", "2003:466")
     assert compress.exists(art_path)        # stored precompressed (.json.br)
     assert json.loads(compress.read_bytes(art_path))["version"] == "2003:466"
@@ -347,12 +380,13 @@ def test_diff_endpoint_does_not_cache_current_consolidation(archive, monkeypatch
 # cover the pieces.
 # --------------------------------------------------------------------------
 
-def test_version_list_excludes_counter_keyed_archives(archive):
-    # counter-keyed archives ("12.html", "13.html") have no ":" in their own
-    # key -- their true identity is only known after parsing, so a dispatch
-    # key computed here could point at the wrong output path; excluded from
-    # the fan-out, handled directly by rebuild_sidecars instead
-    assert source.sfs_version_list() == ["1998:204@2003:466"]
+def test_version_list_includes_every_explicit_key(archive):
+    # every archive file carries its own ":" key, duplicate or corrupt alike
+    # -- the fan-out dispatches all of them; rebuild_sidecars sorts out which
+    # ones actually produced a new version (see test_build_writes_artifacts_
+    # and_sidecar)
+    assert source.sfs_version_list() == [
+        "1998:204@2003:466", "1998:204@2003:467", "1998:204@2003:998"]
 
 
 def test_version_key_output_and_inputs_shape():
@@ -390,9 +424,7 @@ def test_rebuild_sidecars_skips_a_statute_untouched_since_its_last_build(
     # sidecar would be rewritten on every run this hook fires on, cascading
     # false staleness into anything gated on a sidecar's own mtime (the
     # lydelse pages) even for statutes nothing touched
-    for key in source.sfs_version_list():
-        source.sfs_version_run(key)
-    source.sfs_versions_rebuild_sidecars()
+    _build("1998:204")
     before = layout.sfs_versions_sidecar("1998:204").stat().st_mtime_ns
 
     def boom(*a, **kw):
@@ -405,10 +437,7 @@ def test_rebuild_sidecars_skips_a_statute_untouched_since_its_last_build(
 
 def test_rebuild_sidecars_rebuilds_when_a_new_version_is_archived(
         archive):
-    for key in source.sfs_version_list():
-        source.sfs_version_run(key)
-    source.sfs_versions_rebuild_sidecars()
-    first = json.loads(layout.sfs_versions_sidecar("1998:204").read_text())
+    first = _build("1998:204")
     assert [e["version"] for e in first["versions"]] == ["2003:466"]
 
     later = (FILES / "sfst-archival.html").read_bytes().replace(
@@ -445,10 +474,10 @@ def mislabeled_archive(tmp_path, monkeypatch):
 
 
 def test_version_list_includes_a_mislabeled_explicit_key(mislabeled_archive):
-    # the key itself has a ":" (it's the statute's own number), so it still
-    # dispatches through the fan-out -- only a counter-keyed archive
-    # ("12.html") is excluded, not one whose content later turns out to
-    # disagree with its own key
+    # the key itself has a ":" (it's the statute's own number), so it
+    # dispatches through the fan-out same as any other -- the fan-out never
+    # opens the file to check, only rebuild_sidecars discovers its content
+    # disagrees with its own key
     assert source.sfs_version_list() == ["1998:204@1998:204"]
 
 
@@ -467,10 +496,10 @@ def test_version_run_writes_under_the_recovered_identity(mislabeled_archive):
 def test_rebuild_sidecars_recovers_a_mislabeled_explicit_key(mislabeled_archive):
     # the predicted artifact never appears for this key (see above) -- the
     # sidecar hook must not silently drop the version because of that: it
-    # falls through to the same direct-parse fallback used for legacy
-    # counter-keyed archives, regardless of *why* the predicted path is
-    # missing (this is the bug caught live against the real corpus,
-    # 2026-09-04 -- fixed by no longer special-casing "which kind of miss")
+    # falls through to the same direct-parse fallback regardless of *why*
+    # the predicted path is missing (this is the bug caught live against the
+    # real corpus, 2026-09-04 -- fixed by no longer special-casing "which
+    # kind of miss")
     source.sfs_version_run("1998:204@1998:204")
     source.sfs_versions_rebuild_sidecars()
     sidecar = json.loads(layout.sfs_versions_sidecar("1998:204").read_text())

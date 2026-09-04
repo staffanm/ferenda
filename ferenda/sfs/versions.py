@@ -16,11 +16,11 @@ per-source hook that assembles each statute's index) writes
 which the renderer (historical "lydelse" pages, the version panel), the API
 (/document/versions, /document/diff) and the diff view consume. A version's
 id is the SFS number of the last amendment folded in ("2003:466"), the same
-identity the downloader uses. Legacy counter-keyed archive files ("11.html",
-archived before the old downloader learned to read the cutoff) carry the real
-cutoff in their header, so their id is recovered at parse time; a recovered id
-that duplicates an explicitly-keyed version is the same consolidation fetched
-twice and is skipped.
+identity the downloader uses. A real, pre-existing minority of the archive is
+mislabeled -- an explicitly-keyed file's own header names a different cutoff
+than its filename claims -- so its id is recovered at parse time regardless;
+a recovered id that duplicates an explicitly-keyed version is the same
+consolidation fetched twice and is skipped.
 """
 
 import html
@@ -36,13 +36,18 @@ from .nf import BASE, to_normalform
 # is occasionally dropped in the source; a yearless cutoff is unusable here
 # since there is no register to resolve it against).
 #
-# Two of the source's own typing slips are read rather than refused, because
+# Three of the source's own typing slips are read rather than refused, because
 # refusing them leaves the act with no cutoff at all and its whole version
 # history unkeyed: the abbreviation written without its last dot ("t.o.m SFS
-# 2018:1409", 1962:627) and the SFS number written with a dot for its colon
-# ("t.o.m. SFS 2026.1467", 2007:1175). Measured over every header in the
-# corpus: 49 gain a cutoff, none read differently.
-RE_CUTOFF = re.compile(r"t\.o\.m\.?\s*SFS\s*(\d+)\s*[:.]\s?(\d+)")
+# 2018:1409", 1962:627), the SFS number written with a dot for its colon
+# ("t.o.m. SFS 2026.1467", 2007:1175), and the "SFS" token dropped entirely
+# ("t.o.m. 2014:1584", 2010:769). The year is pinned to four digits rather than
+# left open-ended, so a header's own typo ("t.o.m. SFS 20120:354", 1991:1128)
+# still refuses instead of minting a cutoff to a year that cannot exist.
+# Measured over every header in the corpus, 2026-09-04: 40 gain a cutoff from
+# the dropped "SFS", one stops mis-reading a five-digit year, none else read
+# differently.
+RE_CUTOFF = re.compile(r"t\.o\.m\.?\s*(?:SFS\s*)?(\d{4})\s*[:.]\s?(\d+)")
 
 # a header line in the latin-1 archival <pre> block: "  Rubrik: value"
 RE_HEADER_LINE = re.compile(r"^\s*([^:]+):(.*)$")
@@ -106,8 +111,8 @@ def version_metadata(basefile, version, header):
 def parse_version(basefile, version, path, refparser=None):
     """Parse one archived consolidation into its version artifact. Returns
     ``(recovered_version, artifact)`` -- `recovered_version` is the cutoff the
-    file itself names, which for legacy counter-keyed archives ("11") replaces
-    the meaningless counter."""
+    file itself names, which for a mislabeled explicit key replaces the
+    filename's own (wrong) claim."""
     is_html = path.suffix != ".json"
     if is_html:
         header = (archival_header(path)

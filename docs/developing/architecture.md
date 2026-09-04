@@ -290,9 +290,11 @@ The engine is `lib/freshness.py`; the paths below are its module constants.
 One decision is mtime-based by design: the versions sidecar hooks skip a
 statute or act whose `.versions.json` is newer than every archive file and
 version artifact under it. The artifacts themselves are manifest-governed;
-only the assembly of their index is gated by mtime. (sfs's legacy
-counter-keyed archives, which the hook parses directly rather than through
-a fan-out key, are re-read only when that gate opens.)
+only the assembly of their index is gated by mtime. (sfs's mislabeled
+explicit-key archives -- an archive file's own header names a cutoff other
+than its filename -- fall through to the hook's direct-parse fallback
+rather than the fan-out's predicted path, and are re-read only when that
+gate opens.)
 
 Relate's cross-document block (`__corr__`) has its **own recipe**: the lib
 side is `CORR_CODE` (`lib/hierarki.py`), each source adds its own through

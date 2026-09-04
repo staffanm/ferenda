@@ -154,8 +154,7 @@ def misfiled_as(header, basefile):
 def statute_snapshots(basefile, skipped, gaps, repealed=False):
     """Every usable consolidation of one statute, oldest first: the download
     archive plus the current download, each as ``(cutoff, path,
-    plaintext_hash)``. Explicitly keyed archive files win over counter-keyed
-    duplicates, but the current download wins over an archive of the same
+    plaintext_hash)``. The current download wins over an archive of the same
     cutoff: it is the source the downloader has just corrected.
 
     Two kinds of bad input are told apart, because they need different answers.
@@ -180,11 +179,7 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
     current = layout.sfs_source(basefile)
     if not compress.exists(current):
         current = layout.sfs_sfst(basefile)
-    # explicitly-keyed archives first, so a counter-keyed duplicate of the
-    # same consolidation loses to the authoritative key (as in the versions
-    # stage's sidecar hook, sfs.source.sfs_versions_rebuild_sidecars)
-    archive = sorted(layout.sfs_version_downloads(basefile),
-                     key=lambda vp: (":" not in vp[0], vp[0]))
+    archive = layout.sfs_version_downloads(basefile)
     snapshots = {}
     for _, path in archive:
         try:

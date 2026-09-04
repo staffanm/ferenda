@@ -451,9 +451,13 @@ def sfs_pdf(basefile: str) -> Path:                  # officially published SFS 
 # --------------------------------------------------------------------------
 # sfs archive -- superseded consolidations. Each stage keeps its own archive/
 # subtree (downloaded/sfs/archive for raw, artifact/sfs/archive for parsed), in
-# a per-document .versions/ layout. A version id is the SFS number
-# of the last amendment folded into that consolidation ("2003:466" ->
-# 2003/466.<ext>), or a bare archival counter ("11") where the cutoff is absent.
+# a per-document .versions/ layout. A version id is always the SFS number of
+# the last amendment folded into that consolidation ("2003:466" ->
+# 2003/466.<ext>), or the statute's own number for an un-amended text. (A
+# handful of legacy archive files, saved by the first downloader before it
+# learned to read the cutoff, once carried a bare archival counter instead of
+# a real id -- renamed to their recovered id or deleted as duplicates,
+# 2026-09-04; the counter form no longer exists anywhere in the corpus.)
 # --------------------------------------------------------------------------
 
 def _sfs_version_dir(stage_dir, basefile):
@@ -465,9 +469,14 @@ def _sfs_version_dir(stage_dir, basefile):
 
 def sfs_version_file(stage_dir: Path, basefile: str, version: str) -> Path:
     """Physical path of one archived consolidation under a stage dir's archive
-    subtree: ``<stage_dir>/archive/{y}/{n}/.versions/{vy}/{vn}.json`` -- a flat
-    ``.versions/<version>.json`` for an unrecovered legacy counter with no year
-    to nest under. The single owner of the .versions grammar, shared by the raw
+    subtree: ``<stage_dir>/archive/{y}/{n}/.versions/{vy}/{vn}.json`` -- or a
+    flat ``.versions/<version>.json`` with no year to nest under, for a
+    colon-less version id. `sfs.download.version_id` never mints one (a
+    version id is always the SFS number of the last amendment, or the
+    statute's own number), so this branch is a defensive fallback, not a
+    live path -- kept so a bad `version` still confines cleanly instead of
+    misreading `":" in version` as the only thing standing between it and a
+    traversal. The single owner of the .versions grammar, shared by the raw
     writer (`sfs_archive_version_download`, stage_dir=SFS_DOWNLOADED) and the
     parsed reader (`sfs_version_artifact`, stage_dir=SFS_ARTIFACT) so the two
     archives can never drift (version ids are space-free -- `sfs.download.
@@ -491,12 +500,20 @@ def sfs_archive_version_download(destdir, basefile, version):
 
 def sfs_version_downloads(basefile):
     """Every archived consolidation of a statute: sorted (version, path) pairs
-    from the archive's .versions/ tree -- legacy HTML (the two rättsdatabaser
-    generations) and the new downloader's JSON side by side. When one version id
-    exists in both forms the JSON (the richer, register-carrying form) wins."""
+    from the archive's .versions/{vy}/ tree -- legacy HTML (the two
+    rättsdatabaser generations) and the new downloader's JSON side by side.
+    When one version id exists in both forms the JSON (the richer, register-
+    carrying form) wins."""
     root = _sfs_version_dir(SFS_DOWNLOADED, basefile)
+    stray = sorted(p for p in compress.glob(root, "*")
+                   if not p.is_dir() and p.suffix in (".html", ".json"))
+    assert not stray, (
+        "%s: legacy counter-keyed archive file(s) with no year to nest "
+        "under -- that form was retired 2026-09-04 (renamed to its "
+        "recovered id or deleted as a duplicate); this environment's "
+        "archive was never migrated: %s" % (basefile, stray))
     found = {}
-    for path in sorted(compress.glob(root, "*/*")) + sorted(compress.glob(root, "*")):
+    for path in sorted(compress.glob(root, "*/*")):
         if path.is_dir() or path.suffix not in (".html", ".json"):
             continue   # junk (editor backups) never becomes a version
         # a *leading* underscore is a stray download artifact (2 confirmed
@@ -507,8 +524,7 @@ def sfs_version_downloads(basefile):
         # matching the basefile's own "1971:235_B") and still becomes a space.
         stem = path.stem.lstrip("_") if path.stem.startswith("_") \
             else path.stem.replace("_", " ")
-        version = ("%s:%s" % (path.parent.name, stem)
-                   if path.parent != root else stem)
+        version = "%s:%s" % (path.parent.name, stem)
         if version not in found or path.suffix == ".json":
             found[version] = path
     return sorted(found.items())
@@ -516,12 +532,9 @@ def sfs_version_downloads(basefile):
 
 def sfs_version_key(version):
     """Chronological sort key for a consolidation version id: the cutoff SFS
-    number ("2003:466"); an unrecovered legacy counter ("11", no year to order
-    by) sorts first, by counter."""
-    if ":" in version:
-        year, nr = version.split(":", 1)
-        return (int(year), int(re.sub(r"\D", "", nr) or 0))
-    return (0, int(version))
+    number ("2003:466")."""
+    year, nr = version.split(":", 1)
+    return (int(year), int(re.sub(r"\D", "", nr) or 0))
 
 
 def sfs_version_artifact(basefile: str, version: str) -> Path:
