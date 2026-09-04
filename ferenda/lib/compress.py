@@ -32,6 +32,7 @@ helps (and can inflate), and it keeps tiny always-served files like ``robots.txt
 and empty ``SkipDocument`` placeholders universally readable with no encoding.
 """
 
+import fnmatch
 import gzip as _gzip
 import json
 import mimetypes
@@ -344,12 +345,61 @@ def glob(directory: Path, pattern: str) -> set[Path]:
     """`Path.glob` over the logical names of a compressed tree: match `pattern`
     against plain files *and* their `.br`/`.gz` variants, mapping each hit back to
     its logical path (deduplicated). Callers keep their exact glob pattern (e.g.
-    the one-nesting-level ``*/*.json`` that must not recurse into an archive
-    subtree) and transparently see compressed artifacts. Returns a set; the caller
-    sorts/filters."""
+    the two-level ``*/*.json`` sfs's own basefile lister uses, which must not
+    recurse into an archive subtree) and transparently see compressed artifacts.
+    Returns a set; the caller sorts/filters.
+
+    Every real caller's pattern is a *fixed* number of path segments -- never a
+    recursive ``**`` -- so this walks it one `os.scandir` per level instead of
+    going through `Path.glob` at all: `Path.glob` (even before multiplying by
+    `len(SUFFIXES) + 1` suffix variants) measured 5-10x slower than a plain
+    `os.walk`/`os.scandir` traversal over the same real tree (87,000 and
+    233,000 real files, sfs and förarbete's own downloaded trees, 2026-09-04)
+    -- pathlib's own per-path-object and pattern-matching overhead, not the
+    underlying syscalls, which are identical either way. Falls back to
+    `Path.glob` only for a pattern containing `**` -- none exists in this
+    codebase today, but recursive traversal isn't worth reimplementing for a
+    caller that might one day need it.
+
+    Only the *last* segment gets suffix-variant matching (a compressed variant
+    is only ever a leaf file, never a directory component), via
+    `fnmatch.fnmatchcase` -- with no hidden-file exclusion of its own, and none
+    added here either, since `pathlib.Path.glob` itself does not hide dotfiles
+    from a `*` pattern (confirmed directly; that convention belongs to shell
+    globbing and to `glob.glob`'s own default, not to `pathlib`), so `*.json`
+    matching a stray `.watermark.json` is existing, relied-on behaviour
+    (`compress.list_basefiles` filters dotfiles back out itself, precisely
+    because `glob` hands them over). An intermediate segment follows symlinked
+    directories, matching `Path.glob`'s own default (confirmed directly)."""
     root = Path(directory)
-    return {logical(p) for suffix in ("", *SUFFIXES)
-            for p in root.glob(pattern + suffix)}
+    segments = pattern.split("/")
+    if "**" in segments:
+        return {logical(p) for suffix in ("", *SUFFIXES)
+                for p in root.glob(pattern + suffix)}
+    *dirs, leaf = segments
+    current = [root]
+    for seg in dirs:
+        nxt = []
+        for d in current:
+            try:
+                entries = os.scandir(d)
+            except (FileNotFoundError, NotADirectoryError):
+                continue
+            with entries:
+                nxt.extend(Path(e.path) for e in entries
+                          if e.is_dir() and fnmatch.fnmatchcase(e.name, seg))
+        current = nxt
+    leaf_patterns = [leaf] + [leaf + suffix for suffix in SUFFIXES]
+    found = set()
+    for d in current:
+        try:
+            entries = os.scandir(d)
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        with entries:
+            found.update(logical(Path(e.path)) for e in entries
+                        if any(fnmatch.fnmatchcase(e.name, p) for p in leaf_patterns))
+    return found
 
 
 def list_basefiles(root: Path | str, subdir: str) -> list[str]:

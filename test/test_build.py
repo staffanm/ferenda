@@ -144,6 +144,52 @@ def test_build_then_skip(tmp_path):
     assert res2.planned == []  # everything fresh -> nothing to do
 
 
+def test_fresh_recheck_skips_the_content_hash_when_inputs_are_untouched(tmp_path, monkeypatch):
+    # the real cost this guards against: eurlex's own per-document freshness
+    # recheck read + decompressed + sha256'd every input file, every run, for
+    # all 170,000+ documents -- even the 99.999% nothing had touched since the
+    # last one (2026-09-03). A cheap size+mtime check must rule that out
+    # without ever calling hash_files at all.
+    _, src = make_source(tmp_path)
+    manifest = {}
+    apply(manifest, build_one(src, "parse", "a", manifest))
+    calls = []
+    real_hash_files = freshness.hash_files
+    monkeypatch.setattr(freshness, "hash_files",
+                        lambda paths: (calls.append(1), real_hash_files(paths))[1])
+    res2 = build_one(src, "parse", "a", manifest)
+    assert res2.planned == []
+    assert calls == []                      # never recomputed
+    assert manifest["syn/parse/a"]["inputs_wm"]  # recorded for the cache to use
+
+
+def test_stale_input_is_still_caught_despite_the_cheap_precheck(tmp_path):
+    # the cheap size+mtime signal is only ever a reason to *skip* the real
+    # hash, never a reason to trust staleness it didn't actually check --
+    # a genuinely changed input must still restale the document
+    _, src = make_source(tmp_path)
+    manifest = {}
+    apply(manifest, build_one(src, "parse", "a", manifest))
+    (tmp_path / "dl" / "a.txt").write_text("hello again, a longer body")
+    res2 = build_one(src, "parse", "a", manifest)
+    assert [s for s, _ in res2.planned] == ["parse"]
+    assert src.stages["parse"].output("a").read_text() == "HELLO AGAIN, A LONGER BODY"
+
+
+def test_a_manifest_entry_from_before_this_cache_existed_still_works(tmp_path):
+    # every entry recorded before inputs_wm existed lacks the field entirely;
+    # the first recheck after upgrading must fall back to a real hash (proven
+    # fresh, not a KeyError) and then start caching from there
+    _, src = make_source(tmp_path)
+    manifest = {}
+    apply(manifest, build_one(src, "parse", "a", manifest))
+    del manifest["syn/parse/a"]["inputs_wm"]           # simulate a pre-upgrade entry
+    res2 = build_one(src, "parse", "a", manifest)
+    assert res2.planned == []
+    apply(manifest, res2)
+    assert manifest["syn/parse/a"]["inputs_wm"]         # now present, going forward
+
+
 def test_fresh_skip_heals_stale_error(tmp_path, monkeypatch):
     """A doc skipped as fresh has a valid, up-to-date artifact, so a stale error
     from an earlier transient failure (e.g. an input momentarily missing) must be
@@ -617,6 +663,49 @@ def test_stage_fingerprint_tracks_inputs(tmp_path):
     assert freshness.stage_fingerprint(src, "parse") == fp   # stable while untouched
     (tmp_path / "dl" / "a.txt").write_text("HELLO AGAIN")   # rewrite one input
     assert freshness.stage_fingerprint(src, "parse") != fp
+
+
+def test_stage_fingerprint_reports_progress_per_basefile(tmp_path, monkeypatch):
+    # this scan used to run silently -- on a large, slow-storage corpus that
+    # read as a hang rather than as work in progress (2026-09-03); it now
+    # reports through the usual util.status line. The first and last
+    # basefile always report regardless of throttling (see the dedicated
+    # throttle test below), which is what a 2-basefile source exercises here.
+    _, src = make_source(tmp_path)
+    manifest = {}
+    build_one(src, "download", "a", manifest)
+    build_one(src, "download", "b", manifest)
+    calls = []
+    monkeypatch.setattr(freshness.util, "status",
+                        lambda done, total, msg, **kw: calls.append((done, total, msg)))
+    freshness.stage_fingerprint(src, "parse")
+    assert calls == [(1, 2, "syn parse  checking staleness"),
+                     (2, 2, "syn parse  checking staleness")]
+
+
+def test_stage_fingerprint_throttles_progress_reporting(tmp_path, monkeypatch):
+    # a real util.invocation_bar renders a full nested tqdm frame per
+    # util.status() call (terminal-size query, refresh, ETA recompute) --
+    # calling it on every basefile made the *reporting* itself a measurable
+    # part of the cost on a fast, high-count scan (2026-09-04). 500 basefiles
+    # complete near-instantly here; without throttling that would be ~500
+    # calls, one per basefile.
+    remote = ["doc%d" % i for i in range(500)]
+    (tmp_path / "dl").mkdir()
+    for bf in remote:
+        (tmp_path / "dl" / ("%s.txt" % bf)).write_text(bf)
+    src = Source("syn", lambda: sorted(remote), {
+        "parse": Stage("parse", lambda bf: None,
+                       lambda bf: tmp_path / ("%s.out" % bf),
+                       inputs=lambda bf: [tmp_path / "dl" / ("%s.txt" % bf)]),
+    })
+    calls = []
+    monkeypatch.setattr(freshness.util, "status",
+                        lambda done, total, msg, **kw: calls.append(done))
+    freshness.stage_fingerprint(src, "parse")
+    assert len(calls) < 50            # not one call per basefile
+    assert calls[0] == 1              # the first basefile still reports immediately
+    assert calls[-1] == 500           # the final one always reports, whatever the timing
 
 
 def test_up_to_date_combines_fingerprint_code_and_force(tmp_path):

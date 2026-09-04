@@ -40,6 +40,13 @@ RUNS = config.DATA / ".build" / "runs.ndjson"             # append-only run ledg
 ERRORS = config.DATA / ".build" / "errors.json"           # per-doc latest-outcome store
 STATUS = config.DATA / ".build" / "status.json"           # rolling health snapshot
 
+# how often stage_fingerprint() reports progress -- tqdm's own default
+# mininterval; a real util.invocation_bar renders a full nested frame per
+# util.status() call (terminal-size query, refresh, ETA recompute), so
+# calling it every completion made the reporting itself the bottleneck on a
+# fast, high-count scan (2026-09-04)
+_REPORT_INTERVAL = 0.1
+
 
 # --------------------------------------------------------------------------
 # freshness
@@ -59,6 +66,48 @@ def hash_files(paths):
     return h.hexdigest()
 
 
+def _size_mtime(paths):
+    """`(path, token)` for each *existing* file among `paths`, sorted by path
+    -- the token is the file's size+mtime, no content read. `hash_files`'s
+    own iteration shape (a missing input, e.g. förarbete's OCR sidecar
+    "listed even while absent", is silently skipped rather than an error),
+    shared by the two cheap fingerprints below."""
+    for p in sorted(map(Path, paths), key=str):
+        if compress.exists(p):
+            st = compress.stat(p)
+            yield p, ("\x1f%d\x1f%d" % (st.st_size, st.st_mtime_ns)).encode()
+
+
+def _cheap_inputs_fingerprint(paths):
+    """`hash_files`'s shape (existing files only, name-tagged) but size+mtime
+    like `file_fingerprint`, not a content read: the fast pre-check
+    `_inputs_hash` uses to decide whether the expensive content hash even
+    needs recomputing."""
+    h = hashlib.sha256()
+    for p, token in _size_mtime(paths):
+        h.update(p.name.encode())
+        h.update(token)
+    return h.hexdigest()
+
+
+def _inputs_hash(entry, inputs):
+    """`(inputs_hash, inputs_wm)` for a stage's input files -- the content hash
+    `is_fresh` compares against, reusing `entry`'s last one whenever the cheap
+    size+mtime fingerprint proves nothing has touched any input since it was
+    computed. Full content hashing (`hash_files`: read + decompress + sha256
+    every input) does not scale -- at 170,000+ eurlex documents it dominated a
+    freshness check that, for all but a couple of them, changed nothing (this
+    session's live rebuild, 2026-09-03). `hash_files` reads content rather than
+    stat'ing precisely so a `.br` migration doesn't restale the whole corpus;
+    that guarantee is kept exactly, just paid for again only when the cheap
+    check can't already rule a change out -- including the first run after
+    this code ships, since no existing manifest entry has `inputs_wm` yet."""
+    wm = _cheap_inputs_fingerprint(inputs)
+    if entry and entry.get("inputs_wm") == wm:
+        return entry["inputs"], wm
+    return hash_files(inputs), wm
+
+
 @functools.cache
 def recipe_version(code):
     return hash_files(code) if code else "0"
@@ -74,14 +123,15 @@ def is_fresh(manifest, source, stage, basefile, inputs_hash=None):
         return False
     if stage.always:                    # unhashable inputs -- never fresh
         return False
-    if not stage.inputs(basefile) and not stage.code:
+    inputs = stage.inputs(basefile)
+    if not inputs and not stage.code:
         # nothing to version the output against (e.g. download: the "input" is
         # a remote service, not a file) -- an existing output is by definition
         # up to date, whether the driver or the bulk harvester produced it
         return True
     entry = manifest.get(manifest_key(source.name, stage.name, basefile))
     if inputs_hash is None:
-        inputs_hash = hash_files(stage.inputs(basefile))
+        inputs_hash, _ = _inputs_hash(entry, inputs)
     return bool(entry) \
         and entry["inputs"] == inputs_hash \
         and (protocol.RUN.ignore_code_changes
@@ -120,22 +170,59 @@ def file_fingerprint(paths):
     return h.hexdigest()
 
 
+def _stage_fingerprint_one(stage: protocol.Stage, bf: str) -> bytes:
+    return b"".join([bf.encode(),
+                     *(token for _p, token in _size_mtime(stage.inputs(bf))),
+                     b"\x1e"])
+
+
 def stage_fingerprint(source: protocol.Source, stage_name: str) -> str:
     """A cheap fingerprint of a per-document stage's inputs (parse, versions):
     each basefile plus its input files' size+mtime (no content read). Unchanged
     ⟹ no document needs re-running and none appeared, so the whole per-document
     freshness scan (which content-hashes every input) can be skipped. Basefiles
     are folded in so a newly-downloaded doc whose input doesn't exist yet still
-    moves the mark."""
+    moves the mark.
+
+    Deliberately serial, no thread pool: measured directly against a real
+    97,000-basefile corpus (2026-09-04), each basefile's own contribution
+    costs ~43 microseconds with no gradient anywhere in the run (first,
+    middle and last tenths of the scan measured identical) -- a thread pool's
+    own per-task dispatch overhead (`Future` creation, GIL handoff,
+    `as_completed`'s bookkeeping) dominates work that small, and gets *worse*
+    with more workers: 5.0s serial vs 7.5s/22.0s/27.3s at 4/8/16 threads, on
+    this dev host's NVMe storage. An earlier version threaded this on the
+    (untested) assumption that the `stat()` calls behind `compress.exists`/
+    `compress.stat` are I/O-wait-bound the way NFS would make them -- true on
+    NFS, not measured, and evidently false on fast local storage, where the
+    per-call cost is too small to ever amortise thread dispatch. If prod's
+    HDD-class storage (see prod-hardware-reality) turns out to make this slow
+    enough to be worth revisiting, thread it back in *there*, with numbers
+    from that host -- not by assumption.
+
+    Reports its own progress through the usual `util.status` line (stripped
+    to "checking staleness" beneath an open invocation bar, same as any other
+    per-basefile loop): this scan used to run silently, so a slow one read as
+    a hang rather than as work in progress -- exactly the frozen "0/?" the
+    nested bar's own priming (see `InvocationBar.start`) was primed to avoid,
+    just one call earlier than that priming ever gets to fire. Throttled to
+    `_REPORT_INTERVAL` seconds, not called on every completion: under a real
+    `util.invocation_bar`, every `util.status()` call renders a full nested
+    tqdm frame -- a terminal-size query, a refresh, an ETA recompute -- and
+    calling that once per basefile made the *reporting* itself a measurable
+    part of the cost."""
     stage = source.stages[stage_name]
+    basefiles = list(protocol.stage_basefiles(source, stage_name))
+    total = len(basefiles)
     h = hashlib.sha256()
-    for bf in source.list_basefiles():
-        h.update(bf.encode())
-        for p in sorted(stage.inputs(bf), key=str):
-            if compress.exists(p):
-                st = compress.stat(p)
-                h.update(("\x1f%d\x1f%d" % (st.st_size, st.st_mtime_ns)).encode())
-        h.update(b"\x1e")
+    last_report = 0.0
+    for done, bf in enumerate(basefiles, 1):
+        h.update(_stage_fingerprint_one(stage, bf))
+        now = time.perf_counter()
+        if done == total or now - last_report >= _REPORT_INTERVAL:
+            util.status(done, total, "%s %s  checking staleness"
+                      % (source.name, stage_name))
+            last_report = now
     return h.hexdigest()
 
 
@@ -187,15 +274,27 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
         if not ensure(source, stage.depends, basefile, manifest, res,
                       False, no_deps):
             return False
-    # hash once: the freshness check and the post-run manifest entry use the
-    # same digest (the recipe reads the inputs, never writes them)
-    inputs_hash = hash_files(stage.inputs(basefile))
+    # resolved once: the freshness check and the post-run manifest entry use
+    # the same digest and watermark (the recipe reads the inputs, never
+    # writes them)
+    inputs = stage.inputs(basefile)
+    entry = manifest.get(manifest_key(source.name, stage_name, basefile))
+    inputs_hash, inputs_wm = _inputs_hash(entry, inputs)
     if not force and is_fresh(manifest, source, stage, basefile, inputs_hash):
         # fresh ⟹ a valid, up-to-date artifact exists (is_fresh checks output
         # existence), so the doc is not failing -- heal any stale error left by an
         # earlier transient failure (e.g. an input momentarily missing) without a
         # --force re-parse. report() folds res.fresh into the error-clear set.
         res.fresh.append((stage_name, basefile))
+        if entry and entry.get("inputs_wm") != inputs_wm:
+            # nothing ran (this basefile is not "done"), but the cheap
+            # watermark just computed still needs recording -- a confirmed-
+            # fresh basefile that is never rebuilt (most of a corpus, on
+            # every ordinary run) would otherwise recompute the full content
+            # hash forever, having no other occasion to learn the watermark
+            # its own last content hash was actually taken from
+            res.updates[manifest_key(source.name, stage_name, basefile)] = \
+                {**entry, "inputs_wm": inputs_wm}
         return True
     res.planned.append((stage_name, basefile))
     if protocol.RUN.dry_run:
@@ -220,6 +319,7 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
     res.timings.append((stage_name, basefile, elapsed))
     res.updates[manifest_key(source.name, stage_name, basefile)] = {
         "inputs": inputs_hash,
+        "inputs_wm": inputs_wm,
         "version": recipe_version(stage.code),
         # last real build duration -- _run_parallel schedules descending on it
         # (unknown first), so slice pools stay duration-homogeneous and the

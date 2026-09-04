@@ -271,6 +271,11 @@ The engine is `lib/freshness.py`; the paths below are its module constants.
    manifest records the same **input hash** *and* the same **recipe version**.
    - *Input hash* = SHA-256 over the stage's `inputs(basefile)` (decompressed
      content, so the fingerprint is stable across compression settings).
+     The entry also records a size+mtime watermark of the same inputs
+     (`inputs_wm`): an unchanged watermark reuses the recorded content hash
+     without re-reading anything, a changed one re-hashes -- so a `.br`
+     migration re-hashes once and finds nothing stale, while an ordinary run
+     over 170,000 eurlex documents no longer decompresses every input.
    - *Recipe version* = a hash over the Stage's `code` tuple. **Editing any
      file listed in `code` re-stales every doc of that stage** without a blanket
      `--force`. `code` must list *every* first-party module whose edit changes

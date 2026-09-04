@@ -5,6 +5,7 @@ indirectly by every other suite that persists artifacts; this file targets the
 policy surface added for the raw ``downloaded/`` tree."""
 
 import json
+from pathlib import Path
 
 from ferenda import config
 from ferenda.lib import compress
@@ -75,6 +76,116 @@ def test_glob_dedupes_when_plain_and_br_variant_coexist(tmp_path):
     logical.write_text("plain-bytes")
     found = compress.glob(tmp_path, "*.json")
     assert found == {logical}
+
+
+# --------------------------------------------------------------------------
+# a single-component pattern (the common case: eurlex's per-language content
+# lookup, list_basefiles' own "*.json") is answered from one os.scandir
+# instead of len(SUFFIXES) + 1 separate Path.glob calls over the same
+# directory -- eurlex parse's per-document freshness recheck over 170,000
+# basefiles measured over a minute on this (2026-09-03). A multi-level
+# pattern (sfs/förarbete's own "*/*.json"/"*/*/*.json" basefile listers)
+# gets the same treatment, one os.scandir per level: measured 5-10x faster
+# than Path.glob over the same real trees, even before multiplying by
+# suffix variants (2026-09-04). Only a "**" pattern (none exists in this
+# codebase) still goes through Path.glob.
+# --------------------------------------------------------------------------
+
+def _glob_via_pathlib(directory, pattern):
+    """The pre-optimization algorithm, kept here only as an equivalence
+    reference for the tests below -- not production code."""
+    root = Path(directory)
+    return {compress.logical(p) for suffix in ("", *compress.SUFFIXES)
+            for p in root.glob(pattern + suffix)}
+
+
+def test_glob_single_level_matches_every_suffix_variant(tmp_path):
+    (tmp_path / "a.json").write_text("plain")
+    (tmp_path / "b.json.br").write_bytes(b"br")
+    (tmp_path / "c.json.gz").write_bytes(b"gz")
+    (tmp_path / "d.txt").write_text("not json")
+    found = compress.glob(tmp_path, "*.json")
+    assert found == {tmp_path / "a.json", tmp_path / "b.json", tmp_path / "c.json"}
+
+
+def test_glob_single_level_matches_dotfiles_like_pathlib_does(tmp_path):
+    # unlike shell globbing (and glob.glob's own default), pathlib.Path.glob
+    # does not hide dotfiles from a "*" pattern -- confirmed directly against
+    # the stdlib, not assumed -- so this must not add an exclusion of its own;
+    # compress.list_basefiles relies on glob() handing dotfiles back, since it
+    # filters them back out itself rather than expecting glob() to have done so
+    (tmp_path / ".watermark.json").write_text("{}")
+    (tmp_path / "real.json").write_text("{}")
+    assert compress.glob(tmp_path, "*.json") == {tmp_path / ".watermark.json",
+                                                 tmp_path / "real.json"}
+
+
+def test_glob_single_level_missing_directory_returns_empty(tmp_path):
+    assert compress.glob(tmp_path / "does-not-exist", "*.json") == set()
+
+
+def test_glob_single_level_matches_the_pathlib_reference_on_a_mixed_tree(tmp_path):
+    # a directory shaped like eurlex's per-document content dir: several
+    # candidate languages and formats, a hidden marker file, and a name that
+    # only differs by suffix -- the fast path and the old Path.glob-based
+    # algorithm must agree on every pattern a real caller tries
+    names = ["swe.html", "swe.pdf", "eng.html.br", "eng.xhtml.gz",
+            ".watermark.json", "readme.txt", "swe.htmlx"]
+    for name in names:
+        (tmp_path / name).write_bytes(b"x")
+    for pattern in ("swe.*", "eng.*", "*.json", "*.html", "nomatch.*"):
+        assert compress.glob(tmp_path, pattern) == _glob_via_pathlib(tmp_path, pattern), pattern
+
+
+def test_glob_two_level_matches_sfs_s_own_pattern(tmp_path):
+    (tmp_path / "2018").mkdir()
+    (tmp_path / "2019").mkdir()
+    (tmp_path / "2018" / "585.json").write_text("{}")
+    (tmp_path / "2019" / "1.json.br").write_bytes(b"x")
+    (tmp_path / "2018" / "readme.txt").write_text("not json")
+    found = compress.glob(tmp_path, "*/*.json")
+    assert found == {tmp_path / "2018" / "585.json", tmp_path / "2019" / "1.json"}
+
+
+def test_glob_three_level_matches_forarbete_s_own_pattern(tmp_path):
+    (tmp_path / "prop" / "2020").mkdir(parents=True)
+    (tmp_path / "prop" / "2020" / "1.json").write_text("{}")
+    (tmp_path / "sou" / "2021").mkdir(parents=True)
+    (tmp_path / "sou" / "2021" / "5.json").write_text("{}")
+    found = compress.glob(tmp_path, "*/*/*.json")
+    assert found == {tmp_path / "prop" / "2020" / "1.json",
+                     tmp_path / "sou" / "2021" / "5.json"}
+
+
+def test_glob_multi_level_follows_symlinked_directories(tmp_path):
+    # Path.glob's own default (confirmed directly against the stdlib) --
+    # replicated by hand since os.scandir's is_dir() needs the same choice
+    (tmp_path / "real").mkdir()
+    (tmp_path / "real" / "x.json").write_text("{}")
+    (tmp_path / "linked").symlink_to(tmp_path / "real", target_is_directory=True)
+    found = compress.glob(tmp_path, "*/*.json")
+    assert found == {tmp_path / "real" / "x.json", tmp_path / "linked" / "x.json"}
+
+
+def test_glob_multi_level_matches_the_pathlib_reference_on_a_mixed_tree(tmp_path):
+    (tmp_path / "a" / "sub").mkdir(parents=True)
+    (tmp_path / "a" / "sub" / "x.json").write_text("{}")
+    (tmp_path / "a" / "sub" / "y.json.br").write_bytes(b"x")
+    (tmp_path / "b").mkdir()
+    (tmp_path / "b" / "z.json").write_text("{}")
+    (tmp_path / "b" / ".hidden.json").write_text("{}")
+    (tmp_path / "c.json").write_text("{}")     # not two levels deep -- must not match
+    for pattern in ("*/*.json", "*/sub/*.json", "nomatch/*.json"):
+        assert compress.glob(tmp_path, pattern) == _glob_via_pathlib(tmp_path, pattern), pattern
+
+
+def test_glob_recursive_pattern_still_falls_back_to_pathlib(tmp_path):
+    # no caller in this codebase uses "**" today, but the fallback must still
+    # work correctly if one ever does
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    (tmp_path / "a" / "b" / "x.json").write_text("{}")
+    (tmp_path / "x.json").write_text("{}")
+    assert compress.glob(tmp_path, "**/*.json") == _glob_via_pathlib(tmp_path, "**/*.json")
 
 
 def test_list_basefiles_reads_br_records(tmp_path, monkeypatch):
