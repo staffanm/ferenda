@@ -267,6 +267,20 @@ def test_eu_abbr_and_label_resolve_to_same_act():
     assert resolve.resolve_eu("dataskyddsförordningen") == gdpr  # label
 
 
+# --- CJEU: case number -------------------------------------------------------
+
+def test_ecj_case_number():
+    celex = "https://lagen.nu/celex/62024CJ0199"
+    assert resolve.resolve_ecj("C-199/24") == celex
+    assert resolve.resolve_ecj("mål C-199/24") == celex
+    assert resolve.resolve_ecj("Case C-199/24") == celex
+    assert resolve.resolve_ecj("C‑199/24") == celex  # non-breaking hyphen
+
+
+def test_ecj_unknown_does_not_resolve():
+    assert resolve.resolve_ecj("not a citation") is None
+
+
 # --- DV: case nickname ------------------------------------------------------
 
 def test_dv_case_nickname():
@@ -287,6 +301,8 @@ def test_resolve_dispatches_and_tags_source():
         {"uri": "https://lagen.nu/1915:218#P36", "source": "sfs"}]
     assert resolve.resolve("GDPR art 32") == [
         {"uri": "https://lagen.nu/celex/32016R0679#32", "source": "eurlex"}]
+    assert resolve.resolve("C-199/24") == [
+        {"uri": "https://lagen.nu/celex/62024CJ0199", "source": "eurlex"}]
     assert resolve.resolve("Instagrambilden") == [
         {"uri": "https://lagen.nu/dom/nja/2020s273", "source": "dv"}]
 

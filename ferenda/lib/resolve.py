@@ -36,6 +36,7 @@ from .coe_ids import article_fragment
 from .labels import treaty_names
 from .lagrum import (
     CELEX_BASE,
+    EURATTSFALL,
     LagrumParser,
     lagrum_uri,
     load_abbreviations,
@@ -264,6 +265,36 @@ def resolve_treaty(q):
 
 
 # --------------------------------------------------------------------------
+# CJEU -- case number ("C-199/24" -> celex/62024CJ0199)
+# --------------------------------------------------------------------------
+
+_ecj_parsers = threading.local()
+
+
+def _fresh_ecj_parser():
+    """This thread's CJEU-case-number parser, reset before every query -- the
+    same per-thread, reset-per-call pattern as `_fresh_sfs_parser`. A case
+    number is self-contained and absolute (like a CELEX id), so the grammar
+    needs no named-law or abbreviation vocabulary, only EURATTSFALL."""
+    parser = getattr(_ecj_parsers, "ecj", None)
+    if parser is None:
+        parser = _ecj_parsers.ecj = LagrumParser(
+            {}, basefile="query", parse_types=[EURATTSFALL])
+    parser.reset()
+    return parser
+
+
+def resolve_ecj(q):
+    """A CJEU judgment's CELEX URI for a case number ("C-199/24", "mål
+    C-199/24", "Case C-199/24") -> celex/62024CJ0199, else None. Reuses the
+    citation engine's own EURATTSFALL grammar -- the one that already parses
+    this form inside EU document bodies (eurlex.parse) -- rather than a
+    second, possibly drifting pattern."""
+    refs = _fresh_ecj_parser().parse_text(q, context={})
+    return refs[0].uri if refs else None
+
+
+# --------------------------------------------------------------------------
 # DV -- case nickname
 # --------------------------------------------------------------------------
 
@@ -285,16 +316,18 @@ def resolve_dv(q):
 
 def resolve(q):
     """Every resource the query resolves to as `{"uri", "source"}` (uri carries
-    its #fragment), in priority order CoE treaty, SFS, EU, DV -- usually 0 or
-    1. The treaty resolver leads because it only claims a query with an article
-    pinpoint, and there it must outrank the SFS reading of the same alias.
+    its #fragment), in priority order CoE treaty, SFS, EU, CJEU case, DV --
+    usually 0 or 1. The treaty resolver leads because it only claims a query
+    with an article pinpoint, and there it must outrank the SFS reading of the
+    same alias.
     Pure: the caller confirms each uri against the catalog before surfacing it."""
     q = (q or "").strip()
     if not q:
         return []
     out = []
     for source, fn in (("coe", resolve_treaty), ("sfs", resolve_sfs),
-                       ("eurlex", resolve_eu), ("dv", resolve_dv)):
+                       ("eurlex", resolve_eu), ("eurlex", resolve_ecj),
+                       ("dv", resolve_dv)):
         uri = fn(q)
         if uri and uri not in [o["uri"] for o in out]:
             hit = {"uri": uri, "source": source}
