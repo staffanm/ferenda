@@ -727,6 +727,48 @@ def test_search_explicit_offset_walks_raw_without_the_pin(client):
     assert [r["score"] for r in raw["results"]] == [9.1]
 
 
+def test_resolve_pins_a_pinpoint_citation_with_its_provision(client):
+    # same resolver /search pins as its leading hit, exposed on its own -- no
+    # full-text index involved, so this must work with the FakeIndex untouched
+    body = client.get("/api/v1/resolve",
+                      params={"q": "3 kap. 1 § brottsbalken"}).json()
+    assert body["query"] == "3 kap. 1 § brottsbalken"
+    hit = body["results"][0]
+    assert hit["uri"] == "https://lagen.nu/1962:700"
+    pin = hit["pin"]
+    assert pin["pinpoint"] == "K3P1" and pin["label"] == "3 kap. 1 §"
+    assert hit["fragments"] == []
+    assert hit["score"] is None
+
+
+def test_resolve_empty_when_the_query_is_not_a_citation(client):
+    r = client.get("/api/v1/resolve", params={"q": "mord"})
+    assert r.status_code == 200
+    assert r.json() == {"query": "mord", "results": []}
+
+
+def test_resolve_source_filter_narrows(client):
+    hit = client.get("/api/v1/resolve", params={
+        "q": "3 kap. 1 § brottsbalken", "source": "sfs"}).json()["results"]
+    assert hit and hit[0]["uri"] == "https://lagen.nu/1962:700"
+    assert client.get("/api/v1/resolve", params={
+        "q": "3 kap. 1 § brottsbalken", "source": "dv"}).json()["results"] == []
+
+
+def test_resolve_requires_a_built_catalog(client, tmp_path):
+    # the fixture's own override replaces get_con outright, bypassing its
+    # catalog_ready() check -- pop it so the real dependency (and its 503) runs
+    missing = tmp_path / "missing.sqlite"
+    override = api.app.dependency_overrides.pop(api.get_con)
+    real_catalog, layout.CATALOG = layout.CATALOG, missing
+    try:
+        r = client.get("/api/v1/resolve", params={"q": "3 kap. 1 § brottsbalken"})
+        assert r.status_code == 503
+    finally:
+        layout.CATALOG = real_catalog
+        api.app.dependency_overrides[api.get_con] = override
+
+
 def test_graph_neighborhood_and_pinpoint(client):
     # doc level: fl cites bb once, aggregated per neighbor with flow groups
     r = client.get("/api/v1/graph", params={"uri": "https://lagen.nu/1962:700"})

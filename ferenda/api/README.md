@@ -223,6 +223,48 @@ sin andra rad på `pin` — visa `display` när `abbr` är `null`.
 > Returnerar `/api/v1/search` ett fel om OpenSearch inte är igång eller indexet
 > inte är byggt. Kör `lagen all index` och kontrollera `OPENSEARCH_URL`.
 
+### `GET /api/v1/resolve` — slå upp en hänvisning, utan fulltextsökning
+
+Samma resolver som `/api/v1/search` lägger först som `pin` — här ensam, utan
+den fulltextsökning som en hänvisningsformad fråga annars också triggar (och
+som svarar med många lösa träffar när frågan tolkas ord för ord, t.ex.
+`C-199/24` mot `24` och `199` var för sig). Använd detta anropet när bara den
+utlösta träffen behövs.
+
+| Parameter | Typ | Förklaring |
+|---|---|---|
+| `q` | sträng (obligatorisk) | hänvisningen: ett lagnamn/förkortning + paragraf ("avtalslagen 36 §", "BrB 12:1"), en EU-akt + artikel/skäl ("GDPR artikel 32"), ett EU-domstolsmål ("C-199/24"), en fördragsartikel ("EKMR 6") eller ett vedertaget rättsfallsnamn ("Instagrambilden") |
+| `source` | sträng | begränsa till en källa |
+| `kind` | sträng | begränsa till en dokumenttyp inom källan |
+
+Svaret har samma träffform som `/api/v1/search` (`query` + `results`). Kräver
+**inte** OpenSearch, bara ett byggt corpus-index (`lagen all relate`).
+
+```sh
+curl -G http://127.0.0.1:8001/api/v1/resolve --data-urlencode "q=C-199/24"
+```
+
+```json
+{
+  "query": "C-199/24",
+  "results": [
+    {
+      "uri": "https://lagen.nu/celex/62024CJ0199",
+      "url": "/celex/62024CJ0199",
+      "identifier": "62024CJ0199",
+      "title": "C-199/24",
+      "source": "eurlex",
+      "kind": "judgment",
+      "score": null,
+      "inbound_count": 10,
+      "highlight": [],
+      "pin": null,
+      "fragments": []
+    }
+  ]
+}
+```
+
 ### `GET /api/v1/documents` — lista dokument-id:n (corpus-index)
 
 Räknar upp dokument filtrerade på källa/typ — **inte** fulltextsökning (det är

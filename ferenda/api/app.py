@@ -63,6 +63,7 @@ from ..lib import (
     layout,
     mdtext,
     pathgraph,
+    pins,
     search,
 )
 from . import (
@@ -346,6 +347,15 @@ class SearchResponse(BaseModel):
     facets: dict[str, list[SearchFacetBucket]] = Field(
         {}, description="bucket counts per facet field (source, kind, year)")
     results: list[SearchResult]
+
+
+class ResolveResponse(BaseModel):
+    """The answer to /api/v1/resolve: a citation-shaped query's resolved
+    target(s), with no full-text search involved."""
+
+    query: str = Field(description="the query as asked, echoed back")
+    results: list[SearchResult] = Field(
+        description="the resolved target(s) the corpus holds, usually one hit")
 
 
 class Citation(BaseModel):
@@ -644,6 +654,37 @@ async def search_endpoint(
                           facets=_labelled_facets(res["facets"]),
                           # result/facet dicts are validated by pydantic at runtime
                           results=results)
+
+
+@app.get("/api/v1/resolve", response_model=ResolveResponse, tags=["search"],
+         summary="Resolve a citation to its exact target, no full-text search")
+def resolve_endpoint(
+        q: str = Query(..., description="a citation-shaped query: a law "
+                       "nickname/abbreviation + pinpoint (\"avtalslagen 36 §\", "
+                       "\"BrB 12:1\"), an EU act with an optional article or "
+                       "recital (\"GDPR artikel 32\"), a CJEU case number "
+                       "(\"C-199/24\"), a CoE treaty article (\"EKMR 6\") or a "
+                       "case nickname (\"Instagrambilden\")"),
+        source: str | None = Query(None, description="restrict to one source "
+                                   "-- any name /api/v1/sources lists"),
+        kind: str | None = Query(None, description="restrict to a document "
+                                 "kind within that source"),
+        con: sqlite3.Connection = Depends(get_con)):
+    """Turns a known legal citation into its exact document, and -- when the
+    citation names a provision -- the exact §/article. This is the resolver
+    `/api/v1/search` pins as its leading hit, exposed on its own: use this
+    endpoint when only the resolved target is wanted, not a full-text search
+    alongside it (a citation-shaped query, read as a bag of words, tends to
+    match many loosely-related documents there).
+
+    Answers from the catalog alone -- no OpenSearch involved, so this endpoint
+    stays up even when full-text search is unavailable."""
+    kind_label = facets.kind_labels(singular=True)   # one hit, not a bucket
+    results = pins.resolved_results(con, q, source, kind)
+    return ResolveResponse(
+        query=q,
+        results=[{**r, "kind_label": kind_label.get(r.get("kind"))}
+                 for r in results])
 
 
 def _labelled_facets(buckets):
