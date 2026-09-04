@@ -30,6 +30,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from opensearchpy.exceptions import OpenSearchException
+
 from .. import config
 from . import (
     annstore,
@@ -817,8 +819,7 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
         # belongs in the run's verdict like a failed parse -- one rebuild dropped
         # 1,497 eurlex and 241 förarbete documents from the index and still exited 0
         ib.start("index")
-        had_errors |= cmd_index(sources, names, jobs)
-        run_after(sources, names, "index")
+        had_errors |= _run_index_step(sources, names, jobs)
         ib.finish()
         ib.start("dump")
         cmd_dump(sources, names)
@@ -839,6 +840,34 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
                 cmd_generate(sources, source=name, jobs=jobs, aggregates=aggregates)
                 ib.finish()
         run_after(sources, names, "generate")
+    return had_errors
+
+
+def _run_index_step(sources, names, jobs):
+    """The index step of `cmd_all`: `cmd_index` plus its after-hooks, and True
+    when anything in it failed -- a rejected bulk item, or the step as a whole.
+
+    A cluster that isn't up (or won't take the schema) surfaces as one exception
+    from `cmd_index` before any source is synced, since every source shares the
+    connection: the first failure already says the rest can't succeed either, so
+    there is nothing to retry per source. But dump and generate read the catalog
+    and the artifacts, not the index, so the run carries on and the missed step
+    is recorded under `__cluster__` -- the exit code then names it, where an
+    uncaught exception used to end the run with dump and generate never
+    reached. Only the client's own exceptions are the cluster's fault
+    (`OpenSearchException`: a connection refused, a transport error on the
+    schema); a KeyError from an artifact projection or an sqlite error from
+    the catalog is a bug and still ends the run (rule:narrow-what-you-catch)."""
+    t0 = time.perf_counter()
+    try:
+        had_errors = cmd_index(sources, names, jobs)
+    except OpenSearchException:  # step-level resilience point: an index step that can't reach the cluster must not abort dump and generate, which don't need it; printed + recorded as a failed segment + nonzero exit at end (rule:no-catch-log-continue)
+        traceback.print_exc()
+        freshness._emit_segment("index", "__cluster__", time.perf_counter() - t0,
+                                status="errors", errors=1)
+        print("index: step failed -- dump and generate continue without it")
+        return True
+    run_after(sources, names, "index")
     return had_errors
 
 

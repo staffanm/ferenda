@@ -106,9 +106,14 @@ must not kill a corpus run:
   the run has absorbed
 - the golden-validation harness (`sfs/_validate.py`)
 - the legacy-stats CLI (`dv/legacy.py`)
-- the versions stage's per-version boundary (`sfs/versions.py`) — one
-  corrupt decades-old archive file becomes a recorded skip in the
-  sidecar, not a permanently stale stage
+- the rebuild's index step (`lib/corpus.py`, `_run_index_step`) — a cluster
+  that is down or refuses the schema fails the step once, recorded under
+  `__cluster__`; dump and generate read the catalog and the artifacts, not
+  the index, so they still run and the exit code names the miss. Only
+  `OpenSearchException` is caught: anything else is a bug and ends the run
+- the versions stage's sidecar hook (`sfs/source.py`,
+  `sfs_versions_rebuild_sidecars`) — one corrupt decades-old archive file
+  becomes a recorded skip in the sidecar, not a permanently stale stage
 - the history-as-git export's per-snapshot preflight (`sfs/asgit.py`) —
   every failed snapshot is recorded and reported before any fast-import
   starts. An unusable *archived* consolidation is a gap the export drops and

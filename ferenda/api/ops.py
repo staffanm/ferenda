@@ -57,10 +57,11 @@ STALE_AFTER_H = 26        # snapshot-age warning threshold (a daily run + slack)
 # cell now prints the multiple it measured, so "2.4x median" can be judged.
 SLOW_FACTOR = 2.0
 
-# Ledger "sources" that are not sources: the whole-site generate and relate's
-# cross-corpus correspondence pass both record their segments under a name of
-# their own. They belong to no row of a per-source table.
-PSEUDO_SOURCES = {"__site__", "__corr__"}
+# Ledger "sources" that are not sources: the whole-site generate, relate's
+# cross-corpus correspondence pass and an index step that failed before any
+# source was synced (an unreachable cluster) each record their segment under a
+# name of their own. They belong to no row of a per-source table.
+PSEUDO_SOURCES = {"__site__", "__corr__", "__cluster__"}
 
 # The dashboard is internal in every sense the internal API is, so it carries
 # the same two gates -- out of the public schema, and same-origin only. It

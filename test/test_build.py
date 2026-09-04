@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 import pytest
 import requests
+from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 
 from ferenda import build, config
 from ferenda.dv import source as dv_source
@@ -960,6 +961,50 @@ def test_all_all_contains_harvest_exceptions(wire, tmp_path, monkeypatch):
     assert exc_info.value.code == 1
     assert "syn1" in harvests
     assert "syn2" in harvests
+
+
+def test_rebuild_survives_an_unreachable_cluster(wire, tmp_path, monkeypatch,
+                                                 capsys):
+    """`lagen all rebuild` with OpenSearch down: the index step fails once (the
+    first connection attempt already says no source can be synced, so no
+    per-source retry), dump and generate still run, the exit code is 1 and the
+    failure summary names the step -- the run used to die on the traceback with
+    dump and generate never reached."""
+    src = Source("syn", lambda: [], {})
+    wire(src)
+    ran = []
+    monkeypatch.setattr(corpus, "cmd_relate", lambda *a, **k: ran.append("relate"))
+    monkeypatch.setattr(corpus, "cmd_dump", lambda *a, **k: ran.append("dump"))
+    monkeypatch.setattr(corpus, "cmd_generate",
+                        lambda *a, **k: ran.append("generate"))
+
+    def dead_cluster(*a, **k):
+        raise OpenSearchConnectionError("N/A", "connection refused", None)
+
+    monkeypatch.setattr(corpus, "cmd_index", dead_cluster)
+    with pytest.raises(SystemExit) as exc_info:
+        build.main(["all", "rebuild", "-j1"])
+    assert exc_info.value.code == 1
+    assert ran == ["relate", "dump", "generate"]
+    err = capsys.readouterr().err
+    assert "connection refused" in err
+    assert "index __cluster__: 1 error(s)" in err
+
+
+def test_rebuild_does_not_absorb_a_non_cluster_index_failure(wire, tmp_path,
+                                                             monkeypatch):
+    # only the client's own exceptions are the cluster's fault; a KeyError
+    # from an artifact projection is a bug and still ends the run
+    src = Source("syn", lambda: [], {})
+    wire(src)
+    monkeypatch.setattr(corpus, "cmd_relate", lambda *a, **k: None)
+
+    def broken_projection(*a, **k):
+        raise KeyError("uri")
+
+    monkeypatch.setattr(corpus, "cmd_index", broken_projection)
+    with pytest.raises(KeyError):
+        build.main(["all", "rebuild", "-j1"])
 
 
 def test_explicit_derived_download_errors(wire, tmp_path, monkeypatch):

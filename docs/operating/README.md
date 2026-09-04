@@ -81,7 +81,9 @@ docker compose -f docker-compose.dev.yml up -d
 ```
 
 The rest of the pipeline (download, parse, relate, generate, serve) works
-without OpenSearch; only search-dependent features degrade.
+without OpenSearch; only search-dependent features degrade. A `lagen all
+rebuild` with the cluster down fails its index step once, goes on to dump and
+generate, and exits 1 with `index __cluster__` in the failure summary.
 
 ## 2. config.yml
 
