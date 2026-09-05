@@ -960,7 +960,7 @@ def checking(label):
     and a full `generate` open with. Those scans read the whole corpus off
     disk and used to run silently, so the seconds (minutes, on a cold cache)
     before the first real progress line read as a hang. Same wording as the
-    per-basefile scan `freshness.stage_fingerprint` reports."""
+    per-document scan `freshness._scan` reports."""
     status(0, None, "%s  checking staleness" % label)
 
 

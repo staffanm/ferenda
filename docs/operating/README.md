@@ -253,9 +253,16 @@ lagen all status         # a report, done in seconds: never a bar
 Before a step can run it has to work out what is already up to date, which on
 a big source reads every artifact's size and mtime and can take tens of
 seconds. That scan reports as `checking staleness` on the same line the step's
-own counter uses. Download has no such scan — nothing on disk decides what it
-fetches — so its line names the harvest watermark instead: `(from 2026-01-10)`,
-or `(first harvest)` / `(full sweep)` when there is no boundary to work back to.
+own counter uses. A parse or versions step first lists its documents
+(`listing basefiles`, the walk that reads as a pause on a cold cache), then
+scans them once: a document found up to date is booked on the spot, a stale
+one goes to a worker the moment it is found, most expensive first, so the
+counter moves seconds into the scan and a source with nothing stale answers
+`up to date -- skipped` at the scan's end. Measured on the dev box with
+nothing stale: eurlex parse 21 s end to end, forarbete parse 8 s. Download
+has no such scan — nothing on disk decides what it fetches — so its line
+names the harvest watermark instead: `(from 2026-01-10)`, or
+`(first harvest)` / `(full sweep)` when there is no boundary to work back to.
 
 A run piped to a file or a cron log (`docker compose exec ferenda lagen all
 rebuild >> log 2>&1`) keeps the plain per-document line only, since the bar

@@ -1041,16 +1041,11 @@ def _dispatch(args, p, jobs):
                     p.error("source %r has no action %r (have: %s)"
                             % (name, args.action,
                                ", ".join([*source.stages, *source.actions])))
-                # a full-source run of a fingerprint-gated per-doc stage gets the same
-                # coarse "up to date -- skipped" shortcut cmd_all uses, so a direct
-                # `lagen sfs parse` with nothing changed skips the per-doc scan too
+                # a full-source run of a per-doc stage takes the same path
+                # cmd_all does: list once, scan once, and a source with nothing
+                # stale answers "up to date -- skipped" without a worker
                 if not args.basefiles and args.action in ("parse", "versions"):
-                    store = freshness.load_fingerprints()
-                    errs, recorded = corpus._run_stage_gated(source, args.action, jobs,
-                                                             store)
-                    if recorded:
-                        freshness.save_fingerprints(store)
-                    had_errors |= errs
+                    had_errors |= corpus._run_stage_full(source, args.action, jobs)
                     continue
                 stage = source.stages[args.action]
                 # a fan-out stage's real dispatch keys are finer than what a user

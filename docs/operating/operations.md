@@ -16,10 +16,15 @@ snapshot cell directly (see below).
   (`{total, fresh, stale, missing, failed, empty}` per cell).
 
 `fingerprints.json` (the same directory) holds the coarse per-(step, source)
-gates that let a whole stage answer "up to date -- skipped" without the per-
-document freshness scan. A dry run never records one: `lagen eurlex parse -n`
-after a parser edit printed a 64,004-document plan and then marked the source
-current, so the real run that followed skipped the entire stale artifact tree.
+gates that let relate, index, dump and generate answer "up to date -- skipped"
+without re-reading their inputs, and an owed-hook mark
+(`<step>/__hooks__/<source>`) for a parse or versions stage whose after-hooks
+crashed, so the next run fires them even with nothing stale. Parse and versions
+have no coarse gate any more: their one staleness scan decides per document
+who gets a worker, and a source with nothing stale skips at the end of that
+scan. A dry run never records a gate: `lagen eurlex parse -n` after a parser
+edit once printed a 64,004-document plan and then marked the source current,
+so the real run that followed skipped the entire stale artifact tree.
 
 ```sh
 uv run python -m ferenda.build <source> status   # extended: also shows failed/empty, writes the authoritative snapshot cell

@@ -61,11 +61,11 @@ def test_unbuilt_source_plans_parse_as_not_skipped(wired):
     plan = corpus.build_invocation_plan({"syn": source}, ["syn"], whole_corpus=False)
     step = _by(plan, "syn", "parse")
     assert step.skip is False
-    assert step.secs > 0    # expected_secs' mean fallback for two never-built basefiles
+    assert step.secs > 0    # the ledger default for a step never timed
 
 
 def test_fresh_source_plans_parse_as_skipped(wired):
-    # the planner never calls stage_fingerprint (a per-basefile stat pass,
+    # the planner never runs the per-basefile staleness scan (a stat pass
     # too expensive to pay twice) -- it predicts a skip from the run ledger's
     # own record of what happened last time this (step, source) ran
     source = _source(wired)
@@ -87,15 +87,17 @@ def test_a_run_that_actually_built_is_not_predicted_as_skipped(wired):
     assert step.skip is False and step.secs == pytest.approx(12.0)
 
 
-def test_planning_never_calls_stage_fingerprint(wired, monkeypatch):
-    # stage_fingerprint stats every input file of every basefile -- exactly
-    # the cost that made planning itself a felt delay before rebuild's first
-    # printed line
+def test_planning_never_runs_the_staleness_scan(wired, monkeypatch):
+    # the scan stats every input file of every basefile -- exactly the cost
+    # that made planning itself a felt delay before rebuild's first printed
+    # line. The plan predicts a skip off the ledger and never lists a source
     def _boom(*a, **kw):
-        raise AssertionError("build_invocation_plan must not call stage_fingerprint")
+        raise AssertionError("build_invocation_plan must not scan a source")
 
-    monkeypatch.setattr(freshness, "stage_fingerprint", _boom)
+    monkeypatch.setattr(freshness, "_scan", _boom)
+    monkeypatch.setattr(freshness, "_cheaply_fresh", _boom)
     source = _source(wired)
+    source.list_basefiles = _boom
     corpus.build_invocation_plan({"syn": source}, ["syn"], whole_corpus=False)
 
 
@@ -229,8 +231,8 @@ def test_history_falls_back_to_a_default_for_a_step_never_timed(wired):
 
 
 def test_a_large_never_built_source_does_not_inflate_the_total(wired):
-    # expected_secs' per-basefile fallback (the corpus mean, or 1.0s with no
-    # history at all) used to be summed over every never-built basefile here,
+    # a per-basefile fallback (the corpus mean, or 1.0s with no history at
+    # all) used to be summed over every never-built basefile here,
     # so a source with no manifest history at all -- a sparse manifest after a
     # recipe-version bump, or a genuinely first build -- turned "unknown" into
     # "918410s" for a real corpus. The ledger-based estimate must not scale

@@ -605,45 +605,51 @@ def cmd_download_all(sources, names, jobs):
     return had_errors
 
 
-def _run_stage_gated(source, step, jobs, store):
-    """Run a fingerprint-gated per-document stage (parse/versions) over a whole
-    source. Coarse gate: if the stage's inputs + recipe are unchanged, skip the
-    per-doc freshness scan (which content-hashes every input) wholesale -- "up to
-    date -- skipped"; else run it and, on a clean sweep, record the fingerprint in
-    `store` so the next run can skip. Shared by `cmd_all` and the single-source
-    dispatch so a direct `lagen <src> parse` gets the same shortcut. Returns
-    (had_errors, recorded) -- `recorded` tells the caller to save `store`.
+def _run_stage_full(source, step, jobs):
+    """Run a per-document stage (parse/versions) over a whole source: list its
+    keys once, then `freshness.run_action`, whose scan books every fresh key
+    without a worker and sends the stale ones to the pool as it finds them.
+    Shared by `cmd_all` and the single-source dispatch so a direct
+    `lagen <src> parse` behaves the same. Returns whether any document errored.
+
+    The scan is the gate: a source with nothing stale prints "up to date --
+    skipped" and emits a skipped segment, as the retired whole-source
+    fingerprint used to, but it costs one pass over the tree and no worker
+    round-trips instead of two passes and one round-trip per fresh document.
+    The listing itself is announced first: on a cold cache it is the seconds
+    that used to read as a hang before the first counter appeared.
 
     The source's `after[step]` hooks run here too, and only when the stage
     ran: a skipped stage left every artifact as it was, so a hook that
     derives from them (dv's case-number snapshot, the versions sidecars)
     can only rewrite what it wrote last time -- dv's used to sweep 200k
     artifacts to do exactly that on every "up to date -- skipped" rebuild.
-    They run before the fingerprint is saved (the caller saves after this
-    returns), so a hook that crashes leaves the stage unmarked and the next
-    run retries both."""
-    pcode = source.stages[step].code
-    wm = freshness.stage_fingerprint(source, step)
-    if freshness.up_to_date(store, step, source.name, wm, pcode):
-        print("%s %s: up to date -- skipped" % (step, source.name))
-        # bypasses report(); emit the skipped segment so the run detail still
-        # shows the whole pipeline (§2)
-        freshness._emit_segment(step, source.name, 0.0, ran=0, status="skipped")
-        return False, False
+    A hook that crashes is owed: the gate store keeps a `__hooks__` mark for
+    the stage from before the hooks run until they finish, and a later run
+    that finds nothing stale still runs them while the mark stands."""
+    util.status(0, None, "%s %s  listing basefiles" % (source.name, step))
     basefiles = protocol.stage_basefiles(source, step)
     result = freshness.run_action(source, step, basefiles, jobs)
+    store = freshness.load_fingerprints()
+    owed = freshness.manifest_key(step, "__hooks__", source.name)
+    if not result.planned and not result.errors and owed not in store:
+        print("%s %s: up to date -- skipped" % (step, source.name))
+        # the fresh keys still heal their ledger entries, the way `report`
+        # folds them in; the segment says skipped so the run detail shows
+        # the whole pipeline (§2) and the planner's skip prediction holds
+        freshness._apply_outcomes(source.name, [], result.fresh)
+        freshness._emit_segment(step, source.name, 0.0, total=len(basefiles),
+                                ran=0, skipped_fresh=len(basefiles),
+                                status="skipped")
+        return False
     report(source, step, result, basefiles, full_source=True)
+    if not protocol.RUN.dry_run:
+        store[owed] = {"since": util.now_iso()}
+        freshness.save_fingerprints(store)
     _after_hooks(source, step)
-    # only fingerprint a clean sweep: a failed doc leaves the source un-marked so
-    # the next run retries it (and re-surfaces the error) rather than skipping.
-    # A dry run does no work at all, so it must not mark the source either --
-    # `lagen eurlex parse -n` after a parser edit printed a 64,004-document plan
-    # and then recorded the new recipe version, so the real run that followed
-    # answered "up to date -- skipped" over the whole stale artifact tree.
-    if result.errors or protocol.RUN.dry_run:
-        return bool(result.errors), False
-    freshness.record_step(store, step, source.name, wm, pcode)
-    return False, True
+    store.pop(owed, None)
+    freshness.save_fingerprints(store)
+    return bool(result.errors)
 
 
 def _after_hooks(source, verb):
@@ -661,8 +667,8 @@ def run_after(sources, names, verb):
     source hangs off a standard verb (dv reconciles its artifact tree and
     refreshes the case-number snapshot once its parse sweep is through). Called
     with the whole run's names after each corpus verb, and with one name after
-    a targeted per-document run; a gated full-source parse/versions run fires
-    its own hooks from `_run_stage_gated`, and only when the stage ran."""
+    a targeted per-document run; a full-source parse/versions run fires its
+    own hooks from `_run_stage_full`, and only when the stage ran."""
     for name in names:
         _after_hooks(sources[name], verb)
 
@@ -739,19 +745,20 @@ def build_invocation_plan(sources, names, *, whole_corpus, download=False):
     sits there doing nothing visible. Two things that look cheap are not, and
     neither is used here:
 
-    * `stage_fingerprint` (parse/versions' own gate) walks every basefile and
-      stats every one of its input files -- exactly what makes it trustworthy
-      for the real run's skip decision, and exactly why calling it a second
-      time, for every source, before printing anything, was a felt delay
-      (further, doubling a cost `_run_stage_gated` already pays once for
-      real). Skip prediction here instead reads `runlog.last_segments`: was
+    * the per-document staleness scan (`freshness._scan`, parse/versions'
+      own gate) walks every basefile and stats every one of its input files
+      -- exactly what makes it trustworthy for the real run's skip decision,
+      and exactly why running it a second time, for every source, before
+      printing anything, was a felt delay (doubling a cost `_run_stage_full`
+      pays once for real). Skip prediction here instead reads
+      `runlog.last_segments`: was
       the most recent recorded run of this (step, source) a skip? A stale
       heuristic (a code edit or a newly-downloaded document since that run
       would flip the real answer) is the trade for a lookup in an
       already-loaded dict instead of a disk pass -- and a wrong prediction
       only skews the bar's total, per `_history_secs`.
     * `source.artifacts()` (relate's own gate, and the document-count divisor
-      `expected_secs`-style rate scaling would need for index/dump/generate)
+      a rate-scaled prediction would need for index/dump/generate)
       walks the parsed-artifact tree on disk. Also not called: relate/index/
       dump/generate are planned as "will run" unconditionally, timed from
       `_history_secs`'s ledger wall seconds, which needs no document count
@@ -893,7 +900,6 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
     lives: here for parse/versions/generate, inside `cmd_download_all`,
     `cmd_relate`, `cmd_index` and `cmd_dump` for the rest."""
     had_errors = False
-    store = freshness.load_fingerprints()
     plan = build_invocation_plan(sources, names, whole_corpus=whole_corpus,
                                  download=download)
     plan_by = {(s.source, s.verb): s for s in plan}
@@ -908,19 +914,7 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
                 if step not in source.stages:
                     continue
                 with util.step(plan_by[(name, step)].label):
-                    errs, recorded = _run_stage_gated(source, step, jobs, store)
-                had_errors |= errs
-                # save as soon as a source records, not once the whole loop is
-                # through: a kill during a later source's parse used to discard the
-                # gate for every source that had already finished cleanly, so the
-                # next run re-scanned (and re-hashed the inputs of) all of them for
-                # nothing. The artifacts themselves were never at risk -- the
-                # per-document manifest checkpoints every SAVE_EVERY docs and
-                # flushes in a finally -- but the wasted scan is minutes on a
-                # 100k-document source. The store is a handful of keys per source,
-                # so writing it per source is free.
-                if recorded:
-                    freshness.save_fingerprints(store)
+                    had_errors |= _run_stage_full(source, step, jobs)
         cmd_relate(sources, names)
         run_after(sources, names, "relate")
         # a bulk item the cluster rejected is a *unit missing from search*, so it
