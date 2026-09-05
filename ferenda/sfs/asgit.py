@@ -739,7 +739,8 @@ def subject(event, prop_meta):
                                    else "SFS " + basefile)
     else:
         return event.key
-    if len(changes) + len(deletes) > 1:
+    acts = {c.basefile for c in changes} | {d[1] for d in deletes}
+    if len(acts) > 1:
         head += " m.fl."
     if event.prop:
         title = prop_meta.get("title") if prop_meta else None

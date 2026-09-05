@@ -144,6 +144,12 @@ def test_subject_names_the_act_then_the_proposition_as_far_as_it_fits():
     ev3b = Event(key="SFS 2021:952", changes=[forordning, lag])
     assert subject(ev3b, None) == \
         "ändring i säkerhetsskyddslagen (2018:585) m.fl. (SFS 2021:952)"
+    # two transitions of one act (an event with two cutoffs) are not "m.fl."
+    twice = Change(path="2018/585.txt", src=None, basefile="2018:585",
+                   title="Säkerhetsskyddslag (2018:585)", cutoff="2021:953")
+    ev3c = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194", changes=[lag, twice])
+    assert subject(ev3c, {"title": "Ny sak"}) == \
+        "ändring i säkerhetsskyddslagen (2018:585) (Ny sak)"
     # without a proposition the amending act's own number takes the slot
     ev4 = Event(key="SFS 2021:952", changes=[lag])
     assert subject(ev4, None) == "ändring i säkerhetsskyddslagen (2018:585) (SFS 2021:952)"
