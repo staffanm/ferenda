@@ -128,30 +128,48 @@ def snapshot_cutoff(path, basefile):
     return header_cutoff(snapshot_header(path)) or basefile
 
 
-def _current_cutoff(path, basefile):
+def _current_cutoff(path, basefile, repealer=None):
     """The current download's true cutoff.
 
     The header's own "Ändring införd" text is maintained by hand and is
     sometimes wrong -- a typo (2002:986's header names "20103:54", a
     five-digit year) or simply stale (2020:486's header still names
     2023:216 while its body already carries 2024:216's wording, confirmed
-    directly against beta.rkrattsbaser.gov.se) -- even though the
-    consolidated body itself is already current. The register's own
-    `andringsforfattningar` list is the authoritative amendment chain (see
-    sfs.source's cover-consolidation-gap), so prefer its newest plausible
-    entry over the header text whenever that entry is newer."""
+    directly against beta.rkrattsbaser.gov.se) -- and for most repealed
+    acts it names no cutoff at all although the body is consolidated
+    (1966:436's body carries 1986:176's wording under a bare header). The
+    register's own `andringsforfattningar` list is the authoritative
+    amendment chain (see sfs.source's cover-consolidation-gap), so prefer
+    its newest usable entry over the header text whenever that entry is
+    newer.
+
+    Two kinds of entry consolidate nothing and are never a cutoff: the
+    repealing act itself (`repealer`, the artifact's rinfoex:upphavdAv --
+    5,684 register entries, spelled "upph.", "utgår", "uppgh." and worse, so
+    matched by number, not wording), and an ikraftträdandeförfattning
+    ("ikrafttr."), which brings an amendment into force without changing a
+    word. A header that names the repealer as cutoff (57 repealed acts) is
+    read as naming none: the wording at repeal is the last amendment's, and
+    a cutoff equal to the repealer would put the file's only write and its
+    deletion in one commit, so the text never entered any tree."""
     header_based = snapshot_cutoff(path, basefile)
+    if repealer and header_based == repealer:
+        header_based = basefile
     if path.suffix != ".json":
         return header_based
     source = compress.read_json(path)
     plausible = [act.get("beteckning", "") for act in
-                source.get("andringsforfattningar") or []
-                if RE_PLAUSIBLE_CUTOFF.match(act.get("beteckning", ""))]
+                 source.get("andringsforfattningar") or []
+                 if RE_PLAUSIBLE_CUTOFF.match(act.get("beteckning", ""))
+                 and act.get("beteckning") != repealer
+                 and not act.get("borttagen")
+                 and not (act.get("anteckningar") or "").lstrip().lower()
+                 .startswith("ikrafttr")]
     if not plausible:
         return header_based
     newest = max(plausible, key=layout.sfs_version_key)
     return (newest if layout.sfs_version_key(newest)
-           > layout.sfs_version_key(header_based) else header_based)
+            > layout.sfs_version_key(header_based) else header_based)
 
 
 # the SFS number a snapshot's own Rubrik names -- "Förordning (1982:798) om
@@ -177,7 +195,7 @@ def misfiled_as(header, basefile):
     return named if named and named != basefile else None
 
 
-def statute_snapshots(basefile, skipped, gaps, repealed=False):
+def statute_snapshots(basefile, skipped, gaps, repealed=False, repealer=None):
     """Every usable consolidation of one statute, oldest first: the download
     archive plus the current download, each as ``(cutoff, path,
     plaintext_hash)``. The current download wins over an archive of the same
@@ -236,7 +254,7 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
             continue
         snapshots.setdefault(cutoff, (path, _hash(text)))
     try:
-        cutoff = _current_cutoff(current, basefile)
+        cutoff = _current_cutoff(current, basefile, repealer)
         text = snapshot_text(current)
     except SkipDocument as exc:
         skipped.append({"basefile": basefile, "file": str(current),
@@ -304,6 +322,8 @@ def collect(basefiles):
             amendment_meta.setdefault(nr, meta)
         meta_props = art["metadata"]["properties"]
         repealed = "rinfoex:upphavdAv" in meta_props
+        m = RE_SFS_NR.search(meta_props["rinfoex:upphavdAv"]) if repealed else None
+        repealer = m.group(1) if m else None
         # the amending act whose text was printed as a reprint of the whole
         # statute. The base act keeps its number, so this renames no file --
         # it marks the one transition that restated the act rather than
@@ -317,7 +337,7 @@ def collect(basefiles):
         path = str(rel.parent / (rel.name + ".txt"))
         prev = None
         for cutoff, src, body_hash in statute_snapshots(basefile, skipped, gaps,
-                                                        repealed):
+                                                        repealed, repealer):
             utf, ikraft, prop, rskr = index.get(cutoff, (None, None, None, None))
             key = prop or ("SFS " + cutoff)
             ev = events.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
@@ -332,11 +352,9 @@ def collect(basefiles):
                                      add=prev is None, omtryck=cutoff == omtryck,
                                      body_hash=body_hash))
             prev = cutoff
-        if repealed:
-            m = RE_SFS_NR.search(meta_props["rinfoex:upphavdAv"])
-            if m:
-                repeals.append((path, basefile, title, m.group(1),
-                                meta_props.get("rpubl:upphavandedatum")))
+        if repealer:
+            repeals.append((path, basefile, title, repealer,
+                            meta_props.get("rpubl:upphavandedatum")))
     # repeals resolve against the *global* amendment index, so the deletion
     # joins the repealing act's own event whenever that act is in the run
     for path, basefile, _title, repealer, upphavd in repeals:

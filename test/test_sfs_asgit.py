@@ -13,6 +13,7 @@ from ferenda.sfs.asgit import (
     Change,
     Event,
     RebuildRequired,
+    _current_cutoff,
     collect,
     cycle_members,
     email_slug,
@@ -265,6 +266,55 @@ def test_an_unreadable_current_download_still_refuses_the_corpus(export_corpus):
     assert not repo.exists()
 
 
+def test_current_cutoff_prefers_the_register_but_never_the_repealer(tmp_path):
+    def cutoff(header, register, repealer=None, basefile="1966:436"):
+        path = tmp_path / "436.json"
+        path.write_text(json.dumps(_source(basefile, header, "1 § Text.",
+                                           register)), encoding="utf-8")
+        return _current_cutoff(path, basefile, repealer)
+
+    # a stale (or mistyped) header loses to a newer register entry
+    assert cutoff("2023:216", [("2023:69", "ändr. 13 §"),
+                               ("2024:216", "ändr. 3 a §")]) == "2024:216"
+    # the header wins when it is the newer of the two
+    assert cutoff("2024:216", [("2023:69", "ändr. 13 §")]) == "2024:216"
+    # a bare header on a repealed act: the newest amendment, never the
+    # repealing act (matched by number -- its wording varies)
+    register = [("1986:176", "ändr. 8, 11 §§"), ("1990:717", "utgår")]
+    assert cutoff("1966:436", register, repealer="1990:717") == "1986:176"
+    # a header that names the repealer names no cutoff at all
+    assert cutoff("1990:717", register, repealer="1990:717") == "1986:176"
+    # an ikraftträdandeförfattning changes no word; a withdrawn entry is gone
+    assert cutoff("1991:854", [("1991:878", "ikrafttr. av 1991:854")]) \
+        == "1991:854"
+    assert cutoff("1991:854", [("1991:900", "ändr. 1 §", True)]) == "1991:854"
+    # nothing usable in the register: the header (or the act itself) stands
+    assert cutoff("1990:717", [("1990:717", "upph.")], repealer="1990:717") \
+        == "1966:436"
+
+
+def test_a_repealed_act_whose_header_names_the_repealer_keeps_its_text(
+        export_corpus):
+    # 57 repealed acts name their own repeal as "t.o.m." cutoff. Read
+    # literally, the file's only write and its deletion share one commit and
+    # the wording never enters any tree.
+    basefile, repo = "1966:436", export_corpus / "repo"
+    _write_current(basefile, "1990:717", "8 § Lydelse vid upphävandet.",
+                   register=[("1986:176", "ändr. 8, 11 §§"),
+                             ("1990:717", "upph.")])
+    _write_artifact(basefile, ("1986:176", None), repealed_by="1990:717")
+
+    assert export([basefile], repo, forarbete_meta=_meta) == 2
+    subjects = _git(repo, "log", "--reverse", "--format=%s",
+                    gitledger.BRANCH).splitlines()
+    assert subjects == ["SFS 1986:176: Testlag (1966:436)",
+                        "SFS 1990:717: upphävande"]
+    assert _git(repo, "show", gitledger.BRANCH + "~1:1966/436.txt") \
+        == "8 § Lydelse vid upphävandet."
+    assert "1966/436.txt" not in _git(repo, "ls-tree", "-r", "--name-only",
+                                      gitledger.BRANCH)
+
+
 def test_misfiled_archive_snapshot_is_read_off_its_own_rubrik():
     # 20 archived consolidations hold another act's text, in one shifted chain
     # an old import left behind. Nothing but the snapshot's own Rubrik says so.
@@ -441,16 +491,23 @@ def export_corpus(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _source(basefile, cutoff, text):
+def _source(basefile, cutoff, text, register=()):
+    """A beta-API download; `register` is its andringsforfattningar list as
+    (beteckning, anteckningar) pairs, or (beteckning, anteckningar, borttagen)."""
     return {"beteckning": basefile, "rubrik": "Testlag (%s)" % basefile,
             "fulltext": {"andringInford": "t.o.m. SFS %s" % cutoff,
-                         "forfattningstext": text}}
+                         "forfattningstext": text},
+            "andringsforfattningar": [
+                {"beteckning": e[0], "anteckningar": e[1],
+                 "borttagen": e[2] if len(e) > 2 else False}
+                for e in register]}
 
 
-def _write_current(basefile, cutoff, text):
+def _write_current(basefile, cutoff, text, register=()):
     path = layout.sfs_source(basefile)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_source(basefile, cutoff, text)), encoding="utf-8")
+    path.write_text(json.dumps(_source(basefile, cutoff, text, register)),
+                    encoding="utf-8")
 
 
 def _write_archive(basefile, cutoff, text):
@@ -460,17 +517,20 @@ def _write_archive(basefile, cutoff, text):
     path.write_text(json.dumps(_source(basefile, cutoff, text)), encoding="utf-8")
 
 
-def _write_artifact(basefile, *amendments):
+def _write_artifact(basefile, *amendments, repealed_by=None):
     entries = []
     for cutoff, prop in amendments:
         entries.append({"properties": {"dcterms:identifier": "SFS " + cutoff,
                                         "rpubl:ikrafttradandedatum": "2020-01-01"},
                         "forarbeten": [prop] if prop else []})
+    props = {"dcterms:title": "Testlag (%s)" % basefile}
+    if repealed_by:
+        props["rinfoex:upphavdAv"] = "SFS " + repealed_by
+        props["rpubl:upphavandedatum"] = "2021-01-01"
     path = layout.artifact("sfs", basefile)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"metadata": {"properties": {
-                        "dcterms:title": "Testlag (%s)" % basefile}},
-                        "amendments": entries}), encoding="utf-8")
+    path.write_text(json.dumps({"metadata": {"properties": props},
+                                "amendments": entries}), encoding="utf-8")
 
 
 def test_export_passes_over_an_empty_artifact_placeholder(export_corpus):
