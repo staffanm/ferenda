@@ -870,7 +870,7 @@ def invocation_bar(total_secs, total_steps, desc="lagen all"):
     2>&1`, a cron job): a stacked-position tqdm bar writes raw cursor-up ANSI
     codes to *any* file it is given, tty or not, and a run nobody is watching
     live gains nothing from the bar to offset that. Second, when the plan holds
-    fewer than two steps (`lagen all generate`, `lagen sfs relate`): the outer
+    fewer than two steps (`lagen all generate`, `lagen sfs parse`): the outer
     line would say "1/1" for the whole run and repeat what the step's own
     counter already says, so a single-step run keeps the plain one-line
     counter.
@@ -919,7 +919,7 @@ def step(label):
     """Announce one planned step of a multi-step run -- "<source> <verb>" --
     on the outer invocation bar, for as long as it runs. A no-op when no bar
     is open, which is what lets the same call site serve `lagen all relate`
-    (a bar, one step per source) and `lagen sfs relate` (no bar, the source's
+    (a bar, one step per source) and `lagen sfs parse` (no bar, the source's
     own counter alone)."""
     if _outer is None:
         yield

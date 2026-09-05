@@ -259,7 +259,7 @@ def record(cast, base, out):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("casts", nargs="+", type=Path)
-    ap.add_argument("--base", default="https://ferenda.lagen.nu")
+    ap.add_argument("--base", default="https://lagen.nu")
     ap.add_argument("--out", type=Path, default=MEDIA)
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)

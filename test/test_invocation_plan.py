@@ -256,7 +256,7 @@ def test_plan_verb_steps_skips_a_source_that_lacks_the_verb(wired):
 
 
 def test_a_one_source_run_plans_a_single_step(wired):
-    # which is what makes `lagen sfs relate` keep the plain one-line counter:
+    # which is what makes `lagen sfs parse` keep the plain one-line counter:
     # invocation_bar opens no outer bar below two steps
     source = _source(wired)
     assert len(corpus.plan_verb_steps({"syn": source}, ["syn"], "parse")) == 1
