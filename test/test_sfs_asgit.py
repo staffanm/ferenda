@@ -105,6 +105,31 @@ def test_message_composition():
         "write:2018:585@2021:952", "delete:1998:204@2018:218"}
 
 
+def test_message_dates_a_pre_1970_commit_explicitly():
+    """The git ident date clamps to 1970-01-01 for a pre-1970 event (GitHub
+    rejects a negative timestamp), so the true date must survive in the
+    message -- one line when author and committer dates agree, two otherwise."""
+    ev = Event(key="SFS 1686:0903", ikraft="1686-07-01",
+               changes=[Change(path="1686/0903.txt", src=None,
+                               basefile="1686:0903", title="Kyrkolag (1686:0903)",
+                               cutoff="1686:0903", add=True, body_hash="0" * 64)])
+    msg = message(ev, _meta)
+    assert msg.endswith("saknas i registret).\n\nFörfattardatum: 1686-07-01\n")
+    assert "Incheckningsdatum" not in msg
+    ev = Event(key="SFS 1969:78", utfardad="1969-03-21", ikraft="1970-01-01")
+    msg = message(ev, _meta)
+    assert msg.endswith("\nFörfattardatum: 1969-03-21\n")
+    assert "Incheckningsdatum" not in msg
+    ev = Event(key="SFS 1969:78", utfardad="1969-03-21", ikraft="1969-07-01")
+    msg = message(ev, _meta)
+    assert msg.endswith("\nFörfattardatum: 1969-03-21\nIncheckningsdatum: 1969-07-01\n")
+    # the stream itself never emits a negative ident timestamp
+    ev = Event(key="SFS 1686:0903", ikraft="1686-07-01")
+    header = next(stream({ev.key: ev}, _meta))
+    assert b"author Regeringen <regeringen@lagen.nu> 0 +0000\n" in header
+    assert b"committer Riksdagen <riksdagen@lagen.nu> 0 +0000\n" in header
+
+
 def test_message_add_commit_notes_consolidation_caveat():
     ev = Event(key="SFS 2003:466",
                changes=[Change(path="1998/204.txt", src=None,

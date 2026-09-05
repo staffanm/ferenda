@@ -128,6 +128,32 @@ def snapshot_cutoff(path, basefile):
     return header_cutoff(snapshot_header(path)) or basefile
 
 
+def _current_cutoff(path, basefile):
+    """The current download's true cutoff.
+
+    The header's own "Ändring införd" text is maintained by hand and is
+    sometimes wrong -- a typo (2002:986's header names "20103:54", a
+    five-digit year) or simply stale (2020:486's header still names
+    2023:216 while its body already carries 2024:216's wording, confirmed
+    directly against beta.rkrattsbaser.gov.se) -- even though the
+    consolidated body itself is already current. The register's own
+    `andringsforfattningar` list is the authoritative amendment chain (see
+    sfs.source's cover-consolidation-gap), so prefer its newest plausible
+    entry over the header text whenever that entry is newer."""
+    header_based = snapshot_cutoff(path, basefile)
+    if path.suffix != ".json":
+        return header_based
+    source = compress.read_json(path)
+    plausible = [act.get("beteckning", "") for act in
+                source.get("andringsforfattningar") or []
+                if RE_PLAUSIBLE_CUTOFF.match(act.get("beteckning", ""))]
+    if not plausible:
+        return header_based
+    newest = max(plausible, key=layout.sfs_version_key)
+    return (newest if layout.sfs_version_key(newest)
+           > layout.sfs_version_key(header_based) else header_based)
+
+
 # the SFS number a snapshot's own Rubrik names -- "Förordning (1982:798) om
 # kompensation i vissa fall" -- which says which act the file actually holds
 RE_RUBRIK_SFS = re.compile(r"\((\d{4}:\s?\d+)\)")
@@ -210,7 +236,7 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
             continue
         snapshots.setdefault(cutoff, (path, _hash(text)))
     try:
-        cutoff = snapshot_cutoff(current, basefile)
+        cutoff = _current_cutoff(current, basefile)
         text = snapshot_text(current)
     except SkipDocument as exc:
         skipped.append({"basefile": basefile, "file": str(current),
@@ -620,10 +646,19 @@ def message(event, forarbete_meta, scope="full"):
         body.append("SFS %s: upphävd genom SFS %s" % (basefile, repealer))
     if body:
         lines += [""] + body
-    _, _, substituted = event_dates(event)
+    author_date, committer_date, substituted = event_dates(event)
     if substituted:
         lines += ["", "Författardatum är ikraftträdandedatum (utfärdandedatum "
                       "saknas i registret)."]
+    # the git ident date clamps to 1970-01-01 for a pre-1970 event (GitHub's
+    # receive-side fsck rejects a negative timestamp), so the true date must
+    # survive in the message
+    pre_epoch = [("Författardatum", author_date), ("Incheckningsdatum", committer_date)]
+    pre_epoch = [(label, d) for label, d in pre_epoch if d < "1970-01-01"]
+    if len(pre_epoch) == 2 and pre_epoch[0][1] == pre_epoch[1][1]:
+        pre_epoch = pre_epoch[:1]
+    if pre_epoch:
+        lines += [""] + ["%s: %s" % (label, d) for label, d in pre_epoch]
     coauthors = ["Co-authored-by: %s <%s>" % (name, email_slug(name))
                 for name in (prop_meta.get("signers", [])[1:] if prop_meta else [])]
     if coauthors:
@@ -718,8 +753,10 @@ def stream(events, forarbete_meta, tip=None, scope="full", ref=BRANCH_REF):
         yield ("commit %s\n"
                "author %s <%s> %s\n"
                "committer %s <%s> %s\n"
-               % (ref, a_name, a_mail, gitledger.epoch(author_date),
-                  c_name, c_mail, gitledger.epoch(committer_date))).encode()
+               % (ref, a_name, a_mail,
+                  gitledger.epoch(author_date, clamp=True),
+                  c_name, c_mail,
+                  gitledger.epoch(committer_date, clamp=True))).encode()
         yield gitledger.data_payload(message(ev, forarbete_meta, scope))
         if first and tip:
             yield b"from %s\n" % tip.encode()
