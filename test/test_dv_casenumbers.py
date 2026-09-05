@@ -85,9 +85,9 @@ def test_a_decision_with_no_recorded_date_stays_sortable(monkeypatch, tmp_path):
 
 
 def test_write_reports_whether_the_file_changed(monkeypatch, tmp_path):
-    # the snapshot is a parse input (stage.CASENUMBER_CODE): new content
-    # re-stales five sources' parses, identical content costs nothing, and a
-    # full-source dv parse says which of the two happened
+    # the snapshot is not a recipe input (stage.CASENUMBER_CODE), so nothing
+    # re-stales on a change; a full-source dv parse still says whether the
+    # file changed, and identical content leaves it untouched
     monkeypatch.setattr(casenumbers.layout, "artifacts", lambda source: [])
     path = tmp_path / "casenumbers.json"
     assert casenumbers.write(path)[3] is True          # written for the first time

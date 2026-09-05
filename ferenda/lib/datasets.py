@@ -101,9 +101,10 @@ def load_casenumbers(path=CASENUMBERS):
     data root by `lagen dv casenumbers` (see CASENUMBERS), so a missing file
     means that has not run on this data root, and raises rather than silently
     unlinking every case-number citation of a whole parse run (rule:fail-fast).
-    An empty dict here would be doubly quiet: `build.hash_files` skips a missing
-    path, so the parse recipe would not notice either, and `malnummer._index`
-    caches, so the emptiness would outlive a snapshot written mid-run."""
+    An empty dict here would be doubly quiet: the file is not a recipe input
+    (stage.CASENUMBER_CODE), so no parse would ever re-run over it, and
+    `malnummer._index` caches, so the emptiness would outlive a snapshot
+    written mid-run."""
     assert path.exists(), (
         "%s is missing -- run `lagen dv casenumbers` (or rsync the artifact "
         "tree) before parsing sources that resolve case numbers" % path)

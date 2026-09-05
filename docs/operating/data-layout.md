@@ -16,7 +16,7 @@ site/data/artifact/eurlex/archive/            # superseded consolidations, parse
 site/data/downloaded/dom/                     # DV new-API harvest (per court)
 site/data/downloaded/dv/                      # DV legacy feed (.doc/.docx)
 site/data/artifact/dom/identity-index.json    # canonical case -> source records
-site/data/artifact/dom/casenumbers.json       # case number -> held decisions (lib/malnummer's parse input; `lagen dv casenumbers`)
+site/data/artifact/dom/casenumbers.json       # case number -> held decisions (read by lib/malnummer at parse time, not a recipe input; `lagen dv casenumbers`)
 site/data/downloaded/avg/{jo,jk,arn,imy,kkv}/ # per-decision records (+ jo/arn PDFs, jk landing html)
 site/data/downloaded/avg/imy/dok/             # IMY decision PDFs, by asset name (shared between decisions)
 site/data/downloaded/avg/kkv/dok/             # KKV decision documents, by diarium file name (pdf/htm/docx)

@@ -176,7 +176,10 @@ uv run python -m ferenda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # 
 
 # rewrite artifact/dom/casenumbers.json from the parsed artifacts. A full-source
 # `dv parse` already ends with this; run it by hand after a targeted parse, or
-# to see what the snapshot holds
+# to see what the snapshot holds. Not a recipe input: a refresh reparses
+# nothing, so a document parsed before the decision it cites was held links
+# to it only at a later `--force` parse of its source (schedule that on dev
+# and sync; on prod it is a day)
 uv run python -m ferenda.build dv casenumbers
 ```
 
