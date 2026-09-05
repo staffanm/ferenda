@@ -89,6 +89,15 @@ class Event:
     changes: list[Change] = field(default_factory=list)
     # (path, basefile, repealed_by)
     deletes: list[tuple[str, str, str]] = field(default_factory=list)
+    # basefile -> the act's title, for every change and deletion
+    titles: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def lag(self):
+        """Whether riksdagen enacted any act this event touches. A förordning,
+        kungörelse or tillkännagivande is the government's alone, so nobody
+        but its author stands behind that commit."""
+        return any(is_lag(t) for t in self.titles.values())
 
     def merge_dates(self, utfardad, ikraft):
         """Keep the earliest known date of each kind -- deterministic when an
@@ -97,6 +106,54 @@ class Event:
             cur = getattr(self, attr)
             if val and (cur is None or val < cur):
                 setattr(self, attr, val)
+
+
+# the head noun of an act's title in the definite form the subject line
+# needs: "Lag (2022:1) om foo" -> "lagen (2022:1) om foo". Suffix-matched,
+# longest first; a head no rule names takes the common -en/-n.
+_DEFINITE = [
+    ("tillkännagivande", "tillkännagivandet"), ("föreskrifter", "föreskrifterna"),
+    ("förordning", "förordningen"), ("kungörelse", "kungörelsen"),
+    ("instruktion", "instruktionen"), ("resolution", "resolutionen"),
+    ("föreskrift", "föreskriften"), ("reglemente", "reglementet"),
+    ("skrivelse", "skrivelsen"), ("cirkulär", "cirkuläret"),
+    ("ordning", "ordningen"), ("stadgar", "stadgarna"), ("beslut", "beslutet"),
+    ("stadga", "stadgan"), ("brev", "brevet"), ("form", "formen"),
+    ("balk", "balken"), ("lag", "lagen"),
+]
+# the grundlagar and riksdagsordningen are riksdagen's although no title says "lag"
+_RIKSDAG_HEADS = {"regeringsform", "riksdagsordning", "successionsordning",
+                  "tryckfrihetsförordning"}
+
+
+def _title_head(title):
+    """The head noun of a title: the last word before the SFS number."""
+    words = title.partition(" (")[0].split()
+    return words[-1].lower() if words else ""
+
+
+def is_lag(title):
+    head = _title_head(title)
+    return head.endswith(("lag", "balk")) or head in _RIKSDAG_HEADS
+
+
+def definite(title):
+    """'Lag (2022:1) om foo' -> 'lagen (2022:1) om foo', 'Brottsbalk
+    (1962:700)' -> 'brottsbalken (1962:700)'."""
+    head, sep, rest = title.partition(" (")
+    words = head.split()
+    if not words:
+        return title
+    noun = words[-1].lower()
+    for suffix, form in _DEFINITE:
+        if noun.endswith(suffix):
+            noun = noun[:len(noun) - len(suffix)] + form
+            break
+    else:
+        noun += "n" if noun.endswith(("a", "e")) else "en"
+    words[-1] = noun
+    words[0] = words[0][:1].lower() + words[0][1:]
+    return " ".join(words) + sep + rest
 
 
 def snapshot_text(path):
@@ -365,19 +422,21 @@ def collect(basefiles):
                                      title=title, cutoff=cutoff, folded=folded,
                                      add=prev is None, omtryck=cutoff == omtryck,
                                      body_hash=body_hash))
+            ev.titles[basefile] = title
             prev = cutoff
         if repealer:
             repeals.append((path, basefile, title, repealer,
                             meta_props.get("rpubl:upphavandedatum")))
     # repeals resolve against the *global* amendment index, so the deletion
     # joins the repealing act's own event whenever that act is in the run
-    for path, basefile, _title, repealer, upphavd in repeals:
+    for path, basefile, title, repealer, upphavd in repeals:
         utf, ikraft, prop, rskr = amendment_meta.get(
             repealer, (None, upphavd, None, None))
         key = prop or ("SFS " + repealer)
         ev = events.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
         ev.merge_dates(utf, ikraft or upphavd)
         ev.deletes.append((path, basefile, repealer))
+        ev.titles[basefile] = title
     return resolve_order_conflicts(events, amendment_meta, gaps), skipped, gaps
 
 
@@ -459,9 +518,14 @@ def ungroup(ev, amendment_meta):
         return out
 
     for c in ev.changes:
-        part(c.cutoff).changes.append(c)
+        out = part(c.cutoff)
+        out.changes.append(c)
+        out.titles[c.basefile] = ev.titles.get(c.basefile, c.title)
     for delete in ev.deletes:
-        part(delete[2]).deletes.append(delete)
+        out = part(delete[2])
+        out.deletes.append(delete)
+        if delete[1] in ev.titles:
+            out.titles[delete[1]] = ev.titles[delete[1]]
     return parts
 
 
@@ -515,6 +579,7 @@ def resolve_order_conflicts(events, amendment_meta, gaps):
                     into = events[part_key]
                     into.changes.extend(part.changes)
                     into.deletes.extend(part.deletes)
+                    into.titles.update(part.titles)
                     into.merge_dates(part.utfardad, part.ikraft)
                 else:
                     events[part_key] = part
@@ -639,22 +704,58 @@ def replaced_by(event, change):
                   if repealer == change.basefile)
 
 
-def message(event, forarbete_meta, scope="full"):
-    """The commit message: the proposition's own summary paragraph as body
-    (its title as subject), the affected statutes listed, the granularity and
-    date caveats spelled out, and the idempotency trailer last."""
-    prop_meta = forarbete_meta(event.prop) if event.prop else None
-    if prop_meta and prop_meta.get("title"):
-        subject = "%s: %s" % (event.prop, prop_meta["title"])
-    elif event.prop:
-        subject = "%s: ändringar i %d författning%s" % (
-            event.prop, len(event.changes) + len(event.deletes),
-            "" if len(event.changes) + len(event.deletes) == 1 else "ar")
+SUBJECT_MAX = 72
+
+
+def subject(event, prop_meta):
+    """The subject line: what happened to the act the commit is about --
+    "ändring i lagen (2022:1) om foo", the title itself for a new act,
+    "upphävande av ..." for a repeal -- "m.fl." when the event touches more
+    acts, then in parentheses the proposition's title as far as it fits in
+    `SUBJECT_MAX` columns (the full "Prop. ...: title" follows on the next
+    line of the message), or the amending act's own SFS number when no
+    proposition is known. A new act is the event's main act when it has one:
+    a proposition that enacts a law and amends others is about the new law."""
+    changes = sorted(event.changes, key=lambda c: (not c.add, c.path))
+    deletes = sorted(event.deletes)
+    if changes:
+        c = changes[0]
+        head = c.title if c.add else "ändring i " + definite(c.title)
+    elif deletes:
+        _path, basefile, _repealer = deletes[0]
+        title = event.titles.get(basefile)
+        head = "upphävande av " + (definite(title) if title
+                                   else "SFS " + basefile)
     else:
-        subject = "%s: %s" % (event.key,
-                              event.changes[0].title if event.changes
-                              else "upphävande")
-    lines = [subject]
+        return event.key
+    if len(changes) + len(deletes) > 1:
+        head += " m.fl."
+    if event.prop:
+        title = prop_meta.get("title") if prop_meta else None
+    elif changes and changes[0].add and event.key == "SFS " + changes[0].basefile:
+        title = None            # the act's own number is already in its title
+    else:
+        title = event.key       # the amending or repealing act
+    if not title:
+        return head
+    room = SUBJECT_MAX - len(head) - 3
+    if room < 12:
+        return head
+    if len(title) > room:
+        title = title[:room - 1].rsplit(" ", 1)[0].rstrip(",.;:–-") + "…"
+    return "%s (%s)" % (head, title)
+
+
+def message(event, forarbete_meta, scope="full"):
+    """The commit message: the `subject` line, the proposition (identifier
+    and full title) on the next line, its own summary paragraph as body, the
+    affected statutes listed, the granularity and date caveats spelled out,
+    and the co-authors last."""
+    prop_meta = forarbete_meta(event.prop) if event.prop else None
+    lines = [subject(event, prop_meta)]
+    if event.prop:
+        lines += ["", ("%s: %s" % (event.prop, prop_meta["title"])
+                       if prop_meta and prop_meta.get("title") else event.prop)]
     if prop_meta and prop_meta.get("ingress"):
         lines += ["", prop_meta["ingress"]]
     body = []
@@ -703,7 +804,9 @@ def message(event, forarbete_meta, scope="full"):
 def identities(event, forarbete_meta):
     """((author name, email), (committer name, email)) -- the proposition's
     first signer and the riksdagsskrivelse's first signer, with the corpus
-    fallbacks when either förarbete is unavailable."""
+    fallbacks when either förarbete is unavailable. An event riksdagen had
+    no part in (no förarbete, no lag among its acts) is the government's
+    alone: author and committer are the same."""
     author = ("Regeringen", "regeringen@lagen.nu")
     committer = ("Riksdagen", "riksdagen@lagen.nu")
     prop_meta = forarbete_meta(event.prop) if event.prop else None
@@ -714,6 +817,9 @@ def identities(event, forarbete_meta):
     if rskr_meta and rskr_meta.get("signers"):
         name = rskr_meta["signers"][0]
         committer = (name, email_slug(name))
+    elif not (event.prop or event.rskr or event.lag):
+        # a förordning: the government issues it alone, and commits it
+        committer = author
     return author, committer
 
 
