@@ -50,18 +50,6 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{#- PRD-subdomains.md section 2: every generated page carries this, not just
-    a subdomain's landing page -- the file is the same bytes either way
-    (subdomains.py symlinks to it, it never copies or patches it), so the fix
-    has to be host-independent. Harmless when the page is loaded at its own
-    URL (already the same origin); when the identical bytes are loaded via
-    e.g. avtals.lagen.nu, every root-relative href/asset/fetch in the page
-    resolves to the real site instead of a path that only exists there.
-    CUTOVER: -> https://lagen.nu/ -- `base_path` anchors the href to this
-    document's own served path (empty for a solo page, with no single
-    document), so a bare `#anchor` link (the TOC, a pilcrow permalink)
-    resolves against the document instead of the site root #}
-<base href="https://ferenda.lagen.nu{{ base_path }}">
 <title>{{ head_title }}</title>
 {#- the search-engine and link-preview head. canonical/og:url name the public
     host whatever host served the bytes (see page_context); og:image is one
@@ -69,7 +57,18 @@
     preview scraper does not resolve <base>, so it is absolute. -#}
 {%- if canonical %}
 <link rel="canonical" href="{{ canonical }}">
-<meta property="og:url" content="{{ canonical }}">{% endif %}
+<meta property="og:url" content="{{ canonical }}">
+{#- PRD-subdomains.md section 2: a subdomain landing (avtals.lagen.nu) serves
+    this document's own bytes at "/" (subdomains.py symlinks, never copies),
+    where every root-relative href/asset/fetch would name a path that exists
+    only on the apex. So when the page is loaded at any path other than its
+    own, a <base> to the canonical address is added before the first such
+    link is parsed -- and only then: at its own path (the public host, a
+    localhost serve) the page has no <base> and stays on the host that served
+    it. A bare "#anchor" (the TOC, a pilcrow) resolves against the document
+    either way. Inline, and ahead of the stylesheet: the bundled script.js
+    loads far too late to steer the head's own links. -#}
+<script>(function(){var c=document.querySelector('link[rel=canonical]');if(c&&new URL(c.href).pathname!==location.pathname){var b=document.createElement('base');b.href=c.href;document.head.appendChild(b)}})()</script>{% endif %}
 {%- if description %}
 <meta name="description" content="{{ description }}">
 <meta property="og:description" content="{{ description }}">{% endif %}

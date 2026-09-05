@@ -79,14 +79,12 @@ recreates the containers; the volumes and the bind-mounted data do not move.
 3. **Check the redirect target.** Every `ferenda.lagen.nu` path must have a
    working `lagen.nu` twin. They are the same application, so this holds by
    construction, but spot-check `/api/v1/`, `/dumps/` and a document URL.
-4. **The last regenerate before the switch renders for `lagen.nu`.** Every
-   generated page carries `<base href="https://ferenda.lagen.nu...">`
-   (`ferenda/lib/templates/page.html`, marked `CUTOVER`). Change that host to
-   `lagen.nu` and run a full generate (about 30 minutes) before the switch.
-   Until the switch, the preview host's links then lead to the legacy site;
-   after it, every internal link would otherwise pass through the
-   `ferenda.lagen.nu` redirect. The canonical, OpenGraph and sitemap URLs
-   already name `lagen.nu` and need nothing.
+4. **No regenerate is needed for the host name.** A generated page names no
+   host of its own: its links are root-relative, and the `<base>` a subdomain
+   landing needs is added by a head script from the page's `rel=canonical`,
+   which already names `lagen.nu`. (Until the switch, that makes a subdomain
+   landing's links lead to the legacy site; the subdomains go live with the
+   switch.)
 
 ## The switch
 

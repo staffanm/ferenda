@@ -1,27 +1,33 @@
-"""`page_context`'s `doc_uri` anchors page.html's `<base href>` to the
-document's own served path, so a bare `#anchor` link (the TOC, a pilcrow
-permalink) resolves against the document instead of the site root."""
+"""page.html carries no static `<base>`: a head script adds one, pointing at
+the canonical address, only when the page is loaded at a path other than its
+own (a subdomain landing serving the document's bytes at "/"). At its own
+path -- the public host, a localhost serve -- the page stays on the host that
+served it."""
 
 from ferenda.lib.page import page_context
 from ferenda.lib.tpl import ENV
 
+SCRIPT = "if(c&&new URL(c.href).pathname!==location.pathname)"
 
-def _base_href(**kwargs):
+
+def _head(**kwargs):
     ctx = page_context("Title", "Kind", "meta", body="body", **kwargs)
     html = ENV.get_template("page.html").render(ctx)
-    start = html.index('<base href="') + len('<base href="')
-    return html[start:html.index('"', start)]
+    return html[:html.index("</head>")]
 
 
-def test_base_href_anchors_to_the_document_own_served_path():
-    assert _base_href(doc_uri="https://lagen.nu/1942:740") == \
-        "https://ferenda.lagen.nu/1942:740"
+def test_a_document_page_carries_the_base_script_after_its_canonical():
+    head = _head(doc_uri="https://lagen.nu/1942:740")
+    assert "<base " not in head
+    canonical = head.index('<link rel="canonical" href="https://lagen.nu/1942:740">')
+    assert canonical < head.index(SCRIPT) < head.index('href="/style.css"')
 
 
-def test_base_href_strips_a_fragment_off_the_document_uri():
-    assert _base_href(doc_uri="https://lagen.nu/1942:740#K1P3a") == \
-        "https://ferenda.lagen.nu/1942:740"
+def test_the_canonical_strips_a_fragment_off_the_document_uri():
+    assert 'href="https://lagen.nu/1942:740">' in _head(
+        doc_uri="https://lagen.nu/1942:740#K1P3a")
 
 
-def test_base_href_stays_at_the_site_root_for_a_solo_page():
-    assert _base_href() == "https://ferenda.lagen.nu"
+def test_a_solo_page_has_neither_canonical_nor_base_script():
+    head = _head()
+    assert "canonical" not in head and SCRIPT not in head
