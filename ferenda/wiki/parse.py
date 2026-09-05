@@ -31,7 +31,7 @@ from pathlib import Path
 from ..lib import layout, markdown
 from ..lib.eu_structure import anchored_blocks
 from ..lib.lagrum import ALL_PARSE_TYPES, CELEX_BASE, ECHR_BASE, sfs_parser
-from ..lib.sfs_anchor import paragraf_anchor
+from ..lib.sfs_anchor import RE_SPACE, paragraf_anchor
 
 PARSE_TYPES = ALL_PARSE_TYPES
 
@@ -42,8 +42,10 @@ PARSE_TYPES = ALL_PARSE_TYPES
 # a per-chapter-numbered law (brottsbalken) is commented with fully-qualified
 # `## N kap M §` headings and SFS mints `K{N}P{M}`. Matching that, a bare `N §`
 # yields `P{N}` and a qualified `N kap M §` yields `K{N}P{M}`.
-RE_PARA = re.compile(r"(?:(\d+)\s*kap\.?\s+)?(\d+)\s*([a-z])?\s*§(?:\s+(\d+)\s*st)?")
-RE_KAP = re.compile(r"^\s*(\d+)\s*kap")
+# A chapter can carry a letter ("19 a kap." LOU, "5 a kap."); SFS mints it as
+# `K19a`, so the letter rides along in the kapitel group with its space dropped.
+RE_PARA = re.compile(r"(?:(\d+(?:\s*[a-z])?)\s*kap\.?\s+)?(\d+)\s*([a-z])?\s*§(?:\s+(\d+)\s*st)?")
+RE_KAP = re.compile(r"^\s*(\d+(?:\s*[a-z])?)\s*kap\b")
 # an EU act is commented per article (PRD Step 3): `## Artikel 5` -> "5", the
 # sub-article forms `## Artikel 3.4` -> "3.4", `## Artikel 5.2 a` -> "5.2.a" --
 # the dotted `article(.paragraph)(.point)` anchors render_eurlex mints from the
@@ -69,7 +71,7 @@ def heading_fragment(heading):
                                m.group(4))
     m = RE_KAP.match(heading)
     if m:
-        return "K%s" % m.group(1)
+        return "K%s" % RE_SPACE.sub("", m.group(1))
     m = RE_ARTIKEL.match(heading)
     if m:
         return ".".join(g for g in m.groups() if g)
