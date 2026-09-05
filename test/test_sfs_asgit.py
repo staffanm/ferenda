@@ -315,6 +315,38 @@ def test_a_repealed_act_whose_header_names_the_repealer_keeps_its_text(
                                       gitledger.BRANCH)
 
 
+def test_a_consolidation_cut_off_at_the_repeal_is_a_gap_not_a_cycle(
+        export_corpus):
+    # 2022:1464: repealed by 2023:657, whose transitional provisions 2025:1236
+    # later amended, so the current text postdates the repeal. Read literally
+    # the archived "t.o.m. 2023:657" wording puts the repealing act's commit
+    # both before 2025:1236's (a change) and after it (the deletion).
+    basefile, repo = "2022:1464", export_corpus / "repo"
+    _write_archive(basefile, "2023:584", "1 § Äldre lydelse.")
+    _write_archive(basefile, "2023:657", "1 § Lydelse vid upphävandet.")
+    _write_current(basefile, "2025:1236", "1 § Lydelse med ny p 3.",
+                   register=[("2023:584", "ändr. 1 §"), ("2023:657", "upph."),
+                             ("2025:1236", "ny p 3 övergångsbest.")])
+    _write_artifact(basefile, ("2023:584", None), ("2023:657", None),
+                    ("2025:1236", None), repealed_by="2023:657")
+
+    events, skipped, gaps = collect([basefile])
+    assert skipped == []
+    assert [g["error"] for g in gaps] == [
+        "archived consolidation is cut off at the repealing act SFS 2023:657"]
+    assert export([basefile], repo, forarbete_meta=_meta) == 3
+    subjects = _git(repo, "log", "--reverse", "--format=%s",
+                    gitledger.BRANCH).splitlines()
+    assert subjects == ["SFS 2023:584: Testlag (2022:1464)",
+                        "SFS 2025:1236: Testlag (2022:1464)",
+                        "SFS 2023:657: upphävande"]
+    assert _git(repo, "show", gitledger.BRANCH + "~1:2022/1464.txt") \
+        == "1 § Lydelse med ny p 3."
+    # the dropped consolidation's amendment is named as folded, not lost
+    assert "innefattar även SFS 2023:657" in _git(
+        repo, "log", "-1", "--format=%b", gitledger.BRANCH + "~1")
+
+
 def test_misfiled_archive_snapshot_is_read_off_its_own_rubrik():
     # 20 archived consolidations hold another act's text, in one shifted chain
     # an old import left behind. Nothing but the snapshot's own Rubrik says so.

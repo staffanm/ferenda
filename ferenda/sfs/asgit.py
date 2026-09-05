@@ -219,7 +219,9 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False, repealer=None):
     Cutoff order is likewise required only of a live act. A repealed act's
     current page serves the wording as it stood at repeal and stops naming a
     cutoff -- the newest consolidation is then the last archived one, and
-    demanding that the current file be newest rejected ten repealed acts."""
+    demanding that the current file be newest rejected ten repealed acts.
+    `repealer` (the repealing act's SFS number) is never a cutoff: see
+    `_current_cutoff`."""
     current = layout.sfs_source(basefile)
     if not compress.exists(current):
         current = layout.sfs_sfst(basefile)
@@ -241,6 +243,18 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False, repealer=None):
                              "file": str(path),
                              "error": "archived cutoff %s is not an SFS number"
                                       % cutoff})
+                continue
+            if repealer and cutoff == repealer:
+                # the wording "t.o.m." the repealing act (49 archived
+                # consolidations) would share the deletion's commit, so it
+                # can never enter a tree -- and when a later amendment to the
+                # repeal's transitional provisions follows it (2022:1464),
+                # the repealing act's commit would have to come both before
+                # and after that amendment's
+                gaps.append({"kind": "archive", "basefile": basefile,
+                             "file": str(path),
+                             "error": "archived consolidation is cut off at "
+                                      "the repealing act SFS %s" % cutoff})
                 continue
             text = snapshot_text(path)
         except SkipDocument as exc:
