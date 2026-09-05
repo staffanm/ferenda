@@ -129,6 +129,12 @@ def test_subject_names_the_act_then_the_proposition_as_far_as_it_fits():
     ev3 = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194",
                 changes=[lag, new], deletes=[("1996/627.txt", "1996:627", "2021:1")])
     assert subject(ev3, {"title": "Ny sak"}) == "Lag (2021:1) om ny sak m.fl. (Ny sak)"
+    # an event holding a förordning and a lag reads as the lag's
+    forordning = Change(path="2010/1.txt", src=None, basefile="2010:1",
+                        title="Förordning (2010:1) om foo", cutoff="2021:952")
+    ev3b = Event(key="SFS 2021:952", changes=[forordning, lag])
+    assert subject(ev3b, None) == \
+        "ändring i säkerhetsskyddslagen (2018:585) m.fl. (SFS 2021:952)"
     # without a proposition the amending act's own number takes the slot
     ev4 = Event(key="SFS 2021:952", changes=[lag])
     assert subject(ev4, None) == "ändring i säkerhetsskyddslagen (2018:585) (SFS 2021:952)"

@@ -715,8 +715,11 @@ def subject(event, prop_meta):
     `SUBJECT_MAX` columns (the full "Prop. ...: title" follows on the next
     line of the message), or the amending act's own SFS number when no
     proposition is known. A new act is the event's main act when it has one:
-    a proposition that enacts a law and amends others is about the new law."""
-    changes = sorted(event.changes, key=lambda c: (not c.add, c.path))
+    a proposition that enacts a law and amends others is about the new law;
+    otherwise a lag before a förordning (an event holding both is riksdagen's
+    commit, and should read as one)."""
+    changes = sorted(event.changes,
+                     key=lambda c: (not c.add, not is_lag(c.title), c.path))
     deletes = sorted(event.deletes)
     if changes:
         c = changes[0]
