@@ -27,12 +27,12 @@
 # THE SEPTEMBER CUTOVER
 # ---------------------
 # The two sites swap hostnames: lagen.nu becomes the rebuilt site, the legacy
-# site moves to old.lagen.nu, and every ferenda.lagen.nu URL answers 301 to the
+# site moves to old.lagen.nu, and every ferenda.lagen.nu URL answers 308 to the
 # same path on lagen.nu. The switch is a comment edit, in this order:
 #
 #   1. Point old.lagen.nu at this host in DNS, and wait for it to resolve.
-#   2. Add it to the certificate (the `certbot` service documents the command;
-#      add `-d old.lagen.nu` to the existing -d list and re-run it once).
+#   2. No certificate work: the legacy vhost uses the wildcard certificate
+#      (`*.lagen.nu`), which covers old.lagen.nu.
 #   3. In docker/nginx/default.conf, swap the two `server_name` lines marked
 #      CUTOVER: the legacy vhost answers to old.lagen.nu.
 #   4. In docker/nginx/ferenda.lagen.nu.conf, swap the two `server_name` lines
@@ -147,6 +147,15 @@ services:
         GIT_SHA: ${GIT_SHA:-unknown}
     container_name: ferenda
     profiles: [prod]
+    # Docker's default is 1024 open files. Every request in flight holds one
+    # (a render holds three), so on 2026-09-05 a queue of a minute's worth of
+    # facsimile requests hit it; the accept loop then fails with EMFILE and
+    # the app answers nothing until it is restarted. With headroom an
+    # overload is 504s that clear when the load does.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     environment:
       - OPENSEARCH_URL=http://opensearch:9200
       - WIKI_ROOT=/wiki
@@ -238,9 +247,8 @@ services:
   #     -d lagen.nu -d ferenda.lagen.nu \
   #     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
   #
-  # CUTOVER: add `-d old.lagen.nu` to that list and re-run it once, after
-  # old.lagen.nu resolves to this host. Certbot expands the existing
-  # certificate in place, so nginx's ssl_certificate paths do not change.
+  # old.lagen.nu is not on this certificate and need not be: the legacy
+  # vhost (docker/nginx/default.conf) uses the wildcard one below.
   #
   # One-time wildcard cert for the zones already delegated to Cloudflare
   # (lagen.nu is NOT among them yet -- add `-d lagen.nu -d '*.lagen.nu'` once

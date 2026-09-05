@@ -72,10 +72,11 @@ recreates the containers; the volumes and the bind-mounted data do not move.
 
 1. **DNS.** Point `old.lagen.nu` at this host. Wait until it resolves
    everywhere; the certificate step needs it.
-2. **Certificate.** Add the new name to the existing SAN certificate. Run the
-   `certonly` command in `docker-compose.yml`'s `certbot` service comment with
-   `-d old.lagen.nu` appended to the `-d` list. Certbot expands the certificate
-   in place, so nginx's `ssl_certificate` paths do not change.
+2. **Certificate.** Nothing to issue. The legacy vhost in
+   `docker/nginx/default.conf` uses the wildcard certificate
+   (`certificates/wildcard/`, `*.lagen.nu`), which covers `old.lagen.nu`.
+   The two-name certificate (`lagen.nu`, `ferenda.lagen.nu`) stays on the
+   rebuilt site's vhost and on the redirect block.
 3. **Check the redirect target.** Every `ferenda.lagen.nu` path must have a
    working `lagen.nu` twin. They are the same application, so this holds by
    construction, but spot-check `/api/v1/`, `/dumps/` and a document URL.
@@ -95,7 +96,7 @@ Six edits and a reload. Every line to change is marked `CUTOVER` in its file.
 2. `docker/nginx/ferenda.lagen.nu.conf` — the rebuilt site. Two `server_name`
    lines: `ferenda.lagen.nu` becomes `lagen.nu`.
 3. The same file, at its foot: uncomment the two-server redirect block. It
-   answers `ferenda.lagen.nu` with `301` to `lagen.nu`.
+   answers `ferenda.lagen.nu` with `308` to `lagen.nu`.
 4. The same file: delete the three `X-Robots-Tag "noindex, nofollow"` lines
    (server scope, `/dumps/`, the Matomo block). They kept the preview out of
    the index; left in place they take `lagen.nu` out of it within days.
@@ -116,6 +117,18 @@ Six edits and a reload. Every line to change is marked `CUTOVER` in its file.
 `nginx -t` first. A `server_name` typo makes nginx refuse the reload, which is
 the safe failure; a config that parses but points the wrong way is not.
 
+**Check that the container sees the file you edited.** The three conf files
+are bind-mounted one by one, and a single-file bind mount follows the inode,
+not the path. A `git checkout` or an editor that saves by rename gives the
+file a new inode, and from then on the container reads the old one: `nginx
+-t` and the reload both pass and nothing changes. Compare
+`ls -i docker/nginx/*.conf` on the host with `ls -i /etc/nginx/conf.d/*.conf`
+in the container. When they differ, `docker compose --profile prod up -d
+--force-recreate --no-deps nginx` re-binds them, with seconds of downtime.
+This is what happened on 2026-09-05: two of the three files had new inodes,
+so the redirect-and-410 block committed on 2026-09-02 had never been loaded,
+and its unquoted `{4}` regex stopped nginx from starting once it was.
+
 ## Rolling back
 
 Put the comment markers and the header lines back and reload again. The
@@ -126,7 +139,12 @@ there is nothing else to undo.
 
 Keep the `ferenda.lagen.nu` redirect indefinitely. The hostname was public for
 months, so search engines and other people's links point at it, and only the
-`301` moves them.
+`308` moves them. It is `308` and not `301` on purpose: a client that
+follows a `301` turns a `POST` into a `GET`, which breaks an MCP or API
+consumer still configured with `ferenda.lagen.nu`; `308` keeps the method and
+the body, and search engines treat it as permanent too. Verified on
+2026-09-05: an MCP `initialize` posted at `ferenda.lagen.nu/mcp` ended in a
+`400` under `301` and in a `200` under `308`.
 
 ## Afterwards
 
