@@ -227,7 +227,12 @@ lagen all serve      # serve generated/ + the REST API on one uvicorn process
 Every run counts its work in *steps* — one source's parse, one source's
 relate, the cross-document passes relate ends with, a generate. A run of two
 or more steps draws a whole-invocation progress bar (current step, steps
-remaining, ETA) above the per-document counter each step already shows:
+remaining, ETA) above the per-document counter each step already shows. The
+ETA predicts each step from the wall time it took in earlier runs (the run
+ledger, `site/data/.build/runs.ndjson`) and re-paces the rest of the plan on
+how fast this run's finished steps ran against those predictions; the step in
+flight counts toward it as it runs, up to its own prediction, so a long step
+that overruns holds the ETA rather than pushing it out:
 
 ```sh
 lagen all all        # 90 steps: download, parse, relate, index, dump, generate

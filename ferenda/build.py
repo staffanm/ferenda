@@ -880,7 +880,7 @@ def _prepare_targeted_generate(source, basefiles, jobs):
         # depend on the main artifact parse just wrote
         keys = _stage_keys(source, stage, basefiles)
         result = freshness.run_action(source, stage, keys, jobs, force=False)
-        corpus.report(source, stage, result, len(keys), full_source=False)
+        corpus.report(source, stage, result, keys, full_source=False)
         had_errors |= bool(result.errors)
         if source.stages[stage].list_basefiles:
             corpus.run_after(SOURCES, [source.name], stage)
@@ -973,7 +973,7 @@ def _dispatch(args, p, jobs):
     # more of them gets the same two-line overlay `lagen all rebuild` draws.
     # One step opens no bar -- invocation_bar decides that itself.
     plan = corpus.plan_verb_steps(SOURCES, names, args.action)
-    with util.invocation_bar(sum(s.secs for s in plan), len(plan),
+    with util.invocation_bar({s.label: s.secs for s in plan},
                              desc="lagen %s %s" % (args.source, args.action)):
         if args.action == "relate":
             corpus.cmd_relate(SOURCES, names)
@@ -1061,7 +1061,7 @@ def _dispatch(args, p, jobs):
                              if args.basefiles
                              else protocol.stage_basefiles(source, args.action))
                 result = freshness.run_action(source, args.action, basefiles, jobs)
-                corpus.report(source, args.action, result, len(basefiles),
+                corpus.report(source, args.action, result, basefiles,
                               full_source=not args.basefiles)
                 had_errors |= bool(result.errors)
                 if stage.list_basefiles:

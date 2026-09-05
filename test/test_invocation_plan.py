@@ -69,8 +69,9 @@ def test_fresh_source_plans_parse_as_skipped(wired):
     # too expensive to pay twice) -- it predicts a skip from the run ledger's
     # own record of what happened last time this (step, source) ran
     source = _source(wired)
+    runlog.emit_run_start(freshness.RUNS, "run1", ["lagen"], 1, t="2026-07-04T10:00:00Z")
     runlog.emit_segment(freshness.RUNS, "run1", "parse", "syn", 0.0,
-                        ran=0, status="skipped")
+                        ran=0, status="skipped", t="2026-07-04T10:00:01Z")
     plan = corpus.build_invocation_plan({"syn": source}, ["syn"], whole_corpus=False)
     step = _by(plan, "syn", "parse")
     assert step.skip is True and step.secs == 0.0
@@ -78,8 +79,9 @@ def test_fresh_source_plans_parse_as_skipped(wired):
 
 def test_a_run_that_actually_built_is_not_predicted_as_skipped(wired):
     source = _source(wired)
+    runlog.emit_run_start(freshness.RUNS, "run1", ["lagen"], 1, t="2026-07-04T10:00:00Z")
     runlog.emit_segment(freshness.RUNS, "run1", "parse", "syn", 12.0,
-                        total=2, ran=2, status="ok")
+                        total=2, ran=2, status="ok", t="2026-07-04T10:00:12Z")
     plan = corpus.build_invocation_plan({"syn": source}, ["syn"], whole_corpus=False)
     step = _by(plan, "syn", "parse")
     assert step.skip is False and step.secs == pytest.approx(12.0)
@@ -181,22 +183,35 @@ def test_generate_step_survives_a_source_with_no_artifacts(wired):
                and s.source == "syn"]
 
 
-def test_history_uses_the_ledger_s_raw_median_seconds(wired):
+def test_history_uses_the_ledger_s_median_wall_seconds(wired):
     # no document-count scaling: that would need a fresh list_basefiles()/
     # artifacts() call per source, which is exactly the cost this plan must
-    # not pay. The prediction is just "how long did this take last time"
+    # not pay. The prediction is just "how long did this take last time" --
+    # in wall-clock seconds off the stamps, not the segment's own `secs`,
+    # which a parallel stage reports as the sum over its workers (a 32-worker
+    # forarbete parse says 42,000 s for a 5,600 s wall)
     source = _source(wired)
-    runlog.emit_segment(freshness.RUNS, "run1", "generate", "syn", 4.0,
-                        total=2, ran=2, status="ok")
+    runlog.emit_run_start(freshness.RUNS, "run1", ["lagen"], 1, t="2026-07-04T10:00:00Z")
+    runlog.emit_segment(freshness.RUNS, "run1", "generate", "syn", 42000.0,
+                        total=2, ran=2, status="ok", t="2026-07-04T10:00:04Z")
     runlog.emit_segment(freshness.RUNS, "run1", "generate", "syn", 6.0,
-                        total=3, ran=3, status="ok")
+                        total=3, ran=3, status="ok", t="2026-07-04T10:00:10Z")
     plan = corpus.build_invocation_plan({"syn": source}, ["syn"], whole_corpus=False)
     step = _by(plan, "syn", "generate")
-    assert step.secs == pytest.approx(5.0)   # median of [4.0, 6.0]
+    assert step.secs == pytest.approx(5.0)   # median of the walls [4.0, 6.0]
+
+
+def test_history_without_a_wall_falls_back_to_the_default(wired):
+    # a segment whose run-start was pruned away has no base to count from
+    source = _source(wired)
+    runlog.emit_segment(freshness.RUNS, "run1", "generate", "syn", 4.0,
+                        total=2, ran=2, status="ok", t="2026-07-04T10:00:04Z")
+    plan = corpus.build_invocation_plan({"syn": source}, ["syn"], whole_corpus=False)
+    assert _by(plan, "syn", "generate").secs == corpus.PLANNER_DEFAULT_SECS
 
 
 def test_planning_never_calls_list_basefiles(wired):
-    # _history_secs' estimate is the run ledger's own raw seconds -- no
+    # _history_secs' estimate is the run ledger's own wall seconds -- no
     # document count needed at all, for any step, so no reason left to call
     # list_basefiles() during planning either
     source = _source(wired)

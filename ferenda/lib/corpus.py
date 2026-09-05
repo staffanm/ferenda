@@ -708,18 +708,20 @@ PLANNER_DEFAULT_SECS = 5.0   # a (verb, source) the ledger has never timed
 
 
 def _history_secs(history, verb, source):
-    """A step's predicted duration: the run ledger's own median *raw* seconds
-    for this exact (verb, source) key (`runlog.duration_history`'s `secs`
-    list, not its rate-scaled `median`/`vals` -- those need a fresh document
-    count to turn back into seconds, and getting one cheaply is exactly what
-    this plan cannot do; see the module docstring), or `PLANNER_DEFAULT_SECS`
-    for a step that has never run. An estimate for the outer bar's *initial*
-    total, not a promise -- `InvocationBar.finish` advances it by each step's
-    real elapsed time regardless, so the total self-corrects as the run plays
-    out, and a corpus that has grown since the last measurement just means
-    this step's slice of the bar reads a little low until it finishes."""
+    """A step's predicted duration: the run ledger's own median *wall* seconds
+    for this exact (verb, source) key (`runlog.duration_history`'s `wall`
+    list -- not `secs`, which a parallel stage reports as the sum of its
+    workers' seconds, 32x the wall on a 32-worker box; and not its
+    rate-scaled `median`/`vals`, which need a fresh document count to turn
+    back into seconds, and getting one cheaply is exactly what this plan
+    cannot do; see the module docstring), or `PLANNER_DEFAULT_SECS` for a
+    step that has never run. An estimate for the outer bar's ETA, not a
+    promise -- `InvocationBar` re-paces it on how fast the finished steps ran
+    against their predictions, so a corpus that has grown since the last
+    measurement just makes the ETA read a little low until a step finishes."""
     entry = history.get((verb, source))
-    return statistics.median(entry["secs"]) if entry else PLANNER_DEFAULT_SECS
+    return (statistics.median(entry["wall"]) if entry and entry["wall"]
+            else PLANNER_DEFAULT_SECS)
 
 
 def build_invocation_plan(sources, names, *, whole_corpus, download=False):
@@ -752,7 +754,7 @@ def build_invocation_plan(sources, names, *, whole_corpus, download=False):
       `expected_secs`-style rate scaling would need for index/dump/generate)
       walks the parsed-artifact tree on disk. Also not called: relate/index/
       dump/generate are planned as "will run" unconditionally, timed from
-      `_history_secs`'s *raw* ledger seconds, which needs no document count
+      `_history_secs`'s ledger wall seconds, which needs no document count
       at all -- see its own docstring.
 
     Download's own steps are planned when the run has one (`lagen all all`):
@@ -895,7 +897,7 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
     plan = build_invocation_plan(sources, names, whole_corpus=whole_corpus,
                                  download=download)
     plan_by = {(s.source, s.verb): s for s in plan}
-    with util.invocation_bar(sum(s.secs for s in plan), len(plan),
+    with util.invocation_bar({s.label: s.secs for s in plan},
                              desc="lagen all %s" % ("rebuild" if not download
                                                     else "all")):
         if download:

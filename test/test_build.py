@@ -1741,7 +1741,7 @@ def test_worker_init_resets_the_inherited_invocation_bar_state(monkeypatch):
     # invocation_bar only opens the real bar on a tty, and only for a run of
     # two or more steps; give it both.
     monkeypatch.setattr(util, "_stderr_is_a_tty", lambda: True)
-    with util.invocation_bar(10.0, 2) as ib:
+    with util.invocation_bar({"syn parse": 5.0, "syn relate": 5.0}) as ib:
         ib.start("syn parse")
         util.status(1, 5, "item")
         assert util._outer is not None            # what a fork would inherit
