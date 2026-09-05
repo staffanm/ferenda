@@ -27,6 +27,7 @@ import html
 import re
 
 from ..lib import compress, util
+from ..lib.errors import SkipDocument
 from . import parse_sfs, parse_sfs_source
 from . import register as register_mod
 from .extract import sniff_encoding
@@ -62,9 +63,19 @@ def konsolidering_uri(basefile, version):
 def archival_header(path):
     """Header key→value pairs from a latin-1 SFST archival page. The header
     is plain text above the <hr> inside the <pre>: "key:<b> value</b>" lines,
-    keys sometimes wrapped over two lines ("Departement/\\nmyndighet:")."""
+    keys sometimes wrapped over two lines ("Departement/\\nmyndighet:").
+
+    A page with no <pre> is not a consolidation: the old downloader saved
+    what SFST answered, which could be its FELMEDDELANDE error page or a
+    search-results listing (the base versions of 1810:0403 and 1928:370,
+    until those were removed on 2026-09-05; the two test fixtures are copies).
+    The same `SkipDocument` the body parser raises for it
+    (`extract.extract_body`), so the versions stage books it as a skip, not an
+    error, and the history export records it as a gap."""
     text = compress.read_bytes(path).decode("latin-1")
-    start = text.index("<pre>")
+    start = text.find("<pre>")
+    if start < 0:
+        raise SkipDocument("archival page without <pre>")
     end = text.index("<hr>", start)
     block = html.unescape(re.sub(r"<[^>]+>", "", text[start:end]))
     header = {}

@@ -599,7 +599,7 @@ def cmd_download_all(sources, names, jobs):
             else:
                 basefiles = source.list_basefiles()
                 result = freshness.run_action(source, "download", basefiles, jobs)
-                report(source, "download", result, len(basefiles), full_source=True)
+                report(source, "download", result, basefiles, full_source=True)
                 had_errors |= bool(result.errors)
             run_after(sources, [name], "download")
     return had_errors
@@ -632,7 +632,7 @@ def _run_stage_gated(source, step, jobs, store):
         return False, False
     basefiles = protocol.stage_basefiles(source, step)
     result = freshness.run_action(source, step, basefiles, jobs)
-    report(source, step, result, len(basefiles), full_source=True)
+    report(source, step, result, basefiles, full_source=True)
     _after_hooks(source, step)
     # only fingerprint a clean sweep: a failed doc leaves the source un-marked so
     # the next run retries it (and re-surfaces the error) rather than skipping.
@@ -680,7 +680,7 @@ def run_phase(sources, names, verb, jobs):
                 continue
             basefiles = protocol.stage_basefiles(source, stage_name)
             result = freshness.run_action(source, stage_name, basefiles, jobs)
-            report(source, stage_name, result, len(basefiles), full_source=True)
+            report(source, stage_name, result, basefiles, full_source=True)
             had_errors |= bool(result.errors)
     return had_errors
 
@@ -1421,12 +1421,15 @@ def cmd_ann_status():
              counts["stale"]))
 
 
-def report(source, action, result, requested, full_source):
+def report(source, action, result, basefiles, full_source):
     """Print one action's outcome and fold it into the run instrumentation:
     emit the (action, source) segment, apply the per-doc outcomes to errors.json
     and -- only when the run covered the whole source (`full_source`, no explicit
-    basefile args) -- write the cheap status.json cell. All emissions are no-ops
+    basefile args) -- write the cheap status.json cell. `basefiles` is what the
+    run dispatched over (a fan-out stage's "<basefile>@<version>" keys), the
+    set the error ledger is reconciled against. All emissions are no-ops
     without a run id (--dry-run, non-pipeline verbs)."""
+    requested = len(basefiles)
     verb = "would run" if protocol.RUN.dry_run else "ran"
     # planned already contains every errored basefile (ensure() plans before it
     # runs), so subtract the *union* -- subtracting both sets double-counted
@@ -1448,12 +1451,24 @@ def report(source, action, result, requested, full_source):
     # clear stale errors for docs (re)built this run AND for docs skipped as
     # fresh -- both mean the doc now has a valid artifact and is not failing
     freshness._apply_outcomes(source.name, result.errors, result.done + result.fresh)
-    # a full-source run proves the current basefile set is complete, so error
-    # entries for basefiles it no longer lists are orphans (a doc left the corpus,
+    # a full-source run proves the current key set is complete, so error
+    # entries for keys it no longer lists are orphans (a doc left the corpus,
     # or an enumerator bug once emitted it) -- drop them, since they are never
-    # re-run and fresh-skip healing can't reach them
+    # re-run and fresh-skip healing can't reach them. The keys the run
+    # dispatched over, for this stage and the stages it depends on: a parse
+    # run brings each key's download up to date first (`freshness.ensure`)
+    # and records that failure under the download stage with the same key,
+    # so the parse run is the one that proves it gone. Never the whole
+    # source: a fan-out stage (sfs/eurlex versions) records its failures
+    # under "<basefile>@<version>", which the source's own basefile list
+    # never holds -- reconciling against that list dropped every versions
+    # failure the moment it was written, and the ledger named no document
+    # for the two 2026-09-05 failures.
     if full_source:
-        freshness._reconcile_orphans(source.name, source.list_basefiles())
+        stage = action
+        while stage:
+            freshness._reconcile_orphans(source.name, stage, basefiles)
+            stage = source.stages[stage].depends if stage in source.stages else None
     if freshness.RUN_ID is not None:
         # scope the failing count to THIS source -- a `lagen dv parse` must not
         # report another source's errors (the store holds every source's)

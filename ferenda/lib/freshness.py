@@ -396,10 +396,10 @@ def _apply_outcomes(source, errors, done):
     runlog.apply_outcomes(ERRORS, source, errors, done, RUN_ID)
 
 
-def _reconcile_orphans(source, valid):
+def _reconcile_orphans(source, stage, valid):
     if RUN_ID is None:
         return
-    runlog.reconcile_orphans(ERRORS, source, set(valid))
+    runlog.reconcile_orphans(ERRORS, source, stage, set(valid))
 
 
 def _update_status_cell(source, stage, cell):

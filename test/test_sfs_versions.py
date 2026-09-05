@@ -123,6 +123,18 @@ def test_archival_header():
     assert versions.header_cutoff(header) == "2003:466"
 
 
+def test_a_junk_archive_page_is_a_skip_not_an_error():
+    # the old downloader saved whatever SFST answered: 1810:0403's own base
+    # version is SFST's FELMEDDELANDE page, 1928:370's a search-results
+    # listing. Neither holds a <pre>; the body parser already skips such a
+    # page, and the header reader that runs before it must not crash instead
+    for name in ("sfst-felmeddelande.html", "sfst-search-results.html"):
+        with pytest.raises(SkipDocument, match="archival page without <pre>"):
+            versions.archival_header(FILES / name)
+        with pytest.raises(SkipDocument):
+            versions.parse_version("1810:0403", "1810:0403", FILES / name)
+
+
 def test_archival_header_wrapped_key_and_value():
     # the Rubrik wraps over several lines (continuations fold into the value)
     # and "Departement/myndighet" wraps its *key* -- the colon line wins

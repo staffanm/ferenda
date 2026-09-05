@@ -210,7 +210,7 @@ def test_fresh_skip_heals_stale_error(tmp_path, monkeypatch):
 
     res2 = build_one(src, "parse", "a", manifest)
     assert res2.planned == [] and ("parse", "a") in res2.fresh   # skipped as fresh
-    corpus.report(src, "parse", res2, 1, True)                   # folds fresh -> clear
+    corpus.report(src, "parse", res2, ["a"], True)               # folds fresh -> clear
     assert "syn/parse/a" not in runlog.read_errors(freshness.ERRORS)
 
 
@@ -326,14 +326,59 @@ def test_orphan_errors_reconciled_only_on_full_source(tmp_path, monkeypatch):
                           [("parse", "z", "KeyError", "tb")], [], "r1")
 
     # targeted run (full_source=False): reconcile must NOT fire
-    corpus.report(src, "parse", freshness.Result(), 1, False)
+    corpus.report(src, "parse", freshness.Result(), ["a"], False)
     assert "syn/parse/gone/x" in runlog.read_errors(freshness.ERRORS)
 
     # full-source run: the orphan is dropped, other sources untouched
-    corpus.report(src, "parse", freshness.Result(), 2, True)
+    corpus.report(src, "parse", freshness.Result(), ["a", "b"], True)
     errs = runlog.read_errors(freshness.ERRORS)
     assert "syn/parse/gone/x" not in errs
     assert "other/parse/z" in errs                       # never touches another source
+
+
+def test_reconcile_keeps_a_fan_out_stage_s_failures(tmp_path, monkeypatch):
+    """A versions stage records its failures under "<basefile>@<version>", a
+    key the source's basefile list never holds. Reconciling against that list
+    dropped every such failure the moment it was written; the reconcile must
+    use the stage's own keys."""
+    _, src = make_source(tmp_path)
+    src.stages["versions"] = Stage("versions", lambda bf: None,
+                                   lambda bf: tmp_path / "out" / ("%s.v" % bf),
+                                   list_basefiles=lambda: ["a@1", "b@1"])
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(freshness, "RUN_ID", "r1")
+    runlog.apply_outcomes(freshness.ERRORS, "syn",
+                          [("versions", "a@1", "ValueError", "tb"),
+                           ("versions", "gone@1", "ValueError", "tb"),
+                           ("parse", "a", "ValueError", "tb")], [], "r1")
+    corpus.report(src, "versions", freshness.Result(), ["a@1", "b@1"], True)
+    errs = runlog.read_errors(freshness.ERRORS)
+    assert "syn/versions/a@1" in errs          # a dispatched key: kept
+    assert "syn/versions/gone@1" not in errs   # not dispatched any more: an orphan
+    assert "syn/parse/a" in errs               # another stage's failure: not this run's to judge
+    # and the mirror: a full parse run leaves the versions failures alone
+    corpus.report(src, "parse", freshness.Result(), ["a", "b"], True)
+    assert "syn/versions/a@1" in runlog.read_errors(freshness.ERRORS)
+
+
+def test_reconcile_reaches_the_stages_a_run_depends_on(tmp_path, monkeypatch):
+    """A full parse run brings each basefile's download up to date first and
+    records that failure under the download stage, same key -- so the parse
+    run is what proves a departed document's download entry an orphan too."""
+    _, src = make_source(tmp_path)                       # parse depends on download
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(freshness, "RUN_ID", "r1")
+    runlog.apply_outcomes(freshness.ERRORS, "syn",
+                          [("download", "a", "OSError", "tb"),
+                           ("download", "gone", "OSError", "tb")], [], "r1")
+    corpus.report(src, "parse", freshness.Result(), ["a", "b"], True)
+    errs = runlog.read_errors(freshness.ERRORS)
+    assert "syn/download/a" in errs
+    assert "syn/download/gone" not in errs
 
 
 def test_report_failing_count_is_source_scoped(tmp_path, monkeypatch, capsys):
@@ -349,7 +394,7 @@ def test_report_failing_count_is_source_scoped(tmp_path, monkeypatch, capsys):
     runlog.apply_outcomes(freshness.ERRORS, "other",     # a different source, 3 errors
                           [("parse", x, "E", "tb") for x in ("x", "y", "z")], [], "r0")
 
-    corpus.report(src, "parse", freshness.Result(), 1, False)   # targeted: no reconcile
+    corpus.report(src, "parse", freshness.Result(), ["a"], False)   # targeted: no reconcile
     out = capsys.readouterr().out
     assert "1 docs failing in syn" in out                  # only syn's error counted
     assert "overall" not in out                            # no misleading global count
