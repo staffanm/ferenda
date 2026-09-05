@@ -3,6 +3,7 @@
 temp files -- no real corpus, no JVM, fast."""
 
 
+import contextlib
 import dataclasses
 import json
 import os
@@ -708,6 +709,32 @@ def test_stage_fingerprint_throttles_progress_reporting(tmp_path, monkeypatch):
     assert calls[-1] == 500           # the final one always reports, whatever the timing
 
 
+def test_file_fingerprint_reports_a_labelled_staleness_scan(tmp_path, monkeypatch):
+    # relate and dump open with a size+mtime pass over every artifact of the
+    # source -- tens of seconds on the big ones, and silent until now, so
+    # `lagen sfs relate` printed nothing at all while it ran
+    paths = []
+    for name in ("a", "b"):
+        art = tmp_path / ("%s.json" % name)
+        art.write_text("{}")
+        paths.append(art)
+    calls = []
+    monkeypatch.setattr(freshness.util, "status",
+                        lambda done, total, msg, **kw: calls.append((done, total, msg)))
+    freshness.file_fingerprint(paths, label="syn relate")
+    assert calls == [(1, 2, "syn relate  checking staleness"),
+                     (2, 2, "syn relate  checking staleness")]
+
+
+def test_file_fingerprint_stays_silent_without_a_label(tmp_path):
+    # the label only adds the "checking staleness" line; the digest is the
+    # same with or without it
+    art = tmp_path / "a.json"
+    art.write_text("{}")
+    labelled = freshness.file_fingerprint([art], label="syn relate")
+    assert freshness.file_fingerprint([art]) == labelled   # same digest either way
+
+
 def test_up_to_date_combines_fingerprint_code_and_force(tmp_path):
     vfile = tmp_path / "code.py"; vfile.write_text("v1")
     code = (vfile,)
@@ -1254,6 +1281,25 @@ def test_cmd_relate_index_dump_skip_non_artifact_sources(monkeypatch, tmp_path):
     corpus.cmd_dump(build.SOURCES, ["non_artifact_src"])
 
 
+def test_cmd_dump_announces_one_step_per_source(monkeypatch, tmp_path):
+    # the outer bar counts steps the verb's own loop enters, so cmd_dump has to
+    # announce them itself -- the CLI only opens the bar around it
+    monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "fingerprints.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(corpus, "DUMPS", tmp_path / "dumps")
+    sources = {}
+    for name in ("one", "two"):
+        art = tmp_path / ("%s.json" % name)
+        art.write_text('{"uri": "x"}')
+        sources[name] = Source(name, lambda: [], {},
+                               artifacts=lambda art=art: [art])
+    labels = []
+    monkeypatch.setattr(corpus.util, "step",
+                        lambda label: labels.append(label) or contextlib.nullcontext())
+    corpus.cmd_dump(sources, ["one", "two"])
+    assert labels == ["one dump", "two dump"]
+
+
 def test_rebuild_after_commit_drives_the_right_stages(monkeypatch):
     # the inline editor's post-commit rebuild (build.rebuild_after_commit) runs
     # synchronously inside the commit request, so its argument-shaping glue --
@@ -1692,9 +1738,10 @@ def test_worker_init_resets_the_inherited_invocation_bar_state(monkeypatch):
     # on Linux (this codebase's fork start method), a worker started mid-run
     # is a COW copy of the parent -- it inherits util's bar-state globals
     # verbatim unless _worker_init resets them (util.reset_worker_state).
-    # invocation_bar only opens the real bar on a tty; pretend it is one.
+    # invocation_bar only opens the real bar on a tty, and only for a run of
+    # two or more steps; give it both.
     monkeypatch.setattr(util, "_stderr_is_a_tty", lambda: True)
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("syn parse")
         util.status(1, 5, "item")
         assert util._outer is not None            # what a fork would inherit

@@ -253,7 +253,7 @@ def _no_leaked_bar():
 
 
 def test_status_renders_nested_while_an_invocation_bar_is_open():
-    with util.invocation_bar(10.0, 1, desc="lagen all rebuild") as ib:
+    with util.invocation_bar(10.0, 2, desc="lagen all rebuild") as ib:
         assert util._outer is ib
         ib.start("syn parse")
         util.status(1, 5, "item 1")
@@ -272,7 +272,7 @@ def test_invocation_bar_start_primes_the_nested_bar_before_any_status_call():
     # would otherwise sit blank -- reading as hung, not merely quiet.
     # start() must show something immediately, before the caller ever
     # calls status() for this step.
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("forarbete parse")
         assert util._inner is not None
         assert util._inner.n == 0
@@ -284,7 +284,7 @@ def test_priming_does_not_stick_the_total_once_real_progress_arrives():
     # the step's real first status() call reuses that same bar (same
     # step_no) rather than rebuilding it, so the total must still take
     # effect there, not stay stuck at the priming value forever
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("forarbete parse")
         primed = util._inner
         util.status(1, 25018, "item 1")
@@ -294,7 +294,7 @@ def test_priming_does_not_stick_the_total_once_real_progress_arrives():
 
 
 def test_status_nested_paces_on_work_like_the_plain_line_does():
-    with util.invocation_bar(10.0, 1) as _ib:
+    with util.invocation_bar(10.0, 2) as _ib:
         util.status(1, 5, "item 1", work=(2.0, 8.0))
         assert util._inner.total == 8.0          # the work total, not the item total
         assert util._inner.n == 2.0
@@ -391,7 +391,7 @@ def test_invocation_bar_shows_the_step_count_not_predicted_seconds():
 
 
 def test_both_bars_columns_line_up():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("eurlex parse")
         util.status(12, 8326, "eurlex parse  ran 12  err 0  62022TJ0082")
         inner, outer = str(util._inner), str(ib.bar)
@@ -404,7 +404,7 @@ def test_outer_bar_measures_ncols_the_same_way_as_the_inner_bar():
     # bar-open time, and never again, so the two bars' lines could end up
     # different widths (right edges out of line with each other) on an
     # unresized terminal, wherever that one-time measurement landed
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         assert ib.bar.dynamic_ncols
         assert util._inner is None or util._inner.dynamic_ncols
         ib.start("eurlex parse")
@@ -417,7 +417,7 @@ def test_status_refreshes_the_outer_bar_between_steps():
     # not per stage) -- it must piggyback a refresh so the outer bar's
     # elapsed time visibly progresses instead of sitting frozen until the
     # next step starts, which reads as stuck rather than "elapsed"
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("eurlex parse")
         calls = []
         ib.bar.refresh = lambda *a, **kw: calls.append(1)
@@ -426,7 +426,7 @@ def test_status_refreshes_the_outer_bar_between_steps():
 
 
 def test_status_falls_back_to_the_plain_line_once_the_bar_closes():
-    with util.invocation_bar(1.0, 1):
+    with util.invocation_bar(1.0, 2):
         pass
     buf = io.StringIO()
     util.status(1, 10, "back to normal", stream=buf)
@@ -439,7 +439,7 @@ def test_status_falls_back_to_the_plain_line_once_the_bar_closes():
 # --------------------------------------------------------------------------
 
 def test_invocation_bar_redirects_print_through_tqdm_write(capsys):
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         assert sys.stdout is not sys.__stdout__     # redirected for the duration
         ib.start("sfs parse")
         print("parse sfs: up to date -- skipped")
@@ -450,7 +450,7 @@ def test_invocation_bar_redirects_print_through_tqdm_write(capsys):
 
 def test_streams_are_restored_after_the_bar_closes(capsys):
     before_out, before_err = sys.stdout, sys.stderr
-    with util.invocation_bar(1.0, 1):
+    with util.invocation_bar(1.0, 2):
         pass
     assert sys.stdout is before_out and sys.stderr is before_err
 
@@ -458,13 +458,13 @@ def test_streams_are_restored_after_the_bar_closes(capsys):
 def test_streams_are_restored_even_if_the_body_raises():
     before_out, before_err = sys.stdout, sys.stderr
     with pytest.raises(RuntimeError):
-        with util.invocation_bar(1.0, 1):
+        with util.invocation_bar(1.0, 2):
             raise RuntimeError("boom")
     assert sys.stdout is before_out and sys.stderr is before_err
 
 
 def test_a_bare_newline_print_does_not_open_a_blank_line(capsys):
-    with util.invocation_bar(1.0, 1):
+    with util.invocation_bar(1.0, 2):
         print()                        # print()'s own trailing "\n" content
     assert capsys.readouterr().out == ""
 
@@ -512,7 +512,7 @@ def test_invocation_bar_falls_back_to_a_no_op_off_a_tty(monkeypatch):
 
 
 def test_cost_paced_bar_shows_the_real_document_count_not_the_work_totals():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.status(362, 5000, "forarbete parse  ran 362  err 0  prop/1915-133",
                    work=(172927.0, 178333.0))
         rendered = str(util._inner)
@@ -520,7 +520,7 @@ def test_cost_paced_bar_shows_the_real_document_count_not_the_work_totals():
     assert "172927" not in rendered and "178333" not in rendered
 
 def test_nested_bar_leads_with_plain_elapsed_time():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.status(1, 5, "item", work=(1.0, 2.0))
         rendered = str(util._inner)
     assert rendered.startswith("00:00: ")
@@ -528,7 +528,7 @@ def test_nested_bar_leads_with_plain_elapsed_time():
 
 
 def test_nested_bar_eta_is_a_labelled_field_with_no_percentage():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.status(362, 5000, "forarbete parse  ran 362  err 0  prop/1915-133",
                    work=(172927.0, 178333.0))
         rendered = str(util._inner)
@@ -537,7 +537,7 @@ def test_nested_bar_eta_is_a_labelled_field_with_no_percentage():
 
 
 def test_cost_paced_bar_never_shows_the_raw_work_totals():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.status(362, 5000, "forarbete parse  ran 362  err 0  prop/1915-133",
                    work=(172927.0, 178333.0))
         rendered = str(util._inner)
@@ -546,7 +546,7 @@ def test_cost_paced_bar_never_shows_the_raw_work_totals():
 
 
 def test_item_count_bar_still_shows_a_real_n_of_total():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.status(5, 10, "some item")
         rendered = str(util._inner)
     assert "5/10" in rendered
@@ -556,7 +556,7 @@ def test_nested_bar_formats_cost_totals_with_fixed_precision():
     # even though n/total are no longer printed, the bar fill and ETA are
     # still computed from them -- so a raw, unbounded-precision float must
     # never reach the rendered line through any other field either
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.status(1, 5, "forarbete parse  ran 923  err 0  prop/1960-126",
                    work=(166212.635, 178363.911))
         rendered = str(util._inner)
@@ -564,7 +564,7 @@ def test_nested_bar_formats_cost_totals_with_fixed_precision():
 
 
 def test_nested_bar_never_shows_the_rate_as_seconds_per_second():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.status(1, 5, "item", work=(1.0, 2.0))
         rendered = str(util._inner)
     assert "s/s" not in rendered
@@ -575,14 +575,14 @@ def test_current_stage_bar_renders_above_the_invocation_bar():
     # tqdm's own convention: position 0 is the anchor row (topmost among
     # bars opened together), each higher `position=` one row further down --
     # stored internally negated, so a *higher* .pos is the row further up
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("forarbete parse")
         util.status(1, 5, "item")
         assert util._inner.pos > ib.bar.pos
 
 
 def test_nested_bar_drops_the_outer_bar_s_own_label_prefix():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("forarbete parse")
         util.status(923, 5000, "forarbete parse  ran 923  err 0  prop/1960-126")
         rendered = str(util._inner)
@@ -591,7 +591,7 @@ def test_nested_bar_drops_the_outer_bar_s_own_label_prefix():
 
 
 def test_nested_bar_description_has_a_consistent_width():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("forarbete parse")
         util.status(1, 5, "forarbete parse  ran 923  err 0  prop/1960-126")
         short = util._inner.desc
@@ -644,7 +644,7 @@ def test_narrow_terminal_line_still_fits_without_tqdm_s_raw_truncation(monkeypat
         monkeypatch.setattr(shutil, "get_terminal_size",
                             lambda *a, _n=ncols: os.terminal_size((_n, 24)))
         w = util._desc_width(None)
-        with util.invocation_bar(10.0, 1):
+        with util.invocation_bar(10.0, 2):
             util.status(6167, 11247, "eurlex parse  ran 6167  err 0  32023R1542",
                        work=(2000.0, 30000.0))
             util._inner.set_description_str(
@@ -679,7 +679,7 @@ def test_outer_bar_also_fits_at_a_phone_tmux_pane_width(monkeypatch):
 @pytest.mark.skipif(not hasattr(signal, "SIGWINCH"), reason="Unix only")
 def test_invocation_bar_installs_and_restores_a_sigwinch_handler():
     prior = signal.getsignal(signal.SIGWINCH)
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         assert signal.getsignal(signal.SIGWINCH) is not prior
     assert signal.getsignal(signal.SIGWINCH) is prior
 
@@ -691,7 +691,7 @@ def test_sigwinch_handler_only_sets_a_flag_never_writes():
     # would write to next, and reentering a buffered writer from inside
     # itself is a hard RuntimeError -- verified by actually reproducing that
     # arrival-during-a-write below, not just asserting the design intent
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         assert util._resize_pending is False
@@ -701,7 +701,7 @@ def test_sigwinch_handler_only_sets_a_flag_never_writes():
 
 @pytest.mark.skipif(not hasattr(signal, "SIGWINCH"), reason="Unix only")
 def test_pending_resize_clears_and_refreshes_both_bars_on_the_next_status_call():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         os.kill(os.getpid(), signal.SIGWINCH)
@@ -732,7 +732,7 @@ def test_sigwinch_arriving_mid_write_does_not_crash():
         def fileno(self):
             return self._real.fileno()
 
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("eurlex parse")
         ib.bar.fp = _SignalOnFirstWrite(ib.bar.fp)
         util.status(1, 5, "item", work=(1.0, 2.0))
@@ -748,7 +748,7 @@ def test_resize_recovery_does_not_desync_the_two_bars_cursor_positions():
     # later refresh kept opening a new line forever instead of overwriting.
     # tqdm's own `external_write_mode` is the coordinated version; this pins
     # that each bar's own relative position (`.pos`) is unchanged by it.
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         before = (util._inner.pos, ib.bar.pos)
@@ -768,7 +768,7 @@ def test_resize_recovery_does_not_desync_the_two_bars_cursor_positions():
 # --------------------------------------------------------------------------
 
 def test_reset_worker_state_clears_the_inherited_bar_globals():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(10.0, 2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         assert util._outer is not None and util._inner is not None  # inherited by a fork
@@ -785,8 +785,62 @@ def test_reset_worker_state_makes_write_use_its_plain_fallback():
     # *parent's* bar objects, racing the parent's own concurrent writes to
     # the same fd. After the reset, write() takes its ordinary
     # print-and-break path instead.
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(10.0, 2):
         util.reset_worker_state()
         buf = io.StringIO()
         util.write("worker warning", stream=buf)
         assert buf.getvalue() == "\nworker warning\n"
+
+
+# --------------------------------------------------------------------------
+# how many steps the run has decides which shape it gets: two or more draw the
+# outer bar, one keeps the plain single line
+# --------------------------------------------------------------------------
+
+def test_a_single_step_run_keeps_the_plain_line():
+    # `lagen all generate` / `lagen sfs relate` run one step; an outer bar
+    # reading "1/1" for the whole run only repeats what the step's own
+    # counter already says
+    buf = io.StringIO()
+    with util.invocation_bar(10.0, 1) as ib:
+        assert util._outer is None
+        ib.start("generate")
+        util.status(1, 10, "generate", stream=buf)
+    assert buf.getvalue().startswith("\r(1/10) generate")
+
+
+def test_two_steps_open_the_outer_bar():
+    with util.invocation_bar(10.0, 2) as ib:
+        assert util._outer is ib
+
+
+def test_step_announces_and_closes_one_step_of_the_run():
+    with util.invocation_bar(10.0, 2) as ib:
+        with util.step("sfs relate"):
+            assert ib.step_no == 1
+            assert ib.current_label == "sfs relate"
+        assert ib.secs_done >= 0.0
+        with util.step("dv relate"):
+            assert ib.step_no == 2
+
+
+def test_step_is_a_no_op_without_a_bar():
+    # the same call sites serve `lagen all relate` (a bar) and `lagen sfs
+    # relate` (none), so step() has to do nothing at all when none is open
+    assert util._outer is None
+    with util.step("sfs relate"):
+        pass
+    assert util._outer is None
+
+
+def test_the_outer_total_follows_the_real_step_count():
+    # the plan predicts the step sequence the way it predicts its seconds; a
+    # step the planner read differently is still a step that ran, and the bar
+    # must not render "3/2"
+    with util.invocation_bar(10.0, 2) as ib:
+        for label in ("a", "b", "c"):
+            with util.step(label):
+                pass
+        assert ib.step_no == 3
+        assert ib.total_steps == 3
+        assert ib.bar.total == 3

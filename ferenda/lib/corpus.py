@@ -142,7 +142,8 @@ def _corr_watermark(sources):
     edits."""
     return freshness.file_fingerprint(
         _layers(sources) + list(CORR_CODE)
-        + [p for s in sources.values() for p in s.cross_code])
+        + [p for s in sources.values() for p in s.cross_code],
+        label="relate cross-passes")
 
 
 # how many dangling anchors relate names individually before the count stands
@@ -210,34 +211,39 @@ def cmd_relate(sources, names, force=None):
         source = sources[name]
         if source.artifacts is None:
             continue
-        paths = source.artifacts()
-        wm = freshness.file_fingerprint(paths)
-        if not catalog_missing and freshness.up_to_date(store, "relate", name, wm,
-                                              RELATE_CODE):
-            print("relate %s: up to date (%d artifacts unchanged) -- skipped"
-                  % (name, len(paths)))
-            freshness._emit_segment("relate", name, 0.0, total=len(paths), ran=0,
-                          skipped_fresh=len(paths), status="skipped")
-            continue
+        with util.step("%s relate" % name):
+            # the artifact walk and its size+mtime pass are the whole gate, and
+            # on a 200k-artifact source they are the first tens of seconds of
+            # the step -- announced, not silent (see `util.checking`)
+            util.checking("%s relate" % name)
+            paths = source.artifacts()
+            wm = freshness.file_fingerprint(paths, label="%s relate" % name)
+            if not catalog_missing and freshness.up_to_date(store, "relate", name, wm,
+                                                  RELATE_CODE):
+                print("relate %s: up to date (%d artifacts unchanged) -- skipped"
+                      % (name, len(paths)))
+                freshness._emit_segment("relate", name, 0.0, total=len(paths), ran=0,
+                              skipped_fresh=len(paths), status="skipped")
+                continue
 
-        def progress(seen, total, changed, current, name=name):
-            util.status(seen, total, "relate %s  %d changed  %s"
-                        % (name, changed, current), actual=changed)
+            def progress(seen, total, changed, current, name=name):
+                util.status(seen, total, "relate %s  %d changed  %s"
+                            % (name, changed, current), actual=changed)
 
-        recode = freshness.code_changed(store, "relate", name, RELATE_CODE)
-        if recode and not force:
-            print("relate %s: extraction code changed -- re-extracting all" % name)
-        t0 = time.perf_counter()
-        docs, edges, changed = catalog.rebuild(
-            target, name, paths, progress=progress, force=force or recode,
-            data_root=DATA, exclusive=full_rebuild)
-        freshness._emit_segment("relate", name, time.perf_counter() - t0, total=docs,
-                      ran=changed, status="ok")
-        freshness.record_step(store, "relate", name, wm, RELATE_CODE)
-        dirty = True
-        sys.stderr.write("\n")
-        print("relate %s: %d documents, %d links (%d re-extracted this run)"
-              % (name, docs, edges, changed))
+            recode = freshness.code_changed(store, "relate", name, RELATE_CODE)
+            if recode and not force:
+                print("relate %s: extraction code changed -- re-extracting all" % name)
+            t0 = time.perf_counter()
+            docs, edges, changed = catalog.rebuild(
+                target, name, paths, progress=progress, force=force or recode,
+                data_root=DATA, exclusive=full_rebuild)
+            freshness._emit_segment("relate", name, time.perf_counter() - t0, total=docs,
+                          ran=changed, status="ok")
+            freshness.record_step(store, "relate", name, wm, RELATE_CODE)
+            dirty = True
+            sys.stderr.write("\n")
+            print("relate %s: %d documents, %d links (%d re-extracted this run)"
+                  % (name, docs, edges, changed))
 
     # cross-document post-passes (need the whole catalog, so they run last):
     # each source's own `relate_cross` contribution, then the corpus-wide ones
@@ -247,91 +253,94 @@ def cmd_relate(sources, names, force=None):
     # re-related above) and the authored layers (the .corr and .ann files a
     # source reads), so a no-op run skips them too -- gated on a fingerprint
     # over all of them.
-    corr_wm = _corr_watermark(sources)
-    if dirty or force or not freshness.fingerprint_fresh(store, "relate", "__corr__",
-                                               corr_wm):
-        t0 = time.perf_counter()
-        con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
-        # each source's own contribution first (pinning a genomför-direktiv
-        # statement to the paragraf it transposes, loading the .corr layers,
-        # auditing a commentary's anchors): they read and write their own rows
-        # and are independent of each other and of the corpus-wide passes below
-        counts, warnings = {}, []
-        for s in sources.values():
-            if s.relate_cross:
-                more, lines = s.relate_cross(con)
-                counts.update(more)
-                warnings += lines
-        folded = catalog.canonicalize_concepts(con)
-        concepts = catalog.synthesize_concepts(con)
-        # the norm hierarchy: which rule derives its authority from which. Needs
-        # every source related (a chain crosses EU -> lag -> förordning ->
-        # föreskrift), so it runs here rather than per source.
-        chain = catalog.rebuild_norm_chain(con)
-        # ordering invariant: rebuild_norm_chain DELETEs its table, so the
-        # derived delegation edges always re-insert after it; the ladder rows
-        # store canonical concept uris, so they build after
-        # canonicalize_concepts (above) -- never join its UPDATE loop
-        delegated, deleg_dup = hierarki.derive_delegation_edges(con)
-        ladder_stats = hierarki.rebuild_regleringshierarki(
-            con, curated=hierarki.hierarki_layers())
-        # The same question the kommentar anchor audit asks of one commentary
-        # and its host act, asked of the whole citation graph: a link whose
-        # fragment names no node in the document it points at. Its home is here
-        # because relate is what writes the `links` rows -- the graph exists for
-        # the first time, and the catalog is already open.
-        #
-        # Worth the pass: run by hand it found 126 treaty references pointing
-        # at an `#A42` on a Hague Convention that anchors its Regulations'
-        # articles under `#Annex42`, and every count involved -- links written,
-        # documents related -- looked healthy throughout.
-        # one pass, not two: the scan reads every anchored link and parses each
-        # distinct target artifact, so calling it again only to count them cost
-        # the whole walk twice inside the nightly build
-        dangling = catalog.dangling_anchors(con, ANCHOR_EXACT)
-        # materialize each document's inbound count: the serving layer reads a
-        # column instead of counting an index range per request (the ECHR's is
-        # 1.4M entries -- tens of seconds cold on prod's disk)
-        stamped = catalog.stamp_inbound_counts(con)
-        con.commit()
-        con.close()
-        freshness._emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
-        freshness.record_fingerprint(store, "relate", "__corr__", corr_wm)
-        dirty = True
-        print("relate: %d norm-chain relations" % chain)
-        print("relate: %d förordning->lag delegation edges derived from the "
-              "title pair and the delegation clauses (%d already stated)"
-              % (delegated, deleg_dup))
-        print("relate: %d regleringshierarki rows over %d ladders "
-              "(verbatim %d, aligned labels %d, genomförande %d; %d chain "
-              "documents offer no concept, %d definitions sit off the chain, "
-              "%d lone ladders dropped)"
-              % (ladder_stats["rows"], ladder_stats["ladders"],
-                 ladder_stats["verbatim"], ladder_stats["aligned_labels"],
-                 ladder_stats["genomforande"],
-                 ladder_stats["chain_docs_no_concept"],
-                 ladder_stats["defs_off_chain"],
-                 ladder_stats["single_dropped"]))
-        # the sources' own counts, in registration order
-        for label, value in counts.items():
-            print("relate: %d %s" % (value, label))
-        print("relate: %d inflected concept variants folded onto canonical begrepp"
-              % folded)
-        print("relate: %d concept stubs minted from defined terms + nyckelord"
-              % concepts)
-        print("relate: inbound counts stamped on %d cited documents" % stamped)
-        # ... and their warnings, which a hook hands over already worded
-        for line in warnings:
-            print("relate: %s" % line)
-        print("relate: %d link(s) point at an anchor their target does not "
-              "have (%s -- the sources whose pages offer exactly their "
-              "artifact's anchors)" % (len(dangling), ", ".join(ANCHOR_EXACT)))
-        for from_uri, to_uri, count in dangling[:DANGLING_REPORT]:
-            print("relate: WARNING %s -> %s (%d) -- the document is held, the "
-                  "anchor is not in it" % (from_uri, to_uri, count))
-    else:
-        print("relate: nothing changed -- cross-document passes skipped")
-        freshness._emit_segment("relate", "__corr__", 0.0, status="skipped")
+    # one step of a multi-step run whichever way the gate falls, so the
+    # outer bar counts the same sequence it planned
+    with util.step("relate cross-passes"):
+        corr_wm = _corr_watermark(sources)
+        if dirty or force or not freshness.fingerprint_fresh(store, "relate", "__corr__",
+                                                   corr_wm):
+            t0 = time.perf_counter()
+            con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
+            # each source's own contribution first (pinning a genomför-direktiv
+            # statement to the paragraf it transposes, loading the .corr layers,
+            # auditing a commentary's anchors): they read and write their own rows
+            # and are independent of each other and of the corpus-wide passes below
+            counts, warnings = {}, []
+            for s in sources.values():
+                if s.relate_cross:
+                    more, lines = s.relate_cross(con)
+                    counts.update(more)
+                    warnings += lines
+            folded = catalog.canonicalize_concepts(con)
+            concepts = catalog.synthesize_concepts(con)
+            # the norm hierarchy: which rule derives its authority from which. Needs
+            # every source related (a chain crosses EU -> lag -> förordning ->
+            # föreskrift), so it runs here rather than per source.
+            chain = catalog.rebuild_norm_chain(con)
+            # ordering invariant: rebuild_norm_chain DELETEs its table, so the
+            # derived delegation edges always re-insert after it; the ladder rows
+            # store canonical concept uris, so they build after
+            # canonicalize_concepts (above) -- never join its UPDATE loop
+            delegated, deleg_dup = hierarki.derive_delegation_edges(con)
+            ladder_stats = hierarki.rebuild_regleringshierarki(
+                con, curated=hierarki.hierarki_layers())
+            # The same question the kommentar anchor audit asks of one commentary
+            # and its host act, asked of the whole citation graph: a link whose
+            # fragment names no node in the document it points at. Its home is here
+            # because relate is what writes the `links` rows -- the graph exists for
+            # the first time, and the catalog is already open.
+            #
+            # Worth the pass: run by hand it found 126 treaty references pointing
+            # at an `#A42` on a Hague Convention that anchors its Regulations'
+            # articles under `#Annex42`, and every count involved -- links written,
+            # documents related -- looked healthy throughout.
+            # one pass, not two: the scan reads every anchored link and parses each
+            # distinct target artifact, so calling it again only to count them cost
+            # the whole walk twice inside the nightly build
+            dangling = catalog.dangling_anchors(con, ANCHOR_EXACT)
+            # materialize each document's inbound count: the serving layer reads a
+            # column instead of counting an index range per request (the ECHR's is
+            # 1.4M entries -- tens of seconds cold on prod's disk)
+            stamped = catalog.stamp_inbound_counts(con)
+            con.commit()
+            con.close()
+            freshness._emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
+            freshness.record_fingerprint(store, "relate", "__corr__", corr_wm)
+            dirty = True
+            print("relate: %d norm-chain relations" % chain)
+            print("relate: %d förordning->lag delegation edges derived from the "
+                  "title pair and the delegation clauses (%d already stated)"
+                  % (delegated, deleg_dup))
+            print("relate: %d regleringshierarki rows over %d ladders "
+                  "(verbatim %d, aligned labels %d, genomförande %d; %d chain "
+                  "documents offer no concept, %d definitions sit off the chain, "
+                  "%d lone ladders dropped)"
+                  % (ladder_stats["rows"], ladder_stats["ladders"],
+                     ladder_stats["verbatim"], ladder_stats["aligned_labels"],
+                     ladder_stats["genomforande"],
+                     ladder_stats["chain_docs_no_concept"],
+                     ladder_stats["defs_off_chain"],
+                     ladder_stats["single_dropped"]))
+            # the sources' own counts, in registration order
+            for label, value in counts.items():
+                print("relate: %d %s" % (value, label))
+            print("relate: %d inflected concept variants folded onto canonical begrepp"
+                  % folded)
+            print("relate: %d concept stubs minted from defined terms + nyckelord"
+                  % concepts)
+            print("relate: inbound counts stamped on %d cited documents" % stamped)
+            # ... and their warnings, which a hook hands over already worded
+            for line in warnings:
+                print("relate: %s" % line)
+            print("relate: %d link(s) point at an anchor their target does not "
+                  "have (%s -- the sources whose pages offer exactly their "
+                  "artifact's anchors)" % (len(dangling), ", ".join(ANCHOR_EXACT)))
+            for from_uri, to_uri, count in dangling[:DANGLING_REPORT]:
+                print("relate: WARNING %s -> %s (%d) -- the document is held, the "
+                      "anchor is not in it" % (from_uri, to_uri, count))
+        else:
+            print("relate: nothing changed -- cross-document passes skipped")
+            freshness._emit_segment("relate", "__corr__", 0.0, status="skipped")
     # publish the freshly built scratch over the live catalog atomically -- only now,
     # after every source + the cross-document passes have landed, so a reader never
     # sees a half-built catalog. (Guarded on existence for the degenerate case where
@@ -403,48 +412,53 @@ def cmd_index(sources, names, jobs=1):
             "%s declares searchable=False but no registration module, so "
             "flipping the flag back would leave stale units indexed" % name)
         code = INDEX_CODE + (() if source.searchable else source.registration)
-        wm = catalog.source_content_signature(con, name)
-        if index_present and freshness.up_to_date(store, "index", name, wm, code):
-            print("index %s: up to date (catalog unchanged) -- skipped" % name)
-            freshness._emit_segment("index", name, 0.0, ran=0, status="skipped")
-            continue
-        if not source.searchable:
+        with util.step("%s index" % name):
+            # the catalog signature is one aggregate query over every row of
+            # this source -- seconds on the big ones, and the only thing
+            # happening until it answers
+            util.checking("%s index" % name)
+            wm = catalog.source_content_signature(con, name)
+            if index_present and freshness.up_to_date(store, "index", name, wm, code):
+                print("index %s: up to date (catalog unchanged) -- skipped" % name)
+                freshness._emit_segment("index", name, 0.0, ran=0, status="skipped")
+                continue
+            if not source.searchable:
+                t0 = time.perf_counter()
+                index.wait_for_task(index.delete_source_async(name),
+                                    "purge %s" % name)
+                freshness._emit_segment("index", name, time.perf_counter() - t0, total=0,
+                              ran=0, status="ok")
+                freshness.record_step(store, "index", name, wm, code)
+                dirty = True
+                print("index %s: not a search source -- stale units purged" % name)
+                continue
+
+            def progress(seen, total, current="", name=name):
+                util.status(seen, total, "index %s  %s" % (name, current))
+            recode = freshness.code_changed(store, "index", name, code)
+            if recode and not protocol.RUN.force:
+                print("index %s: index code changed -- reindexing all" % name)
             t0 = time.perf_counter()
-            index.wait_for_task(index.delete_source_async(name),
-                                "purge %s" % name)
-            freshness._emit_segment("index", name, time.perf_counter() - t0, total=0,
-                          ran=0, status="ok")
+            docs, indexed, errors, missing, skipped, deleted = index.index_source(
+                con, name, progress=progress, jobs=jobs, force=protocol.RUN.force or recode,
+                inbound_counts=inbound_counts)
+            freshness._emit_segment("index", name, time.perf_counter() - t0, total=docs,
+                          ran=indexed, errors=len(errors), skipped_fresh=skipped,
+                          status="errors" if errors else "ok")
             freshness.record_step(store, "index", name, wm, code)
             dirty = True
-            print("index %s: not a search source -- stale units purged" % name)
-            continue
-
-        def progress(seen, total, current="", name=name):
-            util.status(seen, total, "index %s  %s" % (name, current))
-        recode = freshness.code_changed(store, "index", name, code)
-        if recode and not protocol.RUN.force:
-            print("index %s: index code changed -- reindexing all" % name)
-        t0 = time.perf_counter()
-        docs, indexed, errors, missing, skipped, deleted = index.index_source(
-            con, name, progress=progress, jobs=jobs, force=protocol.RUN.force or recode,
-            inbound_counts=inbound_counts)
-        freshness._emit_segment("index", name, time.perf_counter() - t0, total=docs,
-                      ran=indexed, errors=len(errors), skipped_fresh=skipped,
-                      status="errors" if errors else "ok")
-        freshness.record_step(store, "index", name, wm, code)
-        dirty = True
-        had_errors |= bool(errors)
-        sys.stderr.write("\n")
-        print("index %s: %d documents -> %d units indexed, %d up to date, "
-              "%d deleted, %d errors"
-              % (name, docs, indexed, skipped, deleted, len(errors)))
-        if errors:
-            _report_index_errors(name, errors)
-        if missing:
-            print("index %s: %d catalogued artifacts gone from disk, skipped "
-                  "(run `lagen %s relate` to prune): %s"
-                  % (name, len(missing), name, ", ".join(missing[:5])
-                     + (" ..." if len(missing) > 5 else "")))
+            had_errors |= bool(errors)
+            sys.stderr.write("\n")
+            print("index %s: %d documents -> %d units indexed, %d up to date, "
+                  "%d deleted, %d errors"
+                  % (name, docs, indexed, skipped, deleted, len(errors)))
+            if errors:
+                _report_index_errors(name, errors)
+            if missing:
+                print("index %s: %d catalogued artifacts gone from disk, skipped "
+                      "(run `lagen %s relate` to prune): %s"
+                      % (name, len(missing), name, ", ".join(missing[:5])
+                         + (" ..." if len(missing) > 5 else "")))
     con.close()
     if dirty:
         freshness.save_fingerprints(store)
@@ -500,25 +514,27 @@ def cmd_dump(sources, names):
         if source.artifacts is None:
             continue
         out = DUMPS / ("%s.ndjson.gz" % name)
-        paths = source.artifacts()
-        wm = freshness.file_fingerprint(paths)
-        if out.exists() and freshness.up_to_date(store, "dump", name, wm, DUMP_CODE):
-            print("dump %s: up to date (%d artifacts unchanged) -- skipped"
-                  % (name, len(paths)))
-            freshness._emit_segment("dump", name, 0.0, total=len(paths), ran=0,
-                          skipped_fresh=len(paths), status="skipped")
-            continue
+        with util.step("%s dump" % name):
+            util.checking("%s dump" % name)
+            paths = source.artifacts()
+            wm = freshness.file_fingerprint(paths, label="%s dump" % name)
+            if out.exists() and freshness.up_to_date(store, "dump", name, wm, DUMP_CODE):
+                print("dump %s: up to date (%d artifacts unchanged) -- skipped"
+                      % (name, len(paths)))
+                freshness._emit_segment("dump", name, 0.0, total=len(paths), ran=0,
+                              skipped_fresh=len(paths), status="skipped")
+                continue
 
-        def progress(seen, total, name=name):
-            util.status(seen, total, "dump %s" % name)
-        t0 = time.perf_counter()
-        lines = dump.dump_source(paths, out, progress=progress)
-        freshness._emit_segment("dump", name, time.perf_counter() - t0, total=lines,
-                      ran=lines, status="ok")
-        freshness.record_step(store, "dump", name, wm, DUMP_CODE)
-        dirty = True
-        sys.stderr.write("\n")
-        print("dump %s: %d documents -> %s" % (name, lines, out))
+            def progress(seen, total, name=name):
+                util.status(seen, total, "dump %s" % name)
+            t0 = time.perf_counter()
+            lines = dump.dump_source(paths, out, progress=progress)
+            freshness._emit_segment("dump", name, time.perf_counter() - t0, total=lines,
+                          ran=lines, status="ok")
+            freshness.record_step(store, "dump", name, wm, DUMP_CODE)
+            dirty = True
+            sys.stderr.write("\n")
+            print("dump %s: %d documents -> %s" % (name, lines, out))
     if dirty:
         freshness.save_fingerprints(store)
 
@@ -575,16 +591,17 @@ def cmd_download_all(sources, names, jobs):
     had_errors = False
     for name in names:
         source = sources[name]
-        if source.harvest is not None:
-            had_errors |= _run_harvest(source, [])       # [] = full discovery
-        elif "download" in source.stages:
-            basefiles = source.list_basefiles()
-            result = freshness.run_action(source, "download", basefiles, jobs)
-            report(source, "download", result, len(basefiles), full_source=True)
-            had_errors |= bool(result.errors)
-        else:
+        if not runs_step(source, "download"):
             continue
-        run_after(sources, [name], "download")
+        with util.step("%s download" % name):
+            if source.harvest is not None:
+                had_errors |= _run_harvest(source, [])   # [] = full discovery
+            else:
+                basefiles = source.list_basefiles()
+                result = freshness.run_action(source, "download", basefiles, jobs)
+                report(source, "download", result, len(basefiles), full_source=True)
+                had_errors |= bool(result.errors)
+            run_after(sources, [name], "download")
     return had_errors
 
 
@@ -705,7 +722,7 @@ def _history_secs(history, verb, source):
     return statistics.median(entry["secs"]) if entry else PLANNER_DEFAULT_SECS
 
 
-def build_invocation_plan(sources, names, *, whole_corpus):
+def build_invocation_plan(sources, names, *, whole_corpus, download=False):
     """The step sequence `cmd_all` is about to run over `names`, predicted up
     front for the outer invocation bar: which steps its own freshness gates
     will skip, and how long the rest are likely to take. One `PlannedStep` per
@@ -738,11 +755,18 @@ def build_invocation_plan(sources, names, *, whole_corpus):
       `_history_secs`'s *raw* ledger seconds, which needs no document count
       at all -- see its own docstring.
 
-    Download is not planned: it is network-bound and its cost has nothing to
-    do with the corpus on disk."""
+    Download's own steps are planned when the run has one (`lagen all all`):
+    each is one `util.step` inside `cmd_download_all` like any other, and its
+    predicted seconds come from the ledger the same way. The prediction is
+    weaker than the rest -- a harvest's cost is network-bound, not a function
+    of the corpus on disk -- but `InvocationBar.finish` re-paces the ETA on
+    real elapsed time regardless, so a wrong guess costs a skewed ETA early in
+    the run and nothing else."""
     last = runlog.last_segments(freshness.RUNS)
     history = runlog.duration_history(freshness.RUNS)
     steps = []
+    if download:
+        steps += _download_steps(sources, names, history)
     for step in ("parse", "versions"):
         for name in names:
             source = sources[name]
@@ -754,13 +778,14 @@ def build_invocation_plan(sources, names, *, whole_corpus):
                 continue
             steps.append(PlannedStep(name, step, False,
                                      _history_secs(history, step, name)))
-    steps.append(PlannedStep("", "relate", False,
-                             sum(_history_secs(history, "relate", name)
-                                for name in names)))
+    # relate/index/dump each run one step per artifact-backed source, plus
+    # relate's cross-document passes over the whole catalog -- exactly the
+    # `util.step` calls their own loops make
+    steps += _artifact_verb_steps(sources, names, "relate", history)
+    steps.append(PlannedStep("", "relate cross-passes", False,
+                             _history_secs(history, "relate", "__corr__")))
     for verb in ("index", "dump"):
-        steps.append(PlannedStep("", verb, False,
-                                 sum(_history_secs(history, verb, name)
-                                    for name in names)))
+        steps += _artifact_verb_steps(sources, names, verb, history)
     if whole_corpus:
         steps.append(PlannedStep("", "generate", False,
                                  _history_secs(history, "generate", "__site__")))
@@ -774,6 +799,70 @@ def build_invocation_plan(sources, names, *, whole_corpus):
             steps.append(PlannedStep(name, "generate", False,
                                      _history_secs(history, "generate", name)))
     return steps
+
+
+def runs_step(source, verb):
+    """Whether a single-verb run over `verb` visits `source` at all -- the one
+    predicate `plan_verb_steps` and `build._dispatch`'s own loop share, so the
+    plan counts exactly the steps the run enters. relate/index/dump skip a
+    source that catalogues no artifacts; download skips one with neither a
+    bulk harvest nor a per-document download stage (kommentar/begrepp derive
+    from another source's dump and fetch nothing); every other verb is
+    whichever stages and actions the source registers. `status` reads what is
+    on disk and so answers for every source."""
+    if verb == "download":
+        return source.harvest is not None or "download" in source.stages
+    if verb in ("relate", "index", "dump"):
+        return source.artifacts is not None
+    if verb == "status":
+        return True
+    return verb in source.stages or verb in source.actions
+
+
+def _artifact_verb_steps(sources, names, verb, history):
+    """One step per name `cmd_relate`/`cmd_index`/`cmd_dump` will visit --
+    they all skip a source with no artifacts of its own (`artifacts is
+    None`), so the plan skips it too."""
+    return [PlannedStep(name, verb, False, _history_secs(history, verb, name))
+            for name in names if runs_step(sources[name], verb)]
+
+
+def _download_steps(sources, names, history):
+    """One step per name a download run will visit: a source with a bulk
+    harvest, or one whose per-document download stage refetches what it
+    already knows. A source derived from another's dump has neither and is
+    skipped -- the same condition `cmd_download_all` loops on."""
+    return [PlannedStep(name, "download", False,
+                        _history_secs(history, "download", name))
+            for name in names if runs_step(sources[name], "download")]
+
+
+def plan_verb_steps(sources, names, verb):
+    """The step sequence a *single-verb* run over `names` will make -- what
+    `build_invocation_plan` is to `lagen all rebuild`, this is to `lagen all
+    relate`, `lagen all download`, `lagen all parse`. One `PlannedStep` per
+    `util.step` the verb's own loop enters, so `build._dispatch` can open the
+    same outer bar over it.
+
+    A verb the plan does not know by name (a per-document stage, a source's
+    own `ai-*` action) runs once per name that offers it. `status` plans
+    nothing: it reads what is on disk and prints, in seconds, and writes no
+    ledger segment a prediction could come from -- a bar over it would show
+    twenty made-up ETAs. A run that plans fewer than two steps opens no bar at
+    all -- `util.invocation_bar` decides that itself."""
+    if verb == "status":
+        return []
+    history = runlog.duration_history(freshness.RUNS)
+    if verb == "download":
+        return _download_steps(sources, names, history)
+    if verb in ("relate", "index", "dump"):
+        steps = _artifact_verb_steps(sources, names, verb, history)
+        if verb == "relate":
+            steps.append(PlannedStep("", "relate cross-passes", False,
+                                     _history_secs(history, "relate", "__corr__")))
+        return steps
+    return [PlannedStep(name, verb, False, _history_secs(history, verb, name))
+            for name in names if runs_step(sources[name], verb)]
 
 
 def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
@@ -793,30 +882,31 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
     hook (run once per source). Both are fields on the registration; this
     function knows neither what they do nor which source has one.
 
-    The offline pipeline (everything below the download) runs inside a
-    `util.invocation_bar`, opened over `build_invocation_plan`'s predicted
-    total: a second, outer progress line naming the current source+step,
-    steps remaining, and a whole-invocation ETA -- next to the existing
-    per-document line each step already draws (which nests beneath it
-    automatically; see `util.status`). Download stays outside it: its cost is
-    network-bound, not a function of the corpus on disk, so a plan cannot
-    usefully predict it."""
+    The whole run happens inside a `util.invocation_bar`, opened over
+    `build_invocation_plan`'s predicted step sequence: a second, outer
+    progress line naming the current source+step, steps remaining, and a
+    whole-invocation ETA -- next to the existing per-document line each step
+    already draws (which nests beneath it automatically; see `util.status`).
+    Each step announces itself with `util.step`, from wherever its own loop
+    lives: here for parse/versions/generate, inside `cmd_download_all`,
+    `cmd_relate`, `cmd_index` and `cmd_dump` for the rest."""
     had_errors = False
-    if download:
-        had_errors = cmd_download_all(sources, names, jobs)
     store = freshness.load_fingerprints()
-    plan = build_invocation_plan(sources, names, whole_corpus=whole_corpus)
+    plan = build_invocation_plan(sources, names, whole_corpus=whole_corpus,
+                                 download=download)
     plan_by = {(s.source, s.verb): s for s in plan}
     with util.invocation_bar(sum(s.secs for s in plan), len(plan),
                              desc="lagen all %s" % ("rebuild" if not download
-                                                    else "all")) as ib:
+                                                    else "all")):
+        if download:
+            had_errors = cmd_download_all(sources, names, jobs)
         for step in ("parse", "versions"):
             for name in names:
                 source = sources[name]
                 if step not in source.stages:
                     continue
-                ib.start(plan_by[(name, step)].label)
-                errs, recorded = _run_stage_gated(source, step, jobs, store)
+                with util.step(plan_by[(name, step)].label):
+                    errs, recorded = _run_stage_gated(source, step, jobs, store)
                 had_errors |= errs
                 # save as soon as a source records, not once the whole loop is
                 # through: a kill during a later source's parse used to discard the
@@ -829,35 +919,27 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
                 # so writing it per source is free.
                 if recorded:
                     freshness.save_fingerprints(store)
-                ib.finish()
-        ib.start("relate")
         cmd_relate(sources, names)
         run_after(sources, names, "relate")
-        ib.finish()
         # a bulk item the cluster rejected is a *unit missing from search*, so it
         # belongs in the run's verdict like a failed parse -- one rebuild dropped
         # 1,497 eurlex and 241 förarbete documents from the index and still exited 0
-        ib.start("index")
         had_errors |= _run_index_step(sources, names, jobs)
-        ib.finish()
-        ib.start("dump")
         cmd_dump(sources, names)
         run_after(sources, names, "dump")
-        ib.finish()
         # a stage that must run after the catalog and the dumps exist, not in the
         # parse loop above -- it reads what relate and dump have just written. The
         # stage says so itself (`phase="dump"`); a run that does not name its source
         # never pays for it (see the stats registration for the worked example).
         had_errors |= run_phase(sources, names, "dump", jobs)
         if whole_corpus:
-            ib.start("generate")
-            cmd_generate(sources, jobs=jobs, aggregates=aggregates)
-            ib.finish()
+            with util.step("generate"):
+                cmd_generate(sources, jobs=jobs, aggregates=aggregates)
         else:
             for name in names:
-                ib.start(plan_by[(name, "generate")].label)
-                cmd_generate(sources, source=name, jobs=jobs, aggregates=aggregates)
-                ib.finish()
+                with util.step(plan_by[(name, "generate")].label):
+                    cmd_generate(sources, source=name, jobs=jobs,
+                                 aggregates=aggregates)
         run_after(sources, names, "generate")
     return had_errors
 
@@ -984,7 +1066,7 @@ def generate_fingerprint(sources):
     # versions-stage sidecars, the remiss answers and the site artifacts. A
     # layer that rides another document's rail enters that page's dependency
     # digest per page (page.site_cross_digests); here it reopens the coarse gate
-    sides = freshness.file_fingerprint(_layers(sources))
+    sides = freshness.file_fingerprint(_layers(sources), label="generate")
     return hashlib.sha256(
         (sig + "\x1f" + sides + "\x1f" + expired).encode()).hexdigest()
 
@@ -1092,6 +1174,12 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     # dependency); a scoped render skips that corpus-wide scan and uses the catalog
     # as-is -- run `lagen <source> relate` to refresh it
     scoped = only is not None or source is not None
+    if not scoped:
+        # stale_sources() stats every artifact of every source and
+        # generate_fingerprint() below signs the whole catalog -- minutes on a
+        # cold cache, and until now not a single line said so (`lagen all
+        # generate` looked hung before it had printed anything at all)
+        util.checking("generate")
     stale = [] if scoped else stale_sources(sources)
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
@@ -1104,6 +1192,7 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     site_wm = None
     if not scoped:
         store = freshness.load_fingerprints()
+        util.checking("generate")
         site_wm = generate_fingerprint(sources)
         if freshness.up_to_date(store, "generate", "__site__", site_wm, GENERATE_CODE):
             print("generate: up to date -- skipped (%s)" % layout.GENERATED)

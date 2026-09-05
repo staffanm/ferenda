@@ -157,16 +157,30 @@ def record_code_version(store, kind, source, code):
         "version": recipe_version(code)}
 
 
-def file_fingerprint(paths):
+def file_fingerprint(paths, *, label=None):
     """A cheap, content-insensitive fingerprint of a file set: each path with its
     size + mtime, no contents read. Detects any add / remove / rewrite (parse
     rewrites an artifact, bumping its mtime), so relate/dump can skip a source
     whose artifacts are all untouched since last run -- instead of re-reading and
-    re-hashing every file. --force or a code-version change overrides it."""
+    re-hashing every file. --force or a code-version change overrides it.
+
+    `label` ("<source> <verb>") turns the walk into a reported "checking
+    staleness" line, throttled to `_REPORT_INTERVAL` exactly as
+    `stage_fingerprint` reports its own: over a source with 200,000 artifacts
+    this is tens of seconds that otherwise print nothing at all. A caller with
+    nothing to report (a test, a scan too short to notice) leaves it out and
+    the walk stays silent."""
     h = hashlib.sha256()
-    for p in paths:                          # a source's lister yields them sorted
+    total = len(paths) if label else 0
+    last_report = 0.0
+    for done, p in enumerate(paths, 1):      # a source's lister yields them sorted
         st = compress.stat(p)                # the real (possibly .br) file's size+mtime
         h.update(("%s\x1f%d\x1f%d\x1e" % (p, st.st_size, st.st_mtime_ns)).encode())
+        if label:
+            now = time.perf_counter()
+            if done == total or now - last_report >= _REPORT_INTERVAL:
+                util.status(done, total, "%s  checking staleness" % label)
+                last_report = now
     return h.hexdigest()
 
 

@@ -799,6 +799,13 @@ class InvocationBar:
         to drop this same "source verb" prefix from its own description,
         which would otherwise just repeat what this line already says."""
         self.step_no += 1
+        # the plan is a prediction, the same way its seconds are (see
+        # `corpus._history_secs`): a step whose loop condition the planner
+        # read differently is still a step that ran. Let the total follow the
+        # real count rather than render "26/25" -- the ETA already
+        # self-corrects on real elapsed time in `finish`.
+        self.total_steps = max(self.total_steps, self.step_no)
+        self.bar.total = self.total_steps
         self._t0 = time.perf_counter()
         self.current_label = label
         self.bar.n = self.step_no
@@ -858,13 +865,22 @@ def invocation_bar(total_secs, total_steps, desc="lagen all"):
     resize-timing race, but the difference between "self-heals on the next
     tick" and "silently corrupted until the run ends".
 
-    Yields a `_NullInvocationBar` instead, with none of the above, when the
-    real stderr is not a tty (`lagen all rebuild > log 2>&1`, a cron job): a
-    stacked-position tqdm bar writes raw cursor-up ANSI codes to *any* file it
-    is given, tty or not, and a run nobody is watching live gains nothing
-    from the bar to offset that."""
+    Yields a `_NullInvocationBar` instead, with none of the above, in two
+    cases. First, when the real stderr is not a tty (`lagen all rebuild > log
+    2>&1`, a cron job): a stacked-position tqdm bar writes raw cursor-up ANSI
+    codes to *any* file it is given, tty or not, and a run nobody is watching
+    live gains nothing from the bar to offset that. Second, when the plan holds
+    fewer than two steps (`lagen all generate`, `lagen sfs relate`): the outer
+    line would say "1/1" for the whole run and repeat what the step's own
+    counter already says, so a single-step run keeps the plain one-line
+    counter.
+
+    Every step announces itself through `step()`, from wherever its own loop
+    lives -- `cmd_relate`/`cmd_index`/`cmd_dump` per source, `cmd_all` and
+    `build._dispatch` around the calls they make. `step()` is a no-op while no
+    bar is open, so the same call sites serve a single-source run too."""
     real = (sys.stdout, sys.stderr)
-    if not _stderr_is_a_tty():
+    if total_steps < 2 or not _stderr_is_a_tty():
         yield _NullInvocationBar()
         return
     global _outer, _real_streams
@@ -896,6 +912,33 @@ def invocation_bar(total_secs, total_steps, desc="lagen all"):
         ib.close()
         _outer = None
         _real_streams = None
+
+
+@contextmanager
+def step(label):
+    """Announce one planned step of a multi-step run -- "<source> <verb>" --
+    on the outer invocation bar, for as long as it runs. A no-op when no bar
+    is open, which is what lets the same call site serve `lagen all relate`
+    (a bar, one step per source) and `lagen sfs relate` (no bar, the source's
+    own counter alone)."""
+    if _outer is None:
+        yield
+        return
+    _outer.start(label)
+    try:
+        yield
+    finally:
+        _outer.finish()
+
+
+def checking(label):
+    """Report a staleness scan that has no item count to report yet -- the
+    artifact walk `relate`/`dump` open with, the catalog signature `index`
+    and a full `generate` open with. Those scans read the whole corpus off
+    disk and used to run silently, so the seconds (minutes, on a cold cache)
+    before the first real progress line read as a hang. Same wording as the
+    per-basefile scan `freshness.stage_fingerprint` reports."""
+    status(0, None, "%s  checking staleness" % label)
 
 
 def harvest_start(label: str, url: str) -> None:

@@ -220,10 +220,39 @@ lagen all serve      # serve generated/ + the REST API on one uvicorn process
 ```
 
 `rebuild`/`all` re-do only what changed; the first full build over the
-~200K-document corpus is slow (see §6 for the rsync shortcut). Both draw a
-whole-invocation progress bar (current step, steps remaining, ETA) above the
-per-document counter each step already shows, on a real terminal; a run
-piped to a file or a cron log (`docker compose exec ferenda lagen all
+~200K-document corpus is slow (see §6 for the rsync shortcut).
+
+#### What a run shows while it works
+
+Every run counts its work in *steps* — one source's parse, one source's
+relate, the cross-document passes relate ends with, a generate. A run of two
+or more steps draws a whole-invocation progress bar (current step, steps
+remaining, ETA) above the per-document counter each step already shows:
+
+```sh
+lagen all all        # 90 steps: download, parse, relate, index, dump, generate
+lagen all download   # 16 steps, one per source with something to fetch
+lagen all relate     # 18 steps: one per source, plus the cross-document passes
+lagen sfs rebuild    # 7 steps
+```
+
+A run of one step keeps the plain single line — the outer bar would read
+"1/1" for the whole run and repeat what the step's own counter already says:
+
+```sh
+lagen all generate       # one step over the whole corpus
+lagen eurlex parse 32016R0970   # one document, no counter worth drawing
+lagen all status         # a report, done in seconds: never a bar
+```
+
+Before a step can run it has to work out what is already up to date, which on
+a big source reads every artifact's size and mtime and can take tens of
+seconds. That scan reports as `checking staleness` on the same line the step's
+own counter uses. Download has no such scan — nothing on disk decides what it
+fetches — so its line names the harvest watermark instead: `(from 2026-01-10)`,
+or `(first harvest)` / `(full sweep)` when there is no boundary to work back to.
+
+A run piped to a file or a cron log (`docker compose exec ferenda lagen all
 rebuild >> log 2>&1`) keeps the plain per-document line only, since the bar
 is for someone watching live and would otherwise write raw cursor-control
 bytes into the log.

@@ -329,6 +329,18 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     nothing. Returns a :class:`WalkResult`."""
     backfill = full or deep or watermark is None or watermark.last_harvest is None
     rep = reporter or Reporter()
+    # How far back this walk means to go, on the live line. A download has no
+    # staleness scan to report -- nothing on disk decides what it fetches --
+    # so the watermark is the one thing that says where it stops. A complete
+    # listing (`watermark=None`) has no boundary to name and says nothing.
+    if watermark is None:
+        since = ""
+    elif full or deep:
+        since = "  (full sweep)"
+    elif watermark.last_harvest is None:
+        since = "  (first harvest)"
+    else:
+        since = "  (from %s)" % watermark.last_harvest
     seen = new = errors = skips = 0
     newest_date: str | None = None
     start = time.monotonic()
@@ -376,7 +388,7 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
         except Exception as exc:  # noqa: BLE001 — one bad doc must not abort the walk: counted, and the run stays dirty so it is retried (rule:no-catch-log-continue)
             errors += 1
             log("  %s %s: %s" % (scope, key.basefile, exc))
-        rep.update(seen, total, scope=scope, **{count_label: new})
+        rep.update(seen, total, scope=scope, note=since, **{count_label: new})
         if limit and new >= limit:
             break
     rep.done()

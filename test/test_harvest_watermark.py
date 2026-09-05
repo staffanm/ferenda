@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from ferenda.lib import compress, net
+from ferenda.lib import compress, net, util
 from ferenda.lib.harvest import (
     HarvestWatermark,
     ItemKey,
@@ -567,3 +567,45 @@ def test_fan_out_non_strict_fanned_out_runs_the_rest_and_ends_red():
     # workers finished their scopes behind it
     assert sorted(ran) == ["a", "b", "c", "d"]
     assert "b is broken" in str(ei.value)
+
+
+# --- what the live line says about how far back the walk goes --------------
+
+def _walk_line(monkeypatch, tmp_path, *, last_harvest=None, full=False,
+               watermark=True):
+    """The message a one-item walk hands the live progress line. Read at
+    `util.status`, the one renderer: it binds sys.stderr as a default argument
+    at import time, so the bytes themselves never reach a captured stream."""
+    wm = None
+    if watermark:
+        wm = HarvestWatermark(tmp_path / "wm.json")
+        wm.last_harvest = last_harvest
+    seen = []
+    monkeypatch.setattr(util, "status",
+                        lambda done, total, message="", **kw: seen.append(message))
+    walk(["a"], resolve=lambda i: True,
+         item_key=lambda i: ItemKey(i, False, date="2026-08-01"),
+         watermark=wm, full=full, scope="fs", reporter=util.Reporter(),
+         log=lambda *a: None)
+    return "".join(seen)
+
+
+def test_walk_line_names_the_watermark_date(monkeypatch, tmp_path):
+    # a download has no staleness scan to report -- nothing on disk decides
+    # what it fetches -- so the watermark is the one thing that says how far
+    # back this run means to go
+    assert "(from 2026-01-10)" in _walk_line(monkeypatch, tmp_path,
+                                            last_harvest="2026-01-10")
+
+
+def test_walk_line_says_when_there_is_no_boundary(monkeypatch, tmp_path):
+    assert "(first harvest)" in _walk_line(monkeypatch, tmp_path)
+    assert "(full sweep)" in _walk_line(monkeypatch, tmp_path,
+                                        last_harvest="2026-01-10", full=True)
+
+
+def test_walk_line_stays_quiet_for_a_complete_listing(monkeypatch, tmp_path):
+    # watermark=None: the listing is walked whole every run, so there is no
+    # boundary to name
+    line = _walk_line(monkeypatch, tmp_path, watermark=False)
+    assert "from" not in line and "sweep" not in line

@@ -968,99 +968,109 @@ def _dispatch(args, p, jobs):
         if had_errors:
             sys.exit(1)
         return
-    if args.action == "relate":
-        corpus.cmd_relate(SOURCES, names)
-        corpus.run_after(SOURCES, names, "relate")
-        return
-    if args.action == "index":
-        had_errors = corpus.cmd_index(SOURCES, names, jobs)
-        corpus.run_after(SOURCES, names, "index")
-        if had_errors:
-            sys.exit(1)
-        return
-    if args.action == "dump":
-        corpus.cmd_dump(SOURCES, names)
-        corpus.run_after(SOURCES, names, "dump")
-        return
+    # every verb below runs one step per named source (relate/index/dump
+    # loop inside their own cmd_*; the rest loop here), so a run over two or
+    # more of them gets the same two-line overlay `lagen all rebuild` draws.
+    # One step opens no bar -- invocation_bar decides that itself.
+    plan = corpus.plan_verb_steps(SOURCES, names, args.action)
+    with util.invocation_bar(sum(s.secs for s in plan), len(plan),
+                             desc="lagen %s %s" % (args.source, args.action)):
+        if args.action == "relate":
+            corpus.cmd_relate(SOURCES, names)
+            corpus.run_after(SOURCES, names, "relate")
+            return
+        if args.action == "index":
+            had_errors = corpus.cmd_index(SOURCES, names, jobs)
+            corpus.run_after(SOURCES, names, "index")
+            if had_errors:
+                sys.exit(1)
+            return
+        if args.action == "dump":
+            corpus.cmd_dump(SOURCES, names)
+            corpus.run_after(SOURCES, names, "dump")
+            return
 
-    had_errors = False
-    for name in names:
-        source = SOURCES[name]
-        if args.action == "status":
-            if args.basefiles:
-                for basefile in args.basefiles:
-                    corpus.cmd_status_document(source, basefile)
-            else:
-                corpus.cmd_status(source)
-            continue
-        if args.action == "download":
-            scopes = args.basefiles
-            if source.harvest is not None and (
-                    not scopes or all(s in source.scopes for s in scopes)):
-                # bulk discovery, optionally narrowed to named sub-scopes
-                # (forarbete doctypes / eurlex sectors). The per-doc stage only
-                # refetches known ids; new docs come only from the bulk sweep,
-                # so this must NOT fall back to list_basefiles().
-                had_errors |= corpus._run_harvest(source, scopes)
-                corpus.run_after(SOURCES, [name], "download")
+        had_errors = False
+        for name in names:
+            source = SOURCES[name]
+            # an "all" sweep visits every source; one that does not offer this
+            # verb (stats has only compute, kommentar/begrepp fetch nothing)
+            # has nothing to do and must not consume a planned step. The
+            # p.error calls below are what a *named* source without it meets.
+            if args.source == "all" and not corpus.runs_step(source, args.action):
                 continue
-            if scopes and source.scopes and "download" not in source.stages:
-                bad = [s for s in scopes if s not in source.scopes]
-                p.error("unknown %s scope(s): %s (have: %s)"
-                        % (name, ", ".join(bad), ", ".join(sorted(source.scopes))))
-            if not scopes and source.harvest is None:
-                if args.source == "all" and "download" not in source.stages:
+            # one planned step per source, so `lagen all download` /
+            # `lagen all parse` get the same outer line a rebuild draws
+            with util.step("%s %s" % (name, args.action)):
+                if args.action == "status":
+                    if args.basefiles:
+                        for basefile in args.basefiles:
+                            corpus.cmd_status_document(source, basefile)
+                    else:
+                        corpus.cmd_status(source)
                     continue
-                p.error("source %r has no bulk harvest" % name)
-            # scopes are document ids -> fall through to the per-doc download stage
-        if args.action in source.actions:
-            t0 = time.perf_counter()
-            report = source.actions[args.action](args.basefiles)
-            if not isinstance(report, aireport.Report):
-                # an ai-* action reports itself (counts, status.json); the rest
-                # get the bare "it ran" segment
-                freshness._emit_segment(args.action, name, time.perf_counter() - t0, status="ok")
-            continue
-        if args.action not in source.stages:
-            # an "all" sweep visits every source; one that lacks the action
-            # simply has nothing to do (stats has only compute, two sources
-            # have browser-download) -- same shortcut the download branch
-            # takes above. A *named* source keeps the hard error.
-            if args.source == "all":
-                continue
-            p.error("source %r has no action %r (have: %s)"
-                    % (name, args.action,
-                       ", ".join([*source.stages, *source.actions])))
-        # a full-source run of a fingerprint-gated per-doc stage gets the same
-        # coarse "up to date -- skipped" shortcut cmd_all uses, so a direct
-        # `lagen sfs parse` with nothing changed skips the per-doc scan too
-        if not args.basefiles and args.action in ("parse", "versions"):
-            store = freshness.load_fingerprints()
-            errs, recorded = corpus._run_stage_gated(source, args.action, jobs,
-                                                     store)
-            if recorded:
-                freshness.save_fingerprints(store)
-            had_errors |= errs
-            continue
-        stage = source.stages[args.action]
-        # a fan-out stage's real dispatch keys are finer than what a user
-        # names on the command line ("lagen sfs versions 1999:1229" means
-        # every version of it, not the literal string "1999:1229") --
-        # protocol.stage_keys expands each given name to every key under it
-        basefiles = (_stage_keys(source, args.action, args.basefiles)
-                     if args.basefiles
-                     else protocol.stage_basefiles(source, args.action))
-        result = freshness.run_action(source, args.action, basefiles, jobs)
-        corpus.report(source, args.action, result, len(basefiles),
-                      full_source=not args.basefiles)
-        had_errors |= bool(result.errors)
-        if stage.list_basefiles:
-            # a fan-out stage's per-source hook assembles what its keys
-            # produced (the versions sidecars) -- the per-item recipe no
-            # longer writes it, so a targeted run needs the hook too
-            corpus.run_after(SOURCES, [name], args.action)
-    if had_errors:                 # report every source first, then signal failure
-        sys.exit(1)
+                if args.action == "download":
+                    scopes = args.basefiles
+                    if source.harvest is not None and (
+                            not scopes or all(s in source.scopes for s in scopes)):
+                        # bulk discovery, optionally narrowed to named sub-scopes
+                        # (forarbete doctypes / eurlex sectors). The per-doc stage only
+                        # refetches known ids; new docs come only from the bulk sweep,
+                        # so this must NOT fall back to list_basefiles().
+                        had_errors |= corpus._run_harvest(source, scopes)
+                        corpus.run_after(SOURCES, [name], "download")
+                        continue
+                    if scopes and source.scopes and "download" not in source.stages:
+                        bad = [s for s in scopes if s not in source.scopes]
+                        p.error("unknown %s scope(s): %s (have: %s)"
+                                % (name, ", ".join(bad), ", ".join(sorted(source.scopes))))
+                    if not scopes and source.harvest is None:
+                        p.error("source %r has no bulk harvest" % name)
+                    # scopes are document ids -> fall through to the per-doc download stage
+                if args.action in source.actions:
+                    t0 = time.perf_counter()
+                    report = source.actions[args.action](args.basefiles)
+                    if not isinstance(report, aireport.Report):
+                        # an ai-* action reports itself (counts, status.json); the rest
+                        # get the bare "it ran" segment
+                        freshness._emit_segment(args.action, name, time.perf_counter() - t0, status="ok")
+                    continue
+                if args.action not in source.stages:
+                    # only a *named* source gets here: an "all" sweep already
+                    # skipped a source without the action (runs_step, above)
+                    p.error("source %r has no action %r (have: %s)"
+                            % (name, args.action,
+                               ", ".join([*source.stages, *source.actions])))
+                # a full-source run of a fingerprint-gated per-doc stage gets the same
+                # coarse "up to date -- skipped" shortcut cmd_all uses, so a direct
+                # `lagen sfs parse` with nothing changed skips the per-doc scan too
+                if not args.basefiles and args.action in ("parse", "versions"):
+                    store = freshness.load_fingerprints()
+                    errs, recorded = corpus._run_stage_gated(source, args.action, jobs,
+                                                             store)
+                    if recorded:
+                        freshness.save_fingerprints(store)
+                    had_errors |= errs
+                    continue
+                stage = source.stages[args.action]
+                # a fan-out stage's real dispatch keys are finer than what a user
+                # names on the command line ("lagen sfs versions 1999:1229" means
+                # every version of it, not the literal string "1999:1229") --
+                # protocol.stage_keys expands each given name to every key under it
+                basefiles = (_stage_keys(source, args.action, args.basefiles)
+                             if args.basefiles
+                             else protocol.stage_basefiles(source, args.action))
+                result = freshness.run_action(source, args.action, basefiles, jobs)
+                corpus.report(source, args.action, result, len(basefiles),
+                              full_source=not args.basefiles)
+                had_errors |= bool(result.errors)
+                if stage.list_basefiles:
+                    # a fan-out stage's per-source hook assembles what its keys
+                    # produced (the versions sidecars) -- the per-item recipe no
+                    # longer writes it, so a targeted run needs the hook too
+                    corpus.run_after(SOURCES, [name], args.action)
+        if had_errors:                 # report every source first, then signal failure
+            sys.exit(1)
 
 
 if __name__ == "__main__":
