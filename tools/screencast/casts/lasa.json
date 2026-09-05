@@ -1,0 +1,20 @@
+{"name": "lasa", "steps": [
+ {"goto": "/1960:729#P26a"},
+ {"caption": "Innehållsförteckning, text, kontextpanel", "wait": 2000},
+ {"hover": "#P26a a[href='/1960:729#P9S1']", "wait": 2200},
+ {"caption": "Håll pekaren över en hänvisning: början av måltexten", "wait": 2000},
+ {"click": ".pop-expand", "wait": 1500},
+ {"caption": "↗ öppnar måldokumentet bredvid, med egen innehållsförteckning och kontext", "wait": 3500},
+ {"goto": "/2007:90#K2P5"},
+ {"caption": "Vägmärkena, ur den tryckta SFS:en", "wait": 1500},
+ {"click": "button.grafik-open", "wait": 2500},
+ {"key": "Escape", "wait": 800},
+ {"goto": "/2001:453"},
+ {"highlight": ".expired-banner", "hold": 300},
+ {"caption": "Bannern säger när sidan inte visar gällande lydelse", "wait": 3000},
+ {"goto": "/1915:218"},
+ {"click": "[data-theme-toggle]"},
+ {"caption": "Mörkt tema. Valet sparas i webbläsaren", "wait": 2500},
+ {"click": "[data-theme-toggle]", "wait": 800},
+ {"caption": "", "wait": 500}
+]}

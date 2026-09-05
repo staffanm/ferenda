@@ -1,0 +1,17 @@
+{"name": "utskrift", "steps": [
+ {"goto": "/1915:218"},
+ {"click": ".pdf-open"},
+ {"caption": "Spara som PDF: kolumner, innehållsförteckning, register", "wait": 2000},
+ {"click": "input[name=kontext]"},
+ {"caption": "Kontext under varje avsnitt — sätts i marginalen bredvid bestämmelsen", "wait": 3000},
+ {"click": ".pdf-dialog button:has-text('Avbryt')", "wait": 800},
+ {"click": ".collection-add"},
+ {"caption": "Lägg till i samling", "wait": 1500},
+ {"goto": "/2018:218"},
+ {"click": ".collection-add", "wait": 1200},
+ {"goto": "/celex/32016R0679"},
+ {"click": ".collection-add", "wait": 1200},
+ {"goto": "/samling"},
+ {"caption": "Min samling: ordna, välj kontext, skapa en PDF. Finns bara i din webbläsare", "wait": 4000},
+ {"caption": "", "wait": 500}
+]}

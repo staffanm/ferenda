@@ -1,0 +1,17 @@
+{"name": "lydelser", "steps": [
+ {"goto": "/2018:218"},
+ {"scroll": "section.andringar"},
+ {"caption": "Ändringar och övergångsbestämmelser, längst ned på lagsidan", "wait": 2500},
+ {"goto": "/2018:218"},
+ {"click": "details.lydelser summary"},
+ {"caption": "Jämför lydelser: välj en tidigare", "wait": 1500},
+ {"select": "select[data-diff]", "label": "SFS 2022:444 (i kraft 2022-07-01)", "wait": 3000},
+ {"caption": "Tillägg och strykningar markeras i texten", "wait": 1000},
+ {"scroll": 600, "wait": 2500},
+ {"goto": "/1949:381/konsolidering/2018:1288"},
+ {"caption": "En äldre lydelse har egen adress: /konsolidering/ och sista SFS", "wait": 3000},
+ {"goto": "/celex/32016L0097"},
+ {"highlight": "dl.meta details.lydelser", "hold": 300},
+ {"caption": "Samma sak för en EU-rättsakt: Konsoliderad t.o.m., och Jämför lydelser", "wait": 3000},
+ {"caption": "", "wait": 500}
+]}

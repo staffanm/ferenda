@@ -1723,6 +1723,16 @@ p.ruta:first-of-type, p:not(.ruta) + p.ruta { margin-top: 1.1rem; }
 figure.bild { margin: 1.4rem 0; text-align: center; }
 figure.bild img { max-width: 100%; height: auto; border: 1px solid var(--rule-soft);
                   border-radius: 3px; }
+/* the manual's screenshots and screencasts (site/media/, site/render.py):
+   the same frame as an illustration, a caption under it, the film full width */
+figure.film { margin: 1.4rem 0; }
+figure.film video { display: block; width: 100%; height: auto;
+                    border: 1px solid var(--rule-soft); border-radius: 3px;
+                    background: var(--surf); }
+.site figure.bild { text-align: left; }
+.site figure figcaption { font-family: var(--serif); font-style: italic;
+                          font-size: .85rem; color: var(--ink-3);
+                          margin-top: .4rem; }
 
 /* A begrepp page with no written description: the term's occurrences ARE the
    page, so they render in the reading column instead of the context rail (see

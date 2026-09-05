@@ -1,0 +1,15 @@
+{"name": "folkratt", "steps": [
+ {"goto": "/"},
+ {"click": "button.search"},
+ {"type": "artikel 6 i Europakonventionen", "wait": 2000},
+ {"key": "Enter", "wait": 2500},
+ {"caption": "Artikel 6, i konventionens egen text", "wait": 2000},
+ {"click": "details.rail-sec[data-sec='dv'] summary"},
+ {"caption": "Rättsfall: svenska avgöranden som åberopat artikeln", "wait": 2500},
+ {"click": "details.rail-sec[data-sec='dv'] summary", "wait": 500},
+ {"click": "details.rail-sec[data-sec='hudoc'] summary"},
+ {"caption": "Europadomstolens praxis", "wait": 2500},
+ {"click": "details.rail-sec[data-sec='hudoc'] a"},
+ {"caption": "En dom från Europadomstolen, med ECLI och berörda artiklar", "wait": 3500},
+ {"caption": "", "wait": 500}
+]}

@@ -1,0 +1,11 @@
+{"name": "forarbeten", "steps": [
+ {"goto": "/prop/2016/17:180#sid291"},
+ {"caption": "prop. 2016/17:180 s. 291 — sidnumret i marginalen är det tryckta", "wait": 2500},
+ {"click": "#sid291 button[data-fax]"},
+ {"caption": "Original: den tryckta sidan bakom texten", "wait": 3500},
+ {"click": "#sid291 button.sid-nr", "wait": 1500},
+ {"goto": "/2017:900#P6"},
+ {"click": "details.rail-sec[data-sec='fk'] summary"},
+ {"caption": "Författningskommentaren i lagens kontextpanel, med länk till sidan i propositionen", "wait": 3500},
+ {"caption": "", "wait": 500}
+]}

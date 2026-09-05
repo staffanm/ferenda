@@ -23,6 +23,19 @@ The golden comparison is a change-detector, not an oracle. Read
 [`../docs/developing/testing.md`](../docs/developing/testing.md) before acting
 on a difference.
 
+## screencast/ — film the site for the manual
+
+| Tool | Input | Output | Destructive |
+|---|---|---|---|
+| `record.py` | a cast (`casts/<name>.json`: a viewport and a list of steps) and the public site | `<name>.webm` plus its poster `<name>.png` in the content repo's `site/media/`; a `shot` step writes a still there too | overwrites those files |
+
+Needs the system `ffmpeg` (`apt install ffmpeg`): Playwright records VP8 with no quality setting, and the recorder re-encodes to VP9 at about half the size.
+
+One cast per manual chapter (`../lagen-wiki/site/om/<chapter>.md` embeds
+`<name>.webm`). Re-record a cast when the chapter's text changes, then commit
+the new files in the content repo. It records the public site by default;
+`--base http://localhost:8000` films a local `lagen serve` instead.
+
 ## operations/ — run and watch the live service
 
 | Tool | Input | Output | Destructive |

@@ -4,9 +4,9 @@ it is hand-authored prose, links and lists -- so the model is a small block
 tree, not a `Forfattning`/`Avgorande`-style domain structure.
 
 A **block** is one of `Heading` / `Paragraph` / `Bullets` / `Table` / `Code` /
-`Rule`; its `type` field is the on-disk discriminator the renderer dispatches on
-(kept in Swedish to match the other artifacts: `rubrik`/`stycke`/`lista`/
-`tabell`/`kod`/`avdelare`). Inline content is a list of *runs*: a bare `str` for
+`Rule` / `Image` / `Video`; its `type` field is the on-disk discriminator the
+renderer dispatches on (kept in Swedish to match the other artifacts: `rubrik`/
+`stycke`/`lista`/`tabell`/`kod`/`avdelare`/`bild`/`film`). Inline content is a list of *runs*: a bare `str` for
 plain text, or a dict `{"text", "uri"?, "bold"?, "italic"?, "code"?}` for a link
 / emphasised / code span (`uri` resolved at parse time via the shared
 `lib.markdown` link grammar, so the artifact is the source of truth for
@@ -66,7 +66,29 @@ class Rule:
     type: str = "avdelare"
 
 
-Block = Heading | Paragraph | Bullets | Table | Code | Rule
+@dataclass
+class Image:
+    """A screenshot or illustration standing on its own line: `![alt](file.png
+    "caption")`. `src` is the served URL (`/media/<file>`); the file itself sits
+    in the content repo's `site/media/` and is copied out at generate."""
+    src: str
+    alt: str
+    caption: str | None = None
+    type: str = "bild"
+
+
+@dataclass
+class Video:
+    """A screencast, written the same way as an image but with a `.webm` file.
+    `alt` is the text shown where the browser cannot play it; the poster is the
+    `.png` beside the file (`tools/screencast/record.py` writes both)."""
+    src: str
+    alt: str
+    caption: str | None = None
+    type: str = "film"
+
+
+Block = Heading | Paragraph | Bullets | Table | Code | Rule | Image | Video
 
 
 @dataclass

@@ -1,0 +1,18 @@
+{"name": "oversikt", "steps": [
+ {"goto": "/1915:218"},
+ {"caption": "Avtalslagen. Innehållet till vänster, texten i mitten, kontexten till höger", "wait": 2500},
+ {"scroll": "#P36"},
+ {"caption": "36 §. Kontextpanelen byter till den paragraf du läser", "wait": 2000},
+ {"click": "details.rail-sec[data-sec='dv'] summary"},
+ {"caption": "Rättsfall: de avgöranden som hänvisar hit", "wait": 2000},
+ {"hover": "details.rail-sec[data-sec='dv'] a", "wait": 2200},
+ {"caption": "Förhandsvisning. ↗ öppnar rättsfallet bredvid lagtexten", "wait": 1500},
+ {"click": ".pop-expand", "wait": 3500},
+ {"goto": "/1915:218"},
+ {"scroll": "section.andringar"},
+ {"caption": "Ändringar och övergångsbestämmelser: varje ändring, med förarbeten", "wait": 2500},
+ {"goto": "/2018:218"},
+ {"highlight": "dl.meta dd:has(strong.here)", "hold": 400},
+ {"caption": "Normkedja: EU-förordningen över lagen, förordningarna under", "wait": 3000},
+ {"caption": "", "wait": 500}
+]}

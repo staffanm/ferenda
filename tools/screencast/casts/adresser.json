@@ -1,0 +1,13 @@
+{"name": "adresser", "steps": [
+ {"goto": "/1962:700"},
+ {"caption": "lagen.nu/1962:700 — SFS-numret är adressen", "wait": 2500},
+ {"goto": "/1962:700#K6P1"},
+ {"caption": "#K6P1 — 6 kap. 1 §", "wait": 2500},
+ {"goto": "/1960:729#P26aS2"},
+ {"caption": "#P26aS2 — 26 a § andra stycket", "wait": 2500},
+ {"goto": "/celex/32016R0679#6.2"},
+ {"caption": "En EU-artikel: /celex/32016R0679#6.2", "wait": 2500},
+ {"goto": "/coe/005#A6"},
+ {"caption": "Europakonventionen: /coe/005#A6", "wait": 2500},
+ {"caption": "", "wait": 500}
+]}

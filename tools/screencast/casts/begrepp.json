@@ -1,0 +1,13 @@
+{"name": "begrepp", "steps": [
+ {"goto": "/celex/32016R0679#13"},
+ {"caption": "Definierade termer är länkade till definitionen", "wait": 1500},
+ {"hover": "[id='13'] a.term", "wait": 2500},
+ {"click": "[id='13'] a.term"},
+ {"caption": "Artikel 4.1: personuppgifter", "wait": 2500},
+ {"goto": "/begrepp/Anbud"},
+ {"caption": "En begreppssida med skriven förklaring", "wait": 2500},
+ {"goto": "/begrepp/L%C3%A4kemedel"},
+ {"caption": "Läkemedel: 18 legaldefinitioner, en per författning", "wait": 1500},
+ {"scroll": 500, "wait": 2500},
+ {"caption": "", "wait": 500}
+]}

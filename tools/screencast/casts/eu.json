@@ -1,0 +1,14 @@
+{"name": "eu", "steps": [
+ {"goto": "/celex/32016R0679#6"},
+ {"caption": "Artikel 6 i dataskyddsförordningen", "wait": 2000},
+ {"click": "details.rail-sec[data-sec='skal'] summary"},
+ {"caption": "Relevanta skäl: de skäl som förklarar artikeln", "wait": 2500},
+ {"click": "details.rail-sec[data-sec='skal'] a"},
+ {"caption": "Skälet, och under det: Relevant artikel", "wait": 3000},
+ {"goto": "/celex/32016L0097"},
+ {"highlight": ".version-banner", "hold": 300},
+ {"caption": "Konsoliderad version, med ändringsrättsakterna namngivna", "wait": 3000},
+ {"click": "details.rail-sec[data-sec='guidance'] summary"},
+ {"caption": "EU-vägledning: riktlinjer från EU:s organ, bredvid rättsakten", "wait": 3000},
+ {"caption": "", "wait": 500}
+]}

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from markupsafe import Markup
 
-from ..lib import compress, feeds, layout, tpl
+from ..lib import compress, feeds, layout, tpl, util
 from ..lib.page import BRAND, escape, href, page
 from ..lib.render import edit_meta
 
@@ -116,7 +116,24 @@ def _block_html(block):
         return "<pre>%s</pre>" % escape(block["text"])
     if t == "avdelare":
         return "<hr>"
+    if t == "bild":
+        return _figure_html(
+            "bild", '<img src="%s" alt="%s" loading="lazy">'
+            % (escape(block["src"]), escape(block["alt"])), block["caption"])
+    if t == "film":
+        # the poster is the recording's first frame, written beside the .webm by
+        # tools/screencast/record.py; nothing plays until the reader asks
+        return _figure_html(
+            "film", '<video controls muted playsinline preload="metadata" '
+            'poster="%s"><source src="%s" type="video/webm">%s</video>'
+            % (escape(block["src"][:-len(".webm")] + ".png"),
+               escape(block["src"]), escape(block["alt"])), block["caption"])
     raise ValueError("unknown site block type %r" % t)
+
+
+def _figure_html(cls, inner, caption):
+    return '<figure class="%s">%s%s</figure>' % (
+        cls, inner, "<figcaption>%s</figcaption>" % escape(caption) if caption else "")
 
 
 def _blocks_html(blocks):
@@ -231,13 +248,32 @@ def _editable(html, basefile):
                         edit_meta("site", basefile, "/" + basefile) + "</head>", 1)
 
 
+def write_media(out_root):
+    """Copy the content repo's ``site/media/`` (screenshots, screencasts and
+    their posters) to ``/media/``. Stored plain: png and webm are already
+    compressed. A file whose copy is at least as new as the source is left
+    alone, so the ~50 MB of screencasts is not rewritten on every generate;
+    the copy is written through `util.write_atomic`, so a run killed mid-copy
+    leaves no truncated file that reads as current on the next one."""
+    src = layout.WIKI_ROOT / "site" / "media"
+    if not src.is_dir():
+        return
+    dest = Path(out_root) / "media"
+    for f in sorted(src.iterdir()):
+        target = dest / f.name
+        if not target.exists() or target.stat().st_mtime < f.stat().st_mtime:
+            util.write_atomic(target, f.read_bytes())
+
+
 def write_site(out_root):
     """Write every parsed site artifact to its page(s) under `out_root`: the
     frontpage to ``index.html``, each about page to ``om/<slug>.html``, each
     subdomain page to ``subdomain/<zone>/<slug>.html``, and the sitenews
     listing + Atom feed under ``dataset/sitenews/feed``. Driven purely by
-    which artifacts exist (an empty site source writes nothing)."""
+    which artifacts exist (an empty site source writes nothing). The media
+    files the pages embed ride along."""
     out = Path(out_root)
+    write_media(out)
     page_fmt = compress.PAGE_ENCODINGS
     for path in layout.artifacts("site"):
         art = compress.read_json(path)

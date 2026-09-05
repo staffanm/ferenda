@@ -1,0 +1,19 @@
+{"name": "praxis-over-tid", "steps": [
+ {"goto": "/2025:400#K11P1"},
+ {"caption": "11 kap. 1 § socialtjänstlagen (2025:400)", "wait": 2000},
+ {"click": "details.rail-sec[data-sec='aldre-rattsfall'] summary"},
+ {"caption": "Äldre rättsfall för motsvarande bestämmelse: 4 kap. 1 § i 2001 års lag", "wait": 3000},
+ {"click": "details.rail-sec[data-sec='aldre-rattsfall'] summary", "wait": 500},
+ {"click": "details.rail-sec[data-sec='aldre-rattsfall'] summary", "nth": 2},
+ {"caption": "… och 6 § i 1980 års lag, två led bakåt", "wait": 3000},
+ {"goto": "/2001:453#K4P1"},
+ {"click": "details.rail-sec[data-sec='motsvarighet'] summary"},
+ {"caption": "Den gamla lagen pekar framåt", "wait": 3000},
+ {"goto": "/2016:1145#K17P1"},
+ {"click": "details.rail-sec[data-sec='genomfor'] summary"},
+ {"caption": "Genomför EU-rätt: artikel 18 och 70 i direktiv 2014/24/EU, enligt prop. 2015/16:195", "wait": 3500},
+ {"goto": "/celex/32016R0679#6"},
+ {"click": "details.rail-sec[data-sec='eu-aldre-praxis'] summary"},
+ {"caption": "Äldre praxis om motsvarande bestämmelse: domarna om artikel 7 i direktiv 95/46/EG", "wait": 3500},
+ {"caption": "", "wait": 500}
+]}

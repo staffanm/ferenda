@@ -44,12 +44,14 @@ from .model import (
     Code,
     Frontpage,
     Heading,
+    Image,
     NewsItem,
     Paragraph,
     Rule,
     Sitenews,
     SubdomainPage,
     Table,
+    Video,
 )
 
 # CommonMark + GFM pipe tables. `html: False` leaves a literal `<b>` as text:
@@ -62,6 +64,9 @@ RE_NEWS_HEAD = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(.*)$")
 
 # markdown-it's `style: text-align:left` cell attribute -> the model's `align`
 _ALIGN = re.compile(r"text-align:(left|center|right)")
+
+# where the content repo's `site/media/` files are served from
+MEDIA_URL = "/media/"
 
 
 # --------------------------------------------------------------------------
@@ -190,25 +195,31 @@ def _text(node):
 # blocks
 # --------------------------------------------------------------------------
 
-def blocks(body, where):
+def blocks(body, where, media):
     """A markdown body -> a list of block dataclasses. `where` names the source
-    (a basefile) so a construct with no block form points at the file to fix.
+    (a basefile) so a construct with no block form points at the file to fix;
+    `media` is the content repo's ``site/media/`` directory, where every
+    figure's file must already be.
 
     Comments go first: `html: False` makes markdown-it render a comment as the
     text `&lt;!-- …` rather than drop it, so the editorial pages would print
     them just as the commentary pages did (`lib.markdown.strip_comments`)."""
     return _blocks(SyntaxTreeNode(_MD.parse(markdown.strip_comments(body))).children,
-                   where)
+                   where, media)
 
 
-def _blocks(nodes, where):
+def _blocks(nodes, where, media):
     out = []
     for node in nodes:
         kind = node.type
         if kind == "heading":
             out.append(Heading(_text(node.children[0]), int(node.tag[1:])))
         elif kind == "paragraph":
-            out.append(Paragraph(_runs(node.children[0], where)))
+            inline = node.children[0]
+            if [c.type for c in inline.children] == ["image"]:
+                out.append(_figure(inline.children[0], where, media))
+            else:
+                out.append(Paragraph(_runs(inline, where)))
         elif kind in ("bullet_list", "ordered_list"):
             out.append(Bullets([_item(li, where) for li in node.children],
                                ordered=kind == "ordered_list"))
@@ -223,6 +234,38 @@ def _blocks(nodes, where):
                 "%s: block markdown %r has no block form (site/model.py has "
                 "rubrik, stycke, lista, tabell, kod, avdelare)" % (where, kind))
     return out
+
+
+def _figure(node, where, media):
+    """An ``image`` node standing alone in its paragraph -> an `Image` or, by
+    file extension, a `Video`. The target names a file in the content repo's
+    ``site/media/`` (``![Sökrutan](sok.png "Sökrutan med tre träffar")``); the
+    optional title is the caption. A target that is not there (a typo, a
+    recording not yet committed) is refused here, where the page's own
+    basefile can be named -- the generated page would otherwise carry a dead
+    ``<img>`` and nothing would say so. An image inside running text has no
+    run form and fails in `_runs` like any other unmapped inline."""
+    src = str(node.attrs["src"]).strip()
+    if "/" in src:
+        raise ValueError(
+            "%s: image target %r must be a bare file name in site/media/"
+            % (where, src))
+    if not (media / src).is_file():
+        raise ValueError(
+            "%s: image target %r is not in %s" % (where, src, media))
+    alt = _text(node)
+    if not alt:
+        raise ValueError("%s: the image %r has no alt text" % (where, src))
+    caption = str(node.attrs["title"]) if "title" in node.attrs else None
+    if src.endswith(".webm"):
+        # the page names the poster beside the film (site/render.py); the
+        # recorder writes both, but a film committed alone would ship a 404
+        poster = src[:-len(".webm")] + ".png"
+        if not (media / poster).is_file():
+            raise ValueError(
+                "%s: the film %r has no poster %r in %s" % (where, src, poster, media))
+        return Video(src=MEDIA_URL + src, alt=alt, caption=caption)
+    return Image(src=MEDIA_URL + src, alt=alt, caption=caption)
 
 
 def _item(li, where):
@@ -271,18 +314,18 @@ def _news_id(published):
     return "n" + re.sub(r"[ :]", "-", published)
 
 
-def frontpage_artifact(path):
+def frontpage_artifact(path, media):
     meta, body = _read(path)
-    return Frontpage(title=meta["title"], blocks=blocks(body, "frontpage"))
+    return Frontpage(title=meta["title"], blocks=blocks(body, "frontpage", media))
 
 
-def about_artifact(slug, path):
+def about_artifact(slug, path, media):
     meta, body = _read(path)
     return AboutPage(slug=slug, title=meta["title"],
-                     blocks=blocks(body, "om/" + slug))
+                     blocks=blocks(body, "om/" + slug, media))
 
 
-def subdomain_artifact(zone, slug, path):
+def subdomain_artifact(zone, slug, path, media):
     where = "subdomain/%s/%s" % (zone, slug)
     meta, body = _read(path)
     if "title" not in meta:
@@ -291,10 +334,10 @@ def subdomain_artifact(zone, slug, path):
             "frontmatter, never by a body heading (rule:errors-drive-retry-"
             "use-raise)" % where)
     return SubdomainPage(zone=zone, slug=slug, title=meta["title"],
-                         blocks=blocks(body, where))
+                         blocks=blocks(body, where, media))
 
 
-def sitenews_artifact(path):
+def sitenews_artifact(path, media):
     meta, body = _read(path)
     items, head, buf = [], None, []
 
@@ -302,7 +345,8 @@ def sitenews_artifact(path):
         if head:
             items.append(NewsItem(id=_news_id(head[0]), published=head[0],
                                   title=head[1],
-                                  blocks=blocks("\n".join(buf), "sitenews")))
+                                  blocks=blocks("\n".join(buf), "sitenews",
+                                                media)))
 
     for line in body.splitlines():
         h = markdown.RE_HEADING.match(line.strip())
@@ -362,13 +406,14 @@ def record(root, basefile):
 def artifact(basefile, root):
     """basefile -> its parsed artifact as a plain JSON-serialisable dict."""
     path = record(root, basefile)
+    media = _site_dir(root) / "media"
     if basefile == "frontpage":
-        art = frontpage_artifact(path)
+        art = frontpage_artifact(path, media)
     elif basefile == "sitenews":
-        art = sitenews_artifact(path)
+        art = sitenews_artifact(path, media)
     elif basefile.startswith("om/"):
-        art = about_artifact(basefile[len("om/"):], path)
+        art = about_artifact(basefile[len("om/"):], path, media)
     else:
         zone, slug = basefile[len("subdomain/"):].rsplit("/", 1)
-        art = subdomain_artifact(zone, slug, path)
+        art = subdomain_artifact(zone, slug, path, media)
     return dataclasses.asdict(art)

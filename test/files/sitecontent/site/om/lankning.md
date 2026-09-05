@@ -33,3 +33,7 @@ två rader](https://example.org/a) och **fet
 text** som gör detsamma.
 
 ## Ankaret `#K6P18` i en rubrik
+
+![Sökrutan med tre träffar](sok.png "Sökrutan, med en hänvisning fäst överst")
+
+![Sökningen som film](sok.webm)

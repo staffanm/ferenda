@@ -1,0 +1,11 @@
+{"name": "oppna-data", "steps": [
+ {"goto": "/docs"},
+ {"caption": "API-dokumentationen på /docs", "wait": 3000},
+ {"goto": "/api/v1/document/inbound?uri=https://lagen.nu/1915:218%23P36", "until": "load"},
+ {"caption": "Vem hänvisar till 36 § avtalslagen — som data", "wait": 3500},
+ {"goto": "https://github.com/staffanm/sfs"},
+ {"caption": "Lagtexten som git: en commit per ändring", "wait": 3500},
+ {"goto": "https://para-graf.tomtebo.org/"},
+ {"caption": "paraGRAF — byggt på API:et", "wait": 3500},
+ {"caption": "", "wait": 500}
+]}
