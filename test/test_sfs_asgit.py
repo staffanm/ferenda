@@ -72,10 +72,18 @@ def test_event_dates_fallback_chain():
 
 def test_identities_from_forarbete_signers_and_fallbacks():
     ev = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194",
-               rskr="Rskr. 2020/21:387")
+               rskr="Rskr. 2020/21:387",
+               titles={"2018:585": "Säkerhetsskyddslag (2018:585)"})
     author, committer = identities(ev, _meta)
     assert author == ("Stefan Löfven", "stefan.lofven@lagen.nu")
     assert committer == ("Andreas Norlén", "andreas.norlen@lagen.nu")
+    # the same proposition followed by a förordning alone: riksdagen decided
+    # nothing there, the minister authors and commits
+    ev = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194",
+               rskr="Rskr. 2020/21:387",
+               titles={"2021:955": "Säkerhetsskyddsförordning (2021:955)"})
+    assert identities(ev, _meta) == (("Stefan Löfven", "stefan.lofven@lagen.nu"),
+                                     ("Stefan Löfven", "stefan.lofven@lagen.nu"))
     # unknown förarbeten -> the corpus fallbacks, never a guessed identity
     ev = Event(key="SFS 1962:700", titles={"1962:700": "Brottsbalk (1962:700)"})
     assert identities(ev, _meta) == (("Regeringen", "regeringen@lagen.nu"),
@@ -102,6 +110,7 @@ def test_definite_title_and_lag_detection():
     assert definite("Skattebrottslag (1971:69)") == "skattebrottslagen (1971:69)"
     assert is_lag("Lag (2022:1) om foo") and is_lag("Brottsbalk (1962:700)")
     assert is_lag("Tryckfrihetsförordning (1949:105)")
+    assert is_lag("Kungörelse (1974:152) om beslutad ny regeringsform")
     assert not is_lag("Förordning (2020:486) om bilar")
     assert not is_lag("Kungörelse (1966:436) om x")
 

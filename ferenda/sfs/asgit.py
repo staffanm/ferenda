@@ -134,7 +134,15 @@ def _title_head(title):
 
 def is_lag(title):
     head = _title_head(title)
-    return head.endswith(("lag", "balk")) or head in _RIKSDAG_HEADS
+    return (head.endswith(("lag", "balk")) or head in _RIKSDAG_HEADS
+            or RE_BESLUTAD_GRUNDLAG.search(title) is not None)
+
+
+# "Kungörelse (1974:152) om beslutad ny regeringsform": a grundlag under a
+# kungörelse title
+RE_BESLUTAD_GRUNDLAG = re.compile(
+    r"om beslutad ny (regeringsform|riksdagsordning|successionsordning|"
+    r"tryckfrihetsförordning)")
 
 
 def definite(title):
@@ -807,22 +815,23 @@ def message(event, forarbete_meta, scope="full"):
 def identities(event, forarbete_meta):
     """((author name, email), (committer name, email)) -- the proposition's
     first signer and the riksdagsskrivelse's first signer, with the corpus
-    fallbacks when either förarbete is unavailable. An event riksdagen had
-    no part in (no förarbete, no lag among its acts) is the government's
-    alone: author and committer are the same."""
+    fallbacks when either förarbete is unavailable. An event with no lag
+    among its acts is the government's alone, whatever proposition it
+    follows on: author and committer are the same."""
     author = ("Regeringen", "regeringen@lagen.nu")
     committer = ("Riksdagen", "riksdagen@lagen.nu")
     prop_meta = forarbete_meta(event.prop) if event.prop else None
     if prop_meta and prop_meta.get("signers"):
         name = prop_meta["signers"][0]
         author = (name, email_slug(name))
+    if not event.lag:
+        # förordningar only: the government issues them alone, and commits
+        # them, whatever proposition they follow on
+        return author, author
     rskr_meta = forarbete_meta(event.rskr) if event.rskr else None
     if rskr_meta and rskr_meta.get("signers"):
         name = rskr_meta["signers"][0]
         committer = (name, email_slug(name))
-    elif not (event.prop or event.rskr or event.lag):
-        # a förordning: the government issues it alone, and commits it
-        committer = author
     return author, committer
 
 
