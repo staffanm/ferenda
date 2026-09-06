@@ -130,6 +130,11 @@ services:
   #     docker compose exec ferenda lagen all rebuild
   #     docker compose exec ferenda lagen all index
   ferenda:
+    # An explicit tag rather than the derived `<project>-ferenda`. The deploy
+    # keeps the outgoing image as `lagen-ferenda:previous` and puts it back
+    # under this name when the new one does not come up healthy, and a rollback
+    # must not depend on how compose happens to name things.
+    image: lagen-ferenda:current
     build:
       context: .
       dockerfile: docker/ferenda/Dockerfile
@@ -156,6 +161,24 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    # This one image serves the public site AND carries the whole ingestion
+    # toolchain -- git, Java, OCR, poppler, a browser -- with write access to
+    # the corpus and to the wiki checkout the editors commit into. It already
+    # runs as an unprivileged user; these three cost nothing and shrink what a
+    # compromised parser, PDF tool or browser can reach next.
+    cap_drop: [ALL]           # binds :8000, writes files: needs no capability
+    security_opt:
+      - no-new-privileges:true
+    # The pipeline runs process pools and shells out to pdftoppm, java and a
+    # headful Chrome (which is many processes), so this is a runaway guard, not
+    # a budget: nothing observed comes near it.
+    pids_limit: 4096
+    # Likewise a ceiling, not an allocation. The nightly `lagen all` is meant
+    # to use this box, and the app bounds its own render concurrency (two
+    # WeasyPrint workers, four poppler slots), so no cpus limit -- what this
+    # stops is one runaway process taking the host down with it. The host has
+    # 48 GB and OpenSearch is resident in a good part of it.
+    mem_limit: 32g
     environment:
       - OPENSEARCH_URL=http://opensearch:9200
       - WIKI_ROOT=/wiki
@@ -434,7 +457,14 @@ services:
   # inert -- rotating a password there is an `ALTER USER` against the running
   # server, and `.env` must then be updated to match. See .env.example.
   db:
-    image: mariadb
+    # An explicit version, pinned by digest. `mariadb` alone floats across major
+    # versions: the running container is whatever `latest` was on the day it was
+    # created, and the next recreate silently brings whatever `latest` is then.
+    # This is the digest `latest` resolved to on 2026-09-05 (12.3.3), so a
+    # recreate today does exactly what the floating tag would have done -- and
+    # the one after that does the same thing again. MariaDB upgrades a data
+    # directory forward but never back, so bump this deliberately.
+    image: mariadb:12.3.3@sha256:ebfd70b7d9681eae911fa3f11b1e5b76b19e316ddd6cc9fc699f86dc881d0b30
     command: --max-allowed-packet=64MB
     profiles: [prod]
     volumes:
