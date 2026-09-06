@@ -15,6 +15,7 @@ block is distinguishable from a genuine error.
 
 import atexit
 import functools
+import ipaddress
 import json
 import os
 import socket
@@ -375,6 +376,45 @@ def _ca_issuers_url(certificate):
     return urls[0]
 
 
+# A certificate names its own caIssuers URL, and the leaf that names it has not
+# been verified yet -- that is the whole point of the walk. So the address is
+# attacker-chosen in the case this exists to survive: a compromised server, or
+# anyone who can answer for it. `_aia_target` is what keeps the request on the
+# public internet. It cannot make the fetch meaningless -- the signature check
+# below already does that -- but a request the server picks must not be able to
+# reach the host's own network.
+AIA_MAX_BYTES = 256 * 1024
+
+
+def _aia_target(url):
+    """`url`, refused unless it is an ordinary http/https address whose name
+    resolves entirely to public addresses.
+
+    Checked before the connection, so a name that resolves differently a
+    moment later is not covered; a rebind still has to produce a certificate
+    that signed the one below it, which is what the trust actually rests on."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise ValueError("caIssuers URL %r is not http(s)" % url)
+    if not parts.hostname:
+        raise ValueError("caIssuers URL %r names no host" % url)
+    try:
+        resolved = socket.getaddrinfo(
+            parts.hostname, parts.port or (443 if parts.scheme == "https" else 80),
+            type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        # a name that does not resolve is a refusal like any other: there is no
+        # issuer at the far end, and the walk has to say so rather than raise
+        # a transport error out of a trust decision
+        raise ValueError("caIssuers URL %r does not resolve" % url) from exc
+    for _family, _type, _proto, _canon, sockaddr in resolved:
+        address = ipaddress.ip_address(sockaddr[0])
+        if not address.is_global or address.is_multicast:
+            raise ValueError("caIssuers URL %r resolves to %s, which is not a "
+                             "public address" % (url, address))
+    return url
+
+
 # how far up an omitted chain to walk before giving up. Two is the real depth
 # today (lifos omits both its intermediate and the cross-signed root above it);
 # the bound is what stops a malicious or looping AIA graph from being followed
@@ -425,8 +465,9 @@ def _omitted_chain(leaf, session, timeout):
                 "the chain above %s does not reach a trusted root within %d "
                 "AIA hops" % (leaf.subject.rfc4514_string(), AIA_CHAIN_MAX))
         issuer = x509.load_der_x509_certificate(
-            request(session, "GET", _ca_issuers_url(certificate),
-                    timeout=timeout).content)
+            request(session, "GET", _aia_target(_ca_issuers_url(certificate)),
+                    timeout=timeout, max_bytes=AIA_MAX_BYTES,
+                    allow_redirects=False).content)
         # raises if `issuer` did not sign `certificate` -- the check the whole
         # helper's safety rests on
         certificate.verify_directly_issued_by(issuer)
