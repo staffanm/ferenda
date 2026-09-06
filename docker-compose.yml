@@ -81,23 +81,48 @@ services:
       - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
       - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
       - bootstrap.memory_lock=true            # keep the JVM heap out of swap
-      # 15GB host, and every byte here is taken FROM the page cache: memory_lock
+      # 47GB host, and every byte here is taken FROM the page cache: memory_lock
       # pins the whole heap, and Xms == Xmx commits it at startup. That trade is
-      # the wrong way round for this workload -- the index is ~31GB on a disk
+      # the wrong way round for this workload -- the index is 22.7GB on a disk
       # doing ~100 random IOPS, so latency is decided by how much of it the OS
       # can cache (a cold search costs 10+ s, a warm one ~100 ms), not by heap.
       #
-      # Measured on prod 2026-08-17 at 2g: 0.65GB used (32%), ZERO old GCs in
-      # 4.2h, zero query-cache and fielddata evictions. Nothing was short of
-      # heap, so 1536m keeps >2x headroom over observed use and hands 512MB back
-      # to the cache. The collapse index is deliberately not heap-hungry (no
-      # parent-child join). Raise it only against evidence -- an old-GC count
-      # that climbs, or fielddata/query-cache evictions in _nodes/stats.
+      # 1536m was set on 2026-08-17 against *search* evidence: 0.65GB used
+      # (32%), zero old GCs in 4.2h, no query-cache or fielddata evictions. That
+      # measurement was right and is still right -- serving needs almost no
+      # heap. It missed the other workload on this cluster.
       #
-      # Room came from retiring two legacy containers: Elasticsearch
-      # (2026-08-17: 3g of heap and a 15GB index) and fuseki (2026-09-06: 2g,
-      # see the note below), neither of which is on this host any more.
-      - OPENSEARCH_JAVA_OPTS=-Xms1536m -Xmx1536m
+      # Raised to 4g on 2026-09-06, against the evidence that note asked for and
+      # then some: a `lagen all rebuild` lost its whole index phase to
+      #   TransportError(429, 'circuit_breaking_exception',
+      #     '[parent] Data too large, data for [<http_request>] would be
+      #      [1555581076/1.4gb]')
+      # The index step asks `indexed_versions(<source>)` what version each
+      # document is at before deciding what to re-send. That is one row per
+      # *document* (the query filters is_doc) -- 97,266 for forarbete, 172,086
+      # for eurlex -- but it asked with `_source=["version"]`, which made the
+      # node decompress each document's whole stored source to read one hash.
+      # Because every source shares the connection the first failure ends the
+      # step: only dv (3 documents) was indexed that night.
+      #
+      # 4g is what the box can spare rather than what the scroll wants: 47GB
+      # total, 12 in use, and the index store is 22.7GB, so the page cache the
+      # serving path actually depends on still holds the whole index with room
+      # over. Retiring fuseki the same day freed 2g of the 2.5g this takes.
+      #
+      # The cause is fixed separately, in the same change: `indexed_versions`
+      # now reads the hash from doc values (`docvalue_fields`), so no source is
+      # decompressed at all -- measured 157.5s -> 61.0s over forarbete, identical
+      # maps. The heap raise is the margin, not the fix.
+      #
+      # How this reaches production: `ferenda` depends_on `opensearch`, so the
+      # deploy's `up -d ferenda` recreates the search node when this value
+      # changes (verified with `up -d --dry-run`: "lagen-opensearch Recreate").
+      # That drops 22.7GB of warm page cache, and neither the deploy's health
+      # gate nor its smoke test touches search -- so the deploy goes green while
+      # search is cold, and a query costs 10+ s until the keep-warm cron refills
+      # it.
+      - OPENSEARCH_JAVA_OPTS=-Xms4g -Xmx4g
     ulimits:
       memlock:
         soft: -1
