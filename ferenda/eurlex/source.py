@@ -547,11 +547,12 @@ def eurlex_extra_pages(only):
         sorted(layout.artifact_dir("eurlex").glob("*/*.versions.json")))
 
 
-def eurlex_relate_cross(con):
+def eurlex_relate_cross(con, jobs=1):
     """eurlex's part of relate's cross-document block: load the hand-authored
     `.corr` layers (a recast with no jämförelsetabell of its own, e.g. GDPR
     against 95/46/EC) into `directive_correspondence`, beside the rows
-    `correspondence` extracts mechanically at parse time."""
+    `correspondence` extracts mechanically at parse time. A handful of files;
+    `jobs` is the protocol's, unused here."""
     rows = correspond.hand_rows()
     catalog.add_directive_correspondence(con, rows)
     return ({"hand-authored directive lineage edges loaded from .corr layers":

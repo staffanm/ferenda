@@ -18,9 +18,11 @@ because the rubrik semantics are förarbete-specific; it imports only the shared
 catalog (never the SFS vertical -- the statute corpus is read through the catalog).
 """
 
+import functools
+import itertools
 import json
 
-from ..lib import annstore, catalog, compress, text
+from ..lib import annstore, catalog, compress, text, util
 from . import kommentar
 
 
@@ -101,49 +103,80 @@ def prop_implements(art, layer_edges):
                           if directive_base(r.get("directive")) not in authored]
 
 
-def resolve(con, layers=None):
+# how many propositions one read job covers -- fk.READ_CHUNK's reasoning
+READ_CHUNK = 200
+# how many statutes one fragment-ids job covers: a consolidated statute is a
+# far larger artifact than a proposition's edges, and its id walk is CPU too
+PIN_CHUNK = 50
+
+
+def _fragment_ids_job(paths):
+    # one read job: the element ids each statute artifact mints
+    return [(p, text.fragment_ids(compress.read_json(p))) for p in paths]
+
+
+def _implements_job(root, props):
+    # one read job: each proposition's date, identifier and the edges to
+    # resolve (`prop_implements` of its artifact and its authored layer)
+    out = []
+    for prop_uri, path, layer_edges in props:
+        art = compress.read_json(root / path)
+        out.append((prop_uri, art.get("date"), art.get("identifier"),
+                    prop_implements(art, layer_edges)))
+    return out
+
+
+def resolve(con, layers=None, jobs=1):
     """Re-derive every genomför-direktiv -> SFS-paragraf relation in the catalog
     from the förarbete props' genomför-direktiv edges (only the props that carry
     such edges are read -- the authored `.ann` layer from `layers` where present,
     else the mechanical `implements`; `prop_implements`). `layers` is the
     prop-uri -> authored-edges map `genomforande_layers` globs at relate time;
     None (the default, and how the pin tests drive it) means mechanical only.
-    Returns the number of relations pinned."""
+    The artifact reads go across `jobs` processes (`util.pooled`); the
+    resolution and the catalog write stay here. Returns the number of
+    relations pinned."""
     layers = layers or {}
     title_idx, path_idx = law_index(con)
-    root = catalog.data_root(con)              # stored paths are data_root-relative
-    props = con.execute(
+    props = [(uri, path, layers.get(uri)) for uri, path in con.execute(
         "SELECT DISTINCT d.uri, d.path FROM links l "
         "JOIN documents d ON d.uri = l.from_uri "
-        "WHERE l.predicate = 'rpubl:genomforDirektiv' AND d.source = 'forarbete'"
-    ).fetchall()
-    rows, sfs_ids = [], {}
-    for prop_uri, prop_path in props:
-        art = compress.read_json(root / prop_path)
-        prop_date, prop_label = art.get("date"), art.get("identifier")
-        for rec in prop_implements(art, layers.get(prop_uri)):
+        "WHERE l.predicate = 'rpubl:genomforDirektiv' AND d.source = 'forarbete'")]
+    # stored paths are data_root-relative
+    read = util.pooled(functools.partial(_implements_job, catalog.data_root(con)),
+                       props, jobs, chunk=READ_CHUNK)
+    # each edge resolved to its statute and anchor; the ones a pin names are
+    # checked against the statute's element ids below
+    edges = []
+    for prop_uri, prop_date, prop_label, recs in itertools.chain.from_iterable(read):
+        for rec in recs:
             sfs_uri = resolve_law(rec.get("law"), prop_date, title_idx, path_idx)
             anchor = kommentar.paragraf_fragment(rec.get("chapter"),
                                                  rec.get("paragraf"))
-            if not (sfs_uri and anchor):
-                continue
-            # the reference's Swedish-side stycke/punkt pinpoint ("S1", "S3N2"),
-            # kept only when the published law actually mints that element id --
-            # forgiving: a pinpoint the paragraf doesn't have (the model said
-            # "S5" on a two-stycke paragraf, or the law changed since the prop)
-            # is disregarded and the paragraf-level reference stands
-            sfs_pin = rec.get("sfs") or ""
-            if sfs_pin:
-                if sfs_uri not in sfs_ids:
-                    sfs_ids[sfs_uri] = text.fragment_ids(
-                        compress.read_json(path_idx[sfs_uri]))
-                if anchor + sfs_pin not in sfs_ids[sfs_uri]:
-                    sfs_pin = ""
-            by_art = kommentar.pinpoints_by_article(rec.get("pinpoints") or [])
-            partial = int(bool(rec.get("partial")))
-            for article in rec.get("articles", []):
-                pin = ", ".join(by_art.get(article, []))
-                rows.append((sfs_uri, anchor, rec["directive"], article,
-                             prop_uri, prop_label, pin, partial, sfs_pin))
+            if sfs_uri and anchor:
+                edges.append((prop_uri, prop_label, sfs_uri, anchor, rec))
+    # the element ids of every statute a pin names, each artifact read once --
+    # across processes: a consolidated statute is a large artifact, and there
+    # are thousands of them to read
+    pinned = sorted({path_idx[sfs_uri] for _p, _l, sfs_uri, _a, rec in edges
+                     if rec.get("sfs")})
+    sfs_ids = dict(itertools.chain.from_iterable(
+        util.pooled(_fragment_ids_job, pinned, jobs, chunk=PIN_CHUNK)))
+    rows = []
+    for prop_uri, prop_label, sfs_uri, anchor, rec in edges:
+        # the reference's Swedish-side stycke/punkt pinpoint ("S1", "S3N2"),
+        # kept only when the published law actually mints that element id --
+        # forgiving: a pinpoint the paragraf doesn't have (the model said
+        # "S5" on a two-stycke paragraf, or the law changed since the prop)
+        # is disregarded and the paragraf-level reference stands
+        sfs_pin = rec.get("sfs") or ""
+        if sfs_pin and anchor + sfs_pin not in sfs_ids[path_idx[sfs_uri]]:
+            sfs_pin = ""
+        by_art = kommentar.pinpoints_by_article(rec.get("pinpoints") or [])
+        partial = int(bool(rec.get("partial")))
+        for article in rec.get("articles", []):
+            pin = ", ".join(by_art.get(article, []))
+            rows.append((sfs_uri, anchor, rec["directive"], article,
+                         prop_uri, prop_label, pin, partial, sfs_pin))
     catalog.set_genomforande(con, rows)
     return len(rows)

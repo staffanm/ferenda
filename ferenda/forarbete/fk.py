@@ -51,9 +51,11 @@ the same machinery the genomför-direktiv edges use).
 """
 
 import argparse
+import functools
+import itertools
 import re
 
-from ..lib import catalog, compress, layout
+from ..lib import catalog, compress, layout, util
 from ..lib.text import runs_text
 from ..lib.util import normalize_fold
 from . import genomforande, kommentar
@@ -386,7 +388,18 @@ def extract(art, include_empty=False, mark=False):
     return out
 
 
-def resolve(con):
+# how many propositions one read job covers: an artifact read is an NFS round
+# trip of ~44 ms on production, so a job is about ten seconds
+READ_CHUNK = 200
+
+
+def _entries_job(root, props):
+    # one read job: each proposition's `kommentarer` entries, off its artifact
+    return [(uri, label, date, compress.read_json(root / path).get("kommentarer") or [])
+            for uri, path, label, date in props]
+
+
+def resolve(con, jobs=1):
     """Re-derive the per-paragraf FK commentary layer in the catalog from the
     prop artifacts' `kommentarer` sections: each entry's law rubrik is resolved
     to an SFS uri (genomforande.resolve_law -- the same numbered/"Förslaget
@@ -394,17 +407,16 @@ def resolve(con):
     statute's fragment anchor; a law-level entry (no designators) lands on
     anchor '' (the document-level rail). Runs at relate time over every prop in
     the catalog -- the FK is a fixture of the genre, so there is no cheaper
-    candidate filter than the artifact itself. Returns the number of rows."""
+    candidate filter than the artifact itself. The 28,000 artifact reads go
+    across `jobs` processes (`util.pooled`); the resolution and the catalog
+    write stay here. Returns the number of rows."""
     title_idx, path_idx = genomforande.law_index(con)
-    root = catalog.data_root(con)
+    props = con.execute("SELECT uri, path, label, date FROM documents "
+                        "WHERE source = 'forarbete' AND kind = 'prop'").fetchall()
     rows = []
-    for prop_uri, path, label, date in con.execute(
-            "SELECT uri, path, label, date FROM documents "
-            "WHERE source = 'forarbete' AND kind = 'prop'"):
-        art = compress.read_json(root / path)
-        entries = art.get("kommentarer")
-        if not entries:
-            continue
+    read = util.pooled(functools.partial(_entries_job, catalog.data_root(con)),
+                       props, jobs, chunk=READ_CHUNK)
+    for prop_uri, label, date, entries in itertools.chain.from_iterable(read):
         for e in entries:
             sfs_uri = genomforande.resolve_law(e.get("law"), date,
                                                title_idx, path_idx)

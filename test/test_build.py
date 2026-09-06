@@ -1619,7 +1619,7 @@ def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_p
     # cross-document block's (counts, warnings) contract is exercised; the
     # corpus-wide passes run over an empty annstore tree.
     sources = {"sfs": Source("sfs", lambda: [], {}, artifacts=lambda: [art]),
-               "x": Source("x", lambda: [], {}, relate_cross=lambda con: (
+               "x": Source("x", lambda: [], {}, relate_cross=lambda con, jobs=1: (
                    {"stub rows contributed": 1}, ["stub warning line"]))}
     empty = tmp_path / "empty"
     empty.mkdir()
@@ -2312,6 +2312,29 @@ def test_rebuild_hashes_only_what_the_stat_check_lets_through(tmp_path):
     assert (docs, changed, asked[-1]) == (1, 0, ["a.json"])
     # without stats/digests the serial form stats and hashes here, same answer
     assert catalog.rebuild(db, "icrc", [a, b])[2] == 0
+
+
+def test_rebuild_builds_the_genomfor_partial_index_the_cross_pass_needs(tmp_path):
+    # forarbete.genomforande.resolve asks which förarbeten carry a
+    # genomför-direktiv link; without an index on `predicate` the planner
+    # fetched every forarbete document's link rows (20+ minutes on prod's
+    # disk). rebuild builds the partial index, and the query then runs as a
+    # covering index scan
+    art = tmp_path / "a.json"
+    art.write_text(json.dumps({
+        "uri": "https://lagen.nu/icrc/1", "metadata": {"properties": {"dcterms:title": "T"}},
+        "structure": [{"type": "artikel", "id": "A1", "text": ["one"]}]}))
+    db = tmp_path / "catalog.sqlite"
+    catalog.rebuild(db, "icrc", [art])
+    con = catalog.connect(db)
+    assert con.execute("SELECT sql FROM sqlite_master WHERE name = 'idx_links_genomfor'"
+                       ).fetchone()[0].endswith("WHERE predicate = 'rpubl:genomforDirektiv'")
+    plan = [row[3] for row in con.execute(
+        "EXPLAIN QUERY PLAN SELECT DISTINCT d.uri, d.path FROM links l "
+        "JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.predicate = 'rpubl:genomforDirektiv' AND d.source = 'forarbete'")]
+    assert any("COVERING INDEX idx_links_genomfor" in step for step in plan), plan
+    con.close()
 
 
 def test_pooled_chunks_items_and_keeps_order(monkeypatch):

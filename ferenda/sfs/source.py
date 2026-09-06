@@ -745,10 +745,11 @@ def sfs_extra_pages(only):
         sorted(layout.SFS_ARTIFACT.glob("*/*.versions.json")))
 
 
-def sfs_relate_cross(con):
+def sfs_relate_cross(con, jobs=1):
     """SFS's part of relate's cross-document block: summarize each proposition's
     Omfattning magnitude across the laws it amends, and load the authored
-    old->new paragraf correspondences (the `.corr` layers) into the catalog."""
+    old->new paragraf correspondences (the `.corr` layers) into the catalog.
+    Catalog work only; `jobs` is the protocol's, unused here."""
     omfattning_rows = resolve_omfattning(con)
     corr = [row for _p, layer in annstore.read_corr("sfs")
             for row in correspond.corr_rows(layer)]

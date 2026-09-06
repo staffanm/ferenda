@@ -347,16 +347,17 @@ def fa_ai_genomforande(basefiles):
     return report
 
 
-def fa_relate_cross(con):
+def fa_relate_cross(con, jobs=1):
     """Förarbete's part of relate's cross-document block: pin each
     genomför-direktiv statement to the SFS paragraf it transposes, and each
     författningskommentar entry to the paragraf it comments on. Both need the
-    whole catalog, so they run there rather than per document."""
+    whole catalog, so they run there rather than per document; both read
+    proposition artifacts by the thousand, across `jobs` processes."""
     return ({"genomför-direktiv relations pinned to SFS paragrafs":
-                 genomforande.resolve(con,
-                                         genomforande.genomforande_layers()),
+                 genomforande.resolve(con, genomforande.genomforande_layers(),
+                                      jobs=jobs),
              "författningskommentar entries pinned to SFS paragrafs":
-                 fk.resolve(con)}, [])
+                 fk.resolve(con, jobs=jobs)}, [])
 
 
 def fa_intermediate(basefile):

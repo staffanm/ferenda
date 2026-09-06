@@ -77,11 +77,12 @@ def kommentar_anchor_warnings(con, basefiles=()):
     return out
 
 
-def kommentar_relate_cross(con):
+def kommentar_relate_cross(con, jobs=1):
     """Kommentar's part of relate's cross-document block: the anchor audit over
     every commentary at once, worded as the lines relate prints. It runs there
     because relate is what writes the `links` rows -- the graph exists for the
-    first time and the catalog is already open."""
+    first time and the catalog is already open. Catalog work only; `jobs` is
+    the protocol's, unused here."""
     return ({}, [
         "WARNING kommentar %s annotates %s but has no matching node for %s "
         "-- check the heading numbering" % (bf, host, ", ".join(anchors))

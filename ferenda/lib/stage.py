@@ -160,9 +160,11 @@ class Source:
     owns_frontpage: Callable[[], bool] | None = None  # the source writes its own
                                           # frontpage, so generate writes no generic one
     # the source's part of relate's cross-document block, given the open
-    # catalog. Returns `(counts, warnings)`: `{report label: count}` prints as
-    # "relate: <n> <label>", each warning is a finished line relate prints
-    relate_cross: Callable[[sqlite3.Connection],
+    # catalog and the run's job count (for a pass that reads many artifacts:
+    # forarbete's reads every proposition). Returns `(counts, warnings)`:
+    # `{report label: count}` prints as "relate: <n> <label>", each warning is
+    # a finished line relate prints
+    relate_cross: Callable[[sqlite3.Connection, int],
                            tuple[dict[str, int], list[str]]] | None = None
     # the source's own code behind `relate_cross`: an edit re-runs only the
     # cross-document block (it joins corpus._corr_watermark beside CORR_CODE),

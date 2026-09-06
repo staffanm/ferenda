@@ -322,7 +322,7 @@ def cmd_relate(sources, names, force=None, jobs=1):
             counts, warnings = {}, []
             for s in sources.values():
                 if s.relate_cross:
-                    more, lines = s.relate_cross(con)
+                    more, lines = s.relate_cross(con, jobs)
                     counts.update(more)
                     warnings += lines
             folded = catalog.canonicalize_concepts(con)

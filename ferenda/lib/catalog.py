@@ -296,6 +296,17 @@ _CREATE_TO_ROOT = ("CREATE INDEX IF NOT EXISTS idx_links_to_root ON links(%s)"
 #
 # `to_uri` stays leftmost, so every plain `to_uri = ?` and `to_uri` range this
 # index already served keeps it; the second column only widens the rows.
+# The genomför-direktiv pass (forarbete.genomforande.resolve) asks which
+# förarbeten carry a `rpubl:genomforDirektiv` link. Nothing indexes
+# `predicate`, so the planner walked every forarbete document's links through
+# idx_links_from and fetched each row to test the predicate -- millions of
+# scattered reads for an answer of 1,436 documents, 20 minutes and more on
+# prod's disk at every relate (2026-09-06). A partial index over just those
+# links is a few thousand entries and answers the query as a covering scan.
+# Built at relate (`build_genomfor_index`), never on the serving path.
+_CREATE_GENOMFOR = ("CREATE INDEX IF NOT EXISTS idx_links_genomfor ON links(from_uri) "
+                    "WHERE predicate = 'rpubl:genomforDirektiv'")
+
 INDEX_TO_URI_COLUMNS = ("to_uri", "from_uri")
 _CREATE_TO_URI = ("CREATE INDEX IF NOT EXISTS idx_links_to_uri ON links(%s)"
                   % ", ".join(INDEX_TO_URI_COLUMNS))
@@ -452,6 +463,13 @@ def widen_to_root_index(con: sqlite3.Connection) -> bool:
     con.execute(_CREATE_TO_ROOT)
     con.execute("COMMIT")
     return True
+
+
+def build_genomfor_index(con: sqlite3.Connection) -> None:
+    """Build `idx_links_genomfor` (see `_CREATE_GENOMFOR`) if it is not there.
+    One scan of `links` the first time, a no-op after; called from `rebuild`
+    like the widened indexes, so the serving path never pays for it."""
+    con.execute(_CREATE_GENOMFOR)
 
 
 def widen_to_uri_index(con: sqlite3.Connection) -> bool:
@@ -1217,6 +1235,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     widen_to_root_index(con)     # build-cost work belongs here, not in serving
     widen_to_uri_index(con)        # ... and so does its provision-level sibling
     widen_docs_source_index(con)   # ... and so does its documents-side sibling
+    build_genomfor_index(con)      # ... and the genomför-direktiv pass's index
     # artifact paths are stored data_root-relative (portable catalog); the root is
     # what `connect` just recorded (or the catalog file's own directory when the two
     # are colocated), never assumed to be catalog_path.parent -- catalog_root may
