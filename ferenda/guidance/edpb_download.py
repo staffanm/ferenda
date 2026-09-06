@@ -52,14 +52,13 @@ Stored per document under ``site/data/downloaded/guidance/edpb/{serie}/``: a
 import io
 import re
 import time
-import zipfile
 from datetime import date
 from functools import partial
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
+from ..lib import archive, compress
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import pdf_path, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
@@ -306,15 +305,15 @@ def swedish_member(data, number):
     carry the *country* code ``SE`` (its ZIP holds 22 members, one per official
     language bar English, and ``_SE`` is the only one that can be the Swedish
     of them). Both are read; nothing else in these archives ends that way."""
-    archive = zipfile.ZipFile(io.BytesIO(data))
+    zf = archive.open_zip(io.BytesIO(data))
     # no word boundary after the number: the revision runs straight on in most
     # of them ("wp243rev01_sv.pdf"), and only some space it ("wp248 rev.01_
     # sv.pdf"). What must not follow is another digit.
-    name = next((n for n in archive.namelist()
+    name = next((n for n in zf.namelist()
                  if re.match(r"wp\s*%s(?!\d)" % number, n, re.I)
                  and n.lower().endswith(("_sv.pdf", "_se.pdf"))
                  and "annex" not in n.lower()), None)
-    return archive.read(name) if name else None
+    return archive.read(zf, name) if name else None
 
 
 def _wp_document(session, item_url, number, delay):

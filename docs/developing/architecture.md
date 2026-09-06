@@ -406,6 +406,20 @@ Write, in a new `ferenda/<source>/` package:
      promised. `assert` stays for invariants whose failure means this program
      is wrong. Asserts vanish under `python -O`, and one that vanishes writes
      an HTML error page to disk as a `.pdf` with a record beside it.
+   * **A downloaded archive is opened through `lib/archive.py`**, not
+     `zipfile` directly. `archive.open_zip` reads the directory and refuses the
+     file before a byte expands — member count, each member's size, the total,
+     and the compression ratio — and `archive.read` bounds the member it
+     hands back. `lib/net.request` likewise caps a response body
+     (`MAX_RESPONSE_BYTES`, or a caller's own `max_bytes`).
+
+     One exception, and it is the only one: `eurlex/bulk.py` opens the EUR-Lex
+     bulk dumps with plain `zipfile`. A `LEG_*_FMX_*.zip` is many gigabytes —
+     far past `archive.MAX_TOTAL_BYTES` — and it does not arrive from a
+     harvest at all: an operator fetches the dump by hand and points `lagen
+     eurlex bulk` at it. The budgets exist to bound what an *upstream server*
+     can make this pipeline expand, and there is no server in that path. A new
+     exception needs the same kind of reason, written here.
 4. **The registration** (`source.py`) — a `list_basefiles()`, an
    `artifact(basefile)`/`inputs(basefile)` pair, a `CODE` tuple naming every
    impl file relative to the package's own `HERE`, and the `SOURCES` tuple:

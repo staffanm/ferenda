@@ -326,6 +326,7 @@ def test_request_caps_timeout_to_remaining_budget():
 
     class Response:
         status_code = 200
+        headers: dict[str, str] = {}       # `net.request` reads Content-Length
 
         def raise_for_status(self):
             pass

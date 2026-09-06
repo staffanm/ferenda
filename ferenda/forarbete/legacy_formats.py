@@ -38,13 +38,14 @@ its Paras carry the bold heading signal.
 import io
 import re
 import subprocess
-import zipfile
 from datetime import date
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 from lxml import html as lxml_html
+
+from ..lib import archive
 
 # de-hyphenation is the same soft-hyphen rule the PDF verticals already use; the
 # ABBYY loader reuses it rather than replicating it (rule:second-use-goes-to-lib)
@@ -345,8 +346,11 @@ def _docx_texts(path):
     """Per-paragraph text of a .docx: for each ``w:p``, its ``w:t`` runs joined
     in document order, with ``w:tab``/``w:br`` rendered as a space so the words
     they separate don't fuse (normalize_space collapses the rest)."""
-    with zipfile.ZipFile(path) as zf:
-        root = etree.fromstring(zf.read("word/document.xml"))
+    with archive.open_zip(path) as zf:
+        # the same hardened parser the remote dokumentstatus XML gets: a .docx
+        # is a downloaded file, and its document.xml can carry a DTD
+        root = etree.fromstring(archive.read(zf, "word/document.xml"),
+                                _XML_PARSER)
     return ["".join(el.text or "" if el.tag == W_NS + "t" else " "
                     for el in p.iter(W_NS + "t", W_NS + "tab", W_NS + "br"))
             for p in root.iter(W_NS + "p")]

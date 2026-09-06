@@ -38,6 +38,8 @@ from cryptography.x509.oid import AuthorityInformationAccessOID
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from .errors import UpstreamChanged
+
 _RETRY = Retry(total=4, backoff_factor=0.5,
                status_forcelist=(429, 500, 502, 503, 504),
                allowed_methods=frozenset({"GET", "POST"}),
@@ -51,6 +53,16 @@ RETRIES = 6
 RETRY_BACKOFF = 2.0        # seconds, doubled each attempt, capped at RETRY_MAX
 RETRY_MAX = 60.0
 RETRY_STATUS = frozenset({403, 408, 425, 429, 466, 500, 502, 503, 504})
+
+# The ceiling on one downloaded body. Nothing the corpus takes comes close --
+# the largest single file is a Formex manifestation of a few tens of MB, and
+# the biggest facsimile PDF is under 200 MB -- so this is not a policy about
+# what to fetch, it is what stops an unbounded body from becoming this
+# process's memory: a bulk export served where a document was asked for, a
+# proxy that streams an error page without end. A caller that knows it is
+# pulling a bulk dataset passes its own `max_bytes`.
+MAX_RESPONSE_BYTES = 256 * 1024 * 1024
+CHUNK = 256 * 1024
 
 # the pipeline's two client identities: the honest harvester UA for services
 # that accept it, and a browser UA for the government sites that 403 bare
@@ -455,6 +467,52 @@ def mount_aia_chain(session: requests.Session, prefix: str, host: str,
 
 # response headers worth quoting when a request fails: they are what tells a
 # throttle or a WAF block apart from a genuine error
+class ResponseTooLarge(UpstreamChanged):
+    """A response body is past the byte budget its caller allowed."""
+
+
+def _enforce_size(response, max_bytes, streamed):
+    """Refuse a body over `max_bytes`, before it is read where that is
+    possible.
+
+    Two checks, because a server may do either. `Content-Length` is refused
+    without reading a byte. Without that header -- or with a wrong one -- the
+    body is read in chunks and the read stops one chunk past the ceiling.
+
+    `streamed` is set only for a real requests session, the transport
+    :func:`request` asked for `stream=True`.
+
+    **On the HTTP/2 client the ceiling is only as good as `Content-Length`.**
+    httpx buffers the whole body before it returns, so there is nothing left to
+    stop mid-flight, and an HTTP/2 response often carries no declared length at
+    all. That client serves exactly one publisher -- Konkurrensverket, which
+    sits behind an HTTP/2-only Cloudflare front: `rs.download.kkv_sync`,
+    `avg.download.kkv_session` and the KKVFS föreskrift scope
+    (`foreskrift/agencies.py`). Those three are bounded only by a declared
+    length; every other source runs on a requests session and is streamed.
+    Making the ceiling real for them means reading through
+    `httpx.Client.stream`, which is a change to how those three fetch, not to
+    this function."""
+    declared = response.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > max_bytes:
+        response.close()
+        raise ResponseTooLarge("%s declares %s bytes, over the %d allowed"
+                               % (response.url, declared, max_bytes))
+    if not streamed:
+        return
+    data = bytearray()
+    for chunk in response.iter_content(CHUNK):
+        data += chunk
+        if len(data) > max_bytes:
+            response.close()
+            raise ResponseTooLarge("%s sent more than the %d bytes allowed"
+                                   % (response.url, max_bytes))
+    # hand the streamed body back as an ordinary buffered response, so every
+    # caller keeps using `.content` / `.text` / `.json()` as before
+    response._content = bytes(data)
+    response._content_consumed = True
+
+
 DIAGNOSTIC_HEADERS = ("Retry-After", "RateLimit-Reset", "X-RateLimit-Remaining",
                       "X-RateLimit-Limit", "Server", "Via", "CF-Ray", "X-Cache",
                       "X-Amzn-Trace-Id", "Content-Type", "Set-Cookie")
@@ -598,7 +656,8 @@ def counted() -> Iterator[Callable[[], int]]:
         total = attempts() - start
 
 
-def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs):
+def request(session, method, url, *, parse_json=False, retries=RETRIES,
+            max_bytes=MAX_RESPONSE_BYTES, **kwargs):
     """Perform an HTTP request, riding out the transient failures a long
     unattended harvest meets: an empty/non-JSON 2xx body, a throttle
     (403/429, or a non-standard code a WAF invented such as 466), a 5xx that
@@ -617,6 +676,13 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
     the time remaining, and a backoff sleep never outlives it -- so one sick
     endpoint cannot stall a walk for hours of retry burn."""
     kwargs.setdefault("timeout", 60)
+    # stream so `_enforce_size` can stop an oversized body while it arrives.
+    # Only for a real requests session: httpx takes no such argument, and the
+    # fake sessions the tests pass take none either.
+    streamed = isinstance(session, requests.Session)
+    if streamed:
+        kwargs.setdefault("stream", True)
+        streamed = kwargs["stream"]
     diagnosed = paced = False
     for attempt in range(retries):
         deadline = getattr(session, "deadline", None)
@@ -638,6 +704,7 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
         try:
             _attempts.n = getattr(_attempts, "n", 0) + 1
             response = session.request(method, url, **kwargs)
+            _enforce_size(response, max_bytes, streamed)
             raise_for_status(response)
             return response.json() if parse_json else response
         # both transports: requests raises RequestException (its JSONDecodeError

@@ -376,6 +376,12 @@ def jp_sync(root, full=False, only=None, limit=None, delay=0.5):
                                "%s/tidskriften/%s/" % (JP.base, slug)).text
             time.sleep(delay)
             return _jp_records_from_page(html, slug, label)
+        except net.ResponseTooLarge:
+            # not this handler's business: `UpstreamChanged` -- and so
+            # `ResponseTooLarge` -- subclasses ValueError, and a body refused
+            # for its size is a transport failure, not an issue that served no
+            # articles. Recorded as a Skip it would read as an empty issue.
+            raise
         except ValueError as err:
             # a challenged or template-less page can read as an articleless
             # issue: one issue that serves no page must not stop the sweep

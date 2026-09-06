@@ -30,7 +30,7 @@ from pathlib import Path
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from . import compress, markup, patch
+from . import archive, compress, markup, patch
 from .errors import UpstreamChanged
 from .util import from_roman
 
@@ -190,13 +190,13 @@ def formex_members(path):
     path = Path(path)
     data = compress.read_bytes(path)
     if zipfile.is_zipfile(io.BytesIO(data)):
-        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        with archive.open_zip(io.BytesIO(data)) as zf:
             names = sorted(n for n in zf.namelist()
                            if n.endswith(".xml")
                            and not n.endswith((".doc.xml", ".toc.fmx.xml")))
             if not names:
                 raise ValueError("%s: zip has no Formex member" % path)
-            members = [(m, zf.read(m)) for m in names]
+            members = [(m, archive.read(zf, m)) for m in names]
         main = next((i for i, (_, d) in enumerate(members)
                      if _root_tag(d) != "ANNEX"), None)
         # a bundle of annexes and no act is a download that lost its main

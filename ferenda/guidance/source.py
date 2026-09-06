@@ -34,6 +34,7 @@ GUIDANCE_CODE = (HERE / "parse.py", HERE / "model.py", HERE / "issuers.py",
                  HERE.parent / "lib" / "pdftext.py",
                  HERE.parent / "lib" / "lagrum.py",
                  HERE.parent / "lib" / "formex.py",
+                 HERE.parent / "lib" / "archive.py",
                  HERE.parent / "lib" / "emdref.py", *CITATION_DATA,
                  HERE.parent / "lib" / "artifact.py")
 

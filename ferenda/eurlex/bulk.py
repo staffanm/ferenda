@@ -26,6 +26,13 @@ opaque cellar work UUID; the CELEX (our basefile) lives only in the metadata rdf
   {root}/{year}/{celex}/{lang}.pdf          the PDF (last resort)
 
 so `lagen eurlex parse` then treats them exactly like downloaded documents.
+
+Opens its archives with plain `zipfile`, not `lib/archive.py` -- the one
+sanctioned exception to that rule, stated in `docs/developing/architecture.md`.
+A `LEG_*_FMX_*.zip` is many gigabytes, far past `archive.MAX_TOTAL_BYTES`, and
+it does not come from a harvest at all: an operator fetches the dump by hand
+and points this command at it. The budgets bound what an upstream *server* can
+make the pipeline expand, and there is no server in this path.
 """
 
 import io

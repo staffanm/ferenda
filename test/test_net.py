@@ -434,3 +434,47 @@ def test_a_nonstandard_throttle_that_outlives_the_retries_raises(monkeypatch):
     with pytest.raises(requests.exceptions.HTTPError):
         net.request(_ThrottledSession(), "GET",
                     "https://wafed.invalid/a", retries=2)
+
+
+def test_a_declared_content_length_over_the_ceiling_is_refused_unread():
+    class Response:
+        status_code = 200
+        url = "https://example.invalid/bulk"
+        headers = {"content-length": str(64 * 1024 * 1024)}
+
+        def close(self):
+            pass
+
+        def raise_for_status(self):
+            raise AssertionError("the body must be refused before this")
+
+    class Session:
+        def request(self, method, url, **kwargs):
+            return Response()
+
+    with pytest.raises(net.ResponseTooLarge, match="declares"):
+        net.request(Session(), "GET", "https://example.invalid/bulk",
+                    max_bytes=1024)
+
+
+def test_a_body_without_a_content_length_is_stopped_while_it_arrives():
+    closed = []
+
+    class Response:
+        status_code = 200
+        url = "https://example.invalid/endless"
+        headers: dict[str, str] = {}
+
+        def close(self):
+            closed.append(True)
+
+        def iter_content(self, chunk):
+            while True:
+                yield b"x" * chunk
+
+        def raise_for_status(self):
+            raise AssertionError("the body must be refused before this")
+
+    with pytest.raises(net.ResponseTooLarge, match="more than"):
+        net._enforce_size(Response(), 4096, True)
+    assert closed
