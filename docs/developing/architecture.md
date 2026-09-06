@@ -116,7 +116,8 @@ dataclasses, the `SOURCES` registry, the run-wide `RUN` options and the shared
 shape helpers), `lib/freshness.py` holds the engine that decides what to run
 (the manifest, the fingerprint gates, the per-document driver and its process
 pool, the run ledger), `lib/corpus.py` holds the corpus verbs
-(`relate`/`index`/`dump`/`generate`, the composites and the status verbs), and
+(`relate`/`index`/`dump`/`generate`, the composites and the status verbs),
+`lib/writerlock.py` holds the corpus writer lease, and
 `build.py` holds the CLI. Each source's registration is its own
 `ferenda/<package>/source.py`; `build.py` imports them and fills the registry,
 so adding a source means adding one file.

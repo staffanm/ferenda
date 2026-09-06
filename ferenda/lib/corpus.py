@@ -47,6 +47,7 @@ from . import (
     runlog,
     search,
     util,
+    writerlock,
 )
 from . import stage as protocol
 
@@ -208,9 +209,25 @@ def cmd_relate(sources, names, force=None):
     published = {name for name, s in sources.items() if s.artifacts}
     full_rebuild = catalog_missing or (force and published <= set(names))
     layout.CATALOG.parent.mkdir(parents=True, exist_ok=True)
-    target = layout.CATALOG.with_name(layout.CATALOG.name + ".building") if full_rebuild else layout.CATALOG
+    # the scratch carries this run's id, so a run never writes -- or deletes --
+    # a file another run could have chosen. The writer lease (build.main) is
+    # what makes a second run impossible in the first place; this is the second
+    # line, and it is also what makes an abandoned scratch nameable.
     if full_rebuild:
-        target.unlink(missing_ok=True)   # discard a scratch left by an aborted rebuild
+        # No fallback name for a missing run id: every name a lease-less caller
+        # could choose is a name a second one chooses too, and `sweep_scratch`
+        # would then delete a live rebuild's scratch as its own. A run id is
+        # also exactly what says `build.main` minted this run -- and so that
+        # the writer lease is held (rule:fail-fast).
+        assert freshness.RUN_ID, \
+            "a full relate needs a run id: it is what names the scratch " \
+            "catalog and what says the writer lease is held"
+        target = writerlock.scratch_name(layout.CATALOG, freshness.RUN_ID)
+        for stale in writerlock.sweep_scratch(layout.CATALOG, freshness.RUN_ID):
+            print("relate: discarded %s, left by an aborted rebuild" % stale.name)
+        target.unlink(missing_ok=True)
+    else:
+        target = layout.CATALOG
     dirty = False
     for name in names:
         source = sources[name]

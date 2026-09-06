@@ -34,6 +34,38 @@ uv run python -m ferenda.build all errors <id>    # one error in full, traceback
 uv run python -m ferenda.build ann status         # inventory the curated LLM-layer store (lib/annstore.py): status/date/staleness per .ann/.corr layer
 ```
 
+## One writer at a time
+
+A pipeline invocation takes the corpus writer lease first — the directory
+`DATA/.build/writer.lock`, `lib/writerlock.py`. The read-only verbs (`serve`,
+`status`, `runs`, `errors`) and `--dry-run` take none, so watching a build
+while it runs is unaffected.
+
+A second writer is refused before it writes anything, naming the first:
+
+```
+all relate is already writing this corpus: 20260906T001458Z-lagen-9912
+(pid 9912 on lagen, started 2026-09-06 00:14:58). Wait for it, or remove
+<data_root>/.build/writer.lock if you know it is gone.
+```
+
+Usually there is nothing to do but wait. A lease whose holder was killed is
+taken over by the next run on its own — the holder's pid and its start time are
+both recorded, so a process that is gone, or a pid the kernel has since reused,
+is a lease nobody owns. Removing the directory by hand is for the cases this
+machine cannot answer: the holder ran on **another** machine, or in a container
+beside this one, and that run is known to be over. Those are judged by age
+instead — a run refreshes its lease every five minutes, and one untouched for an
+hour counts as gone.
+
+This is what makes the run ledger's single-writer assumption true, and it is
+why the fingerprint store may still be rewritten whole. Without it, two runs
+interleave `runs.ndjson`, each writes back a fingerprint snapshot that never
+saw the other's completed gates, and a full relate has both of them deleting
+and writing one scratch catalog. A full rebuild's scratch now carries the run
+id (`catalog.sqlite.<run id>.building`), and each run sweeps away scratch files
+left by runs that are not its own.
+
 `lib/errorlog.py` owns a separate ledger, `DATA/.build/httperrors.ndjson`, for
 the *serving* side rather than the build: one record per 404/500 the running
 site answered, keyed by an 8-hex id the error page shows the reader, so "a

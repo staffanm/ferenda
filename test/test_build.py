@@ -37,6 +37,7 @@ from ferenda.lib import (
     runlog,
     stage,
     util,
+    writerlock,
 )
 from ferenda.lib.errors import SkipDocument
 from ferenda.lib.freshness import build_one, is_fresh
@@ -1341,7 +1342,8 @@ def test_cmd_relate_index_dump_skip_non_artifact_sources(monkeypatch, tmp_path):
     monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
     monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
-    
+    freshness.start_run(os.getpid())     # as `build.main` does before dispatch
+
     # Register a source with no `artifacts` lister (similar to remisser)
     src = Source("non_artifact_src", lambda: [], {})
     monkeypatch.setitem(build.SOURCES, src.name, src)
@@ -1466,11 +1468,15 @@ def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_p
     data_root.mkdir()
     art = _fake_sfs_artifact(data_root)
     cat = tmp_path / "fast" / "catalog.sqlite"          # parent doesn't exist yet
-    scratch = cat.with_name("catalog.sqlite.building")
 
     monkeypatch.setattr(corpus, "DATA", data_root)
     monkeypatch.setattr(layout, "CATALOG", cat)
     monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "wm.json")
+    # a full rebuild names its scratch after the run: `build.main` mints the id
+    # before it dispatches, and calling the verb directly has to do the same
+    freshness.start_run(os.getpid())
+    # the scratch carries the run id, so no two runs can pick the same name
+    scratch = writerlock.scratch_name(cat, freshness.RUN_ID)
     monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(freshness, "ERRORS", tmp_path / "err.json")
     monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")

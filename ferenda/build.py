@@ -78,6 +78,7 @@ from .lib import (
     patch,
     runlog,
     util,
+    writerlock,
 )
 from .lib import stage as protocol
 from .lib.stage import SOURCES
@@ -667,9 +668,21 @@ def main(argv=None):
     # non-pipeline verb after a pipeline run) never inherits the prior run's id
     # or error tally
     freshness.start_run()
+    lease = None
     if args.action not in ("serve", "status", "runs", "errors") \
             and not protocol.RUN.dry_run:
         run_id = freshness.start_run(os.getpid())
+        # One writer at a time over this corpus, taken before anything is
+        # written and before the ledger is pruned. The pipeline has always
+        # assumed a single writer (see lib/runlog); two runs interleave the
+        # ledger, discard each other's fingerprint entries and race the same
+        # catalog scratch file. A second writer is refused here, naming the
+        # first, rather than corrupting what it finds.
+        try:
+            lease = writerlock.acquire("%s %s" % (args.source, args.action),
+                                       run_id=run_id)
+        except writerlock.Held as exc:
+            raise SystemExit(str(exc)) from None
         runlog.prune(freshness.RUNS)
         runlog.emit_run_start(freshness.RUNS, run_id, ["lagen", *argv],
                               os.getpid())
@@ -693,6 +706,12 @@ def main(argv=None):
                 # says a step somewhere failed. Print what and where, once, here,
                 # so the exit code has a reason attached beside it.
                 _print_failure_summary(freshness.RUN_ID)
+        # last, after the ledger's end record and the failure summary: the
+        # lease is a guard on the *next* run, and nothing above it should be
+        # lost to a filesystem error on the way out (writerlock.Lease.release
+        # swallows one, but the order is the real guarantee)
+        if lease is not None:
+            lease.release()
 
 
 def _cmd_runs(limit):

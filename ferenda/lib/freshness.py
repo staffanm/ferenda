@@ -898,6 +898,12 @@ def save_fingerprints(store):
     # seventh one cannot reintroduce it.
     if protocol.RUN.dry_run:
         return
+    # The whole store is rewritten from a process-local snapshot, which is only
+    # safe because there is exactly one writer: `build.main` holds the corpus
+    # writer lease (lib/writerlock) for the length of a pipeline invocation.
+    # Without it, two runs each load the file, and the second to finish writes
+    # back a dict that never saw the first one's completed gates -- so a source
+    # marked current is silently marked stale again, or worse, the other way.
     global _FINGERPRINTS_CACHE
     _FINGERPRINTS_CACHE = store
     util.write_atomic(FINGERPRINTS, json.dumps(store, ensure_ascii=False,

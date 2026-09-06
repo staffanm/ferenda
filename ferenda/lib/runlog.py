@@ -6,13 +6,16 @@ either importing the other:
 
 * ``runs.ndjson`` -- an append-only run ledger, one flushed JSON line per
   event (run-start, one segment per (step, source) execution, run-end).
-  Written only by the parent build process; single-writer by assumption
-  (the manifest already shares it) -- two concurrent invocations would
-  interleave appends and race `prune`, which is accepted, not defended
-  against. The *readers* do defend against its one visible consequence: a
-  run whose run-start a concurrent prune rewrote away is reported as
-  "damaged" rather than taking the whole ledger read down with it (see
-  `_run_start`).
+  Written only by the parent build process, and only ever by one of them:
+  `build.main` takes the corpus writer lease (lib/writerlock) before it
+  prunes or emits anything, so a second invocation is refused rather than
+  interleaving appends and racing `prune`. The lease is what makes this
+  file's single-writer assumption true; before it, the race was accepted
+  rather than defended against. The *readers* still defend against its one
+  visible consequence, because a lease taken over from a killed run can
+  leave a torn ledger behind: a run whose run-start a prune rewrote away is
+  reported as "damaged" rather than taking the whole ledger read down with
+  it (see `_run_start`).
 * ``errors.json`` -- a keyed latest-outcome store per document
   ("<source>/<stage>/<basefile>"), set on error and deleted on success, so
   "failed" is distinguishable from "never tried" and the store stays
