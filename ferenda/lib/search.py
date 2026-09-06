@@ -938,17 +938,34 @@ class SearchIndex:
         """{doc_uri: version} for a source's whole-document units already in the
         index -- the artifact content hash each was indexed at. The is_doc unit's
         _id is the doc_uri, so the scan reads identity + version with no body.
-        Drives index_source's diff; empty when the index doesn't exist yet."""
+        Drives index_source's diff; empty when the index doesn't exist yet.
+
+        Read from **doc values**, not from `_source`. `_source=["version"]` looks
+        like it fetches one field, but the field list is applied after the fact:
+        the node loads and decompresses each hit's whole stored `_source` and
+        then throws all of it away but the hash. Over a large source that is the
+        entire corpus decompressed to read one keyword per document -- 97,266
+        förarbete documents, 172,086 eurlex -- and on 2026-09-06 it pushed an
+        already-loaded node past the parent circuit breaker (429,
+        `circuit_breaking_exception`, 1.4gb of a 1536m heap), which ended the
+        whole index step: every source shares the connection, so only dv was
+        indexed that night. `version` is a keyword, so it has doc values and the
+        node reads the hash straight out of them with no source fetch at all."""
         if not self.client.indices.exists(index=self.index):
             return {}
 
         def go():
             scan = helpers.scan(
-                self.client, index=self.index, _source=["version"],
-                query={"query": {"bool": {"filter": [
-                    {"term": {"source": source}},
-                    {"term": {"is_doc": True}}]}}})
-            return {hit["_id"]: hit["_source"].get("version") for hit in scan}
+                self.client, index=self.index,
+                query={"_source": False, "docvalue_fields": ["version"],
+                       "query": {"bool": {"filter": [
+                           {"term": {"source": source}},
+                           {"term": {"is_doc": True}}]}}})
+            # docvalue_fields answers under `fields`, always as a list; a unit
+            # indexed before the field existed has none, which reads as "no
+            # version" exactly as a missing _source key did.
+            return {hit["_id"]: (hit.get("fields", {}).get("version") or [None])[0]
+                    for hit in scan}
         # scan drives a scroll of its own -- a breaker trip mid-scroll must not
         # abort the whole run, so retry it as one unit (the scroll restarts).
         return _retry(go, "indexed_versions(%s)" % source)

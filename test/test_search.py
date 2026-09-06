@@ -240,6 +240,43 @@ def test_doc_actions_carries_repeal_date_when_present():
     assert "expired" not in live["_source"]
 
 
+def test_indexed_versions_reads_doc_values_not_source(monkeypatch):
+    """The index step asks what version each document was indexed at, to send
+    only what changed. `_source=["version"]` looks cheap and is not: the field
+    list is applied after the node has loaded and decompressed each hit's whole
+    stored source. Over förarbete that is 97,266 documents decompressed to read
+    one hash each, and on 2026-09-06 it pushed a loaded node past the parent
+    circuit breaker and ended the whole index step. `version` is a keyword, so
+    it has doc values; this pins that the query reads them and asks for no
+    source at all."""
+    seen = {}
+
+    def fake_scan(client, index, query, **kwargs):
+        seen["query"] = query
+        seen["kwargs"] = kwargs
+        return iter([
+            {"_id": "https://lagen.nu/1962:700", "fields": {"version": ["7:abc"]}},
+            # a unit indexed before the field existed carries no `fields` entry,
+            # which has to read as "no version" the way a missing _source key did
+            {"_id": "https://lagen.nu/1998:204"},
+        ])
+
+    monkeypatch.setattr(search.helpers, "scan", fake_scan)
+    idx = search.SearchIndex.__new__(search.SearchIndex)
+    idx.index = "lagen"
+    idx.client = type("C", (), {
+        "indices": type("I", (), {"exists": staticmethod(lambda **k: True)})()})()
+
+    assert idx.indexed_versions("sfs") == {"https://lagen.nu/1962:700": "7:abc",
+                                           "https://lagen.nu/1998:204": None}
+    assert seen["query"]["_source"] is False
+    assert seen["query"]["docvalue_fields"] == ["version"]
+    assert "_source" not in seen["kwargs"]
+    filters = seen["query"]["query"]["bool"]["filter"]
+    assert {"term": {"source": "sfs"}} in filters
+    assert {"term": {"is_doc": True}} in filters
+
+
 def test_query_excludes_in_force_repeals_but_keeps_future_ones():
     # a repeal already in force is filtered out; a future/absent repeal is kept
     # (S6/S7) -- evaluated against `now` at query time, not baked in
