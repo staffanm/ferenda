@@ -2,8 +2,11 @@
 the API endpoint in both its documented and legacy-path forms."""
 
 import json
+import os
 import threading
 import time
+import types
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
@@ -231,9 +234,13 @@ def test_sfs_full_page_facsimile_resolver(corpus):
 # --------------------------------------------------------------------------
 
 def test_bbox_query_parses_to_the_renderer_shape():
-    assert facsimiles.parse_bbox("331,338,476,452") == [331.0, 338.0, 476.0, 452.0]
+    """A public rectangle is snapped outward onto a 4-point grid: the cache is
+    keyed by the rounded bbox, so an unsnapped one lets a caller mint a fresh
+    PNG for every pixel of every page. The grid never cuts an edge off."""
+    assert facsimiles.parse_bbox("332,336,476,452") == [332.0, 336.0, 476.0, 452.0]
+    assert facsimiles.parse_bbox("331,338,476,452") == [328.0, 336.0, 476.0, 452.0]
     assert facsimiles.parse_bbox("220.9,225.5,317.6,301.6") == [
-        220.9, 225.5, 317.6, 301.6]
+        220.0, 224.0, 320.0, 304.0]
 
 
 @pytest.mark.parametrize("raw", [
@@ -393,3 +400,104 @@ def test_a_forarbete_illustration_keeps_the_page_resolution(corpus, monkeypatch)
                            "bbox": "72,72,300,200"})
     assert r.status_code == 200
     assert asked == [facsimile.DPI]
+
+
+def test_the_render_queue_refuses_rather_than_filling_the_thread_pool():
+    """The cap on poppler is not the important bound -- the cap on *waiting* is.
+
+    These endpoints are synchronous, so every request waiting for a render slot
+    holds one of AnyIO's worker threads. A cap on poppler alone would let a
+    flood fill that pool with threads doing nothing but waiting, and ordinary
+    pages would stop being served: the outage moves rather than goes away."""
+    held, refused = [], []
+    release = threading.Event()
+
+    def hold():
+        try:
+            with facsimile.render_slot():
+                held.append(1)
+                release.wait(5)
+        except facsimile.RenderBusy:
+            refused.append(1)
+
+    threads = [threading.Thread(target=hold) for _ in range(
+        facsimile.RENDER_WORKERS + facsimile.MAX_WAITING + 4)]
+    for t in threads:
+        t.start()
+    # the four over the waiting room are refused at once, without waiting out
+    # RENDER_WAIT and without holding a thread
+    deadline = time.monotonic() + 5
+    while len(refused) < 4:
+        assert time.monotonic() < deadline, "extra callers were not refused"
+        time.sleep(0.01)
+    release.set()
+    for t in threads:
+        t.join(10)
+    assert len(held) == facsimile.RENDER_WORKERS + facsimile.MAX_WAITING
+    assert len(refused) == 4
+    # the slots are all handed back, so the next caller renders
+    with facsimile.render_slot():
+        pass
+
+
+def test_the_cache_sweep_drops_the_oldest_until_the_target_is_met(tmp_path,
+                                                                 monkeypatch):
+    """Eviction was a cron line alone, and it failed silently for months --
+    658 GB of live cache on the production host. The writer now sweeps too,
+    on free space rather than a size cap, because the cache shares a
+    filesystem with the corpus and what matters is that the corpus can write."""
+    for n in range(10):
+        png = tmp_path / ("src%d" % (n % 3)) / ("sid%d.png" % n)
+        png.parent.mkdir(parents=True, exist_ok=True)
+        png.write_bytes(b"x" * 1000)
+        stamp = 1_000_000 + n * 60          # sid0 oldest, sid9 newest
+        os.utime(png, (stamp, stamp))
+
+    freed_so_far = 0
+
+    def fake_usage(_path):
+        # free space rises as the sweep deletes, which is what stops it
+        return types.SimpleNamespace(free=2000 + freed_so_far)
+
+    real_unlink = Path.unlink
+
+    def counting_unlink(self, **kwargs):
+        nonlocal freed_so_far
+        freed_so_far += self.stat().st_size
+        real_unlink(self, **kwargs)
+
+    monkeypatch.setattr(facsimile.shutil, "disk_usage", fake_usage)
+    monkeypatch.setattr(Path, "unlink", counting_unlink)
+    facsimile.evict(tmp_path, target_free=5000)
+
+    left = sorted(p.name for p in tmp_path.rglob("*.png"))
+    # 3000 bytes short of the target, so exactly three files go -- and the
+    # oldest three. An earlier version added the bytes it had freed on top of
+    # a free-space reading that already counted them, and stopped halfway.
+    assert left == ["sid3.png", "sid4.png", "sid5.png", "sid6.png",
+                    "sid7.png", "sid8.png", "sid9.png"]
+
+
+def test_the_cache_sweep_never_runs_on_the_caller_s_thread(tmp_path,
+                                                           monkeypatch):
+    """The sweep walks the whole cache tree. On the request thread it would
+    hold an AnyIO worker for minutes -- exactly what the render-slot bound
+    exists to prevent, reintroduced on the same code path."""
+    swept = threading.Event()
+    caller = threading.current_thread()
+    seen = []
+
+    def slow_evict(root, target_free):
+        seen.append(threading.current_thread())
+        swept.set()
+        return 0
+
+    monkeypatch.setattr(facsimile, "evict", slow_evict)
+    monkeypatch.setattr(facsimile, "RENDERS_BETWEEN_CHECKS", 1)
+    monkeypatch.setattr(facsimile.layout, "FACSIMILE", tmp_path)
+    monkeypatch.setattr(facsimile.shutil, "disk_usage",
+                        lambda _p: types.SimpleNamespace(free=0))
+
+    facsimile._evict_if_low()
+    assert swept.wait(5), "the sweep never ran"
+    assert seen and seen[0] is not caller

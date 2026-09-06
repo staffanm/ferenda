@@ -29,6 +29,7 @@ must fail loudly rather than read to a caller as "no such page".
 """
 
 import json
+import math
 import re
 import subprocess
 from pathlib import Path
@@ -46,10 +47,29 @@ from . import db
 FAX_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
+# What a public rectangle is rounded to, in PDF points. The cache is keyed by
+# the rounded bbox, so a caller who moves an edge by one point today mints a
+# new PNG; on a 4-point grid a page has 256 times fewer distinct crops, and no
+# reader can tell the difference -- 4 pt is under a millimetre and the crop is
+# shown at 300 DPI. The rounding grows the rectangle, never shrinks it, so a
+# figure never loses an edge to it.
+BBOX_GRID = 4
+
+
+def quantize_bbox(bbox):
+    """`bbox` snapped outward onto the `BBOX_GRID` lattice."""
+    x0, y0, x1, y1 = bbox
+    return [float(math.floor(x0 / BBOX_GRID) * BBOX_GRID),
+            float(math.floor(y0 / BBOX_GRID) * BBOX_GRID),
+            float(math.ceil(x1 / BBOX_GRID) * BBOX_GRID),
+            float(math.ceil(y1 / BBOX_GRID) * BBOX_GRID)]
+
+
 def parse_bbox(raw):
     """A ``bbox=x0,y0,x1,y1`` query value as the float list the crop renderer
-    takes, in PDF points from the page's top-left. A malformed or degenerate
-    rectangle is client input, so it is a 400 rather than an assertion."""
+    takes, in PDF points from the page's top-left, snapped onto `BBOX_GRID`. A
+    malformed or degenerate rectangle is client input, so it is a 400 rather
+    than an assertion."""
     parts = raw.split(",")
     if len(parts) != 4:
         raise HTTPException(400, "bbox needs four comma-separated numbers")
@@ -59,7 +79,7 @@ def parse_bbox(raw):
         raise HTTPException(400, "bbox coordinates must be numbers") from None
     if not facsimile.valid_bbox(bbox):
         raise HTTPException(400, "bbox must satisfy 0 <= x0 < x1, 0 <= y0 < y1")
-    return bbox
+    return quantize_bbox(bbox)
 
 
 def png_path(source, basefile, pdf, page, bbox, missing, *,
@@ -77,6 +97,9 @@ def png_path(source, basefile, pdf, page, bbox, missing, *,
     shown once, beside the page it was cut from."""
     try:
         png = facsimile.cached(source, basefile, pdf, page, bbox, dpi=dpi)
+    except facsimile.RenderBusy as exc:
+        raise HTTPException(503, str(exc),
+                            headers={"Retry-After": "10"}) from None
     except facsimile.OffPage:
         if not client_bbox:
             raise

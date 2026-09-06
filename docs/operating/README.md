@@ -479,14 +479,21 @@ jobs **one at a time**: they share the process-global `DISPLAY`.
 
 `data/cache/facsimile` holds the page PNGs `lib/facsimile` renders on demand.
 It is a **pure cache**. Nothing else reads it. A deleted file is re-rendered on
-the next request, in about half a second. Eviction is therefore a crontab line,
-by publication age, not by source-specific code:
+the next request, in about half a second.
+
+The renderer evicts it itself when the filesystem runs low: every 200 renders
+it reads the free space, and under `facsimile.CACHE_MIN_FREE` (20 GB) it drops
+the oldest PNGs until 40 GB are free. This is the floor, not the policy — a
+cron line by age is still the right way to keep the cache small, because the
+in-process sweep only fires when the disk is already nearly full:
 
 ```sh
 0 1 * * * find <data_root>/cache/facsimile -name "*.png" -mtime +15 -delete
 ```
 
-Measured 2026-08-19: 245 PNGs use 34 MB. There is no pressure yet, so this command is documented but not installed.
+Measured 2026-08-19 on dev: 245 PNGs use 34 MB. Production is a different
+story — the legacy facsimile cache reached 658 GB while a cron line was failing
+silently, which is why the writer now evicts as well.
 
 Its siblings under `cache/` are not pure caches on the same terms.
 `cache/pdfconv` (9.9 GB) holds the poppler conversions the parsers read. A lost
