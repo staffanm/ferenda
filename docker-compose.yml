@@ -27,12 +27,12 @@
 # THE SEPTEMBER CUTOVER
 # ---------------------
 # The two sites swap hostnames: lagen.nu becomes the rebuilt site, the legacy
-# site moves to old.lagen.nu, and every ferenda.lagen.nu URL answers 301 to the
+# site moves to old.lagen.nu, and every ferenda.lagen.nu URL answers 308 to the
 # same path on lagen.nu. The switch is a comment edit, in this order:
 #
 #   1. Point old.lagen.nu at this host in DNS, and wait for it to resolve.
-#   2. Add it to the certificate (the `certbot` service documents the command;
-#      add `-d old.lagen.nu` to the existing -d list and re-run it once).
+#   2. No certificate work: the legacy vhost uses the wildcard certificate
+#      (`*.lagen.nu`), which covers old.lagen.nu.
 #   3. In docker/nginx/default.conf, swap the two `server_name` lines marked
 #      CUTOVER: the legacy vhost answers to old.lagen.nu.
 #   4. In docker/nginx/ferenda.lagen.nu.conf, swap the two `server_name` lines
@@ -130,6 +130,11 @@ services:
   #     docker compose exec ferenda lagen all rebuild
   #     docker compose exec ferenda lagen all index
   ferenda:
+    # An explicit tag rather than the derived `<project>-ferenda`. The deploy
+    # keeps the outgoing image as `lagen-ferenda:previous` and puts it back
+    # under this name when the new one does not come up healthy, and a rollback
+    # must not depend on how compose happens to name things.
+    image: lagen-ferenda:current
     build:
       context: .
       dockerfile: docker/ferenda/Dockerfile
@@ -147,6 +152,33 @@ services:
         GIT_SHA: ${GIT_SHA:-unknown}
     container_name: ferenda
     profiles: [prod]
+    # Docker's default is 1024 open files. Every request in flight holds one
+    # (a render holds three), so on 2026-09-05 a queue of a minute's worth of
+    # facsimile requests hit it; the accept loop then fails with EMFILE and
+    # the app answers nothing until it is restarted. With headroom an
+    # overload is 504s that clear when the load does.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # This one image serves the public site AND carries the whole ingestion
+    # toolchain -- git, Java, OCR, poppler, a browser -- with write access to
+    # the corpus and to the wiki checkout the editors commit into. It already
+    # runs as an unprivileged user; these three cost nothing and shrink what a
+    # compromised parser, PDF tool or browser can reach next.
+    cap_drop: [ALL]           # binds :8000, writes files: needs no capability
+    security_opt:
+      - no-new-privileges:true
+    # The pipeline runs process pools and shells out to pdftoppm, java and a
+    # headful Chrome (which is many processes), so this is a runaway guard, not
+    # a budget: nothing observed comes near it.
+    pids_limit: 4096
+    # Likewise a ceiling, not an allocation. The nightly `lagen all` is meant
+    # to use this box, and the app bounds its own render concurrency (two
+    # WeasyPrint workers, four poppler slots), so no cpus limit -- what this
+    # stops is one runaway process taking the host down with it. The host has
+    # 48 GB and OpenSearch is resident in a good part of it.
+    mem_limit: 32g
     environment:
       - OPENSEARCH_URL=http://opensearch:9200
       - WIKI_ROOT=/wiki
@@ -211,6 +243,18 @@ services:
     depends_on:
       - opensearch   # start order only, not a health gate: serving + the CLI don't
                       # need a live OpenSearch (see api/app.py), only /search does
+    # What "up" means for this service. `up -d` returning only says the
+    # container started; the deploy needs to know the app answers, and answers
+    # with a readable catalog and a generated site behind it (/healthz, see
+    # api/app.py). OpenSearch is reported by that endpoint but never gates it:
+    # the site serves without search.
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     restart: always
     logging:
       options:
@@ -238,9 +282,8 @@ services:
   #     -d lagen.nu -d ferenda.lagen.nu \
   #     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
   #
-  # CUTOVER: add `-d old.lagen.nu` to that list and re-run it once, after
-  # old.lagen.nu resolves to this host. Certbot expands the existing
-  # certificate in place, so nginx's ssl_certificate paths do not change.
+  # old.lagen.nu is not on this certificate and need not be: the legacy
+  # vhost (docker/nginx/default.conf) uses the wildcard one below.
   #
   # One-time wildcard cert for the zones already delegated to Cloudflare
   # (lagen.nu is NOT among them yet -- add `-d lagen.nu -d '*.lagen.nu'` once
@@ -414,7 +457,14 @@ services:
   # inert -- rotating a password there is an `ALTER USER` against the running
   # server, and `.env` must then be updated to match. See .env.example.
   db:
-    image: mariadb
+    # An explicit version, pinned by digest. `mariadb` alone floats across major
+    # versions: the running container is whatever `latest` was on the day it was
+    # created, and the next recreate silently brings whatever `latest` is then.
+    # This is the digest `latest` resolved to on 2026-09-05 (12.3.3), so a
+    # recreate today does exactly what the floating tag would have done -- and
+    # the one after that does the same thing again. MariaDB upgrades a data
+    # directory forward but never back, so bump this deliberately.
+    image: mariadb:12.3.3@sha256:ebfd70b7d9681eae911fa3f11b1e5b76b19e316ddd6cc9fc699f86dc881d0b30
     command: --max-allowed-packet=64MB
     profiles: [prod]
     volumes:

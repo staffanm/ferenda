@@ -838,6 +838,12 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     (`_write_inbound`), so the two stay in step: the same staleness that
     re-renders a page is what makes its citation set stale."""
     out_root = Path(out_root)
+    # everything down to the planning loop below is staleness work -- the
+    # document query, the Site build, and above all the batched dependency
+    # digests, which stream the whole 10M-row links table (~30 s). It used to
+    # run silently, so a generate printed its first line half a minute in
+    label = "generate %s" % source if source else "generate"
+    util.checking(label)
     con = catalog.connect(catalog_path)
     rows = con.execute(
         "SELECT uri, source, path, title, content_hash FROM documents "
@@ -878,6 +884,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     # rebuild) instead looks up just its own uris -- the batched pass streams the
     # whole 10M-row links table (~30 s), which dwarfs rendering one page. A
     # link-less uri is absent either way and takes the empty default.
+    util.checking(label)
     deps = (catalog.page_dependency_digests_for(con, [r[0] for r in rows])
             if only is not None else catalog.page_dependency_digests(con))
     # cross-document content (kommentar prose/.ann, remiss .ann, .corr rows)

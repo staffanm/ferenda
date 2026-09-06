@@ -69,6 +69,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, get_text, make_session, request
@@ -179,7 +180,8 @@ def parse_leaf(html_text, url):
     file name."""
     soup = BeautifulSoup(html_text, "html.parser")
     heading = soup.find("h1")
-    assert heading is not None, "%s carries no document title" % url
+    if heading is None:
+        raise UpstreamChanged("%s carries no document title" % url)
     files = []
     for item in soup.select(".ecl-file"):
         anchor = item.select_one("a.ecl-file__download")
@@ -204,7 +206,8 @@ def leaf_date(soup):
     """The leaf's own Publication date, as an ISO date. Eiopa states it as a
     definition term on every leaf ("16 February 2026")."""
     term = soup.find("dt", string=re.compile(r"^\s*Publication date\s*$"))
-    assert term is not None, "the leaf states no publication date"
+    if term is None:
+        raise UpstreamChanged("the leaf states no publication date")
     return datetime.strptime(
         normalize_space(term.find_next("dd").get_text()), "%d %B %Y"
     ).date().isoformat()

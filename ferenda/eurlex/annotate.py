@@ -188,15 +188,16 @@ def annotate(celex, force=False):
     """Author and write the `.ann` editorial layer for one sector-3 CELEX; returns
     the written path. Refuses (before the LLM spend) to regenerate a verified
     layer unless `force`."""
-    assert celex.startswith("3") and len(celex) > 5 and celex[5] in "RLD", \
-        ("%s: ai-annotate handles only sector-3 acts "
-         "(regulation/directive/decision)" % celex)
+    if not (celex.startswith("3") and len(celex) > 5 and celex[5] in "RLD"):
+        raise ValueError("%s: ai-annotate handles only sector-3 acts "
+                         "(regulation/directive/decision)" % celex)
     out = annstore.path("eurlex", celex)
     annstore.guard(out, force)
     art_path = layout.artifact("eurlex", celex)
-    assert compress.exists(art_path), \
-        "%s: no parsed artifact at %s -- run `lagen eurlex parse %s` first" \
-        % (celex, art_path, celex)
+    if not compress.exists(art_path):
+        raise ValueError("%s: no parsed artifact at %s -- run "
+                         "`lagen eurlex parse %s` first"
+                         % (celex, art_path, celex))
     art = compress.read_json(art_path)
     prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
     layer = llm.author(prompt, _validate)

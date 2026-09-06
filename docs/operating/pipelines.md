@@ -44,6 +44,8 @@ uv run python -m ferenda.build sfs mirror-pdf                     # every base a
 uv run python -m ferenda.build sfs mirror-pdf 2007:90             # named SFS act(s) only
 uv run python -m ferenda.build sfs mirror-pdf --full              # re-fetch existing + re-ask about acts once denied
 uv run python -m ferenda.build sfs ai-includegraphics 2007:90     # vision-localize that act's gaps
+uv run python -m ferenda.build sfs cover-consolidation-gap 1974:156   # reconstruct that act's missing archived consolidations from the amendment PDFs
+uv run python -m ferenda.build sfs cover-consolidation-gap --all --dry-run  # every statute with an attemptable gap, reported only
 ```
 
 The mirror writes `site/data/downloaded/sfs/pdf/{year}/{number}.pdf`. Which
@@ -94,7 +96,11 @@ marker (`/Träder i kraft: den dag som regeringen bestämmer/`).
 **SFS version history** (historical consolidations / time travel / diff): the
 downloader archives every superseded consolidation under
 `site/data/downloaded/sfs/archive/{y}/{n}/.versions/`. Retained HTML
-consolidations use the same tree. The `versions` stage parses
+consolidations use the same tree, and so do the consolidations
+`sfs cover-consolidation-gap` reconstructs from the amendment PDFs for the
+links the corpus never captured (beta-API-shaped JSON with a
+`_reconstructed` key first, naming base, amendment, PDF and the recreate
+command; `sfs/coverage.py`). The `versions` stage parses
 them into `artifact/sfs/archive/…/.versions/{vy}/{vn}.json` plus a per-statute
 `artifact/sfs/{y}/{n}.versions.json` sidecar; `generate` then renders one page per
 historical lydelse at `/{sfsnr}/konsolidering/{version}` (watermarked
@@ -170,7 +176,10 @@ uv run python -m ferenda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # 
 
 # rewrite artifact/dom/casenumbers.json from the parsed artifacts. A full-source
 # `dv parse` already ends with this; run it by hand after a targeted parse, or
-# to see what the snapshot holds
+# to see what the snapshot holds. Not a recipe input: a refresh reparses
+# nothing, so a document parsed before the decision it cites was held links
+# to it only at a later `--force` parse of its source (schedule that on dev
+# and sync; on prod it is a day)
 uv run python -m ferenda.build dv casenumbers
 ```
 

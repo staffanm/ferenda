@@ -734,9 +734,9 @@ class _NullInvocationBar:
 
 class InvocationBar:
     """The outer whole-invocation bar `cmd_all` drives: one `start()`/`finish()`
-    pair per `PlannedStep`. `total_secs` (the plan's summed predictions) and
-    `total_steps` -- both from `corpus.build_invocation_plan` -- pace the ETA
-    and the step count respectively.
+    pair per `PlannedStep`. `plan` maps each step's label to its predicted
+    seconds (`corpus.build_invocation_plan`, `plan_verb_steps`); its length is
+    the step count and its sum the ETA's cost model.
 
     Rendered at `position=1`, *below* the current stage's own nested counter
     (`position=0`): the stage line is what changes moment to moment and reads
@@ -756,31 +756,49 @@ class InvocationBar:
     milliseconds, one runs for hours) made worse than the problem it solved:
     a bar that had barely moved through several real, completed steps because
     they cost almost none of the plan's predicted total time. The ETA is
-    still paced on that cost model (`secs_done`/`total_secs`, real elapsed vs.
-    predicted), computed by hand (`_eta_str`) and baked into `bar_format` as
-    literal text on every refresh, exactly as the nested bar already bakes in
-    its own real done/total beside a cost-paced fill (see `_status_nested`)."""
+    still paced on that cost model, computed by hand (`_eta_str`) and baked
+    into `bar_format` as literal text on every refresh, exactly as the nested
+    bar already bakes in its own real done/total beside a cost-paced fill
+    (see `_status_nested`).
 
-    def __init__(self, total_secs, total_steps, desc, *, file=None):
+    The ETA's arithmetic: the finished steps give a speed -- their predicted
+    seconds over the real seconds they took -- and what remains of the plan
+    is divided by it. The step in flight earns credit as it runs, its own
+    elapsed time at that speed up to its prediction, so the ETA keeps
+    counting down through a two-hour step instead of climbing. It used to be
+    `remaining / (real_done / elapsed)`: real seconds of finished steps over
+    real seconds of the whole run, a fraction that only shrinks while a long
+    step runs, dividing predicted seconds it was never in the units of --
+    two hours into a three-hour run it read 69 h."""
+
+    def __init__(self, plan, desc, *, file=None):
         self._t0 = 0.0
-        self._run_t0 = time.perf_counter()
         self._file = file
-        self.total_steps = total_steps
-        self.total_secs = total_secs
-        self.secs_done = 0.0
+        self.plan = dict(plan)
+        self.total_steps = len(self.plan)
+        self.pred_total = sum(self.plan.values())
+        self.pred_done = 0.0      # predicted seconds of the finished steps
+        self.real_done = 0.0      # what they really took
+        self._pred_cur = 0.0      # the in-flight step's prediction
         self.step_no = 0
         self.current_label = ""
         self.bar = _tqdm.tqdm(
-            total=total_steps, desc=desc, position=1, leave=True,
+            total=self.total_steps, desc=desc, position=1, leave=True,
             dynamic_ncols=True, file=file)
 
     def _eta_str(self):
-        elapsed = time.perf_counter() - self._run_t0
-        if self.secs_done <= 0 or elapsed <= 0:
-            return "?"
-        rate = self.secs_done / elapsed
-        remaining = self.total_secs - self.secs_done
-        return _tqdm.tqdm.format_interval(remaining / rate) if remaining > 0 else "0:00"
+        # predicted seconds per real second, from the finished steps; the
+        # plan at face value until one has finished
+        speed = (self.pred_done / self.real_done
+                 if self.pred_done > 0 and self.real_done > 0 else 1.0)
+        # the in-flight step: credited for its elapsed time, at that speed,
+        # up to what was predicted for it -- an overrun adds nothing more
+        # rather than pushing the ETA out
+        running = time.perf_counter() - self._t0 if self._t0 else 0.0
+        credit = min(self._pred_cur, running * speed)
+        remaining = self.pred_total - self.pred_done - credit
+        return (_tqdm.tqdm.format_interval(remaining / speed) if remaining > 0
+                else "0:00")
 
     def refresh(self):
         """Recompute the ETA text and redraw -- called on every nested-bar
@@ -799,7 +817,15 @@ class InvocationBar:
         to drop this same "source verb" prefix from its own description,
         which would otherwise just repeat what this line already says."""
         self.step_no += 1
+        # the plan is a prediction, the same way its seconds are (see
+        # `corpus._history_secs`): a step whose loop condition the planner
+        # read differently is still a step that ran. Let the total follow the
+        # real count rather than render "26/25"; such a step has no
+        # prediction and costs the ETA only what it really takes.
+        self.total_steps = max(self.total_steps, self.step_no)
+        self.bar.total = self.total_steps
         self._t0 = time.perf_counter()
+        self._pred_cur = self.plan.get(label, 0.0)
         self.current_label = label
         self.bar.n = self.step_no
         w = _desc_width(self._file)
@@ -816,12 +842,16 @@ class InvocationBar:
         _status_nested(0, None, "")
 
     def finish(self):
-        """Add this step's real elapsed time to the ETA's cost tally,
-        whatever its prediction said -- a step that ran fast (a skip the plan
-        could not predict) or slow never desyncs the ETA from wall-clock
-        reality. The bar's own fill already advanced in `start()`, since it
-        tracks completed steps, not this step's own duration."""
-        self.secs_done += time.perf_counter() - self._t0
+        """Book this step: its prediction into `pred_done`, its real elapsed
+        time into `real_done`. Their ratio is the speed the ETA paces the
+        rest of the plan on, so a step that ran fast (a skip the plan could
+        not predict) or slow never desyncs the ETA from wall-clock reality.
+        The bar's own fill already advanced in `start()`, since it tracks
+        completed steps, not this step's own duration."""
+        self.pred_done += self._pred_cur
+        self.real_done += time.perf_counter() - self._t0
+        self._pred_cur = 0.0
+        self._t0 = 0.0
         self.refresh()
 
     def close(self):
@@ -833,7 +863,7 @@ class InvocationBar:
 
 
 @contextmanager
-def invocation_bar(total_secs, total_steps, desc="lagen all"):
+def invocation_bar(plan, desc="lagen all"):
     """Open the whole-invocation bar for the run's lifetime: `cmd_all` calls
     `ib.start(label)` / `ib.finish()` around each planned step. Every `status()`
     call made while this is open renders nested beneath it instead of as the
@@ -858,18 +888,27 @@ def invocation_bar(total_secs, total_steps, desc="lagen all"):
     resize-timing race, but the difference between "self-heals on the next
     tick" and "silently corrupted until the run ends".
 
-    Yields a `_NullInvocationBar` instead, with none of the above, when the
-    real stderr is not a tty (`lagen all rebuild > log 2>&1`, a cron job): a
-    stacked-position tqdm bar writes raw cursor-up ANSI codes to *any* file it
-    is given, tty or not, and a run nobody is watching live gains nothing
-    from the bar to offset that."""
+    Yields a `_NullInvocationBar` instead, with none of the above, in two
+    cases. First, when the real stderr is not a tty (`lagen all rebuild > log
+    2>&1`, a cron job): a stacked-position tqdm bar writes raw cursor-up ANSI
+    codes to *any* file it is given, tty or not, and a run nobody is watching
+    live gains nothing from the bar to offset that. Second, when the plan holds
+    fewer than two steps (`lagen all generate`, `lagen sfs parse`): the outer
+    line would say "1/1" for the whole run and repeat what the step's own
+    counter already says, so a single-step run keeps the plain one-line
+    counter.
+
+    Every step announces itself through `step()`, from wherever its own loop
+    lives -- `cmd_relate`/`cmd_index`/`cmd_dump` per source, `cmd_all` and
+    `build._dispatch` around the calls they make. `step()` is a no-op while no
+    bar is open, so the same call sites serve a single-source run too."""
     real = (sys.stdout, sys.stderr)
-    if not _stderr_is_a_tty():
+    if len(plan) < 2 or not _stderr_is_a_tty():
         yield _NullInvocationBar()
         return
     global _outer, _real_streams
     _real_streams = real
-    ib = InvocationBar(total_secs, total_steps, desc, file=real[1])
+    ib = InvocationBar(plan, desc, file=real[1])
     _outer = ib
     sys.stdout, sys.stderr = _TqdmRedirect(real[0]), _TqdmRedirect(real[1])
     global _resize_pending
@@ -896,6 +935,33 @@ def invocation_bar(total_secs, total_steps, desc="lagen all"):
         ib.close()
         _outer = None
         _real_streams = None
+
+
+@contextmanager
+def step(label):
+    """Announce one planned step of a multi-step run -- "<source> <verb>" --
+    on the outer invocation bar, for as long as it runs. A no-op when no bar
+    is open, which is what lets the same call site serve `lagen all relate`
+    (a bar, one step per source) and `lagen sfs parse` (no bar, the source's
+    own counter alone)."""
+    if _outer is None:
+        yield
+        return
+    _outer.start(label)
+    try:
+        yield
+    finally:
+        _outer.finish()
+
+
+def checking(label):
+    """Report a staleness scan that has no item count to report yet -- the
+    artifact walk `relate`/`dump` open with, the catalog signature `index`
+    and a full `generate` open with. Those scans read the whole corpus off
+    disk and used to run silently, so the seconds (minutes, on a cold cache)
+    before the first real progress line read as a hang. Same wording as the
+    per-document scan `freshness._scan` reports."""
+    status(0, None, "%s  checking staleness" % label)
 
 
 def harvest_start(label: str, url: str) -> None:

@@ -12,14 +12,18 @@ source/stage protocol, imported as `protocol` because `stage` is the name a
 Stage instance carries throughout the engine.
 """
 
+import collections
 import faulthandler
 import functools
 import hashlib
+import heapq
+import itertools
 import json
 import multiprocessing
 import os
 import sqlite3
 import sys
+import threading
 import time
 import traceback
 from concurrent.futures import ProcessPoolExecutor
@@ -40,12 +44,16 @@ RUNS = config.DATA / ".build" / "runs.ndjson"             # append-only run ledg
 ERRORS = config.DATA / ".build" / "errors.json"           # per-doc latest-outcome store
 STATUS = config.DATA / ".build" / "status.json"           # rolling health snapshot
 
-# how often stage_fingerprint() reports progress -- tqdm's own default
-# mininterval; a real util.invocation_bar renders a full nested frame per
-# util.status() call (terminal-size query, refresh, ETA recompute), so
-# calling it every completion made the reporting itself the bottleneck on a
-# fast, high-count scan (2026-09-04)
+# how often a staleness scan (`_scan`, `file_fingerprint`) reports progress
+# -- tqdm's own default mininterval; a real util.invocation_bar renders a
+# full nested frame per util.status() call (terminal-size query, refresh, ETA
+# recompute), so calling it every completion made the reporting itself the
+# bottleneck on a fast, high-count scan (2026-09-04)
 _REPORT_INTERVAL = 0.1
+# how many keys `_run_parallel` scans between looks at the pool: the scan is
+# the parent's own work while the workers build, and a chunk of this size
+# costs about 10 ms on a 97k-document source (43 µs a key, 2026-09-05)
+SCAN_CHUNK = 200
 
 
 # --------------------------------------------------------------------------
@@ -157,72 +165,30 @@ def record_code_version(store, kind, source, code):
         "version": recipe_version(code)}
 
 
-def file_fingerprint(paths):
+def file_fingerprint(paths, *, label=None):
     """A cheap, content-insensitive fingerprint of a file set: each path with its
     size + mtime, no contents read. Detects any add / remove / rewrite (parse
     rewrites an artifact, bumping its mtime), so relate/dump can skip a source
     whose artifacts are all untouched since last run -- instead of re-reading and
-    re-hashing every file. --force or a code-version change overrides it."""
+    re-hashing every file. --force or a code-version change overrides it.
+
+    `label` ("<source> <verb>") turns the walk into a reported "checking
+    staleness" line, throttled to `_REPORT_INTERVAL` exactly as the
+    per-document `_scan` reports its own: over a source with 200,000 artifacts
+    this is tens of seconds that otherwise print nothing at all. A caller with
+    nothing to report (a test, a scan too short to notice) leaves it out and
+    the walk stays silent."""
     h = hashlib.sha256()
-    for p in paths:                          # a source's lister yields them sorted
+    total = len(paths) if label else 0
+    last_report = 0.0
+    for done, p in enumerate(paths, 1):      # a source's lister yields them sorted
         st = compress.stat(p)                # the real (possibly .br) file's size+mtime
         h.update(("%s\x1f%d\x1f%d\x1e" % (p, st.st_size, st.st_mtime_ns)).encode())
-    return h.hexdigest()
-
-
-def _stage_fingerprint_one(stage: protocol.Stage, bf: str) -> bytes:
-    return b"".join([bf.encode(),
-                     *(token for _p, token in _size_mtime(stage.inputs(bf))),
-                     b"\x1e"])
-
-
-def stage_fingerprint(source: protocol.Source, stage_name: str) -> str:
-    """A cheap fingerprint of a per-document stage's inputs (parse, versions):
-    each basefile plus its input files' size+mtime (no content read). Unchanged
-    ⟹ no document needs re-running and none appeared, so the whole per-document
-    freshness scan (which content-hashes every input) can be skipped. Basefiles
-    are folded in so a newly-downloaded doc whose input doesn't exist yet still
-    moves the mark.
-
-    Deliberately serial, no thread pool: measured directly against a real
-    97,000-basefile corpus (2026-09-04), each basefile's own contribution
-    costs ~43 microseconds with no gradient anywhere in the run (first,
-    middle and last tenths of the scan measured identical) -- a thread pool's
-    own per-task dispatch overhead (`Future` creation, GIL handoff,
-    `as_completed`'s bookkeeping) dominates work that small, and gets *worse*
-    with more workers: 5.0s serial vs 7.5s/22.0s/27.3s at 4/8/16 threads, on
-    this dev host's NVMe storage. An earlier version threaded this on the
-    (untested) assumption that the `stat()` calls behind `compress.exists`/
-    `compress.stat` are I/O-wait-bound the way NFS would make them -- true on
-    NFS, not measured, and evidently false on fast local storage, where the
-    per-call cost is too small to ever amortise thread dispatch. If prod's
-    HDD-class storage (see prod-hardware-reality) turns out to make this slow
-    enough to be worth revisiting, thread it back in *there*, with numbers
-    from that host -- not by assumption.
-
-    Reports its own progress through the usual `util.status` line (stripped
-    to "checking staleness" beneath an open invocation bar, same as any other
-    per-basefile loop): this scan used to run silently, so a slow one read as
-    a hang rather than as work in progress -- exactly the frozen "0/?" the
-    nested bar's own priming (see `InvocationBar.start`) was primed to avoid,
-    just one call earlier than that priming ever gets to fire. Throttled to
-    `_REPORT_INTERVAL` seconds, not called on every completion: under a real
-    `util.invocation_bar`, every `util.status()` call renders a full nested
-    tqdm frame -- a terminal-size query, a refresh, an ETA recompute -- and
-    calling that once per basefile made the *reporting* itself a measurable
-    part of the cost."""
-    stage = source.stages[stage_name]
-    basefiles = list(protocol.stage_basefiles(source, stage_name))
-    total = len(basefiles)
-    h = hashlib.sha256()
-    last_report = 0.0
-    for done, bf in enumerate(basefiles, 1):
-        h.update(_stage_fingerprint_one(stage, bf))
-        now = time.perf_counter()
-        if done == total or now - last_report >= _REPORT_INTERVAL:
-            util.status(done, total, "%s %s  checking staleness"
-                      % (source.name, stage_name))
-            last_report = now
+        if label:
+            now = time.perf_counter()
+            if done == total or now - last_report >= _REPORT_INTERVAL:
+                util.status(done, total, "%s  checking staleness" % label)
+                last_report = now
     return h.hexdigest()
 
 
@@ -382,10 +348,10 @@ def _apply_outcomes(source, errors, done):
     runlog.apply_outcomes(ERRORS, source, errors, done, RUN_ID)
 
 
-def _reconcile_orphans(source, valid):
+def _reconcile_orphans(source, stage, valid):
     if RUN_ID is None:
         return
-    runlog.reconcile_orphans(ERRORS, source, set(valid))
+    runlog.reconcile_orphans(ERRORS, source, stage, set(valid))
 
 
 def _update_status_cell(source, stage, cell):
@@ -525,22 +491,104 @@ def _rebuild_isolated(source, action, basefile, options):
     return res
 
 
-def _run_parallel(source, action, order, jobs, absorb, force=None):
-    """Fan the basefiles out across `jobs` worker processes, absorbing each
-    result as it completes (imap_unordered: continuous feeding, no barriers,
-    a slow doc stalls nothing but itself).
+def _cheaply_fresh(source, stage_name, basefile, manifest, force, no_deps, fresh):
+    """The scan's answer to "does this document need a worker?" -- `ensure`'s
+    own test, minus the content hash: the stage's output exists, its recipe
+    version is the one recorded, and its inputs' size+mtime mark is the one
+    the manifest was last built from (`_inputs_hash`'s cheap pre-check). A
+    dependency is checked first the way `ensure` recurses into it, without
+    `force` (which names one stage). Every stage found fresh along the way is
+    appended to `fresh` as ``(stage, basefile)``, what `ensure` reports for
+    the same outcome, so `report` heals the same ledger entries.
+
+    False means "maybe stale": the worker's `ensure` still compares content
+    hashes, so a file whose mtime moved without its bytes changing (a
+    compression migration) is found fresh there, exactly as before. The scan
+    only decides who gets a worker."""
+    stage = source.stages[stage_name]
+    if stage.depends and not no_deps and not _cheaply_fresh(
+            source, stage.depends, basefile, manifest, False, no_deps, fresh):
+        return False
+    if force or stage.always or not compress.exists(stage.output(basefile)):
+        return False
+    inputs = stage.inputs(basefile)
+    if inputs or stage.code:
+        entry = manifest.get(manifest_key(source.name, stage_name, basefile))
+        if not entry:
+            return False
+        if not (protocol.RUN.ignore_code_changes
+                or entry["version"] == recipe_version(stage.code)):
+            return False
+        if entry.get("inputs_wm") != _cheap_inputs_fingerprint(inputs):
+            return False
+    fresh.append((stage_name, basefile))
+    return True
+
+
+def _scan(source, action, basefiles, manifest, force, merged, expected, counts):
+    """Walk `basefiles` once and yield the ones that need a worker, as they
+    are met. A fresh document is booked into `merged.fresh` on the spot and
+    never reaches the pool -- the round-trip a fresh document used to cost
+    (eurlex parse: 43-52 s for 172,000 of them with nothing to parse,
+    2026-09-03) is gone, and so is the separate whole-source fingerprint
+    pass that existed to spare it. `expected[basefile]` gets the manifest's
+    last build seconds (None when never built), what the dispatcher orders
+    on and the ETA weighs. `counts["fresh"]` is the number of documents
+    booked fresh -- `merged.fresh` holds one ``(stage, basefile)`` pair per
+    stage of a fresh document's chain, so its length is not that number.
+
+    Reports as "checking staleness" on the usual status line, throttled to
+    `_REPORT_INTERVAL`; the first and last basefile always report."""
+    total = len(basefiles)
+    last_report = 0.0
+    stale = 0
+    for done, bf in enumerate(basefiles, 1):
+        if _cheaply_fresh(source, action, bf, manifest, force,
+                          protocol.RUN.no_deps, merged.fresh):
+            counts["fresh"] += 1
+        else:
+            entry = manifest.get(manifest_key(source.name, action, bf))
+            expected[bf] = entry.get("secs") if entry else None
+            stale += 1
+            yield bf
+        now = time.perf_counter()
+        if done == total or now - last_report >= _REPORT_INTERVAL:
+            util.status(done, total, "%s %s  checking staleness  %d stale"
+                        % (source.name, action, stale))
+            last_report = now
+
+
+def _priority(expected, basefile):
+    """The dispatch order as a heap key: a never-built document first (it is
+    assumed slowest -- a new forty-minute scan must not land at the end of
+    the run), then by last build duration, longest first. Two consumers,
+    one manifest lookup made by `_scan`: the order and the ETA's weights."""
+    secs = expected[basefile]
+    return (secs is not None, -(secs or 0.0))
+
+
+def _run_parallel(source, action, feed, jobs, absorb, priority, force=None):
+    """Fan the stale documents `feed` yields out across `jobs` worker
+    processes, absorbing each result as it completes.
+
+    The feed is the staleness scan itself, pulled `SCAN_CHUNK` keys at a
+    time between looks at the pool, so the first worker starts on the first
+    stale document found, seconds into a scan that takes 5-16 s on the big
+    sources, instead of after every pass over the tree. What is known so far
+    sits on a heap keyed by `priority` (never-built first, then longest
+    last build), and a free worker always takes the most expensive known
+    document. The order is not strictly slowest-first during the scan's few
+    seconds; once it ends the heap holds everything and it is, so the tail
+    of the run is the cheap documents and the final straggler a fast one
+    rather than a long scan.
 
     `force` overrides the run's `--force` for these builds (None = use it).
-    A worker reads it off its copy of the run options, which is why the override
-    travels in the options the pool is initialised with rather than per job.
-
-    `order` is already in dispatch order -- descending expected duration, with
-    the never-built document first (`expected_secs`). This starts the slow tail
-    early, so the final straggler is a fast document rather than a long scan."""
-    jobs_list = [(source.name, action, bf) for bf in order]
+    A worker reads it off its copy of the run options, which is why the
+    override travels in the options the pool is initialised with rather than
+    per job."""
     # A worker that dies hard (a C-extension segfault) before it hits
-    # maxtasksperchild loses its in-flight result, and imap_unordered then waits
-    # for it forever -- multiprocessing.Pool has no BrokenProcessPool equivalent
+    # maxtasksperchild loses its in-flight result, and the pool then never
+    # delivers it -- multiprocessing.Pool has no BrokenProcessPool equivalent
     # to ProcessPoolExecutor's, whose respawn path we can't use (it deadlocked,
     # see MAX_DOCS_PER_WORKER). Observed: a förarbete parse sat at
     # "(97212/97213) ... ETA 00:00" with all 26 workers asleep, and would have
@@ -549,68 +597,104 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
     # that follows was, which is the part that costs a night.
     #
     # So: whenever results pause for WORKER_POLL seconds, sweep for corpses.
-    # A timeout tick guarantees the result queue is empty (a queued result
-    # returns instantly, no timeout), so an inflight slot (see _worker) whose
-    # pid is not among the pool's live workers is a worker that died without
-    # delivering -- if its slot names a doc still outstanding, that doc's
-    # result is never coming. pool._pool is private but has been the worker
-    # list since 2.6; there is no public liveness API. Once everything still
-    # outstanding is attributed to a corpse, stop waiting and rebuild those
-    # documents one at a time in fresh subprocesses below -- the crashes are
-    # rare and not document-deterministic (the same doc rebuilds fine), so the
-    # run completes instead of aborting at 99.99% after an hour-long stall.
-    # LOST_RESULT_TIMEOUT stays as the hang backstop (rule:fail-fast); the
-    # serial `--jobs 1` path takes no pool and remains the diagnostic fallback.
+    # An inflight slot (see _worker) whose pid is not among the pool's live
+    # workers is a worker that died without delivering -- if its slot names a
+    # doc still outstanding, that doc's result is never coming. pool._pool is
+    # private but has been the worker list since 2.6; there is no public
+    # liveness API. Once everything still outstanding is attributed to a
+    # corpse, stop waiting and rebuild those documents one at a time in fresh
+    # subprocesses below -- the crashes are rare and not document-deterministic
+    # (the same doc rebuilds fine), so the run completes instead of aborting at
+    # 99.99% after an hour-long stall. LOST_RESULT_TIMEOUT stays as the hang
+    # backstop (rule:fail-fast); the serial `--jobs 1` path takes no pool and
+    # remains the diagnostic fallback.
     INFLIGHT.mkdir(parents=True, exist_ok=True)
     for slot in INFLIGHT.iterdir():        # stale slots from an earlier run
         slot.unlink()
-    outstanding = {bf for _source, _action, bf in jobs_list}
-    lost = set()                           # attributed to a dead worker
-    quiet = 0.0                            # seconds since the last result
     # every child of this run -- the pool's workers and the isolated rebuilds
     # below -- runs under these, so the force override cannot drift between them
     options = (protocol.RUN if force is None
                else replace(protocol.RUN, force=force))
+    heap = []                              # (priority, seq, basefile)
+    seq = itertools.count()
+    cond = threading.Condition()
+    arrived = collections.deque()          # (basefile, Result), from the pool's thread
+    broken = []                            # an exception a worker raised outright
+    def on_result(item):
+        with cond:
+            arrived.append(item)
+            cond.notify()
+    def on_error(exc):
+        with cond:
+            broken.append(exc)
+            cond.notify()
+    outstanding = set()                    # dispatched, not yet absorbed
+    lost = set()                           # attributed to a dead worker
+    quiet = 0.0                            # seconds since the last result
+    feeding = True
     with multiprocessing.Pool(processes=jobs, initializer=_worker_init,
                               initargs=(options,),
                               maxtasksperchild=MAX_DOCS_PER_WORKER) as pool:
-        results = pool.imap_unordered(_worker, jobs_list, chunksize=1)
-        while len(outstanding) > len(lost):
-            try:
-                basefile, res = results.next(timeout=WORKER_POLL)
-            except StopIteration:
-                break
-            except multiprocessing.TimeoutError:
-                quiet += WORKER_POLL
-                alive = {p.pid for p in pool._pool}  # ty: ignore[unresolved-attribute]  # no public liveness API; _pool stable since 2.6
-                for slot in INFLIGHT.iterdir():
-                    if int(slot.name) in alive:
-                        continue           # current worker, doc in flight
-                    bf = slot.read_text()
-                    slot.unlink()          # attribute a corpse only once
-                    if bf in outstanding and bf not in lost:
-                        lost.add(bf)
-                        util.write("%s %s: worker died building %s; queued "
-                                  "for an isolated rebuild once the pool drains"
-                                  % (source.name, action, bf), err=True)
-                if quiet >= LOST_RESULT_TIMEOUT:
-                    raise RuntimeError(
-                        "%s %s: no worker result in %d s with %d document(s) "
-                        "outstanding (%d attributed to dead workers) -- a "
-                        "worker is hung. The results that did arrive are "
-                        "saved; re-run to finish. Outstanding: %s"
-                        % (source.name, action, int(quiet), len(outstanding),
-                           len(lost), ", ".join(sorted(outstanding)[:10])
-                           + (" ..." if len(outstanding) > 10 else ""))) \
-                        from None
-                continue
+        while True:
+            if feeding:
+                for _ in range(SCAN_CHUNK):
+                    try:
+                        bf = next(feed)
+                    except StopIteration:
+                        feeding = False
+                        break
+                    heapq.heappush(heap, (priority(bf), next(seq), bf))
+            while heap and len(outstanding) - len(lost) < jobs:
+                _, _, bf = heapq.heappop(heap)
+                outstanding.add(bf)
+                pool.apply_async(_worker, ((source.name, action, bf),),
+                                 callback=on_result, error_callback=on_error)
+            with cond:
+                if broken:
+                    raise broken[0]
+                items = list(arrived)      # everything that landed: absorbing
+                arrived.clear()            # frees capacity for the next dispatch
+                if items:
+                    pass
+                elif feeding:
+                    continue               # the scan is the work meanwhile
+                elif not heap and len(outstanding) == len(lost):
+                    break
+                elif cond.wait(timeout=WORKER_POLL):
+                    continue               # a result landed: pick it up above
+                else:
+                    quiet += WORKER_POLL
+                    alive = {p.pid for p in pool._pool}  # ty: ignore[unresolved-attribute]  # no public liveness API; _pool stable since 2.6
+                    for slot in INFLIGHT.iterdir():
+                        if int(slot.name) in alive:
+                            continue       # current worker, doc in flight
+                        bf = slot.read_text()
+                        slot.unlink()      # attribute a corpse only once
+                        if bf in outstanding and bf not in lost:
+                            lost.add(bf)
+                            util.write("%s %s: worker died building %s; queued "
+                                       "for an isolated rebuild once the pool "
+                                       "drains" % (source.name, action, bf),
+                                       err=True)
+                    if quiet >= LOST_RESULT_TIMEOUT:
+                        raise RuntimeError(
+                            "%s %s: no worker result in %d s with %d "
+                            "document(s) outstanding (%d attributed to dead "
+                            "workers) -- a worker is hung. The results that "
+                            "did arrive are saved; re-run to finish. "
+                            "Outstanding: %s"
+                            % (source.name, action, int(quiet),
+                               len(outstanding), len(lost),
+                               ", ".join(sorted(outstanding)[:10])
+                               + (" ..." if len(outstanding) > 10 else "")))
+                    continue
             quiet = 0.0
-            outstanding.discard(basefile)
-            lost.discard(basefile)   # delivered after all: nothing was lost
-            absorb(res, basefile)
+            for basefile, res in items:
+                outstanding.discard(basefile)
+                lost.discard(basefile)     # delivered after all: nothing was lost
+                absorb(res, basefile)
     # the loop exits only with every un-lost result absorbed; any other state
-    # (an imap accounting anomaly delivering StopIteration with residue) must
-    # crash with a diagnosis here, not be papered over by the rebuild below
+    # must crash with a diagnosis here, not be papered over by the rebuild below
     assert outstanding == lost, (outstanding, lost)
     for bf in sorted(outstanding):
         # every doc still outstanding lost its worker: rebuild it one at a
@@ -619,75 +703,66 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
         absorb(_rebuild_isolated(source, action, bf, options), bf)
 
 
-def expected_secs(source_name, action, basefiles, manifest):
-    """`(weights, order)` -- the expected seconds per basefile, and the basefiles
-    in dispatch order.
-
-    Two consumers, one pass over the manifest: `_run_parallel` dispatches
-    longest-first, and the ETA paces on the same numbers. They need the unknown
-    basefile (new, or never built by this recipe) treated differently, which is
-    why both come from here rather than from one dict:
-
-    * for *ordering* an unknown document is assumed slowest and goes first, so a
-      new forty-minute scan cannot land at the end of the run;
-    * for *summing* it cannot be infinite, so it weighs the corpus mean.
-
-    Costs one dict lookup per basefile -- what the dispatch sort was already
-    paying on its own."""
-    secs = {}
-    for bf in basefiles:
-        entry = manifest.get(manifest_key(source_name, action, bf))
-        secs[bf] = entry.get("secs") if entry else None
-    known = [v for v in secs.values() if v is not None]
-    mean = (sum(known) / len(known)) if known else 1.0
-    weights = {bf: (mean if v is None else v) for bf, v in secs.items()}
-    # unknown first (True > False), then by expected duration, longest first
-    order = sorted(basefiles,
-                   key=lambda bf: (secs[bf] is None, weights[bf]), reverse=True)
-    return weights, order
-
-
 def run_action(source, action, basefiles, jobs, force=None):
-    """Run `action` over `basefiles`, in parallel where the stage allows it,
-    reporting progress. `force` overrides the run's `--force` for this action
-    (None = use it) -- see `build_one`."""
+    """Run `action` over `basefiles`: one scan decides which of them need a
+    worker (`_scan`), and those go to the pool as they are found, most
+    expensive first (`_run_parallel`) -- or, with one job, one basefile or a
+    dry run, are built here in scan order. `force` overrides the run's
+    `--force` for this action (None = use it) -- see `build_one`."""
     manifest = load_manifest()
     merged = Result()
     total = len(basefiles)
-    done = actual = 0
-    # expected cost per basefile: the dispatch order and the ETA read the same
-    # numbers, so they are computed once here and threaded down
-    weights, order = expected_secs(source.name, action, basefiles, manifest)
-    total_work = sum(weights.values())
-    done_work = 0.0
-
+    expected = {}                          # stale basefile -> last build secs, or None
+    counts = {"fresh": 0}                  # documents the scan booked fresh
+    absorbed = actual = 0
+    done_work = total_work = 0.0
+    known_sum, known_n = 0.0, 0
+    weights = {}
+    def weight(basefile):
+        # a never-built document weighs the mean of the stale ones with a
+        # record met so far (1.0 before any), so the ETA's total is finite;
+        # the order treats it as slowest
+        nonlocal known_sum, known_n
+        secs = expected[basefile]
+        if secs is not None:
+            known_sum += secs
+            known_n += 1
+        w = secs if secs is not None else (known_sum / known_n if known_n else 1.0)
+        weights[basefile] = w
+        return w
+    def feed():
+        nonlocal total_work
+        for bf in _scan(source, action, basefiles, manifest,
+                        protocol.RUN.force if force is None else force,
+                        merged, expected, counts):
+            total_work += weight(bf)
+            yield bf
     def persist():
         if merged.updates and not protocol.RUN.dry_run:
             manifest.update(merged.updates)
-
     def absorb(res, basefile):
-        nonlocal done, actual, done_work
+        nonlocal absorbed, actual, done_work
         _absorb(merged, res)
-        done += 1
-        done_work += weights.get(basefile, 0.0)
+        absorbed += 1
+        done_work += weights[basefile]     # every absorbed key came out of feed()
         # a basefile that only refreshed fresh dependencies (no run/skip/error) is
         # a near-instant skip; the rest are real work the ETA should be paced on
         if res.done or res.skips or res.errors:
             actual += 1
-        _progress(source.name, action, done, total, actual, merged, basefile,
-                  (done_work, total_work))
-        if done % SAVE_EVERY == 0:
+        _progress(source.name, action, counts["fresh"] + absorbed, total,
+                  actual, merged, basefile, (done_work, total_work))
+        if absorbed % SAVE_EVERY == 0:
             persist()       # checkpoint so a kill mid-run doesn't lose progress
-
     try:
         # a single basefile can never use more than one worker, so run it here
         # rather than through the pool. Not just an optimisation: a pool worker is
         # daemonic, and a recipe that parallelises internally (stats compute fans
         # its corpus scan over a ProcessPoolExecutor) cannot spawn children there.
-        if jobs > 1 and len(basefiles) > 1 and not protocol.RUN.dry_run:
-            _run_parallel(source, action, order, jobs, absorb, force)
+        if jobs > 1 and total > 1 and not protocol.RUN.dry_run:
+            _run_parallel(source, action, feed(), jobs, absorb,
+                          lambda bf: _priority(expected, bf), force)
         else:
-            for bf in basefiles:
+            for bf in feed():
                 absorb(build_one(source, action, bf, manifest, force), bf)
     finally:
         # always flush what was done -- on normal completion AND on Ctrl-C, so an
@@ -823,6 +898,12 @@ def save_fingerprints(store):
     # seventh one cannot reintroduce it.
     if protocol.RUN.dry_run:
         return
+    # The whole store is rewritten from a process-local snapshot, which is only
+    # safe because there is exactly one writer: `build.main` holds the corpus
+    # writer lease (lib/writerlock) for the length of a pipeline invocation.
+    # Without it, two runs each load the file, and the second to finish writes
+    # back a dict that never saw the first one's completed gates -- so a source
+    # marked current is silently marked stale again, or worse, the other way.
     global _FINGERPRINTS_CACHE
     _FINGERPRINTS_CACHE = store
     util.write_atomic(FINGERPRINTS, json.dumps(store, ensure_ascii=False,

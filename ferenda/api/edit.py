@@ -16,7 +16,7 @@ returns. A stale hunk fails the commit as a 409 with the offending keys.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import editcart, editcontent
 from .auth import Editor, require_editor
@@ -56,19 +56,27 @@ class RegionView(BaseModel):
     draft: bool
 
 
+# What one edit may carry. A commentary region is prose, not a document: the
+# longest in the wiki today is under 40 kB. The ceilings exist because uvicorn
+# reached directly has no nginx body limit in front of it.
+MAX_TEXT = 1024 * 1024
+MAX_KEY = 500
+MAX_MESSAGE = 4096
+
+
 class EditBody(BaseModel):
-    kind: str
-    ref: str
-    anchor: str | None = None
-    new_text: str
+    kind: str = Field(max_length=MAX_KEY)
+    ref: str = Field(max_length=MAX_KEY)
+    anchor: str | None = Field(default=None, max_length=MAX_KEY)
+    new_text: str = Field(max_length=MAX_TEXT)
 
 
 class DiscardBody(BaseModel):
-    key: str
+    key: str = Field(max_length=MAX_KEY)
 
 
 class CommitBody(BaseModel):
-    message: str
+    message: str = Field(max_length=MAX_MESSAGE)
 
 
 @router.get("/region", response_model=RegionView)

@@ -179,6 +179,7 @@ def test_omitted_chain_refuses_an_issuer_naming_itself_the_real_one():
     assert evil.subject == leaf.issuer          # the name check would pass ...
     with mock.patch.object(net, "_ca_issuers_url",
                            return_value="http://evil.example/ca"), \
+            mock.patch.object(net, "_aia_target", side_effect=lambda url: url), \
             pytest.raises(InvalidSignature):    # ... the signature does not
         net._omitted_chain(leaf, serves(evil), 5)
 
@@ -190,6 +191,7 @@ def test_omitted_chain_refuses_an_issuer_for_another_certificate_entirely():
     _leaf_key, leaf = selfsigned("victim.example")
     with mock.patch.object(net, "_ca_issuers_url",
                            return_value="http://evil.example/ca"), \
+            mock.patch.object(net, "_aia_target", side_effect=lambda url: url), \
             pytest.raises(ValueError):
         net._omitted_chain(leaf, serves(evil), 5)
 
@@ -202,6 +204,7 @@ def test_omitted_chain_gives_up_rather_than_following_a_loop():
     _leaf_key, leaf = issued_by(key, ca, "victim.example")
     with mock.patch.object(net, "_ca_issuers_url",
                            return_value="http://loop.example/ca"), \
+            mock.patch.object(net, "_aia_target", side_effect=lambda url: url), \
             pytest.raises(ValueError, match="does not reach a trusted root"):
         net._omitted_chain(leaf, serves(ca), 5)
 
@@ -434,3 +437,71 @@ def test_a_nonstandard_throttle_that_outlives_the_retries_raises(monkeypatch):
     with pytest.raises(requests.exceptions.HTTPError):
         net.request(_ThrottledSession(), "GET",
                     "https://wafed.invalid/a", retries=2)
+
+
+def test_a_declared_content_length_over_the_ceiling_is_refused_unread():
+    class Response:
+        status_code = 200
+        url = "https://example.invalid/bulk"
+        headers = {"content-length": str(64 * 1024 * 1024)}
+
+        def close(self):
+            pass
+
+        def raise_for_status(self):
+            raise AssertionError("the body must be refused before this")
+
+    class Session:
+        def request(self, method, url, **kwargs):
+            return Response()
+
+    with pytest.raises(net.ResponseTooLarge, match="declares"):
+        net.request(Session(), "GET", "https://example.invalid/bulk",
+                    max_bytes=1024)
+
+
+def test_a_body_without_a_content_length_is_stopped_while_it_arrives():
+    closed = []
+
+    class Response:
+        status_code = 200
+        url = "https://example.invalid/endless"
+        headers: dict[str, str] = {}
+
+        def close(self):
+            closed.append(True)
+
+        def iter_content(self, chunk):
+            while True:
+                yield b"x" * chunk
+
+        def raise_for_status(self):
+            raise AssertionError("the body must be refused before this")
+
+    with pytest.raises(net.ResponseTooLarge, match="more than"):
+        net._enforce_size(Response(), 4096, True)
+    assert closed
+
+
+def test_an_aia_url_pointing_at_link_local_metadata_is_refused_unfetched():
+    """The caIssuers URL comes out of an unverified certificate, so the server
+    chooses it. A cloud metadata address, a loopback port or anything else off
+    the public internet must be refused before the request goes out."""
+    class _Refuses:
+        def request(self, *_a, **_kw):
+            raise AssertionError("made a request for a private AIA address")
+
+    _key, leaf = selfsigned("victim.example")
+    for url in ("http://169.254.169.254/latest/meta-data/",
+                "http://127.0.0.1:8000/ca", "http://localhost/ca"):
+        with mock.patch.object(net, "_ca_issuers_url", return_value=url), \
+                pytest.raises(ValueError, match="not a public address"):
+            net._omitted_chain(leaf, _Refuses(), 5)
+
+
+def test_an_aia_url_with_a_non_http_scheme_is_refused():
+    _key, leaf = selfsigned("victim.example")
+    with mock.patch.object(net, "_ca_issuers_url",
+                           return_value="file:///etc/ssl/cert.pem"), \
+            pytest.raises(ValueError, match="not http"):
+        net._omitted_chain(leaf, None, 5)

@@ -25,7 +25,10 @@ in another court's series (B 53-11 is both an AD and an HD case), or two
 Arbetsdomstolen cases a year apart. Picking is the citation's problem, and
 `lib/malnummer` picks with the court and date the citation prints.
 
-Re-run ``lagen dv casenumbers`` after a parse run to refresh the snapshot.
+Re-run ``lagen dv casenumbers`` after a parse run to refresh the snapshot. The
+file is read at parse time but is not a recipe input (`stage.CASENUMBER_CODE`):
+a refresh reparses nothing, and a document parsed before we held the decision
+it cites links to it at its source's next code-staleness or --force pass.
 """
 
 import json
@@ -73,10 +76,9 @@ def write(path=CASENUMBERS):
     """Rewrite the snapshot; report what it holds, what it refused, and whether
     the file changed.
 
-    `changed` is what the caller reports on, because the snapshot is a parse
-    input (`build.CASENUMBER_CODE`): new content re-stales the parse of every
-    source that resolves case numbers, and unchanged content costs nothing --
-    the recipe fingerprint hashes the file, not its timestamp."""
+    `changed` is what the caller reports on: new content is what a later
+    --force parse of the citing sources would pick up, and an unchanged file is
+    left untouched."""
     snapshot, refused = build()
     serialized = json.dumps(snapshot, ensure_ascii=False,
                             separators=(",", ":")) + "\n"

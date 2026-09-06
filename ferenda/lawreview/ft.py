@@ -28,6 +28,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
+from ..lib.errors import UpstreamChanged
 from ..lib.util import normalize_space
 from .journals import FT
 
@@ -63,8 +64,8 @@ def _ft_issues(session):
             if not issue.isdigit():
                 continue
             href = a.get("href")
-            assert isinstance(href, str), \
-                "an ft issue button is not a link"
+            if not isinstance(href, str):
+                raise UpstreamChanged("an ft issue button is not a link")
             issues.append({"year": year, "issue": issue,
                            "url": urljoin(FT.base, href)})
     if not issues:
@@ -97,7 +98,8 @@ def _ft_records_from_page(html, issue_url):
         if link is None:
             continue             # a subscription card: no public PDF
         href = link.get("href")
-        assert isinstance(href, str), "an ft open-access link is not a link"
+        if not isinstance(href, str):
+            raise UpstreamChanged("an ft open-access link is not a link")
         title_el = li.find("b")
         title = normalize_space(title_el.get_text(" ", strip=True)) \
             if title_el is not None else ""

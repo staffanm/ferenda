@@ -49,6 +49,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from ..lib import compress
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
@@ -143,8 +144,9 @@ def download_bilagor(session, destdir, record, delay):
         # the API-supplied filename is reduced to its basename so it can't
         # carry directory components out of dirpath
         name = Path(bilaga["filnamn"]).name
-        assert name and name not in (".", ".."), \
-            "unexpected bilaga filename: %r" % bilaga["filnamn"]
+        if not name or name in (".", ".."):
+            raise UpstreamChanged("unexpected bilaga filename: %r"
+                                  % bilaga["filnamn"])
         target = dirpath / name
         if compress.exists(target) and compress.stat(target).st_size > 0:
             continue

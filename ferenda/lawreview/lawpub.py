@@ -51,6 +51,7 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, net
 from ..lib.artifact import prune, scanned_nodes
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import (
     HarvestWatermark,
     document_item_key,
@@ -92,10 +93,12 @@ def kod_from_icon(icon):
     (``ft-icon.svg`` -> ``FT``, ``siplr_icon.svg`` -> ``SIPLR``). The item
     carries the icon's full path, so the stem is read off the file name alone
     -- a path taken as a whole would name its first directory, not the icon."""
-    assert isinstance(icon, str) and icon, "a publisher icon is a path: %r" % (icon,)
+    if not (isinstance(icon, str) and icon):
+        raise UpstreamChanged("a publisher icon is a path: %r" % (icon,))
     name = icon.rsplit("/", 1)[-1]
     m = RE_ICON_STEM.search(name)
-    assert m is not None, "no publisher stem in the icon's name: %r" % (icon,)
+    if m is None:
+        raise UpstreamChanged("no publisher stem in the icon's name: %r" % (icon,))
     return m.group(0).upper()
 
 
@@ -224,13 +227,14 @@ def _record(it):
     also its download key, a DOI keeps that key private until its article page
     is read at download time."""
     a = it.select_one("h2 a")
-    assert a is not None and a.get("href"), \
-        "a section item names no article: %r" % it
+    if a is None or not a.get("href"):
+        raise UpstreamChanged("a section item names no article: %r" % it)
     href = a["href"]
     handle = href.split("/artikel/", 1)[1]
     icon = it.select_one("img.publisher-icon")
-    assert icon is not None, \
-        "a section item names no publisher: %r" % a.get_text(strip=True)
+    if icon is None:
+        raise UpstreamChanged("a section item names no publisher: %r"
+                              % a.get_text(strip=True))
     pub = BY_ICON[kod_from_icon(icon["src"]).lower()]
 
     doi = None
@@ -275,7 +279,8 @@ def _fetch_pdf(session, record, delay):
         page = net.request(session, "GET", record["source_url"]).text
         time.sleep(delay)
         m = RE_SECTION_ID.search(page)
-        assert m is not None, "no section id on %s" % record["source_url"]
+        if m is None:
+            raise UpstreamChanged("no section id on %s" % record["source_url"])
         sectionid = m.group(1)
     data = net.request(
         session, "GET", "%s/utils/downloadsection/%s" % (LAWPUB_BASE, sectionid)

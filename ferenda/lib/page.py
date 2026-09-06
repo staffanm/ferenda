@@ -1909,11 +1909,10 @@ def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
     heading), so the frontmatter must not emit a second one. `mark` puts the
     lagen.nu mark in the frontmatter's left margin -- the frontpage, which is
     the site speaking as itself rather than showing a document. `doc_uri` is
-    the document's own uri (`art["uri"]`) -- page.html anchors `<base href>`
-    to its served path, so a bare `#anchor` link (the TOC, a pilcrow
-    permalink) resolves against the document instead of the site root; a
-    `solo` page (browse, frontpage) has no single document and leaves it
-    unset. `short_id` is the identifier the document is cited by (`head_title`
+    the document's own uri (`art["uri"]`) -- it becomes the page's canonical
+    address, which page.html's head script also uses as `<base>` when the
+    bytes are served at some other path (a subdomain landing); a `solo` page
+    (browse, frontpage) has no single document and leaves it unset. `short_id` is the identifier the document is cited by (`head_title`
     puts it in the title tag; the h1 stays `title`); `description` its opening
     words (`Site.snippet`), for the meta description and the link preview. A
     document page carries a self-referencing `canonical` on the public host,
@@ -1930,7 +1929,7 @@ def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
                 eyebrow=eyebrow, subtitle=subtitle, summary=Markup(summary),
                 summary_text=summary_text, island=Markup(island), solo=solo,
                 body_class=body_class, head=Markup(head), own_h1=own_h1,
-                mark=mark, base_path=base_path,
+                mark=mark,
                 title_html=Markup(title_html) if title_html is not None else None,
                 **extra)
 

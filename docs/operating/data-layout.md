@@ -7,7 +7,7 @@ committed):
 site/data/downloaded/sfs/                     # SFS raw (beta JSON + legacy sfst/sfsr HTML)
 site/data/downloaded/sfs/pdf/                 # mirrored official SFS PDFs (1998–; the graphic-crop source)
 site/data/artifact/sfs/                       # parsed JSON artifacts (+ .versions.json sidecars)
-site/data/{downloaded,artifact}/sfs/archive/  # superseded consolidations, raw + parsed
+site/data/{downloaded,artifact}/sfs/archive/  # superseded consolidations, raw + parsed (a raw JSON with a `_reconstructed` key is ferenda's own reconstruction, not a download)
 site/data/downloaded/eurlex/                  # CELLAR harvest: {year}/{celex}/notice.ttl + content per language
 site/data/downloaded/eurlex/*/*/.versions/    # consolidated wordings (CONSLEG), one dated dir per version
 site/data/downloaded/eurlex/*/*/.versions/*/.no-content  # dated: CELLAR had no swe/eng text for this wording (re-asked when stale)
@@ -16,7 +16,7 @@ site/data/artifact/eurlex/archive/            # superseded consolidations, parse
 site/data/downloaded/dom/                     # DV new-API harvest (per court)
 site/data/downloaded/dv/                      # DV legacy feed (.doc/.docx)
 site/data/artifact/dom/identity-index.json    # canonical case -> source records
-site/data/artifact/dom/casenumbers.json       # case number -> held decisions (lib/malnummer's parse input; `lagen dv casenumbers`)
+site/data/artifact/dom/casenumbers.json       # case number -> held decisions (read by lib/malnummer at parse time, not a recipe input; `lagen dv casenumbers`)
 site/data/downloaded/avg/{jo,jk,arn,imy,kkv}/ # per-decision records (+ jo/arn PDFs, jk landing html)
 site/data/downloaded/avg/imy/dok/             # IMY decision PDFs, by asset name (shared between decisions)
 site/data/downloaded/avg/kkv/dok/             # KKV decision documents, by diarium file name (pdf/htm/docx)

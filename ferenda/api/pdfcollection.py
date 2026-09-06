@@ -31,6 +31,20 @@ MAX_DOCUMENTS = 1000
 MAX_SECTIONS_PER_DOCUMENT = 500
 COLLECTION_FORMAT = 1
 
+# What one collection may cost, on top of the per-field ceilings above. The
+# route is public and anonymous, and the per-field limits multiply: 1,000
+# documents of 500 sections each is half a million selections, and the
+# documents themselves can be the largest pages in the corpus. These three
+# bound the render the manifest actually asks for, and they are checked before
+# a worker is taken.
+#
+# The numbers are what a real collection stays far under. The largest thing
+# anyone has exported is a författningssamling of a few dozen statutes: about
+# 3 MB of input HTML and a few hundred sections. A collection over these is
+# not a reader's, and it would hold one of the two render workers for hours.
+MAX_TOTAL_SECTIONS = 5000
+MAX_INPUT_BYTES = 64 * 1024 * 1024
+
 StartMode = Literal["direct", "page", "recto"]
 
 
@@ -88,11 +102,25 @@ def _resolved_page(path: str) -> Path:
 
 
 def validate(manifest: CollectionManifest) -> CollectionManifest:
-    """Validate facts that span several Pydantic fields."""
+    """Validate facts that span several Pydantic fields, and the budget the
+    whole collection has to fit."""
     paths = [_canonical_path(item.path) for item in manifest.items]
-    if len(paths) != len(set(_resolved_page(path) for path in paths)):
+    pages = [_resolved_page(path) for path in paths]
+    if len(paths) != len(set(pages)):
         raise pdf.InvalidExportRequest(
             "samma dokument får inte förekomma flera gånger")
+    sections = sum(len(item.sections) for item in manifest.items)
+    if sections > MAX_TOTAL_SECTIONS:
+        raise pdf.InvalidExportRequest(
+            "samlingen väljer %d avsnitt; högst %d går att exportera"
+            % (sections, MAX_TOTAL_SECTIONS))
+    # the input the render reads, measured before a worker is taken -- the one
+    # cheap number that says how large this export really is
+    total = sum(page.stat().st_size for page in pages)
+    if total > MAX_INPUT_BYTES:
+        raise pdf.InvalidExportRequest(
+            "samlingens dokument är %d byte; högst %d går att exportera"
+            % (total, MAX_INPUT_BYTES))
     pdf.parse_kinds(",".join(manifest.context))
     if manifest.columns == 2 and manifest.context:
         raise pdf.InvalidExportRequest(

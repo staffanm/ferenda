@@ -68,6 +68,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from ..lib import compress
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, pdf_path, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, make_session, request
@@ -127,14 +128,16 @@ def report_slug(url):
     href verbatim -- only the identity is folded."""
     tail = unquote(unquote(url.rstrip("/").rsplit("/", 1)[-1]))
     slug = RE_NOT_SLUG.sub("-", tail.lower()).strip("-")
-    assert slug, "no slug in ENISA publication address %r" % url
+    if not slug:
+        raise UpstreamChanged("no slug in ENISA publication address %r" % url)
     return slug
 
 
 def published_date(text):
     """ISO form of the date a leaf prints ("June 26, 2025" -> "2025-06-26")."""
     match = RE_PUBLISHED.match(normalize_space(text))
-    assert match, "not an ENISA publication date: %r" % text
+    if not match:
+        raise UpstreamChanged("not an ENISA publication date: %r" % text)
     return "%s-%02d-%02d" % (match.group(3), MONTHS_EN[match.group(1).lower()],
                              int(match.group(2)))
 
@@ -169,11 +172,14 @@ def parse_leaf(html_text, url):
     carry no such field."""
     soup = BeautifulSoup(html_text, "html.parser")
     article = soup.select_one("article.node--type-publications")
-    assert article is not None, "%s is not an ENISA publication page" % url
+    if article is None:
+        raise UpstreamChanged("%s is not an ENISA publication page" % url)
     heading = soup.select_one("h1")
-    assert heading is not None, "%s carries no title" % url
+    if heading is None:
+        raise UpstreamChanged("%s carries no title" % url)
     published = article.select_one(".publish-date .date")
-    assert published is not None, "%s states no publication date" % url
+    if published is None:
+        raise UpstreamChanged("%s states no publication date" % url)
     detail = {}
     for item in article.select(".publication-metadata-detail > li"):
         label = item.select_one(".label-detail")
@@ -243,7 +249,9 @@ def index_leaves(session, delay):
         listing_leaves, cap=INDEX_PAGES_MAX, what="ENISA publications")
     # an index whose first page names nothing is selector rot, not a corpus of
     # none: every other page's emptiness is the walk's own stop signal
-    assert leaves, "the ENISA publications index named no publications at all"
+    if not leaves:
+        raise UpstreamChanged(
+            "the ENISA publications index named no publications at all")
     return leaves, pages
 
 
@@ -255,8 +263,9 @@ def _slugged(leaves):
     filed = {}
     for leaf in leaves:
         nummer = report_slug(leaf)
-        assert nummer not in filed, \
-            "%s and %s both slug to %r" % (filed.get(nummer), leaf, nummer)
+        if nummer in filed:
+            raise UpstreamChanged("%s and %s both slug to %r"
+                                  % (filed.get(nummer), leaf, nummer))
         filed[nummer] = leaf
     return filed
 

@@ -1,0 +1,19 @@
+{"name": "kontext", "steps": [
+ {"goto": "/1915:218#P36"},
+ {"caption": "Kontext för 36 §: varje avsnitt hopfällt, med sitt antal", "wait": 2500},
+ {"click": "details.rail-sec[data-sec='dv'] summary"},
+ {"caption": "Rättsfall: tjugo i taget, sedan ”+ fler”", "wait": 2500},
+ {"click": "details.rail-sec[data-sec='dv'] summary", "wait": 600},
+ {"click": "details.rail-sec[data-sec='forarbete'] summary"},
+ {"caption": "Förarbeten som hänvisar hit", "wait": 2500},
+ {"goto": "/2017:900#P6"},
+ {"click": "details.rail-sec[data-sec='fk'] summary"},
+ {"caption": "Författningskommentar: utdraget ur propositionen, med länk dit", "wait": 3000},
+ {"goto": "/2016:1145#K17P1"},
+ {"click": "details.rail-sec[data-sec='genomfor'] summary"},
+ {"caption": "Genomför EU-rätt: vilken direktivartikel paragrafen genomför", "wait": 3000},
+ {"goto": "/2025:400#K11P1"},
+ {"click": "details.rail-sec[data-sec='bemyndigande'] summary"},
+ {"caption": "Föreskrifter meddelade med stöd av denna paragraf", "wait": 3000},
+ {"caption": "", "wait": 500}
+]}

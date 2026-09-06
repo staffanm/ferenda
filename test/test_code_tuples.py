@@ -30,7 +30,7 @@ import warnings
 from pathlib import Path
 
 import ferenda.build  # noqa: F401 -- importing build is what fills stage.SOURCES
-from ferenda.lib import corpus, stage
+from ferenda.lib import corpus, freshness, stage
 
 PKG = Path(stage.__file__).parent.parent
 
@@ -171,3 +171,38 @@ def test_report_closure_members_absent_from_the_tuple():
     warnings.warn("%d recipe tuples reach first-party modules they do not list; "
                   "run this test with -s for the per-tuple lists" % len(lines),
                   stacklevel=1)
+
+
+def test_editing_a_listed_dependency_re_stales_relate(tmp_path):
+    """The property the recipe tuples exist for: an edit to any module the
+    tuple lists changes the recipe version, so the next relate re-extracts
+    instead of reporting "up to date". `catalog_rows` importing a helper the
+    tuple did not list (`eu_structure`, `pinpoint`) is exactly how this
+    silently stopped holding -- the helper changed the catalog rows and relate
+    skipped anyway."""
+    head = tmp_path / "catalog_rows.py"
+    helper = tmp_path / "pinpoint.py"
+    head.write_text("from . import pinpoint\n")
+    helper.write_text("LABEL = 'a'\n")
+    code = (head, helper)
+
+    store = {}
+    freshness.record_code_version(store, "relate", "sfs", code)
+    assert not freshness.code_changed(store, "relate", "sfs", code)
+
+    helper.write_text("LABEL = 'b'\n")
+    # `recipe_version` memoizes on the tuple -- code cannot change inside one
+    # build run, so the real re-stale happens in the next process
+    freshness.recipe_version.cache_clear()
+    assert freshness.code_changed(store, "relate", "sfs", code)
+
+
+def test_relate_covers_the_helpers_catalog_rows_derives_fields_through():
+    """`catalog_rows` builds the eurlex description through `eu_structure` and
+    the provision label through `pinpoint`. Both are catalog row content, so
+    both belong in the tuple that decides whether relate re-runs."""
+    for name in ("eu_structure.py", "pinpoint.py"):
+        assert PKG / "lib" / name in corpus.RELATE_CODE, \
+            "RELATE_CODE no longer covers lib/%s" % name
+        assert PKG / "lib" / name in corpus.INDEX_CODE, \
+            "INDEX_CODE no longer covers lib/%s" % name

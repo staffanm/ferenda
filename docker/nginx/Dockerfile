@@ -6,7 +6,8 @@
 # sidecar service (docker-compose.yml), an actively maintained official image.
 # ssl-dhparams.pem/options-ssl-nginx.conf are the same certbot-generated
 # security defaults the old image shipped, just no longer certbot-managed.
-FROM nginx:1.27-alpine
+# Pinned by digest with the tag beside it, like the ferenda image.
+FROM nginx:1.27-alpine@sha256:62223d644fa234c3a1cc785ee14242ec47a77364226f1c811d2f669f96dc2ac8
 COPY options-ssl-nginx.conf /etc/ssl-options/options-nginx-ssl.conf
 COPY ssl-dhparams.pem /etc/ssl-options/ssl-dhparams.pem
 COPY default.conf /etc/nginx/conf.d/default.conf

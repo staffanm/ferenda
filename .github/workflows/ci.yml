@@ -1,0 +1,14 @@
+# Tests, lint, types and the layer rule on every branch and pull request.
+#
+# A push to `main` does NOT run this: deploy.yml runs the same reusable job as
+# its own gate, so main would otherwise run it twice.
+name: ci
+
+on:
+  pull_request: {}
+  push:
+    branches-ignore: [main]
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml

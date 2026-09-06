@@ -33,6 +33,7 @@ keeping it out of here leaves this module free of the build/render graph.
 """
 
 import json
+import re
 import threading
 import time
 from pathlib import Path
@@ -90,7 +91,15 @@ _LOCK = threading.Lock()
 # the draft store
 # --------------------------------------------------------------------------
 
+# a username reaches here from the signed session, and `require_editor` has
+# already matched it against the `editors` registry -- so this is a check on
+# what config.yml is allowed to name, not on request data
+_USERNAME = re.compile(r"[A-Za-z0-9._-]{1,64}\Z")
+
+
 def _store(username):
+    if not _USERNAME.match(username):
+        raise ValueError("editor name %r is not a usable file name" % username)
     return EDITS / (username + ".json")
 
 

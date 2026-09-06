@@ -241,12 +241,13 @@ def dv_casenumbers(args=()):
               "number, left out: %s" % (len(refused), ", ".join(
                   sorted(set(refused))[:5]) + (" ..." if len(refused) > 5 else "")))
     if changed:
-        # the snapshot is a parse input (CASENUMBER_CODE), so new content
-        # re-stales every parse that resolves a case number -- said out loud,
-        # because that is hours of reparsing an operator did not ask for by name
-        print("dv casenumbers: snapshot changed -- the parse of dv, forarbete, "
-              "avg, rs, lawreview and wiki is now stale and re-runs on the "
-              "next `lagen <source> parse`")
+        # deliberately not a parse input (stage.CASENUMBER_CODE): a document
+        # already parsed before we held the decision it cites links to it only
+        # at the next code-staleness or --force pass of its source
+        print("dv casenumbers: snapshot changed -- documents parsed from now "
+              "on resolve the new numbers; already-parsed ones reach them at "
+              "the next --force parse of dv, forarbete, avg, rs, lawreview "
+              "or wiki")
     return changed
 
 
@@ -260,8 +261,7 @@ def _dv_casenumbers_after_parse():
     strength of an artifact that pass just deleted. ~3 s over 23,739 artifacts.
 
     Full-source parse only. A one-document run leaves the snapshot as it is: it
-    is rebuilt from the whole tree either way, and rewriting it there would
-    re-stale five sources' parses on the strength of one document."""
+    is rebuilt from the whole tree either way."""
     t0 = time.perf_counter()
     changed = dv_casenumbers()
     freshness._emit_segment("casenumbers", "dv", time.perf_counter() - t0,

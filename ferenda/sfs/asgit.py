@@ -89,6 +89,15 @@ class Event:
     changes: list[Change] = field(default_factory=list)
     # (path, basefile, repealed_by)
     deletes: list[tuple[str, str, str]] = field(default_factory=list)
+    # basefile -> the act's title, for every change and deletion
+    titles: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def lag(self):
+        """Whether riksdagen enacted any act this event touches. A förordning,
+        kungörelse or tillkännagivande is the government's alone, so nobody
+        but its author stands behind that commit."""
+        return any(is_lag(t) for t in self.titles.values())
 
     def merge_dates(self, utfardad, ikraft):
         """Keep the earliest known date of each kind -- deterministic when an
@@ -97,6 +106,62 @@ class Event:
             cur = getattr(self, attr)
             if val and (cur is None or val < cur):
                 setattr(self, attr, val)
+
+
+# the head noun of an act's title in the definite form the subject line
+# needs: "Lag (2022:1) om foo" -> "lagen (2022:1) om foo". Suffix-matched,
+# longest first; a head no rule names takes the common -en/-n.
+_DEFINITE = [
+    ("tillkännagivande", "tillkännagivandet"), ("föreskrifter", "föreskrifterna"),
+    ("förordning", "förordningen"), ("kungörelse", "kungörelsen"),
+    ("instruktion", "instruktionen"), ("resolution", "resolutionen"),
+    ("föreskrift", "föreskriften"), ("reglemente", "reglementet"),
+    ("skrivelse", "skrivelsen"), ("cirkulär", "cirkuläret"),
+    ("ordning", "ordningen"), ("stadgar", "stadgarna"), ("beslut", "beslutet"),
+    ("stadga", "stadgan"), ("brev", "brevet"), ("form", "formen"),
+    ("balk", "balken"), ("lag", "lagen"),
+]
+# the grundlagar and riksdagsordningen are riksdagen's although no title says "lag"
+_RIKSDAG_HEADS = {"regeringsform", "riksdagsordning", "successionsordning",
+                  "tryckfrihetsförordning"}
+
+
+def _title_head(title):
+    """The head noun of a title: the last word before the SFS number."""
+    words = title.partition(" (")[0].split()
+    return words[-1].lower() if words else ""
+
+
+def is_lag(title):
+    head = _title_head(title)
+    return (head.endswith(("lag", "balk")) or head in _RIKSDAG_HEADS
+            or RE_BESLUTAD_GRUNDLAG.search(title) is not None)
+
+
+# "Kungörelse (1974:152) om beslutad ny regeringsform": a grundlag under a
+# kungörelse title
+RE_BESLUTAD_GRUNDLAG = re.compile(
+    r"om beslutad ny (regeringsform|riksdagsordning|successionsordning|"
+    r"tryckfrihetsförordning)")
+
+
+def definite(title):
+    """'Lag (2022:1) om foo' -> 'lagen (2022:1) om foo', 'Brottsbalk
+    (1962:700)' -> 'brottsbalken (1962:700)'."""
+    head, sep, rest = title.partition(" (")
+    words = head.split()
+    if not words:
+        return title
+    noun = words[-1].lower()
+    for suffix, form in _DEFINITE:
+        if noun.endswith(suffix):
+            noun = noun[:len(noun) - len(suffix)] + form
+            break
+    else:
+        noun += "n" if noun.endswith(("a", "e")) else "en"
+    words[-1] = noun
+    words[0] = words[0][:1].lower() + words[0][1:]
+    return " ".join(words) + sep + rest
 
 
 def snapshot_text(path):
@@ -128,6 +193,50 @@ def snapshot_cutoff(path, basefile):
     return header_cutoff(snapshot_header(path)) or basefile
 
 
+def _current_cutoff(path, basefile, repealer=None):
+    """The current download's true cutoff.
+
+    The header's own "Ändring införd" text is maintained by hand and is
+    sometimes wrong -- a typo (2002:986's header names "20103:54", a
+    five-digit year) or simply stale (2020:486's header still names
+    2023:216 while its body already carries 2024:216's wording, confirmed
+    directly against beta.rkrattsbaser.gov.se) -- and for most repealed
+    acts it names no cutoff at all although the body is consolidated
+    (1966:436's body carries 1986:176's wording under a bare header). The
+    register's own `andringsforfattningar` list is the authoritative
+    amendment chain (see sfs.source's cover-consolidation-gap), so prefer
+    its newest usable entry over the header text whenever that entry is
+    newer.
+
+    Two kinds of entry consolidate nothing and are never a cutoff: the
+    repealing act itself (`repealer`, the artifact's rinfoex:upphavdAv --
+    5,684 register entries, spelled "upph.", "utgår", "uppgh." and worse, so
+    matched by number, not wording), and an ikraftträdandeförfattning
+    ("ikrafttr."), which brings an amendment into force without changing a
+    word. A header that names the repealer as cutoff (57 repealed acts) is
+    read as naming none: the wording at repeal is the last amendment's, and
+    a cutoff equal to the repealer would put the file's only write and its
+    deletion in one commit, so the text never entered any tree."""
+    header_based = snapshot_cutoff(path, basefile)
+    if repealer and header_based == repealer:
+        header_based = basefile
+    if path.suffix != ".json":
+        return header_based
+    source = compress.read_json(path)
+    plausible = [act.get("beteckning", "") for act in
+                 source.get("andringsforfattningar") or []
+                 if RE_PLAUSIBLE_CUTOFF.match(act.get("beteckning", ""))
+                 and act.get("beteckning") != repealer
+                 and not act.get("borttagen")
+                 and not (act.get("anteckningar") or "").lstrip().lower()
+                 .startswith("ikrafttr")]
+    if not plausible:
+        return header_based
+    newest = max(plausible, key=layout.sfs_version_key)
+    return (newest if layout.sfs_version_key(newest)
+            > layout.sfs_version_key(header_based) else header_based)
+
+
 # the SFS number a snapshot's own Rubrik names -- "Förordning (1982:798) om
 # kompensation i vissa fall" -- which says which act the file actually holds
 RE_RUBRIK_SFS = re.compile(r"\((\d{4}:\s?\d+)\)")
@@ -151,7 +260,7 @@ def misfiled_as(header, basefile):
     return named if named and named != basefile else None
 
 
-def statute_snapshots(basefile, skipped, gaps, repealed=False):
+def statute_snapshots(basefile, skipped, gaps, repealed=False, repealer=None):
     """Every usable consolidation of one statute, oldest first: the download
     archive plus the current download, each as ``(cutoff, path,
     plaintext_hash)``. The current download wins over an archive of the same
@@ -175,7 +284,9 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
     Cutoff order is likewise required only of a live act. A repealed act's
     current page serves the wording as it stood at repeal and stops naming a
     cutoff -- the newest consolidation is then the last archived one, and
-    demanding that the current file be newest rejected ten repealed acts."""
+    demanding that the current file be newest rejected ten repealed acts.
+    `repealer` (the repealing act's SFS number) is never a cutoff: see
+    `_current_cutoff`."""
     current = layout.sfs_source(basefile)
     if not compress.exists(current):
         current = layout.sfs_sfst(basefile)
@@ -198,6 +309,18 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
                              "error": "archived cutoff %s is not an SFS number"
                                       % cutoff})
                 continue
+            if repealer and cutoff == repealer:
+                # the wording "t.o.m." the repealing act (49 archived
+                # consolidations) would share the deletion's commit, so it
+                # can never enter a tree -- and when a later amendment to the
+                # repeal's transitional provisions follows it (2022:1464),
+                # the repealing act's commit would have to come both before
+                # and after that amendment's
+                gaps.append({"kind": "archive", "basefile": basefile,
+                             "file": str(path),
+                             "error": "archived consolidation is cut off at "
+                                      "the repealing act SFS %s" % cutoff})
+                continue
             text = snapshot_text(path)
         except SkipDocument as exc:
             gaps.append({"kind": "archive", "basefile": basefile,
@@ -210,7 +333,7 @@ def statute_snapshots(basefile, skipped, gaps, repealed=False):
             continue
         snapshots.setdefault(cutoff, (path, _hash(text)))
     try:
-        cutoff = snapshot_cutoff(current, basefile)
+        cutoff = _current_cutoff(current, basefile, repealer)
         text = snapshot_text(current)
     except SkipDocument as exc:
         skipped.append({"basefile": basefile, "file": str(current),
@@ -278,6 +401,8 @@ def collect(basefiles):
             amendment_meta.setdefault(nr, meta)
         meta_props = art["metadata"]["properties"]
         repealed = "rinfoex:upphavdAv" in meta_props
+        m = RE_SFS_NR.search(meta_props["rinfoex:upphavdAv"]) if repealed else None
+        repealer = m.group(1) if m else None
         # the amending act whose text was printed as a reprint of the whole
         # statute. The base act keeps its number, so this renames no file --
         # it marks the one transition that restated the act rather than
@@ -291,7 +416,7 @@ def collect(basefiles):
         path = str(rel.parent / (rel.name + ".txt"))
         prev = None
         for cutoff, src, body_hash in statute_snapshots(basefile, skipped, gaps,
-                                                        repealed):
+                                                        repealed, repealer):
             utf, ikraft, prop, rskr = index.get(cutoff, (None, None, None, None))
             key = prop or ("SFS " + cutoff)
             ev = events.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
@@ -305,21 +430,21 @@ def collect(basefiles):
                                      title=title, cutoff=cutoff, folded=folded,
                                      add=prev is None, omtryck=cutoff == omtryck,
                                      body_hash=body_hash))
+            ev.titles[basefile] = title
             prev = cutoff
-        if repealed:
-            m = RE_SFS_NR.search(meta_props["rinfoex:upphavdAv"])
-            if m:
-                repeals.append((path, basefile, title, m.group(1),
-                                meta_props.get("rpubl:upphavandedatum")))
+        if repealer:
+            repeals.append((path, basefile, title, repealer,
+                            meta_props.get("rpubl:upphavandedatum")))
     # repeals resolve against the *global* amendment index, so the deletion
     # joins the repealing act's own event whenever that act is in the run
-    for path, basefile, _title, repealer, upphavd in repeals:
+    for path, basefile, title, repealer, upphavd in repeals:
         utf, ikraft, prop, rskr = amendment_meta.get(
             repealer, (None, upphavd, None, None))
         key = prop or ("SFS " + repealer)
         ev = events.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
         ev.merge_dates(utf, ikraft or upphavd)
         ev.deletes.append((path, basefile, repealer))
+        ev.titles[basefile] = title
     return resolve_order_conflicts(events, amendment_meta, gaps), skipped, gaps
 
 
@@ -401,9 +526,14 @@ def ungroup(ev, amendment_meta):
         return out
 
     for c in ev.changes:
-        part(c.cutoff).changes.append(c)
+        out = part(c.cutoff)
+        out.changes.append(c)
+        out.titles[c.basefile] = ev.titles.get(c.basefile, c.title)
     for delete in ev.deletes:
-        part(delete[2]).deletes.append(delete)
+        out = part(delete[2])
+        out.deletes.append(delete)
+        if delete[1] in ev.titles:
+            out.titles[delete[1]] = ev.titles[delete[1]]
     return parts
 
 
@@ -457,6 +587,7 @@ def resolve_order_conflicts(events, amendment_meta, gaps):
                     into = events[part_key]
                     into.changes.extend(part.changes)
                     into.deletes.extend(part.deletes)
+                    into.titles.update(part.titles)
                     into.merge_dates(part.utfardad, part.ikraft)
                 else:
                     events[part_key] = part
@@ -581,22 +712,62 @@ def replaced_by(event, change):
                   if repealer == change.basefile)
 
 
-def message(event, forarbete_meta, scope="full"):
-    """The commit message: the proposition's own summary paragraph as body
-    (its title as subject), the affected statutes listed, the granularity and
-    date caveats spelled out, and the idempotency trailer last."""
-    prop_meta = forarbete_meta(event.prop) if event.prop else None
-    if prop_meta and prop_meta.get("title"):
-        subject = "%s: %s" % (event.prop, prop_meta["title"])
-    elif event.prop:
-        subject = "%s: ändringar i %d författning%s" % (
-            event.prop, len(event.changes) + len(event.deletes),
-            "" if len(event.changes) + len(event.deletes) == 1 else "ar")
+SUBJECT_MAX = 72
+
+
+def subject(event, prop_meta):
+    """The subject line: what happened to the act the commit is about --
+    "ändring i lagen (2022:1) om foo", the title itself for a new act,
+    "upphävande av ..." for a repeal -- "m.fl." when the event touches more
+    acts, then in parentheses the proposition's title as far as it fits in
+    `SUBJECT_MAX` columns (the full "Prop. ...: title" follows on the next
+    line of the message), or the amending act's own SFS number when no
+    proposition is known. A new act is the event's main act when it has one:
+    a proposition that enacts a law and amends others is about the new law;
+    otherwise a lag before a förordning (an event holding both is riksdagen's
+    commit, and should read as one)."""
+    changes = sorted(event.changes,
+                     key=lambda c: (not c.add, not is_lag(c.title), c.path))
+    deletes = sorted(event.deletes)
+    if changes:
+        c = changes[0]
+        head = c.title if c.add else "ändring i " + definite(c.title)
+    elif deletes:
+        _path, basefile, _repealer = deletes[0]
+        title = event.titles.get(basefile)
+        head = "upphävande av " + (definite(title) if title
+                                   else "SFS " + basefile)
     else:
-        subject = "%s: %s" % (event.key,
-                              event.changes[0].title if event.changes
-                              else "upphävande")
-    lines = [subject]
+        return event.key
+    acts = {c.basefile for c in changes} | {d[1] for d in deletes}
+    if len(acts) > 1:
+        head += " m.fl."
+    if event.prop:
+        title = prop_meta.get("title") if prop_meta else None
+    elif changes and changes[0].add and event.key == "SFS " + changes[0].basefile:
+        title = None            # the act's own number is already in its title
+    else:
+        title = event.key       # the amending or repealing act
+    if not title:
+        return head
+    room = SUBJECT_MAX - len(head) - 3
+    if room < 12:
+        return head
+    if len(title) > room:
+        title = title[:room - 1].rsplit(" ", 1)[0].rstrip(",.;:–-") + "…"
+    return "%s (%s)" % (head, title)
+
+
+def message(event, forarbete_meta, scope="full"):
+    """The commit message: the `subject` line, the proposition (identifier
+    and full title) on the next line, its own summary paragraph as body, the
+    affected statutes listed, the granularity and date caveats spelled out,
+    and the co-authors last."""
+    prop_meta = forarbete_meta(event.prop) if event.prop else None
+    lines = [subject(event, prop_meta)]
+    if event.prop:
+        lines += ["", ("%s: %s" % (event.prop, prop_meta["title"])
+                       if prop_meta and prop_meta.get("title") else event.prop)]
     if prop_meta and prop_meta.get("ingress"):
         lines += ["", prop_meta["ingress"]]
     body = []
@@ -620,10 +791,19 @@ def message(event, forarbete_meta, scope="full"):
         body.append("SFS %s: upphävd genom SFS %s" % (basefile, repealer))
     if body:
         lines += [""] + body
-    _, _, substituted = event_dates(event)
+    author_date, committer_date, substituted = event_dates(event)
     if substituted:
         lines += ["", "Författardatum är ikraftträdandedatum (utfärdandedatum "
                       "saknas i registret)."]
+    # the git ident date clamps to 1970-01-01 for a pre-1970 event (GitHub's
+    # receive-side fsck rejects a negative timestamp), so the true date must
+    # survive in the message
+    pre_epoch = [("Författardatum", author_date), ("Incheckningsdatum", committer_date)]
+    pre_epoch = [(label, d) for label, d in pre_epoch if d < "1970-01-01"]
+    if len(pre_epoch) == 2 and pre_epoch[0][1] == pre_epoch[1][1]:
+        pre_epoch = pre_epoch[:1]
+    if pre_epoch:
+        lines += [""] + ["%s: %s" % (label, d) for label, d in pre_epoch]
     coauthors = ["Co-authored-by: %s <%s>" % (name, email_slug(name))
                 for name in (prop_meta.get("signers", [])[1:] if prop_meta else [])]
     if coauthors:
@@ -636,13 +816,19 @@ def message(event, forarbete_meta, scope="full"):
 def identities(event, forarbete_meta):
     """((author name, email), (committer name, email)) -- the proposition's
     first signer and the riksdagsskrivelse's first signer, with the corpus
-    fallbacks when either förarbete is unavailable."""
+    fallbacks when either förarbete is unavailable. An event with no lag
+    among its acts is the government's alone, whatever proposition it
+    follows on: author and committer are the same."""
     author = ("Regeringen", "regeringen@lagen.nu")
     committer = ("Riksdagen", "riksdagen@lagen.nu")
     prop_meta = forarbete_meta(event.prop) if event.prop else None
     if prop_meta and prop_meta.get("signers"):
         name = prop_meta["signers"][0]
         author = (name, email_slug(name))
+    if not event.lag:
+        # förordningar only: the government issues them alone, and commits
+        # them, whatever proposition they follow on
+        return author, author
     rskr_meta = forarbete_meta(event.rskr) if event.rskr else None
     if rskr_meta and rskr_meta.get("signers"):
         name = rskr_meta["signers"][0]
@@ -718,8 +904,10 @@ def stream(events, forarbete_meta, tip=None, scope="full", ref=BRANCH_REF):
         yield ("commit %s\n"
                "author %s <%s> %s\n"
                "committer %s <%s> %s\n"
-               % (ref, a_name, a_mail, gitledger.epoch(author_date),
-                  c_name, c_mail, gitledger.epoch(committer_date))).encode()
+               % (ref, a_name, a_mail,
+                  gitledger.epoch(author_date, clamp=True),
+                  c_name, c_mail,
+                  gitledger.epoch(committer_date, clamp=True))).encode()
         yield gitledger.data_payload(message(ev, forarbete_meta, scope))
         if first and tip:
             yield b"from %s\n" % tip.encode()

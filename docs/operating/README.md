@@ -165,8 +165,18 @@ Editors are a hand-curated registry; there is no self-signup. Mint a `pwhash`
 (nothing is ever stored in the clear):
 
 ```sh
-python -m ferenda.api.auth hash '<the password>'   # prints the pbkdf2$… line
+python -m ferenda.api.auth hash    # prompts twice, prints the pbkdf2$… line
 ```
+
+The command takes no argument: a password on the command line lands in the
+shell history and in every `ps` listing. New hashes are minted at 600,000
+pbkdf2-sha256 rounds; the cost travels inside the stored string, so an existing
+`pbkdf2$260000$…` keeps working until it is re-minted.
+
+`editor_secret` must be at least 32 characters — `openssl rand -hex 32` writes
+64. A shorter one raises `ConfigError` at startup rather than signing sessions
+with a guessable key. It can also come from a file named by `EDITOR_SECRET_FILE`
+(how a Docker secret arrives), so the key is not in every process's environment.
 
 Paste the line into the editor's entry. A password change plus a restart
 invalidates every outstanding session for that editor (the cookie embeds a
@@ -220,10 +230,51 @@ lagen all serve      # serve generated/ + the REST API on one uvicorn process
 ```
 
 `rebuild`/`all` re-do only what changed; the first full build over the
-~200K-document corpus is slow (see §6 for the rsync shortcut). Both draw a
-whole-invocation progress bar (current step, steps remaining, ETA) above the
-per-document counter each step already shows, on a real terminal; a run
-piped to a file or a cron log (`docker compose exec ferenda lagen all
+~200K-document corpus is slow (see §6 for the rsync shortcut).
+
+#### What a run shows while it works
+
+Every run counts its work in *steps* — one source's parse, one source's
+relate, the cross-document passes relate ends with, a generate. A run of two
+or more steps draws a whole-invocation progress bar (current step, steps
+remaining, ETA) above the per-document counter each step already shows. The
+ETA predicts each step from the wall time it took in earlier runs (the run
+ledger, `site/data/.build/runs.ndjson`) and re-paces the rest of the plan on
+how fast this run's finished steps ran against those predictions; the step in
+flight counts toward it as it runs, up to its own prediction, so a long step
+that overruns holds the ETA rather than pushing it out:
+
+```sh
+lagen all all        # 90 steps: download, parse, relate, index, dump, generate
+lagen all download   # 16 steps, one per source with something to fetch
+lagen all relate     # 18 steps: one per source, plus the cross-document passes
+lagen sfs rebuild    # 7 steps
+```
+
+A run of one step keeps the plain single line — the outer bar would read
+"1/1" for the whole run and repeat what the step's own counter already says:
+
+```sh
+lagen all generate       # one step over the whole corpus
+lagen eurlex parse 32016R0970   # one document, no counter worth drawing
+lagen all status         # a report, done in seconds: never a bar
+```
+
+Before a step can run it has to work out what is already up to date, which on
+a big source reads every artifact's size and mtime and can take tens of
+seconds. That scan reports as `checking staleness` on the same line the step's
+own counter uses. A parse or versions step first lists its documents
+(`listing basefiles`, the walk that reads as a pause on a cold cache), then
+scans them once: a document found up to date is booked on the spot, a stale
+one goes to a worker the moment it is found, most expensive first, so the
+counter moves seconds into the scan and a source with nothing stale answers
+`up to date -- skipped` at the scan's end. Measured on the dev box with
+nothing stale: eurlex parse 21 s end to end, forarbete parse 8 s. Download
+has no such scan — nothing on disk decides what it fetches — so its line
+names the harvest watermark instead: `(from 2026-01-10)`, or
+`(first harvest)` / `(full sweep)` when there is no boundary to work back to.
+
+A run piped to a file or a cron log (`docker compose exec ferenda lagen all
 rebuild >> log 2>&1`) keeps the plain per-document line only, since the bar
 is for someone watching live and would otherwise write raw cursor-control
 bytes into the log.
@@ -306,9 +357,10 @@ lagen sfs ai-hierarki --all               # every lag whose chain reaches a för
 lagen sfs ai-correspond 2018:585 prop/2017-18-89   # old->new paragraf map of a restructured act (.corr)
 lagen sfs ai-includegraphics 2007:90      # place the graphics the consolidated text drops (.graphics)
 lagen forarbete ai-genomforande prop/2025-26-28    # directive->paragraf transposition map of a prop
+lagen sfs cover-consolidation-gap --all            # no LLM: reconstruct missing archived consolidations from the amendment PDFs
 ```
 
-All seven report the same way (`lib/aireport.py`): the live counter the
+All eight report the same way (`lib/aireport.py`): the live counter the
 stages use, one persistent line per layer written, and a closing line --
 `sfs ai-hierarki: 12 layer(s) written over 3 item(s), 400 skipped (layers
 present 380, no graphic gaps 20), 1 failed in 2h05m`, the failed ids listed
@@ -416,9 +468,27 @@ image `CMD`); the `nginx` vhost reverse-proxies to it on `:8000`. The app
 resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
 rules. One SAN certificate covers both vhosts; the `certbot` sidecar renews it.
 
-**Continuous deploy + nightly sync.** Pushes to `main` trigger
-`.github/workflows/deploy.yml` on a self-hosted runner on the prod host (update
-checkout → build → `up -d` → `lagen all rebuild`). `staffan`'s crontab runs the
+**Continuous deploy + nightly sync.** A push to `main` runs
+`.github/workflows/deploy.yml`. Its first job is `checks`
+(`.github/workflows/checks.yml`, a GitHub-hosted runner: pytest, ruff, ty, the
+layer rule, `pip-audit`); the deploy job does not start unless it passes. The
+deploy itself runs on the self-hosted runner on the prod host: update checkout
+→ tag the outgoing image `lagen-ferenda:previous` → build → `up -d` → wait for
+the container health check → smoke-test the public site through nginx →
+publish the browser chrome. Any failure after the build puts
+`lagen-ferenda:previous` back and restarts, so a release that does not come up
+leaves the previous one serving.
+
+The health check is `GET /healthz`: the app imported, `catalog.sqlite` answers
+a query, and the generated tree is mounted. OpenSearch is reported beside those
+three and never gates them — the site serves without search.
+
+The deploy `reset --hard`s `~/wds/ferenda`, which holds the bind-mounted nginx
+confs. It now saves the diff of a dirty tree to `~/wds/deploy-lost/<stamp>.patch`
+first, so a host-side edit is recoverable. A recent git lock file stops the
+deploy instead of being deleted; one older than an hour is removed as stale.
+
+The same push does **not** fold in data. `staffan`'s crontab does that. `staffan`'s crontab runs the
 pipeline as inlined `docker compose exec` lines: `lagen all all` nightly (which
 now skips the browser-shielded föreskrift agencies skvfs/mtfs), plus a weekly
 `lagen foreskrift browser-download` (Sundays) for those — the browser transport
@@ -434,18 +504,45 @@ the next run resume. Nothing is stranded — a run stores a record only once its
 page is on disk. Run both browser jobs **one at a time**: Playwright's sync API
 is not built for one browser per thread.
 
+### The facsimile render gate
+
+A facsimile render holds a worker thread in poppler for about a second. On
+2026-09-05 scrapers filled all 40 worker threads this way and every other route
+on lagen.nu timed out. Measured over 30 minutes of that wedge: 8795 of 8835
+`sidN.png` requests carried no `Referer` at all, from 5938 addresses, and 275
+of 300 sampled addresses never fetched a single HTML page.
+
+`/api/v1/facsimile`, `/api/v1/sfs-graphic` and the legacy `sidN.png` paths now
+serve a cached PNG to any caller, but refuse to *start a render* unless the
+request shows it came from a lagen.nu page — `Sec-Fetch-Site: same-origin`, or
+a `Referer` on our own host (`auth.from_own_page`). No header change was
+needed for that: the vhost's `Referrer-Policy: strict-origin-when-cross-origin`
+already sends the full URL on a same-origin request, and trims it to the bare
+origin cross-origin. A refused render is `403`; every
+render slot busy (`facsimile.RENDER_WORKERS`, 4) is `503` with `Retry-After`.
+This is not access control — an already-rendered page stays public, and both
+headers can be typed by hand — only a floor under how much CPU a script
+walking URLs can spend on the box.
+
 ### Evicting the facsimile cache
 
 `data/cache/facsimile` holds the page PNGs `lib/facsimile` renders on demand.
 It is a **pure cache**. Nothing else reads it. A deleted file is re-rendered on
-the next request, in about half a second. Eviction is therefore a crontab line,
-by publication age, not by source-specific code:
+the next request, in about half a second.
+
+The renderer evicts it itself when the filesystem runs low: every 200 renders
+it reads the free space, and under `facsimile.CACHE_MIN_FREE` (20 GB) it drops
+the oldest PNGs until 40 GB are free. This is the floor, not the policy — a
+cron line by age is still the right way to keep the cache small, because the
+in-process sweep only fires when the disk is already nearly full:
 
 ```sh
 0 1 * * * find <data_root>/cache/facsimile -name "*.png" -mtime +15 -delete
 ```
 
-Measured 2026-08-19: 245 PNGs use 34 MB. There is no pressure yet, so this command is documented but not installed.
+Measured 2026-08-19 on dev: 245 PNGs use 34 MB. Production is a different
+story — the legacy facsimile cache reached 658 GB while a cron line was failing
+silently, which is why the writer now evicts as well.
 
 Its siblings under `cache/` are not pure caches on the same terms.
 `cache/pdfconv` (9.9 GB) holds the poppler conversions the parsers read. A lost

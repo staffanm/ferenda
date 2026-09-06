@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Literal
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (
     FileResponse,
@@ -65,9 +65,11 @@ from ..lib import (
     pathgraph,
     pins,
     search,
+    util,
 )
 from . import (
     analytics,
+    auth,
     db,
     errors,
     facsimiles,
@@ -164,6 +166,15 @@ app = FastAPI(
 # surface is a GET whose body is nobody else's business.
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["GET"], allow_headers=["*"])
+
+
+# No Referrer-Policy here. The prod vhost already sets it at server scope
+# (`docker/nginx/ferenda.lagen.nu.conf`), and `add_header` appends rather than
+# replaces an upstream one, so a second value from the app would reach the
+# browser as a duplicate and lose to nginx's anyway. The deployed value,
+# `strict-origin-when-cross-origin`, sends the *full* URL on a same-origin
+# request, which is exactly what `auth.from_own_page` reads -- the render gate
+# needs no policy change.
 
 # FastAPI serves the interactive docs at exactly /docs and /redoc, and the ops
 # dashboard sits at exactly /ops; the trailing-slash forms are different paths.
@@ -582,6 +593,17 @@ class FacetTree(BaseModel):
                               "(e.g. [\"court\", \"year\"])")
     default: list[str] = Field(description="the landing bucket's key path")
     buckets: list[FacetBucket]
+    bucket: list[str] | None = Field(
+        None, description="/browse only: the leaf whose documents this "
+        "response carries, as its slug path")
+    offset: int | None = Field(
+        None, description="/browse only: the index the returned documents "
+        "start at within that leaf")
+    limit: int | None = Field(
+        None, description="/browse only: how many documents were asked for")
+    total: int | None = Field(
+        None, description="/browse only: documents in that leaf, of which "
+        "this response carries at most `limit`")
 
 
 class SourceInfo(BaseModel):
@@ -798,21 +820,131 @@ def facets_endpoint(
     return FacetTree(**facets.tree(con, source))
 
 
+# The browse model of a whole source is large -- eurlex is 36 MB of JSON over
+# 172,000 rows, and it grows with the corpus -- so it is built once per source
+# and served one leaf bucket at a time. The cache holds exactly one source: a
+# reader pages through one bucket, and `generate` walks one source's leaves in
+# order, so both pay a single catalog scan. It is keyed on the catalog file's
+# identity and mtime, so a `relate` that swaps a new catalog in is picked up on
+# the next request rather than served stale.
+BROWSE_PAGE = 500
+BROWSE_PAGE_MAX = 2000
+
+
+def _catalog_stamp(con):
+    """What identifies the catalog this connection reads, cheaply: its path,
+    size and mtime. `relate` publishes by atomic rename, so a new catalog is a
+    new inode with a new mtime and never the same stamp."""
+    path = Path(con.execute("PRAGMA database_list").fetchone()[2])
+    st = path.stat()
+    return (str(path), st.st_size, st.st_mtime_ns)
+
+
+_browse_cache: tuple | None = None
+_browse_cache_lock = threading.Lock()
+# One build per source at a time. A miss is a full catalog scan producing tens
+# of megabytes, and the cache holds one source -- so a client alternating
+# `?source=` across the faceted sources would otherwise have every request miss
+# and every miss scan, concurrently, on an anonymous route. That is the shape
+# of the uncached-facsimile flood that took the site down on 2026-09-05. The
+# second asker for a source waits and reads the first one's result.
+_browse_build = util.KeyedLocks()
+
+
+def _browse_model(source, stamp, con):
+    """The cached browse model for one source. Not `functools.lru_cache`: the
+    connection is a per-request dependency and would key every call apart, so
+    the key is the source and the catalog stamp and the connection is only
+    what builds a miss."""
+    global _browse_cache
+    cached = _browse_hit(source, stamp)
+    if cached is not None:
+        return cached
+    with _browse_build(source):
+        # another thread may have built it while this one waited
+        cached = _browse_hit(source, stamp)
+        if cached is not None:
+            return cached
+        view = facets.browse_view(con, source)
+        with _browse_cache_lock:
+            _browse_cache = ((source, stamp), view)
+    return view
+
+
+def _browse_hit(source, stamp):
+    """The cached model for `(source, stamp)`, or None."""
+    with _browse_cache_lock:
+        if _browse_cache is not None and _browse_cache[0] == (source, stamp):
+            return _browse_cache[1]
+    return None
+
+
+def _leaf(nodes, path):
+    """The bucket `path` (slugs, outermost first) names, or None."""
+    for slug in path:
+        node = next((n for n in nodes if n["slug"] == slug), None)
+        if node is None:
+            return None
+        nodes = node["children"]
+        if nodes is None:
+            return node if slug == path[-1] else None
+    return None
+
+
 @app.get("/api/v1/browse", response_model=FacetTree, tags=["catalog"],
-         summary="The same buckets, with each leaf's documents")
+         summary="One leaf bucket's documents, with the navigator around them")
 def browse_endpoint(
         source: str = Query(..., description="a faceted source: sfs, dv, "
                             "forarbete, foreskrift, avg, rs, begrepp, "
                             "eurlex, edpb, hudoc, coe, icrc, untc, icc, "
                             "icj. A source with no facet scheme is a 404."),
+        bucket: str | None = Query(None, description="the leaf to list, as its "
+                                   "slug path joined by \"/\" (\"nja/2024\"). "
+                                   "Omit for the navigator alone."),
+        offset: int = Query(0, ge=0, description="where in the leaf's ordered "
+                            "documents to start"),
+        limit: int = Query(BROWSE_PAGE, ge=1, le=BROWSE_PAGE_MAX,
+                           description="how many documents to return"),
         con: sqlite3.Connection = Depends(get_con)):
-    """The complete browse model for a source: the facet navigator *plus* each
-    leaf bucket's ordered, display-labelled documents. The single payload the
-    static-site generator consumes to write the browse pages -- it has no other
-    access to the data store."""
+    """The facet navigator for a source, plus one leaf bucket's ordered,
+    display-labelled documents.
+
+    Without `bucket` this is the navigator alone with every leaf's `count`,
+    which is what tells a client how many pages a leaf has. With `bucket` the
+    named leaf carries `documents`, sliced by `offset`/`limit`, and the
+    response states `total` for that leaf. A whole source at once is not
+    served: eurlex alone is 36 MB of JSON.
+    """
     if source not in facets.sources():
         raise HTTPException(404, "source %r is not faceted" % source)
-    return FacetTree(**facets.browse_view(con, source))
+    view = _browse_model(source, _catalog_stamp(con), con)
+    if bucket is None:
+        return FacetTree(source=view["source"], levels=view["levels"],
+                         default=view["default"],
+                         buckets=_without_documents(view["buckets"]))
+    path = [seg for seg in bucket.split("/") if seg]
+    node = _leaf(view["buckets"], path)
+    if node is None:
+        raise HTTPException(404, "%r names no leaf bucket of %s" % (bucket, source))
+    documents = node.get("documents") or []
+    return FacetTree(
+        source=view["source"], levels=view["levels"], default=view["default"],
+        buckets=_without_documents(view["buckets"],
+                                   keep=(id(node), documents[offset:offset + limit])),
+        bucket=path, offset=offset, limit=limit, total=len(documents))
+
+
+def _without_documents(nodes, keep=None):
+    """`nodes` with every leaf's `documents` dropped -- except the one leaf
+    `keep` names, which carries the page. Copies rather than mutates: the
+    nodes belong to the cached model."""
+    out = []
+    for node in nodes:
+        children = (_without_documents(node["children"], keep)
+                    if node["children"] is not None else None)
+        documents = keep[1] if keep and id(node) == keep[0] else None
+        out.append({**node, "children": children, "documents": documents})
+    return out
 
 
 @app.get("/api/v1/documents", response_model=DocumentList, tags=["document"],
@@ -1132,6 +1264,39 @@ def outbound_endpoint(uri: str = Query(..., description="citing document uri"),
     The same links sit inline in the artifact `/document` returns; this is the
     flat, already-resolved view of them."""
     return [Citation(**row) for row in reads.outbound(con, uri)]
+
+
+class Health(BaseModel):
+    """What `/healthz` reports. `ok` is the deploy gate; `search` is beside it
+    rather than inside it, because the site serves without OpenSearch."""
+
+    ok: bool = Field(description="the app started, the catalog reads and the "
+                     "generated site is on disk")
+    catalog: bool = Field(description="catalog.sqlite answers a query")
+    generated: bool = Field(description="the generated site root is present")
+    search: bool = Field(description="OpenSearch answers -- reported, never "
+                         "part of `ok`: only /search needs it")
+    revision: str = Field(description="the deployed git revision, as baked in")
+
+
+@app.get("/healthz", response_model=Health, include_in_schema=False)
+def healthz(response: Response, con: sqlite3.Connection = Depends(get_con)):
+    """Whether this instance is serving. The Compose health check and the
+    deploy's smoke test read it, so it has to test the three things a start
+    can silently get wrong -- the app imported, the catalog is readable, the
+    generated tree is mounted -- and nothing that takes real work.
+
+    OpenSearch is reported separately on purpose. The site is a static tree
+    plus a catalog; only /search needs the cluster, and gating the deploy on
+    it would refuse a perfectly good release because a sidecar was slow to
+    start."""
+    catalog_ok = bool(con.execute("select 1 from documents limit 1").fetchone())
+    generated_ok = layout.GENERATED.is_dir()
+    search_ok = _index.alive()
+    ok = catalog_ok and generated_ok
+    response.status_code = 200 if ok else 503
+    return Health(ok=ok, catalog=catalog_ok, generated=generated_ok,
+                  search=search_ok, revision=os.environ.get("GIT_SHA", "unknown"))
 
 
 @app.get("/api/v1/sources", response_model=list[SourceInfo], tags=["catalog"],
@@ -1533,12 +1698,27 @@ def _hop_count(con, a, b, direction):
 # every page-oriented PDF source: each resolver maps a uri-local document id
 # to (source, build-basefile, pdf path) from layout rules + the downloaded
 # record -- adding a source is one resolver.
+#
+# A render is the one expensive thing this server does: poppler for about a
+# second, on a thread the request holds the whole time. So a *render* is
+# reserved for a request that came from one of our own pages
+# (`auth.from_own_page`); everyone else gets the cache or a 403. This is not
+# access control -- an already-rendered page is served to anyone, and the
+# headers it reads can be typed by hand. It is the cheapest thing that
+# separates a reader looking at a page from a script walking a URL space, and
+# on 2026-09-05 that was the difference between serving the site and not:
+# 8795 of 8835 `sidN.png` requests in 30 minutes carried no `Referer`, from
+# 5938 addresses, and they held all 40 worker threads until every other route
+# timed out.
 # --------------------------------------------------------------------------
 
 @app.get("/api/v1/facsimile", response_class=FileResponse, tags=["document"],
-         responses={200: {"content": {"image/png": {}}}},
+         responses={200: {"content": {"image/png": {}}},
+                    403: {"description": "not rendered yet, and this caller "
+                          "may not start a render"}},
          summary="A PNG of one printed page of the source PDF")
 def facsimile_endpoint(
+        request: Request,
         uri: str = Query(..., description="full lagen.nu document uri"),
         sid: int = Query(..., ge=1, description="printed page number "
                          "(the #sid{N} anchor)"),
@@ -1548,10 +1728,15 @@ def facsimile_endpoint(
     """A facsimile PNG of one printed page of the document's source PDF
     (förarbeten, myndighetsföreskrifter, avgöranden), rendered at retina
     resolution (150 DPI) on first request and cached on disk. `bbox` crops to a
-    region of that page -- what a figure inside a förarbete is."""
+    region of that page -- what a figure inside a förarbete is.
+
+    An already-rendered page is served to any caller. A page that is *not* yet
+    rendered is 403 unless the request came from a lagen.nu page, because a
+    render costs a second of CPU and a whole worker thread."""
     return facsimiles.facsimile_response(
         catalog.uri_local(uri), sid,
-        facsimiles.parse_bbox(bbox) if bbox else None)
+        facsimiles.parse_bbox(bbox) if bbox else None,
+        may_render=auth.from_own_page(request))
 
 
 _DV_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
@@ -1605,14 +1790,14 @@ def pdf_endpoint(
     `andringar` controls the SFS amendment register. `kolumner=2` uses the
     compact two-column layout and omits context."""
     generated, kinds = pdfjob.parse_request(path, kontext, kolumner)
-    try:
-        data = pdf.export(generated, toc=toc, kinds=kinds,
-                          subresource=facsimiles.subresource,
-                          amendments=andringar, columns=kolumner)
-    except pdf.SubresourceUnavailable as exc:
-        # a degraded PDF is never served or cached; the failure is usually
-        # transient (facsimile render, NFS), so the client should retry
-        raise HTTPException(503, "subresource failed: %s" % exc) from None
+    # through the bounded job queue, not on this thread: two workers do every
+    # render on this server, so a script asking for a thousand documents waits
+    # in one queue instead of starting a thousand WeasyPrint runs. A queue with
+    # no slot, a render past `SYNC_WAIT` and a failed render are all 503 with a
+    # Retry-After (api/errors).
+    data = pdfjob.render_sync(generated, toc=toc, kinds=kinds,
+                              subresource=facsimiles.subresource,
+                              amendments=andringar, columns=kolumner)
     return Response(data, media_type="application/pdf", headers={
         "Content-Disposition": '%s; filename="%s"' % (
             "attachment" if download else "inline", pdf.filename_for(path))})
@@ -1629,20 +1814,25 @@ def pdf_collection_page():
 # "/avg/jo/2340-2025/sid1.png"); year-numbered ids do not
 # ("/sou/2021:82/sid1.png", "/mcffs/2026:1/sid1.png")
 @app.get("/{a}/{b}/{c}/sid{sid:int}.png", include_in_schema=False)
-def facsimile_legacy_3(a: str, b: str, c: str, sid: int):
-    return facsimiles.facsimile_response("%s/%s/%s" % (a, b, c), sid)
+def facsimile_legacy_3(request: Request, a: str, b: str, c: str, sid: int):
+    return facsimiles.facsimile_response(
+        "%s/%s/%s" % (a, b, c), sid, may_render=auth.from_own_page(request))
 
 
 @app.get("/{a}/{b}/sid{sid:int}.png", include_in_schema=False)
-def facsimile_legacy_2(a: str, b: str, sid: int):
-    return facsimiles.facsimile_response("%s/%s" % (a, b), sid)
+def facsimile_legacy_2(request: Request, a: str, b: str, sid: int):
+    return facsimiles.facsimile_response(
+        "%s/%s" % (a, b), sid, may_render=auth.from_own_page(request))
 
 
 @app.get("/api/v1/sfs-graphic", response_class=FileResponse,
          tags=["document"],
-         responses={200: {"content": {"image/png": {}}}},
+         responses={200: {"content": {"image/png": {}}},
+                    403: {"description": "not rendered yet, and this caller "
+                          "may not start a render"}},
          summary="A graphic the consolidated statute text omits")
 def sfs_graphic_endpoint(
+        request: Request,
         uri: str = Query(..., description="full lagen.nu SFS uri"),
         node: str = Query(..., description="stable graphic-gap key (the "
                           "data-grafik value, e.g. g-a1b2…)"),
@@ -1658,10 +1848,14 @@ def sfs_graphic_endpoint(
     .graphics layer), rendered on first request and cached. Two resolutions, one
     per use: the inline thumbnail, and `stor=1` for the lightbox. A page of road
     signs asks for hundreds of the first and one of the second, so serving the
-    large one to both would cost the reader megabytes nothing on screen uses."""
+    large one to both would cost the reader megabytes nothing on screen uses.
+
+    Same render gate as `/api/v1/facsimile`: a cached crop is served to any
+    caller, an uncached one only to a request from a lagen.nu page."""
     return facsimiles.sfs_graphic_response(
         catalog.uri_local(uri), node,
-        facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI)
+        facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI,
+        may_render=auth.from_own_page(request))
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"],

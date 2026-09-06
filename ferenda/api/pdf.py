@@ -54,14 +54,18 @@ from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 from weasyprint.urls import URLFetcherResponse
 
 from .. import config
-from ..lib import compress, layout, util
+from ..lib import cachesweep, compress, layout, util
 from ..lib.catalog import BASE
 from ..lib.page import RAIL_SECTION_ORDER
 from ..lib.render import ASSETS
 
-# the PDF result cache is bounded by size alone (the key carries every
-# staleness input); 2 GiB holds a few hundred large exports
+# the PDF result cache is bounded by size (the key carries every staleness
+# input); 2 GiB holds a few hundred large exports
 CACHE_MAX_BYTES = 2 * 1024**3
+# ...and by what the filesystem has left. The cap alone assumes the cache is
+# the only thing filling the disk; it shares one with the corpus, and a full
+# disk stops the pipeline writing, not just this cache.
+CACHE_MIN_FREE = 20 * 1024**3
 
 
 # style.css is also the browser stylesheet. WeasyPrint reports browser-only
@@ -590,23 +594,13 @@ def _cache_key(stored: bytes, toc, kinds, amendments, columns):
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def prune(cache, cap=CACHE_MAX_BYTES):
-    """Drop the least-recently-used entries until the cache fits `cap`.
-    Recency is mtime: a hit re-touches its entry (`export`)."""
-    entries = []
-    for p in cache.glob("*.pdf"):
-        try:
-            st = p.stat()
-        except FileNotFoundError:           # a sibling worker pruned it
-            continue
-        entries.append((st.st_mtime_ns, st.st_size, p))
-    entries.sort()
-    total = sum(size for _, size, _ in entries)
-    for _, size, p in entries:
-        if total <= cap:
-            break
-        p.unlink(missing_ok=True)
-        total -= size
+def prune(cache, cap=CACHE_MAX_BYTES, min_free=CACHE_MIN_FREE):
+    """Drop the least-recently-used exports until the cache fits `cap` *and*
+    the filesystem has `min_free` bytes free. Recency is mtime: a hit
+    re-touches its entry (`export`). The sweep is `lib/cachesweep`, shared with
+    the facsimile cache -- including its NFS reasoning, which applies here for
+    the same reason: both trees sit on the same export."""
+    cachesweep.sweep(cache, cache.glob("*.pdf"), target_free=min_free, cap=cap)
 
 
 def generated_page(path: str):

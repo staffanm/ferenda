@@ -230,7 +230,8 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
         works = [w for w in works
                  if basefile_slug("%s/%s" % (body.kod, serie.slug(w[1])))
                  .endswith(basefile_slug(only))]
-        assert works, "CELLAR carries no %s document %s" % (body.kod, only)
+        if not works:
+            raise ValueError("CELLAR carries no %s document %s" % (body.kod, only))
     report = Reporter()
     seen = new = 0
     utan_text = 0

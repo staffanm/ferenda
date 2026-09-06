@@ -65,6 +65,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, get_text, make_session
@@ -243,7 +244,8 @@ def framework_slug(titel):
     of them carries both and neither tells two apart."""
     stem = RE_FRAMEWORK_LEAD.sub("", titel)
     slug = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
-    assert slug, "ramriktlinjen %r has no name left to slug" % titel
+    if not slug:
+        raise UpstreamChanged("ramriktlinjen %r has no name left to slug" % titel)
     return slug
 
 
@@ -368,7 +370,8 @@ def _listing_pages(session, url, delay):
         seen |= fresh
         if not has_next_page(text):
             break
-    assert pages and seen, "the ACER listing %s named no document at all" % url
+    if not (pages and seen):
+        raise UpstreamChanged("the ACER listing %s named no document at all" % url)
     return pages
 
 

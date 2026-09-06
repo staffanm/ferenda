@@ -41,8 +41,9 @@ from ..lib.render import (
 # faceted browse. A whole source is too large for one flat listing, so it is
 # sliced into one or two facets (a law's subject initial, a case's court + year).
 # The generator is a *client of the REST API*: it reads the browse model from
-# GET /api/v1/browse (the navigator + each leaf bucket's ordered, labelled
-# documents) and writes static HTML -- it never touches the catalog directly.
+# GET /api/v1/browse (the navigator, then each leaf bucket's ordered, labelled
+# documents a page at a time) and writes static HTML -- it never touches the
+# catalog directly.
 # Every leaf bucket becomes its own page ("Författningar som börjar på A",
 # "NJA – Högsta domstolen 2024") with a navigator linking the sibling buckets,
 # so the site is browsable with no JS.
@@ -497,6 +498,57 @@ def _leaf_paths(node):
             for tail in _leaf_paths(child)]
 
 
+def browse_model(client, source):
+    """The whole browse model for a source, assembled from the paged API.
+
+    `/api/v1/browse` serves one leaf bucket at a time -- a whole source is tens
+    of megabytes of JSON, which no client should be handed in one response --
+    so the navigator comes first and each leaf's documents follow. The API
+    holds one source's model in memory while this walk runs, so the leaves cost
+    one catalog scan between them, not one each."""
+    view = client.get("/api/v1/browse", params={"source": source}).json()
+    for path, leaf in _leaves(view["buckets"], ()):
+        documents, offset = [], 0
+        while True:
+            page = client.get("/api/v1/browse", params={
+                "source": source, "bucket": "/".join(path),
+                "offset": offset, "limit": BROWSE_PAGE}).json()
+            documents += _leaf_documents(page["buckets"], path)
+            offset += BROWSE_PAGE
+            if offset >= page["total"]:
+                break
+        leaf["documents"] = documents
+    return view
+
+
+# what one /api/v1/browse call asks for: the API's own ceiling, read from it
+# rather than copied. A copy pinned by a comment goes stale silently -- lower
+# the API's maximum and every `generate` run would get a 422, surfacing as a
+# bare KeyError on the missing `total`. `site/browse` already imports `api.app`
+# under the allowlisted layer exception (docs/developing/architecture.md).
+BROWSE_PAGE = api_service.BROWSE_PAGE_MAX
+
+
+def _leaves(nodes, path):
+    """Every leaf bucket as `(slug path, node)`, in document order."""
+    for node in nodes:
+        here = path + (node["slug"],)
+        if node["children"] is None:
+            yield here, node
+        else:
+            yield from _leaves(node["children"], here)
+
+
+def _leaf_documents(nodes, path):
+    """The documents the response hung on the leaf `path` names."""
+    for slug in path:
+        node = next(n for n in nodes if n["slug"] == slug)
+        nodes = node["children"]
+        if nodes is None:
+            return node["documents"] or []
+    raise ValueError("no leaf at %s" % "/".join(path))
+
+
 def generate_browse(client, source, out_root, cross_axis=None):
     """Write every leaf-bucket page of one source from the API's browse model,
     plus the landing copies: a primary bucket's directory shows its first
@@ -524,8 +576,7 @@ def generate_browse(client, source, out_root, cross_axis=None):
     entry, so a guidance page marks that entry current whichever body's series
     it lists, and its rail -- unlike eurlex's -- starts with the primary axis
     (Utgivare), which the banner does not carry."""
-    resp = client.get("/api/v1/browse", params={"source": source})
-    view = resp.json()
+    view = browse_model(client, source)
     root_html = None
     written = set()
     landed = set()          # ancestor directories already given a landing copy

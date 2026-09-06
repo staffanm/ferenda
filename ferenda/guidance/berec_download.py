@@ -73,6 +73,7 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, get_text, make_session
@@ -118,7 +119,8 @@ def nummer(text):
     first line says. Only the spacing moves -- the year and the serial are the
     register's, and a qualifier ("Rev 1") is kept as written."""
     match = RE_NUMMER.match(normalize_space(text))
-    assert match, "not a BEREC document number: %r" % text
+    if not match:
+        raise UpstreamChanged("not a BEREC document number: %r" % text)
     ar, lopnummer, kvalificerare = match.groups()
     return "BoR (%s) %s%s" % (ar, lopnummer,
                               " " + kvalificerare if kvalificerare else "")
@@ -131,7 +133,8 @@ def base_number(number):
     BoR (10) 44 Rev 1 reads "BoR (10) 44 Rev1"), while the year and the serial
     are written one way everywhere."""
     match = RE_NUMMER.match(number)
-    assert match, "not a BEREC document number: %r" % number
+    if not match:
+        raise UpstreamChanged("not a BEREC document number: %r" % number)
     return "BoR (%s) %s" % match.groups()[:2]
 
 
@@ -154,7 +157,8 @@ def basefile(number):
 def declared(listing_html):
     """How many rows the register says this category has. Pure over the HTML."""
     match = RE_DECLARED.search(listing_html)
-    assert match, "the BEREC register page states no row count"
+    if not match:
+        raise UpstreamChanged("the BEREC register page states no row count")
     return int(match.group(1))
 
 
@@ -215,8 +219,8 @@ def parse_leaf(leaf_html, url):
               title.find_next_sibling("span", class_="info-details")
               for title in soup.select(".info-content .info-title")}
     dokumentnummer = fields.get("Document number")
-    assert dokumentnummer is not None, \
-        "%s carries no Document number field" % url
+    if dokumentnummer is None:
+        raise UpstreamChanged("%s carries no Document number field" % url)
     anchor = soup.select_one(".doc-info a[href]")
     return {
         "nummer": nummer(dokumentnummer.get_text()),

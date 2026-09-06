@@ -3,6 +3,7 @@
 temp files -- no real corpus, no JVM, fast."""
 
 
+import contextlib
 import dataclasses
 import json
 import os
@@ -10,6 +11,7 @@ import shutil
 import signal
 import socket
 import sqlite3
+import threading
 from concurrent.futures import Future, ProcessPoolExecutor
 from urllib.parse import urlparse
 
@@ -35,6 +37,7 @@ from ferenda.lib import (
     runlog,
     stage,
     util,
+    writerlock,
 )
 from ferenda.lib.errors import SkipDocument
 from ferenda.lib.freshness import build_one, is_fresh
@@ -209,52 +212,52 @@ def test_fresh_skip_heals_stale_error(tmp_path, monkeypatch):
 
     res2 = build_one(src, "parse", "a", manifest)
     assert res2.planned == [] and ("parse", "a") in res2.fresh   # skipped as fresh
-    corpus.report(src, "parse", res2, 1, True)                   # folds fresh -> clear
+    corpus.report(src, "parse", res2, ["a"], True)               # folds fresh -> clear
     assert "syn/parse/a" not in runlog.read_errors(freshness.ERRORS)
 
 
-def test_stage_gate_skips_when_fingerprint_unchanged(tmp_path, monkeypatch, capsys):
-    """The coarse fingerprint gate (shared by cmd_all and single-source `lagen sfs
-    parse`): once the source is fingerprinted, a re-run with unchanged inputs skips
-    the per-doc scan wholesale ("up to date -- skipped"); an input change re-runs."""
+def _isolate_gates(tmp_path, monkeypatch):
+    monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "fingerprints.json")
+    monkeypatch.setattr(freshness, "_FINGERPRINTS_CACHE", None)
+
+
+def test_a_source_with_nothing_stale_is_skipped_by_the_scan(tmp_path, monkeypatch,
+                                                              capsys):
+    """The scan is the gate (shared by cmd_all and single-source `lagen sfs
+    parse`): a re-run with unchanged inputs books every key fresh without a
+    worker and answers "up to date -- skipped"; an input change re-runs, and
+    only the changed document."""
     _, src = make_source(tmp_path)
     _isolate_manifest(tmp_path, monkeypatch)
-    # settle downloads first (as `download` before `parse` does in real use), so a
-    # later parse touches no inputs and the recorded fingerprint stays valid
-    freshness.run_action(src, "parse", src.list_basefiles(), 1)
-    capsys.readouterr()
-    store = {}
+    _isolate_gates(tmp_path, monkeypatch)
+    assert corpus._run_stage_full(src, "parse", 1) is False      # first run builds
+    out = capsys.readouterr().out
+    # each document's download stage runs ahead of its parse: four builds
+    assert "ran 4" in out and "up to date -- skipped" not in out
 
-    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
-    assert (errs, recorded) == (False, True)                 # ran + fingerprinted
-    assert "up to date -- skipped" not in capsys.readouterr().out
-
-    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
-    assert (errs, recorded) == (False, False)                # skipped wholesale
+    assert corpus._run_stage_full(src, "parse", 1) is False      # nothing stale
     assert "parse syn: up to date -- skipped" in capsys.readouterr().out
 
-    # an input change re-stales the gate -> it runs again
     (tmp_path / "dl" / "a.txt").write_text("CHANGED")
-    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
-    assert (errs, recorded) == (False, True)
+    assert corpus._run_stage_full(src, "parse", 1) is False
+    out = capsys.readouterr().out
+    assert "ran 1, skipped (fresh) 1" in out
 
 
-def test_stage_gate_fires_after_hooks_only_when_the_stage_ran(tmp_path, monkeypatch,
-                                                              capsys):
+def test_after_hooks_fire_only_when_the_stage_ran(tmp_path, monkeypatch, capsys):
     """A skipped stage left every artifact as it was, so its `after` hook
     (dv's case-number sweep) can only rewrite what it wrote last time -- it
     used to run on every "up to date -- skipped" rebuild. A hook that crashes
-    leaves the stage unmarked, so the next run runs both again."""
+    is owed: the next run fires the hooks again even with nothing stale."""
     _, src = make_source(tmp_path)
     _isolate_manifest(tmp_path, monkeypatch)
-    freshness.run_action(src, "parse", src.list_basefiles(), 1)
+    _isolate_gates(tmp_path, monkeypatch)
     fired = []
     src = dataclasses.replace(src, after={"parse": (lambda: fired.append("parse"),)})
-    store = {}
 
-    assert corpus._run_stage_gated(src, "parse", 1, store) == (False, True)
+    assert corpus._run_stage_full(src, "parse", 1) is False
     assert fired == ["parse"]
-    assert corpus._run_stage_gated(src, "parse", 1, store) == (False, False)
+    assert corpus._run_stage_full(src, "parse", 1) is False
     assert fired == ["parse"]                                # skipped: no hook
     assert "parse syn: up to date -- skipped" in capsys.readouterr().out
 
@@ -263,32 +266,34 @@ def test_stage_gate_fires_after_hooks_only_when_the_stage_ran(tmp_path, monkeypa
     def crash():
         raise RuntimeError("hook crashed")
 
-    src = dataclasses.replace(src, after={"parse": (crash,)})
-    before = dict(store)
+    crashing = dataclasses.replace(src, after={"parse": (crash,)})
     with pytest.raises(RuntimeError, match="hook crashed"):
-        corpus._run_stage_gated(src, "parse", 1, store)
-    assert store == before                                   # not marked
+        corpus._run_stage_full(crashing, "parse", 1)
+    # the document was rebuilt before the hook crashed, so nothing is stale
+    # now -- and the hooks still run, because they are owed
+    assert corpus._run_stage_full(src, "parse", 1) is False
+    assert fired == ["parse", "parse"]
+    assert "up to date -- skipped" not in capsys.readouterr().out
+    assert corpus._run_stage_full(src, "parse", 1) is False   # paid: skipped again
+    assert fired == ["parse", "parse"]
 
 
-def test_stage_gate_is_not_recorded_by_a_dry_run(tmp_path, monkeypatch, capsys):
-    """A dry run does no work, so it must not fingerprint the source. It did:
-    `lagen eurlex parse -n` after a parser edit printed a 64,004-document plan
-    and recorded the new recipe version, so the real run that followed answered
-    "up to date -- skipped" over the whole stale artifact tree."""
+def test_a_dry_run_plans_and_leaves_the_stage_stale(tmp_path, monkeypatch, capsys):
+    """A dry run does no work, so the real run that follows must still find
+    every document stale. It did not always: `lagen eurlex parse -n` after a
+    parser edit once recorded the new recipe version, and the real run
+    answered "up to date -- skipped" over the whole stale artifact tree."""
     _, src = make_source(tmp_path)
     _isolate_manifest(tmp_path, monkeypatch)
+    _isolate_gates(tmp_path, monkeypatch)
     monkeypatch.setattr(stage.RUN, "dry_run", True)
-    store = {}
-
-    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
-    assert (errs, recorded) == (False, False)                # planned, not marked
-    assert store == {}
+    assert corpus._run_stage_full(src, "parse", 1) is False
+    assert "would run 4" in capsys.readouterr().out       # download + parse, per document
 
     monkeypatch.setattr(stage.RUN, "dry_run", False)
-    capsys.readouterr()
-    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
-    assert (errs, recorded) == (False, True)                 # the real run still runs
-    assert "up to date -- skipped" not in capsys.readouterr().out
+    assert corpus._run_stage_full(src, "parse", 1) is False
+    out = capsys.readouterr().out
+    assert "ran 4" in out and "up to date -- skipped" not in out
 
 
 def test_eurlex_parse_hashes_the_notice_it_reads_the_repeal_from():
@@ -325,14 +330,59 @@ def test_orphan_errors_reconciled_only_on_full_source(tmp_path, monkeypatch):
                           [("parse", "z", "KeyError", "tb")], [], "r1")
 
     # targeted run (full_source=False): reconcile must NOT fire
-    corpus.report(src, "parse", freshness.Result(), 1, False)
+    corpus.report(src, "parse", freshness.Result(), ["a"], False)
     assert "syn/parse/gone/x" in runlog.read_errors(freshness.ERRORS)
 
     # full-source run: the orphan is dropped, other sources untouched
-    corpus.report(src, "parse", freshness.Result(), 2, True)
+    corpus.report(src, "parse", freshness.Result(), ["a", "b"], True)
     errs = runlog.read_errors(freshness.ERRORS)
     assert "syn/parse/gone/x" not in errs
     assert "other/parse/z" in errs                       # never touches another source
+
+
+def test_reconcile_keeps_a_fan_out_stage_s_failures(tmp_path, monkeypatch):
+    """A versions stage records its failures under "<basefile>@<version>", a
+    key the source's basefile list never holds. Reconciling against that list
+    dropped every such failure the moment it was written; the reconcile must
+    use the stage's own keys."""
+    _, src = make_source(tmp_path)
+    src.stages["versions"] = Stage("versions", lambda bf: None,
+                                   lambda bf: tmp_path / "out" / ("%s.v" % bf),
+                                   list_basefiles=lambda: ["a@1", "b@1"])
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(freshness, "RUN_ID", "r1")
+    runlog.apply_outcomes(freshness.ERRORS, "syn",
+                          [("versions", "a@1", "ValueError", "tb"),
+                           ("versions", "gone@1", "ValueError", "tb"),
+                           ("parse", "a", "ValueError", "tb")], [], "r1")
+    corpus.report(src, "versions", freshness.Result(), ["a@1", "b@1"], True)
+    errs = runlog.read_errors(freshness.ERRORS)
+    assert "syn/versions/a@1" in errs          # a dispatched key: kept
+    assert "syn/versions/gone@1" not in errs   # not dispatched any more: an orphan
+    assert "syn/parse/a" in errs               # another stage's failure: not this run's to judge
+    # and the mirror: a full parse run leaves the versions failures alone
+    corpus.report(src, "parse", freshness.Result(), ["a", "b"], True)
+    assert "syn/versions/a@1" in runlog.read_errors(freshness.ERRORS)
+
+
+def test_reconcile_reaches_the_stages_a_run_depends_on(tmp_path, monkeypatch):
+    """A full parse run brings each basefile's download up to date first and
+    records that failure under the download stage, same key -- so the parse
+    run is what proves a departed document's download entry an orphan too."""
+    _, src = make_source(tmp_path)                       # parse depends on download
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(freshness, "RUN_ID", "r1")
+    runlog.apply_outcomes(freshness.ERRORS, "syn",
+                          [("download", "a", "OSError", "tb"),
+                           ("download", "gone", "OSError", "tb")], [], "r1")
+    corpus.report(src, "parse", freshness.Result(), ["a", "b"], True)
+    errs = runlog.read_errors(freshness.ERRORS)
+    assert "syn/download/a" in errs
+    assert "syn/download/gone" not in errs
 
 
 def test_report_failing_count_is_source_scoped(tmp_path, monkeypatch, capsys):
@@ -348,7 +398,7 @@ def test_report_failing_count_is_source_scoped(tmp_path, monkeypatch, capsys):
     runlog.apply_outcomes(freshness.ERRORS, "other",     # a different source, 3 errors
                           [("parse", x, "E", "tb") for x in ("x", "y", "z")], [], "r0")
 
-    corpus.report(src, "parse", freshness.Result(), 1, False)   # targeted: no reconcile
+    corpus.report(src, "parse", freshness.Result(), ["a"], False)   # targeted: no reconcile
     out = capsys.readouterr().out
     assert "1 docs failing in syn" in out                  # only syn's error counted
     assert "overall" not in out                            # no misleading global count
@@ -654,42 +704,63 @@ def test_layout_grammar_covers_every_registered_fs():
             == "%s/2020_1_grund.html" % fs, fs
 
 
-def test_stage_fingerprint_tracks_inputs(tmp_path):
+def test_the_scan_books_a_fresh_document_without_a_worker(tmp_path, monkeypatch):
+    # a fresh document used to cost a worker round-trip to learn it was fresh
+    # (172,000 of them, 43-52 s, on an eurlex parse with nothing to parse);
+    # the scan books it on the spot, dependency chain included, so `report`
+    # heals the same ledger entries `ensure` would have
     _, src = make_source(tmp_path)
-    manifest = {}
-    build_one(src, "download", "a", manifest)        # materialise the inputs
-    build_one(src, "download", "b", manifest)
-    fp = freshness.stage_fingerprint(src, "parse")
-    assert freshness.stage_fingerprint(src, "parse") == fp   # stable while untouched
-    (tmp_path / "dl" / "a.txt").write_text("HELLO AGAIN")   # rewrite one input
-    assert freshness.stage_fingerprint(src, "parse") != fp
+    _isolate_manifest(tmp_path, monkeypatch)
+    first = freshness.run_action(src, "parse", ["a", "b"], 1)
+    assert sorted(first.done) == [("download", "a"), ("download", "b"),
+                                  ("parse", "a"), ("parse", "b")]
 
+    again = freshness.run_action(src, "parse", ["a", "b"], 1)
+    assert again.planned == [] and again.done == []
+    assert sorted(set(again.fresh)) == [("download", "a"), ("download", "b"),
+                                        ("parse", "a"), ("parse", "b")]
 
-def test_stage_fingerprint_reports_progress_per_basefile(tmp_path, monkeypatch):
-    # this scan used to run silently -- on a large, slow-storage corpus that
-    # read as a hang rather than as work in progress (2026-09-03); it now
-    # reports through the usual util.status line. The first and last
-    # basefile always report regardless of throttling (see the dedicated
-    # throttle test below), which is what a 2-basefile source exercises here.
-    _, src = make_source(tmp_path)
-    manifest = {}
-    build_one(src, "download", "a", manifest)
-    build_one(src, "download", "b", manifest)
-    calls = []
+    (tmp_path / "dl" / "b.txt").write_text("HELLO AGAIN")      # rewrite one input
+    lines = []
     monkeypatch.setattr(freshness.util, "status",
-                        lambda done, total, msg, **kw: calls.append((done, total, msg)))
-    freshness.stage_fingerprint(src, "parse")
-    assert calls == [(1, 2, "syn parse  checking staleness"),
-                     (2, 2, "syn parse  checking staleness")]
+                        lambda done, total, msg, **kw: lines.append((done, total, msg)))
+    third = freshness.run_action(src, "parse", ["a", "b"], 1)
+    assert [bf for _, bf in third.planned] == ["b"]
+    assert ("parse", "a") in third.fresh and ("parse", "b") not in third.fresh
+    # the counter counts documents -- "a" booked fresh by the scan, then "b"
+    # built -- not the (stage, basefile) pairs `fresh` holds per stage of a
+    # chain, which are three by the time "b" is absorbed
+    assert (2, 2, "syn parse  ran 1  err 0  b") in lines
 
 
-def test_stage_fingerprint_throttles_progress_reporting(tmp_path, monkeypatch):
-    # a real util.invocation_bar renders a full nested tqdm frame per
-    # util.status() call (terminal-size query, refresh, ETA recompute) --
-    # calling it on every basefile made the *reporting* itself a measurable
-    # part of the cost on a fast, high-count scan (2026-09-04). 500 basefiles
-    # complete near-instantly here; without throttling that would be ~500
-    # calls, one per basefile.
+def test_the_scan_sends_a_document_whose_bytes_did_not_change_to_the_worker(
+        tmp_path, monkeypatch):
+    # the scan compares size+mtime only; a file rewritten with the same
+    # content (a compression migration) is "maybe stale" to it, and the
+    # worker's content hash is what finds it fresh -- exactly as before
+    _, src = make_source(tmp_path)
+    _isolate_manifest(tmp_path, monkeypatch)
+    freshness.run_action(src, "parse", ["a"], 1)
+    path = tmp_path / "dl" / "a.txt"
+    path.write_text(path.read_text())
+    os.utime(path, (path.stat().st_atime, path.stat().st_mtime + 5))
+    res = freshness.run_action(src, "parse", ["a"], 1)
+    assert res.done == [] and ("parse", "a") in res.fresh       # found fresh there
+    # ... which shows in the manifest: the worker recorded the new mark, so
+    # the next scan books it fresh without a worker
+    key = freshness.manifest_key("syn", "parse", "a")
+    assert key in res.updates
+    again = freshness.run_action(src, "parse", ["a"], 1)
+    assert again.updates == {} and ("parse", "a") in again.fresh
+
+
+def test_the_scan_reports_progress_and_throttles(tmp_path, monkeypatch):
+    # the scan reports on the usual status line (silent, it read as a hang on
+    # slow storage); a real util.invocation_bar renders a full nested tqdm
+    # frame per util.status() call, so it reports at most every
+    # _REPORT_INTERVAL -- 500 basefiles scan near-instantly here, and without
+    # throttling that would be one call per basefile. The first and last
+    # always report, whatever the timing.
     remote = ["doc%d" % i for i in range(500)]
     (tmp_path / "dl").mkdir()
     for bf in remote:
@@ -699,13 +770,41 @@ def test_stage_fingerprint_throttles_progress_reporting(tmp_path, monkeypatch):
                        lambda bf: tmp_path / ("%s.out" % bf),
                        inputs=lambda bf: [tmp_path / "dl" / ("%s.txt" % bf)]),
     })
+    _isolate_manifest(tmp_path, monkeypatch)
     calls = []
     monkeypatch.setattr(freshness.util, "status",
-                        lambda done, total, msg, **kw: calls.append(done))
-    freshness.stage_fingerprint(src, "parse")
-    assert len(calls) < 50            # not one call per basefile
-    assert calls[0] == 1              # the first basefile still reports immediately
-    assert calls[-1] == 500           # the final one always reports, whatever the timing
+                        lambda done, total, msg, **kw: calls.append((done, total, msg)))
+    freshness.run_action(src, "parse", sorted(remote), 1)
+    scans = [c for c in calls if "checking staleness" in c[2]]
+    assert len(scans) < 50                 # not one call per basefile
+    assert scans[0][:2] == (1, 500)        # the first basefile reports at once
+    assert scans[-1] == (500, 500, "syn parse  checking staleness  500 stale")
+
+
+def test_file_fingerprint_reports_a_labelled_staleness_scan(tmp_path, monkeypatch):
+    # relate and dump open with a size+mtime pass over every artifact of the
+    # source -- tens of seconds on the big ones, and silent until now, so
+    # `lagen sfs relate` printed nothing at all while it ran
+    paths = []
+    for name in ("a", "b"):
+        art = tmp_path / ("%s.json" % name)
+        art.write_text("{}")
+        paths.append(art)
+    calls = []
+    monkeypatch.setattr(freshness.util, "status",
+                        lambda done, total, msg, **kw: calls.append((done, total, msg)))
+    freshness.file_fingerprint(paths, label="syn relate")
+    assert calls == [(1, 2, "syn relate  checking staleness"),
+                     (2, 2, "syn relate  checking staleness")]
+
+
+def test_file_fingerprint_stays_silent_without_a_label(tmp_path):
+    # the label only adds the "checking staleness" line; the digest is the
+    # same with or without it
+    art = tmp_path / "a.json"
+    art.write_text("{}")
+    labelled = freshness.file_fingerprint([art], label="syn relate")
+    assert freshness.file_fingerprint([art]) == labelled   # same digest either way
 
 
 def test_up_to_date_combines_fingerprint_code_and_force(tmp_path):
@@ -1243,7 +1342,8 @@ def test_cmd_relate_index_dump_skip_non_artifact_sources(monkeypatch, tmp_path):
     monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
     monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
-    
+    freshness.start_run(os.getpid())     # as `build.main` does before dispatch
+
     # Register a source with no `artifacts` lister (similar to remisser)
     src = Source("non_artifact_src", lambda: [], {})
     monkeypatch.setitem(build.SOURCES, src.name, src)
@@ -1252,6 +1352,25 @@ def test_cmd_relate_index_dump_skip_non_artifact_sources(monkeypatch, tmp_path):
     corpus.cmd_relate(build.SOURCES, ["non_artifact_src"])
     corpus.cmd_index(build.SOURCES, ["non_artifact_src"])
     corpus.cmd_dump(build.SOURCES, ["non_artifact_src"])
+
+
+def test_cmd_dump_announces_one_step_per_source(monkeypatch, tmp_path):
+    # the outer bar counts steps the verb's own loop enters, so cmd_dump has to
+    # announce them itself -- the CLI only opens the bar around it
+    monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "fingerprints.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(corpus, "DUMPS", tmp_path / "dumps")
+    sources = {}
+    for name in ("one", "two"):
+        art = tmp_path / ("%s.json" % name)
+        art.write_text('{"uri": "x"}')
+        sources[name] = Source(name, lambda: [], {},
+                               artifacts=lambda art=art: [art])
+    labels = []
+    monkeypatch.setattr(corpus.util, "step",
+                        lambda label: labels.append(label) or contextlib.nullcontext())
+    corpus.cmd_dump(sources, ["one", "two"])
+    assert labels == ["one dump", "two dump"]
 
 
 def test_rebuild_after_commit_drives_the_right_stages(monkeypatch):
@@ -1349,11 +1468,15 @@ def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_p
     data_root.mkdir()
     art = _fake_sfs_artifact(data_root)
     cat = tmp_path / "fast" / "catalog.sqlite"          # parent doesn't exist yet
-    scratch = cat.with_name("catalog.sqlite.building")
 
     monkeypatch.setattr(corpus, "DATA", data_root)
     monkeypatch.setattr(layout, "CATALOG", cat)
     monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "wm.json")
+    # a full rebuild names its scratch after the run: `build.main` mints the id
+    # before it dispatches, and calling the verb directly has to do the same
+    freshness.start_run(os.getpid())
+    # the scratch carries the run id, so no two runs can pick the same name
+    scratch = writerlock.scratch_name(cat, freshness.RUN_ID)
     monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(freshness, "ERRORS", tmp_path / "err.json")
     monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
@@ -1455,66 +1578,61 @@ def test_fa_soukb_scans_passes_politeness(monkeypatch):
 
 
 
-def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
-    """A worker that dies hard loses its in-flight result and imap_unordered
-    then waits for it forever -- observed as a förarbete parse frozen at
-    "(97212/97213) ... ETA 00:00" with every worker asleep. The parent knows
-    which basefiles never came back, so the wait is bounded and names them."""
-    class LosesOneResult:
-        """imap_unordered's iterator when a worker died: yields what arrived,
-        then blocks on a result that is never coming."""
-        def __init__(self, arrived):
-            self._arrived = list(arrived)
-
-        def next(self, timeout=None):
-            if self._arrived:
-                return self._arrived.pop(0)
-            raise freshness.multiprocessing.TimeoutError()
-
+def _fake_pool(deliver=(), corpse=None, late=(), inflight=None):
+    """A `multiprocessing.Pool` stand-in for the dead-worker paths: apply_async
+    delivers the results of the basefiles in `deliver` at once, delivers each
+    ``(basefile, delay)`` in `late` from a timer, and never delivers the rest
+    (a worker that died mid-document). `corpse` is the basefile a dead
+    worker's slot file names, written the moment it is dispatched (see
+    `_worker`). `_pool` is empty: every worker is gone, so any slot is a
+    corpse to attribute."""
     class FakePool:
-        # the dead-worker sweep reads `pool._pool` for the live workers' pids;
-        # empty models the case these tests exercise -- the worker is gone, so
-        # its in-flight slot is a corpse to attribute
         _pool = ()
 
         def __init__(self, *a, **kw): pass
         def __enter__(self): return self
         def __exit__(self, *a): return False
-        def imap_unordered(self, _fn, _jobs, chunksize=1):
-            return LosesOneResult([("a", freshness.Result())])
 
-    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+        def apply_async(self, _fn, args, callback=None, error_callback=None):
+            _source, _action, bf = args[0]
+            if bf == corpse:
+                (inflight / "99999").write_text(bf)
+            if bf in deliver:
+                callback((bf, freshness.Result()))
+            for name, delay in late:
+                if name == bf:
+                    threading.Timer(delay, callback,
+                                    ((bf, freshness.Result()),)).start()
+    return FakePool
+
+
+def _parallel(source, feed, jobs, absorb, **kw):
+    return freshness._run_parallel(source, "parse", iter(feed), jobs, absorb,
+                                   lambda bf: (True, 0.0), **kw)
+
+
+def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
+    """A worker that dies hard loses its in-flight result and the pool never
+    delivers it -- observed as a förarbete parse frozen at
+    "(97212/97213) ... ETA 00:00" with every worker asleep. The parent knows
+    which basefiles never came back, so the wait is bounded and names them."""
+    monkeypatch.setattr(freshness.multiprocessing, "Pool", _fake_pool(deliver=("a",)))
     monkeypatch.setattr(freshness, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(freshness, "WORKER_POLL", 0.01)
     monkeypatch.setattr(freshness, "INFLIGHT", tmp_path / "inflight")
     source = stage.Source("syn", lambda: ["a", "b"], {})
-
     with pytest.raises(RuntimeError, match=r"no worker result.*outstanding"):
-        freshness._run_parallel(source, "parse", ["a", "b"], 2, lambda res, bf: None)
+        _parallel(source, ["a", "b"], 2, lambda res, bf: None)
 
 
 def test_the_lost_result_error_names_the_missing_basefiles(tmp_path, monkeypatch):
-    class Blocks:
-        def next(self, timeout=None):
-            raise freshness.multiprocessing.TimeoutError()
-
-    class FakePool:
-        # the dead-worker sweep reads `pool._pool` for the live workers' pids;
-        # empty models the case these tests exercise -- the worker is gone, so
-        # its in-flight slot is a corpse to attribute
-        _pool = ()
-
-        def __init__(self, *a, **kw): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def imap_unordered(self, _fn, _jobs, chunksize=1): return Blocks()
-
-    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(freshness.multiprocessing, "Pool", _fake_pool())
     monkeypatch.setattr(freshness, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(freshness, "WORKER_POLL", 0.01)
     monkeypatch.setattr(freshness, "INFLIGHT", tmp_path / "inflight")
     source = stage.Source("syn", lambda: ["ds/2010-47"], {})
-
     with pytest.raises(RuntimeError, match="ds/2010-47"):
-        freshness._run_parallel(source, "parse", ["ds/2010-47"], 1, lambda res, bf: None)
+        _parallel(source, ["ds/2010-47"], 1, lambda res, bf: None)
 
 
 def test_a_dead_workers_doc_is_rebuilt_in_a_subprocess(tmp_path, monkeypatch):
@@ -1524,30 +1642,9 @@ def test_a_dead_workers_doc_is_rebuilt_in_a_subprocess(tmp_path, monkeypatch):
     rebuilds those docs in fresh subprocesses instead of raising -- the run
     completes."""
     inflight = tmp_path / "inflight"
-
-    class LosesOneResult:
-        """One result arrives; then silence. The corpse's slot -- written by
-        the worker before it died -- appears alongside the delivery, naming
-        the doc ("b") whose result is never coming."""
-        def __init__(self):
-            self._arrived = [("a", freshness.Result())]
-
-        def next(self, timeout=None):
-            if self._arrived:
-                (inflight / "99999").write_text("b")
-                return self._arrived.pop(0)
-            raise freshness.multiprocessing.TimeoutError()
-
-    class FakePool:
-        _pool = ()                  # the crashed worker is gone
-
-        def __init__(self, *a, **kw): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def imap_unordered(self, _fn, _jobs, chunksize=1):
-            return LosesOneResult()
-
-    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(freshness.multiprocessing, "Pool",
+                        _fake_pool(deliver=("a",), corpse="b", inflight=inflight))
+    monkeypatch.setattr(freshness, "WORKER_POLL", 0.01)
     monkeypatch.setattr(freshness, "INFLIGHT", inflight)
     rebuilt = []
 
@@ -1559,10 +1656,7 @@ def test_a_dead_workers_doc_is_rebuilt_in_a_subprocess(tmp_path, monkeypatch):
     monkeypatch.setattr(stage, "RUN", stage.RunOptions())
     source = stage.Source("syn", lambda: ["a", "b"], {})
     absorbed = []
-
-    freshness._run_parallel(source, "parse", ["a", "b"], 2,
-                            lambda res, bf: absorbed.append(bf), force=True)
-
+    _parallel(source, ["a", "b"], 2, lambda res, bf: absorbed.append(bf), force=True)
     # the rebuilt doc runs under the same force override the pool's workers got
     assert rebuilt == [("b", stage.RunOptions(force=True))]
     assert sorted(absorbed) == ["a", "b"]
@@ -1573,43 +1667,51 @@ def test_a_result_delivered_after_its_workers_death_is_not_rebuilt(
     """A worker can die *after* queueing its result (the observed lxml heap
     corruption strikes at frame teardown): the sweep attributes its slot, but
     when the queued result then arrives the attribution is withdrawn and
-    nothing is rebuilt twice."""
+    nothing is rebuilt twice. "a"'s slot is a corpse at the first sweep
+    (10 ms); its result lands at 30 ms, "b"'s at 50 ms."""
     inflight = tmp_path / "inflight"
-
-    class DeliversLate:
-        """Tick 1: silence, with the corpse's slot naming "a". Then "a"'s
-        already-queued result arrives anyway, followed by the rest."""
-        def __init__(self):
-            self._script = ["timeout", ("a", freshness.Result()),
-                            ("b", freshness.Result())]
-
-        def next(self, timeout=None):
-            step = self._script.pop(0)
-            if step == "timeout":
-                (inflight / "99999").write_text("a")
-                raise freshness.multiprocessing.TimeoutError()
-            return step
-
-    class FakePool:
-        _pool = ()
-
-        def __init__(self, *a, **kw): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def imap_unordered(self, _fn, _jobs, chunksize=1):
-            return DeliversLate()
-
-    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(freshness.multiprocessing, "Pool",
+                        _fake_pool(corpse="a", late=(("a", 0.03), ("b", 0.05)),
+                                   inflight=inflight))
+    monkeypatch.setattr(freshness, "WORKER_POLL", 0.01)
     monkeypatch.setattr(freshness, "INFLIGHT", inflight)
     monkeypatch.setattr(freshness, "_rebuild_isolated",
                         lambda *a: pytest.fail("nothing should be rebuilt"))
     source = stage.Source("syn", lambda: ["a", "b"], {})
     absorbed = []
-
-    freshness._run_parallel(source, "parse", ["a", "b"], 2,
-                            lambda res, bf: absorbed.append(bf))
-
+    _parallel(source, ["a", "b"], 2, lambda res, bf: absorbed.append(bf))
     assert sorted(absorbed) == ["a", "b"]
+
+
+def test_a_free_worker_takes_the_most_expensive_known_document(tmp_path, monkeypatch):
+    """The feed is the scan itself: what is known so far sits on a heap and
+    a free worker takes its top -- a never-built document first, then the
+    longest last build. With one worker and everything known before the
+    first result, the dispatch order is the heap order."""
+    dispatched = []
+
+    class RecordingPool:
+        _pool = ()
+
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+        def apply_async(self, _fn, args, callback=None, error_callback=None):
+            dispatched.append(args[0][2])
+            callback((args[0][2], freshness.Result()))
+
+    monkeypatch.setattr(freshness.multiprocessing, "Pool", RecordingPool)
+    monkeypatch.setattr(freshness, "INFLIGHT", tmp_path / "inflight")
+    expected = {"quick": 1.0, "slow": 40.0, "new": None, "mid": 5.0}
+    source = stage.Source("syn", lambda: list(expected), {})
+    # SCAN_CHUNK covers the whole feed, so the heap is complete before the
+    # first dispatch; the pool answers each at once, so one job is in flight
+    # at a time and the order is the heap's
+    freshness._run_parallel(source, "parse", iter(expected), 1,
+                            lambda res, bf: None,
+                            lambda bf: freshness._priority(expected, bf))
+    assert dispatched == ["new", "slow", "mid", "quick"]
 
 
 def _crash_hard(_job):
@@ -1692,9 +1794,10 @@ def test_worker_init_resets_the_inherited_invocation_bar_state(monkeypatch):
     # on Linux (this codebase's fork start method), a worker started mid-run
     # is a COW copy of the parent -- it inherits util's bar-state globals
     # verbatim unless _worker_init resets them (util.reset_worker_state).
-    # invocation_bar only opens the real bar on a tty; pretend it is one.
+    # invocation_bar only opens the real bar on a tty, and only for a run of
+    # two or more steps; give it both.
     monkeypatch.setattr(util, "_stderr_is_a_tty", lambda: True)
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar({"syn parse": 5.0, "syn relate": 5.0}) as ib:
         ib.start("syn parse")
         util.status(1, 5, "item")
         assert util._outer is not None            # what a fork would inherit

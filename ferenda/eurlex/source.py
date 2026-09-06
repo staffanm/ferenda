@@ -64,6 +64,8 @@ HERE = Path(__file__).parent
 
 EURLEX_CODE = (HERE / "parse.py", HERE / "parse_html.py",
                HERE.parent / "lib" / "formex.py",
+               # the zip budgets formex reads a manifestation through
+               HERE.parent / "lib" / "archive.py",
                HERE / "correspond.py",
                HERE / "parse_pdf.py", HERE / "lang.py",
                HERE / "model.py", HERE / "structure.py",

@@ -24,25 +24,29 @@ PKG = Path(__file__).parent.parent   # the ferenda package root
 
 POLITENESS = 0.3   # seconds between per-document network fetches
 
-# The data snapshots the citation scan reads: the named-law/abbreviation table
-# every LagrumParser is built from, emdref's ECHR case registry and the JO
-# ämbetsberättelse page table. A refreshed snapshot changes parse output exactly
-# like a grammar edit, so it rides every recipe that carries lagrum.py/emdref.py
-# -- the same policy treaty_names.json gets on the treaty-linking recipes. It
-# lives here, with the protocol, because eleven sources' recipes name it and no
-# one of them owns it.
-CITATION_DATA = (datasets.NAMEDLAWS, datasets.EMD_CASES,
-                 datasets.EMD_RESPONDENTS, datasets.JO_ARSBERATTELSE)
-# The case-number matcher and its snapshot, on the recipes of the sources that
-# can actually request MALNUMMER (`lagrum.ALL_PARSE_TYPES`: dv, forarbete, avg,
-# rs, lawreview, wiki). Kept out of CITATION_DATA because the sfs/eurlex/foreskrift/
-# guidance parsers never ask for that parse type, and listing it there would
-# reparse those four corpora in full every time `lagen dv casenumbers` rewrites
-# the snapshot, for output that cannot change. The snapshot is a data-root file
-# (datasets.CASENUMBERS), the one recipe input outside the package: hash_files
-# reads its content, so a refreshed snapshot re-stales those parses on whichever
-# machine holds it, and a machine without it hashes as if the entry were absent.
-CASENUMBER_CODE = (PKG / "lib" / "malnummer.py", datasets.CASENUMBERS)
+# The hand-edited tables the citation scan reads: the named-law/abbreviation
+# table every LagrumParser is built from and emdref's Swedish respondent-state
+# names. An edit to one changes parse output exactly like a grammar edit, so it
+# rides every recipe that carries lagrum.py/emdref.py -- the same policy
+# treaty_names.json gets on the treaty-linking recipes. It lives here, with the
+# protocol, because eleven sources' recipes name it and no one of them owns it.
+#
+# The *derived* snapshots the same scan reads are deliberately NOT recipe
+# inputs: emdref's ECHR case registry (datasets.EMD_CASES, `hudoc casenames`),
+# the JO ämbetsberättelse page table (datasets.JO_ARSBERATTELSE, `avg
+# arsberattelse`) and the case-number index (datasets.CASENUMBERS, rewritten by
+# every full-source `dv parse`). Each grows with its corpus, and hashing it
+# would reparse eleven (or six) sources in full every time a harvest adds a
+# decision -- a day on prod. A newly held decision is new: a document parsed
+# after the refresh resolves it, and an already-parsed document that cited it
+# before we held it reaches the link only at the next code-staleness or
+# --force pass, the way dv's identity index already works (dv/source.DV_CODE).
+CITATION_DATA = (datasets.NAMEDLAWS, datasets.EMD_RESPONDENTS)
+# The case-number matcher, on the recipes of the sources that can actually
+# request MALNUMMER (`lagrum.ALL_PARSE_TYPES`: dv, forarbete, avg, rs,
+# lawreview, wiki). Kept out of CITATION_DATA because the
+# sfs/eurlex/foreskrift/guidance parsers never ask for that parse type.
+CASENUMBER_CODE = (PKG / "lib" / "malnummer.py",)
 
 
 # --------------------------------------------------------------------------

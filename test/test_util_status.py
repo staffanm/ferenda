@@ -27,6 +27,10 @@ def _pretend_stderr_is_a_tty(monkeypatch):
     monkeypatch.setattr(util, "_stderr_is_a_tty", lambda: True)
 
 
+# a two-step plan for the tests that only need a bar open
+PLAN2 = {"syn parse": 5.0, "syn relate": 5.0}
+
+
 class FakeClock:
     """A monotonic clock the ETA tests advance by hand."""
 
@@ -253,7 +257,7 @@ def _no_leaked_bar():
 
 
 def test_status_renders_nested_while_an_invocation_bar_is_open():
-    with util.invocation_bar(10.0, 1, desc="lagen all rebuild") as ib:
+    with util.invocation_bar(PLAN2, desc="lagen all rebuild") as ib:
         assert util._outer is ib
         ib.start("syn parse")
         util.status(1, 5, "item 1")
@@ -272,7 +276,7 @@ def test_invocation_bar_start_primes_the_nested_bar_before_any_status_call():
     # would otherwise sit blank -- reading as hung, not merely quiet.
     # start() must show something immediately, before the caller ever
     # calls status() for this step.
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("forarbete parse")
         assert util._inner is not None
         assert util._inner.n == 0
@@ -284,7 +288,7 @@ def test_priming_does_not_stick_the_total_once_real_progress_arrives():
     # the step's real first status() call reuses that same bar (same
     # step_no) rather than rebuilding it, so the total must still take
     # effect there, not stay stuck at the priming value forever
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("forarbete parse")
         primed = util._inner
         util.status(1, 25018, "item 1")
@@ -294,7 +298,7 @@ def test_priming_does_not_stick_the_total_once_real_progress_arrives():
 
 
 def test_status_nested_paces_on_work_like_the_plain_line_does():
-    with util.invocation_bar(10.0, 1) as _ib:
+    with util.invocation_bar(PLAN2) as _ib:
         util.status(1, 5, "item 1", work=(2.0, 8.0))
         assert util._inner.total == 8.0          # the work total, not the item total
         assert util._inner.n == 2.0
@@ -305,7 +309,7 @@ def test_status_nested_paces_on_work_like_the_plain_line_does():
 def test_status_opens_a_fresh_nested_bar_on_a_new_stage():
     # matches corpus.cmd_all's real usage: every step is bracketed by
     # ib.start()/ib.finish(), which is the actual rebase signal (see below)
-    with util.invocation_bar(10.0, 2) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("stage one")
         util.status(5, 5, "last item of stage one")
         first_bar = util._inner
@@ -323,7 +327,7 @@ def test_status_opens_a_fresh_nested_bar_even_when_the_new_stage_s_total_matches
     # step count (ib.start(), the real step boundary) rather than on total
     # catches this; rebasing on total alone would miss it and leave the first
     # stage's elapsed clock ticking under the second stage's numbers.
-    with util.invocation_bar(10.0, 2) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("source a parse")
         util.status(3, 5, "item")
         first_bar = util._inner
@@ -340,7 +344,7 @@ def test_invocation_bar_fill_tracks_step_count_not_seconds(monkeypatch):
     # itself, the same number already printed beside it
     clock = FakeClock()
     monkeypatch.setattr(util.time, "perf_counter", clock)
-    with util.invocation_bar(10.0, 2) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("syn parse")
         assert ib.bar.n == 1                # filled the moment the step starts
         clock.now += 3.0
@@ -353,22 +357,64 @@ def test_invocation_bar_fill_tracks_step_count_not_seconds(monkeypatch):
         assert ib.bar.n == 2
 
 
-def test_invocation_bar_eta_is_still_paced_on_predicted_seconds(monkeypatch):
-    # the fill is step-based now, but the ETA a reader actually waits on is
-    # still paced on the plan's cost model, same as before the fill changed
+def test_invocation_bar_eta_is_paced_on_predicted_seconds(monkeypatch):
+    # the fill is step-based, but the ETA a reader actually waits on is
+    # paced on the plan's cost model: the finished steps' predicted seconds
+    # over their real seconds is the speed the rest of the plan runs at
     clock = FakeClock()
     monkeypatch.setattr(util.time, "perf_counter", clock)
-    with util.invocation_bar(10.0, 2) as ib:
+    with util.invocation_bar(PLAN2) as ib:
+        assert ib._eta_str() == "00:10"      # nothing finished: the plan at face value
         ib.start("syn parse")
         clock.now += 5.0
-        ib.finish()                          # 5s real for a step costed at 5s of the 10s plan
-        assert ib.secs_done == pytest.approx(5.0)
-        # rate 5s-done/5s-elapsed = 1.0; 5s of the 10s plan remain -> ETA 5s
-        assert ib._eta_str() == "00:05"
+        ib.finish()                          # 5s real for a step costed at 5s
+        assert ib.pred_done == pytest.approx(5.0)
+        assert ib.real_done == pytest.approx(5.0)
+        assert ib._eta_str() == "00:05"      # speed 1.0, 5s of the plan left
+    with util.invocation_bar(PLAN2) as ib:
+        ib.start("syn parse")
+        clock.now += 10.0                    # twice as slow as predicted
+        ib.finish()
+        assert ib._eta_str() == "00:10"      # the remaining 5s at half speed
+
+
+def test_the_step_in_flight_earns_the_eta_credit_as_it_runs(monkeypatch):
+    # a two-hour step used to freeze the numerator while the denominator
+    # grew: `real_done / elapsed` fell toward zero and the ETA climbed the
+    # whole time (69 h shown two hours into a three-hour run). The running
+    # step is credited its elapsed time at the current speed, up to its own
+    # prediction, so the ETA counts down through it
+    clock = FakeClock()
+    monkeypatch.setattr(util.time, "perf_counter", clock)
+    with util.invocation_bar({"dv parse": 10.0, "forarbete parse": 100.0,
+                              "generate": 20.0}) as ib:
+        ib.start("dv parse")
+        clock.now += 10.0
+        ib.finish()                          # speed 1.0
+        ib.start("forarbete parse")
+        assert ib._eta_str() == "02:00"      # 100 + 20 to go
+        clock.now += 60.0
+        assert ib._eta_str() == "01:00"      # 60 s credited against the 100
+        clock.now += 80.0                    # 140 s in: an overrun
+        assert ib._eta_str() == "00:20"      # capped at its prediction; the rest stands
+        ib.finish()                          # 100 predicted over 140 real
+        assert ib._eta_str() == "00:27"      # 20 s of plan at speed 110/150
+
+
+def test_a_step_the_plan_did_not_foresee_costs_only_its_real_time(monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr(util.time, "perf_counter", clock)
+    with util.invocation_bar(PLAN2) as ib:
+        ib.start("syn versions")             # not in the plan
+        clock.now += 3.0
+        assert ib._eta_str() == "00:10"      # no prediction to credit against
+        ib.finish()
+        assert ib.pred_done == 0.0 and ib.real_done == pytest.approx(3.0)
+        assert ib._eta_str() == "00:10"      # speed stays at face value
 
 
 def test_invocation_bar_tracks_step_count():
-    with util.invocation_bar(10.0, 3) as ib:
+    with util.invocation_bar({"one": 4.0, "two": 3.0, "three": 3.0}) as ib:
         ib.start("one")
         assert ib.step_no == 1
         ib.finish()
@@ -381,7 +427,7 @@ def test_invocation_bar_shows_the_step_count_not_predicted_seconds():
     # n/total (predicted-vs-actual seconds) still pace the bar's fill/ETA,
     # but a reader wants "how many steps in", not a seconds total nobody
     # could predict precisely -- see corpus.build_invocation_plan
-    with util.invocation_bar(30000.0, 25) as ib:
+    with util.invocation_bar({"eurlex parse %d" % i: 1200.0 for i in range(25)}) as ib:
         for _ in range(4):
             ib.start("eurlex parse")
             ib.finish()
@@ -391,7 +437,7 @@ def test_invocation_bar_shows_the_step_count_not_predicted_seconds():
 
 
 def test_both_bars_columns_line_up():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("eurlex parse")
         util.status(12, 8326, "eurlex parse  ran 12  err 0  62022TJ0082")
         inner, outer = str(util._inner), str(ib.bar)
@@ -404,7 +450,7 @@ def test_outer_bar_measures_ncols_the_same_way_as_the_inner_bar():
     # bar-open time, and never again, so the two bars' lines could end up
     # different widths (right edges out of line with each other) on an
     # unresized terminal, wherever that one-time measurement landed
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         assert ib.bar.dynamic_ncols
         assert util._inner is None or util._inner.dynamic_ncols
         ib.start("eurlex parse")
@@ -417,7 +463,7 @@ def test_status_refreshes_the_outer_bar_between_steps():
     # not per stage) -- it must piggyback a refresh so the outer bar's
     # elapsed time visibly progresses instead of sitting frozen until the
     # next step starts, which reads as stuck rather than "elapsed"
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("eurlex parse")
         calls = []
         ib.bar.refresh = lambda *a, **kw: calls.append(1)
@@ -426,7 +472,7 @@ def test_status_refreshes_the_outer_bar_between_steps():
 
 
 def test_status_falls_back_to_the_plain_line_once_the_bar_closes():
-    with util.invocation_bar(1.0, 1):
+    with util.invocation_bar({"one": 0.5, "two": 0.5}):
         pass
     buf = io.StringIO()
     util.status(1, 10, "back to normal", stream=buf)
@@ -439,7 +485,7 @@ def test_status_falls_back_to_the_plain_line_once_the_bar_closes():
 # --------------------------------------------------------------------------
 
 def test_invocation_bar_redirects_print_through_tqdm_write(capsys):
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         assert sys.stdout is not sys.__stdout__     # redirected for the duration
         ib.start("sfs parse")
         print("parse sfs: up to date -- skipped")
@@ -450,7 +496,7 @@ def test_invocation_bar_redirects_print_through_tqdm_write(capsys):
 
 def test_streams_are_restored_after_the_bar_closes(capsys):
     before_out, before_err = sys.stdout, sys.stderr
-    with util.invocation_bar(1.0, 1):
+    with util.invocation_bar({"one": 0.5, "two": 0.5}):
         pass
     assert sys.stdout is before_out and sys.stderr is before_err
 
@@ -458,13 +504,13 @@ def test_streams_are_restored_after_the_bar_closes(capsys):
 def test_streams_are_restored_even_if_the_body_raises():
     before_out, before_err = sys.stdout, sys.stderr
     with pytest.raises(RuntimeError):
-        with util.invocation_bar(1.0, 1):
+        with util.invocation_bar({"one": 0.5, "two": 0.5}):
             raise RuntimeError("boom")
     assert sys.stdout is before_out and sys.stderr is before_err
 
 
 def test_a_bare_newline_print_does_not_open_a_blank_line(capsys):
-    with util.invocation_bar(1.0, 1):
+    with util.invocation_bar({"one": 0.5, "two": 0.5}):
         print()                        # print()'s own trailing "\n" content
     assert capsys.readouterr().out == ""
 
@@ -481,7 +527,7 @@ def test_invocation_bar_falls_back_to_a_no_op_off_a_tty(monkeypatch):
     monkeypatch.setattr(util, "_stderr_is_a_tty", lambda: False)
     stdout_before = sys.stdout
     buf = io.StringIO()
-    with util.invocation_bar(10.0, 2) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         assert util._outer is None
         assert sys.stdout is stdout_before           # no redirect installed
         ib.start("sfs parse")                        # no-op, must not raise
@@ -512,7 +558,7 @@ def test_invocation_bar_falls_back_to_a_no_op_off_a_tty(monkeypatch):
 
 
 def test_cost_paced_bar_shows_the_real_document_count_not_the_work_totals():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.status(362, 5000, "forarbete parse  ran 362  err 0  prop/1915-133",
                    work=(172927.0, 178333.0))
         rendered = str(util._inner)
@@ -520,7 +566,7 @@ def test_cost_paced_bar_shows_the_real_document_count_not_the_work_totals():
     assert "172927" not in rendered and "178333" not in rendered
 
 def test_nested_bar_leads_with_plain_elapsed_time():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.status(1, 5, "item", work=(1.0, 2.0))
         rendered = str(util._inner)
     assert rendered.startswith("00:00: ")
@@ -528,7 +574,7 @@ def test_nested_bar_leads_with_plain_elapsed_time():
 
 
 def test_nested_bar_eta_is_a_labelled_field_with_no_percentage():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.status(362, 5000, "forarbete parse  ran 362  err 0  prop/1915-133",
                    work=(172927.0, 178333.0))
         rendered = str(util._inner)
@@ -537,7 +583,7 @@ def test_nested_bar_eta_is_a_labelled_field_with_no_percentage():
 
 
 def test_cost_paced_bar_never_shows_the_raw_work_totals():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.status(362, 5000, "forarbete parse  ran 362  err 0  prop/1915-133",
                    work=(172927.0, 178333.0))
         rendered = str(util._inner)
@@ -546,7 +592,7 @@ def test_cost_paced_bar_never_shows_the_raw_work_totals():
 
 
 def test_item_count_bar_still_shows_a_real_n_of_total():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.status(5, 10, "some item")
         rendered = str(util._inner)
     assert "5/10" in rendered
@@ -556,7 +602,7 @@ def test_nested_bar_formats_cost_totals_with_fixed_precision():
     # even though n/total are no longer printed, the bar fill and ETA are
     # still computed from them -- so a raw, unbounded-precision float must
     # never reach the rendered line through any other field either
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.status(1, 5, "forarbete parse  ran 923  err 0  prop/1960-126",
                    work=(166212.635, 178363.911))
         rendered = str(util._inner)
@@ -564,7 +610,7 @@ def test_nested_bar_formats_cost_totals_with_fixed_precision():
 
 
 def test_nested_bar_never_shows_the_rate_as_seconds_per_second():
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.status(1, 5, "item", work=(1.0, 2.0))
         rendered = str(util._inner)
     assert "s/s" not in rendered
@@ -575,14 +621,14 @@ def test_current_stage_bar_renders_above_the_invocation_bar():
     # tqdm's own convention: position 0 is the anchor row (topmost among
     # bars opened together), each higher `position=` one row further down --
     # stored internally negated, so a *higher* .pos is the row further up
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("forarbete parse")
         util.status(1, 5, "item")
         assert util._inner.pos > ib.bar.pos
 
 
 def test_nested_bar_drops_the_outer_bar_s_own_label_prefix():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("forarbete parse")
         util.status(923, 5000, "forarbete parse  ran 923  err 0  prop/1960-126")
         rendered = str(util._inner)
@@ -591,7 +637,7 @@ def test_nested_bar_drops_the_outer_bar_s_own_label_prefix():
 
 
 def test_nested_bar_description_has_a_consistent_width():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("forarbete parse")
         util.status(1, 5, "forarbete parse  ran 923  err 0  prop/1960-126")
         short = util._inner.desc
@@ -644,7 +690,7 @@ def test_narrow_terminal_line_still_fits_without_tqdm_s_raw_truncation(monkeypat
         monkeypatch.setattr(shutil, "get_terminal_size",
                             lambda *a, _n=ncols: os.terminal_size((_n, 24)))
         w = util._desc_width(None)
-        with util.invocation_bar(10.0, 1):
+        with util.invocation_bar(PLAN2):
             util.status(6167, 11247, "eurlex parse  ran 6167  err 0  32023R1542",
                        work=(2000.0, 30000.0))
             util._inner.set_description_str(
@@ -659,7 +705,7 @@ def test_outer_bar_also_fits_at_a_phone_tmux_pane_width(monkeypatch):
     for ncols in (63, 79):
         monkeypatch.setattr(shutil, "get_terminal_size",
                             lambda *a, _n=ncols: os.terminal_size((_n, 24)))
-        with util.invocation_bar(30000.0, 25) as ib:
+        with util.invocation_bar({"eurlex parse %d" % i: 1200.0 for i in range(25)}) as ib:
             ib.start("eurlex parse")
             w = util._desc_width(ib._file)
             ib.bar.set_description_str("eurlex parse"[:w].ljust(w))
@@ -679,7 +725,7 @@ def test_outer_bar_also_fits_at_a_phone_tmux_pane_width(monkeypatch):
 @pytest.mark.skipif(not hasattr(signal, "SIGWINCH"), reason="Unix only")
 def test_invocation_bar_installs_and_restores_a_sigwinch_handler():
     prior = signal.getsignal(signal.SIGWINCH)
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         assert signal.getsignal(signal.SIGWINCH) is not prior
     assert signal.getsignal(signal.SIGWINCH) is prior
 
@@ -691,7 +737,7 @@ def test_sigwinch_handler_only_sets_a_flag_never_writes():
     # would write to next, and reentering a buffered writer from inside
     # itself is a hard RuntimeError -- verified by actually reproducing that
     # arrival-during-a-write below, not just asserting the design intent
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         assert util._resize_pending is False
@@ -701,7 +747,7 @@ def test_sigwinch_handler_only_sets_a_flag_never_writes():
 
 @pytest.mark.skipif(not hasattr(signal, "SIGWINCH"), reason="Unix only")
 def test_pending_resize_clears_and_refreshes_both_bars_on_the_next_status_call():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         os.kill(os.getpid(), signal.SIGWINCH)
@@ -732,7 +778,7 @@ def test_sigwinch_arriving_mid_write_does_not_crash():
         def fileno(self):
             return self._real.fileno()
 
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("eurlex parse")
         ib.bar.fp = _SignalOnFirstWrite(ib.bar.fp)
         util.status(1, 5, "item", work=(1.0, 2.0))
@@ -748,7 +794,7 @@ def test_resize_recovery_does_not_desync_the_two_bars_cursor_positions():
     # later refresh kept opening a new line forever instead of overwriting.
     # tqdm's own `external_write_mode` is the coordinated version; this pins
     # that each bar's own relative position (`.pos`) is unchanged by it.
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         before = (util._inner.pos, ib.bar.pos)
@@ -768,7 +814,7 @@ def test_resize_recovery_does_not_desync_the_two_bars_cursor_positions():
 # --------------------------------------------------------------------------
 
 def test_reset_worker_state_clears_the_inherited_bar_globals():
-    with util.invocation_bar(10.0, 1) as ib:
+    with util.invocation_bar(PLAN2) as ib:
         ib.start("eurlex parse")
         util.status(1, 5, "item")
         assert util._outer is not None and util._inner is not None  # inherited by a fork
@@ -785,8 +831,62 @@ def test_reset_worker_state_makes_write_use_its_plain_fallback():
     # *parent's* bar objects, racing the parent's own concurrent writes to
     # the same fd. After the reset, write() takes its ordinary
     # print-and-break path instead.
-    with util.invocation_bar(10.0, 1):
+    with util.invocation_bar(PLAN2):
         util.reset_worker_state()
         buf = io.StringIO()
         util.write("worker warning", stream=buf)
         assert buf.getvalue() == "\nworker warning\n"
+
+
+# --------------------------------------------------------------------------
+# how many steps the run has decides which shape it gets: two or more draw the
+# outer bar, one keeps the plain single line
+# --------------------------------------------------------------------------
+
+def test_a_single_step_run_keeps_the_plain_line():
+    # `lagen all generate` / `lagen sfs relate` run one step; an outer bar
+    # reading "1/1" for the whole run only repeats what the step's own
+    # counter already says
+    buf = io.StringIO()
+    with util.invocation_bar({"generate": 10.0}) as ib:
+        assert util._outer is None
+        ib.start("generate")
+        util.status(1, 10, "generate", stream=buf)
+    assert buf.getvalue().startswith("\r(1/10) generate")
+
+
+def test_two_steps_open_the_outer_bar():
+    with util.invocation_bar(PLAN2) as ib:
+        assert util._outer is ib
+
+
+def test_step_announces_and_closes_one_step_of_the_run():
+    with util.invocation_bar(PLAN2) as ib:
+        with util.step("sfs relate"):
+            assert ib.step_no == 1
+            assert ib.current_label == "sfs relate"
+        assert ib.real_done >= 0.0
+        with util.step("dv relate"):
+            assert ib.step_no == 2
+
+
+def test_step_is_a_no_op_without_a_bar():
+    # the same call sites serve `lagen all relate` (a bar) and `lagen sfs
+    # relate` (none), so step() has to do nothing at all when none is open
+    assert util._outer is None
+    with util.step("sfs relate"):
+        pass
+    assert util._outer is None
+
+
+def test_the_outer_total_follows_the_real_step_count():
+    # the plan predicts the step sequence the way it predicts its seconds; a
+    # step the planner read differently is still a step that ran, and the bar
+    # must not render "3/2"
+    with util.invocation_bar(PLAN2) as ib:
+        for label in ("a", "b", "c"):
+            with util.step(label):
+                pass
+        assert ib.step_no == 3
+        assert ib.total_steps == 3
+        assert ib.bar.total == 3

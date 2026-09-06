@@ -716,8 +716,11 @@ def localize_group(gaps, pdf_path, src, model=None, author=llm.author,
         if not remaining:
             break
         log("%s: rendering page image(s) %d-%d" % (src, chunk[0], chunk[-1]))
+        # may_render: this is the build rendering its own inputs, not a
+        # request that has to show where it came from (api/auth.from_own_page)
         images = [facsimile.cached("sfs", src, pdf_path, p,
-                                   dpi=facsimile.DPI).read_bytes()
+                                   dpi=facsimile.DPI,
+                                   may_render=True).read_bytes()
                   for p in chunk]
         image_sizes = {page: facsimile.png_size(image)
                        for page, image in zip(chunk, images, strict=True)}
@@ -902,7 +905,8 @@ def roadsign_boxes(pdf_path, src):
         designators = [l for l in designators if abs(l.runs[0].left - col1) <= 3]
         foot, pitch = max(l.top for l in lines), _line_pitch(lines)
         with Image.open(facsimile.cached("sfs", src, pdf_path, pageno,
-                                         dpi=facsimile.DPI)) as page_png:
+                                         dpi=facsimile.DPI,
+                                         may_render=True)) as page_png:
             page_image = page_png.convert("L")
             # the ruler both tools share: this page as poppler *renders* it,
             # never `pdfinfo`'s size (see pdftext.page_boxes)

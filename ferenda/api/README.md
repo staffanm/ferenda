@@ -103,6 +103,17 @@ Det interna API:t bär inloggningen (`/auth/*`), de tre redigerarna
 (`/pdf/*`). Ops-panelen `/ops` behåller sin egen sökväg men har samma två
 grindar: utanför det publika schemat och bara samma origin.
 
+**Ett undantag från "vem som helst, varifrån som helst":
+faksimil-renderingen.** `/api/v1/facsimile` och `/api/v1/sfs-graphic` lämnar
+ut en redan renderad PNG till vem som helst, men *startar* en rendering bara
+för en begäran som visar att den kommer från en lagen.nu-sida
+(`auth.from_own_page`: `Sec-Fetch-Site: same-origin`, eller en `Referer` på vår
+egen värd). Andra får `403`. En rendering är en sekund poppler på en arbetstråd,
+och den 2026-09-05 tog skrapare alla 40 trådarna. Det är ingen åtkomstkontroll —
+bilden är publik så snart den finns — utan ett golv under hur mycket CPU ett
+skript kan lägga beslag på. En tredjepartsklient som vill ha en osparad sida
+kan gå via `/api/v1/pdf`, som köar renderingen i stället.
+
 **Samma origin gäller allt internt, inte bara skrivningarna.** Grinden
 (`auth.same_origin`) avvisar en begäran vars `Sec-Fetch-Site` säger att en
 annan sida gjorde den, eller vars `Origin` inte är vår egen — med `403`. En

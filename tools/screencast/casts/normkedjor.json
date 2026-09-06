@@ -1,0 +1,14 @@
+{"name": "normkedjor", "steps": [
+ {"goto": "/celex/32016L0097"},
+ {"highlight": "dl.meta dd:has(strong.here)", "hold": 300},
+ {"caption": "Normkedja: direktiv → lag och förordning → föreskrift", "wait": 3000},
+ {"click": "dl.meta a[href='/fffs/2018:10']"},
+ {"caption": "Föreskriften, med samma kedja från andra hållet", "wait": 3000},
+ {"goto": "/2025:400#K11P1"},
+ {"click": "details.rail-sec[data-sec='bemyndigande'] summary"},
+ {"caption": "Föreskrifter meddelade med stöd av denna paragraf", "wait": 2500},
+ {"goto": "/begrepp/L%C3%A4kemedel"},
+ {"click": "details"},
+ {"caption": "På begreppssidan: en kedja per legaldefinition", "wait": 3000},
+ {"caption": "", "wait": 500}
+]}

@@ -13,13 +13,16 @@ from ferenda.sfs.asgit import (
     Change,
     Event,
     RebuildRequired,
+    _current_cutoff,
     collect,
     cycle_members,
+    definite,
     email_slug,
     event_dates,
     existing_ledger,
     export,
     identities,
+    is_lag,
     message,
     misfiled_as,
     ordered_events,
@@ -28,6 +31,7 @@ from ferenda.sfs.asgit import (
     scope_id,
     snapshot_text,
     stream,
+    subject,
     transition_records,
     ungroup,
 )
@@ -68,14 +72,90 @@ def test_event_dates_fallback_chain():
 
 def test_identities_from_forarbete_signers_and_fallbacks():
     ev = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194",
-               rskr="Rskr. 2020/21:387")
+               rskr="Rskr. 2020/21:387",
+               titles={"2018:585": "Säkerhetsskyddslag (2018:585)"})
     author, committer = identities(ev, _meta)
     assert author == ("Stefan Löfven", "stefan.lofven@lagen.nu")
     assert committer == ("Andreas Norlén", "andreas.norlen@lagen.nu")
+    # the same proposition followed by a förordning alone: riksdagen decided
+    # nothing there, the minister authors and commits
+    ev = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194",
+               rskr="Rskr. 2020/21:387",
+               titles={"2021:955": "Säkerhetsskyddsförordning (2021:955)"})
+    assert identities(ev, _meta) == (("Stefan Löfven", "stefan.lofven@lagen.nu"),
+                                     ("Stefan Löfven", "stefan.lofven@lagen.nu"))
     # unknown förarbeten -> the corpus fallbacks, never a guessed identity
-    ev = Event(key="SFS 1962:700")
+    ev = Event(key="SFS 1962:700", titles={"1962:700": "Brottsbalk (1962:700)"})
     assert identities(ev, _meta) == (("Regeringen", "regeringen@lagen.nu"),
                                      ("Riksdagen", "riksdagen@lagen.nu"))
+    # a förordning is the government's alone: it authors and commits
+    ev = Event(key="SFS 2024:216", titles={
+        "2020:486": "Förordning (2020:486) om miljö- och trafiksäkerhetskrav"})
+    assert identities(ev, _meta) == (("Regeringen", "regeringen@lagen.nu"),
+                                     ("Regeringen", "regeringen@lagen.nu"))
+    # the grundlagar are riksdagen's whatever their title says
+    ev = Event(key="SFS 2018:1801", titles={
+        "1949:105": "Tryckfrihetsförordning (1949:105)"})
+    assert identities(ev, _meta)[1] == ("Riksdagen", "riksdagen@lagen.nu")
+
+
+def test_definite_title_and_lag_detection():
+    assert definite("Lag (2022:1) om foo") == "lagen (2022:1) om foo"
+    assert definite("Brottsbalk (1962:700)") == "brottsbalken (1962:700)"
+    assert definite("Förordning (2020:486) om bilar") == "förordningen (2020:486) om bilar"
+    assert definite("Kungörelse (1966:436) om x") == "kungörelsen (1966:436) om x"
+    assert definite("Tillkännagivande (2023:1) av y") == "tillkännagivandet (2023:1) av y"
+    assert definite("Tryckfrihetsförordning (1949:105)") == "tryckfrihetsförordningen (1949:105)"
+    assert definite("Riksdagsordning (2014:801)") == "riksdagsordningen (2014:801)"
+    assert definite("Skattebrottslag (1971:69)") == "skattebrottslagen (1971:69)"
+    assert is_lag("Lag (2022:1) om foo") and is_lag("Brottsbalk (1962:700)")
+    assert is_lag("Tryckfrihetsförordning (1949:105)")
+    assert is_lag("Kungörelse (1974:152) om beslutad ny regeringsform")
+    assert not is_lag("Förordning (2020:486) om bilar")
+    assert not is_lag("Kungörelse (1966:436) om x")
+
+
+def test_subject_names_the_act_then_the_proposition_as_far_as_it_fits():
+    lag = Change(path="2018/585.txt", src=None, basefile="2018:585",
+                 title="Säkerhetsskyddslag (2018:585)", cutoff="2021:952")
+    ev = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194", changes=[lag])
+    assert subject(ev, {"title": "Ett starkare skydd"}) \
+        == "ändring i säkerhetsskyddslagen (2018:585) (Ett starkare skydd)"
+    assert subject(ev, {"title": "Ett starkare skydd för Sveriges säkerhet"}) \
+        == "ändring i säkerhetsskyddslagen (2018:585) (Ett starkare skydd för…)"
+    # a title that does not fit is cut at a word, never past column 72
+    long = "Ett starkare skydd för Sveriges säkerhet och för allting annat också"
+    s = subject(ev, {"title": long})
+    assert s.endswith("…)") and len(s) <= 72
+    # no room for anything meaningful: the act alone
+    wide = Change(path="2018/585.txt", src=None, basefile="2018:585",
+                  title="Lag (2018:585) om " + "x" * 60, cutoff="2021:952")
+    ev2 = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194", changes=[wide])
+    assert subject(ev2, {"title": long}) == "ändring i lagen (2018:585) om " + "x" * 60
+    # a new act is the main act of its event, and m.fl. counts the rest
+    new = Change(path="2021/1.txt", src=None, basefile="2021:1",
+                 title="Lag (2021:1) om ny sak", cutoff="2021:1", add=True)
+    ev3 = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194",
+                changes=[lag, new], deletes=[("1996/627.txt", "1996:627", "2021:1")])
+    assert subject(ev3, {"title": "Ny sak"}) == "Lag (2021:1) om ny sak m.fl. (Ny sak)"
+    # an event holding a förordning and a lag reads as the lag's
+    forordning = Change(path="2010/1.txt", src=None, basefile="2010:1",
+                        title="Förordning (2010:1) om foo", cutoff="2021:952")
+    ev3b = Event(key="SFS 2021:952", changes=[forordning, lag])
+    assert subject(ev3b, None) == \
+        "ändring i säkerhetsskyddslagen (2018:585) m.fl. (SFS 2021:952)"
+    # two transitions of one act (an event with two cutoffs) are not "m.fl."
+    twice = Change(path="2018/585.txt", src=None, basefile="2018:585",
+                   title="Säkerhetsskyddslag (2018:585)", cutoff="2021:953")
+    ev3c = Event(key="Prop. 2020/21:194", prop="Prop. 2020/21:194", changes=[lag, twice])
+    assert subject(ev3c, {"title": "Ny sak"}) == \
+        "ändring i säkerhetsskyddslagen (2018:585) (Ny sak)"
+    # without a proposition the amending act's own number takes the slot
+    ev4 = Event(key="SFS 2021:952", changes=[lag])
+    assert subject(ev4, None) == "ändring i säkerhetsskyddslagen (2018:585) (SFS 2021:952)"
+    ev5 = Event(key="SFS 2021:1", deletes=[("1996/627.txt", "1996:627", "2021:1")],
+                titles={"1996:627": "Säkerhetsskyddslag (1996:627)"})
+    assert subject(ev5, None) == "upphävande av säkerhetsskyddslagen (1996:627) (SFS 2021:1)"
 
 
 def test_message_composition():
@@ -89,7 +169,11 @@ def test_message_composition():
                deletes=[("1998/204.txt", "1998:204", "2018:218")])
     msg = message(ev, _meta)
     lines = msg.splitlines()
-    assert lines[0] == ("Prop. 2020/21:194: Ett starkare skydd för Sveriges "
+    assert lines[0] == ("ändring i säkerhetsskyddslagen (2018:585) m.fl. "
+                        "(Ett starkare skydd…)")
+    assert len(lines[0]) <= 72
+    assert lines[1] == ""
+    assert lines[2] == ("Prop. 2020/21:194: Ett starkare skydd för Sveriges "
                         "säkerhet")
     assert "föreslår regeringen ändringar" in msg          # the ingress body
     assert ("SFS 2018:585: Säkerhetsskyddslag (2018:585) -- ändrad t.o.m. "
@@ -103,6 +187,32 @@ def test_message_composition():
     records = transition_records(ev, _meta)
     assert {r["id"] for r in records} == {
         "write:2018:585@2021:952", "delete:1998:204@2018:218"}
+
+
+def test_message_dates_a_pre_1970_commit_explicitly():
+    """The git ident date clamps to 1970-01-01 for a pre-1970 event (GitHub
+    rejects a negative timestamp), so the true date must survive in the
+    message -- one line when author and committer dates agree, two otherwise."""
+    ev = Event(key="SFS 1686:0903", ikraft="1686-07-01",
+               changes=[Change(path="1686/0903.txt", src=None,
+                               basefile="1686:0903", title="Kyrkolag (1686:0903)",
+                               cutoff="1686:0903", add=True, body_hash="0" * 64)])
+    msg = message(ev, _meta)
+    assert msg.endswith("saknas i registret).\n\nFörfattardatum: 1686-07-01\n")
+    assert "Incheckningsdatum" not in msg
+    ev = Event(key="SFS 1969:78", utfardad="1969-03-21", ikraft="1970-01-01")
+    msg = message(ev, _meta)
+    assert msg.endswith("\nFörfattardatum: 1969-03-21\n")
+    assert "Incheckningsdatum" not in msg
+    ev = Event(key="SFS 1969:78", utfardad="1969-03-21", ikraft="1969-07-01")
+    msg = message(ev, _meta)
+    assert msg.endswith("\nFörfattardatum: 1969-03-21\nIncheckningsdatum: 1969-07-01\n")
+    # the stream itself never emits a negative ident timestamp
+    ev = Event(key="SFS 1686:0903", ikraft="1686-07-01",
+               titles={"1686:0903": "Kyrkolag (1686:0903)"})
+    header = next(stream({ev.key: ev}, _meta))
+    assert b"author Regeringen <regeringen@lagen.nu> 0 +0000\n" in header
+    assert b"committer Riksdagen <riksdagen@lagen.nu> 0 +0000\n" in header
 
 
 def test_message_add_commit_notes_consolidation_caveat():
@@ -240,6 +350,87 @@ def test_an_unreadable_current_download_still_refuses_the_corpus(export_corpus):
     assert not repo.exists()
 
 
+def test_current_cutoff_prefers_the_register_but_never_the_repealer(tmp_path):
+    def cutoff(header, register, repealer=None, basefile="1966:436"):
+        path = tmp_path / "436.json"
+        path.write_text(json.dumps(_source(basefile, header, "1 § Text.",
+                                           register)), encoding="utf-8")
+        return _current_cutoff(path, basefile, repealer)
+
+    # a stale (or mistyped) header loses to a newer register entry
+    assert cutoff("2023:216", [("2023:69", "ändr. 13 §"),
+                               ("2024:216", "ändr. 3 a §")]) == "2024:216"
+    # the header wins when it is the newer of the two
+    assert cutoff("2024:216", [("2023:69", "ändr. 13 §")]) == "2024:216"
+    # a bare header on a repealed act: the newest amendment, never the
+    # repealing act (matched by number -- its wording varies)
+    register = [("1986:176", "ändr. 8, 11 §§"), ("1990:717", "utgår")]
+    assert cutoff("1966:436", register, repealer="1990:717") == "1986:176"
+    # a header that names the repealer names no cutoff at all
+    assert cutoff("1990:717", register, repealer="1990:717") == "1986:176"
+    # an ikraftträdandeförfattning changes no word; a withdrawn entry is gone
+    assert cutoff("1991:854", [("1991:878", "ikrafttr. av 1991:854")]) \
+        == "1991:854"
+    assert cutoff("1991:854", [("1991:900", "ändr. 1 §", True)]) == "1991:854"
+    # nothing usable in the register: the header (or the act itself) stands
+    assert cutoff("1990:717", [("1990:717", "upph.")], repealer="1990:717") \
+        == "1966:436"
+
+
+def test_a_repealed_act_whose_header_names_the_repealer_keeps_its_text(
+        export_corpus):
+    # 57 repealed acts name their own repeal as "t.o.m." cutoff. Read
+    # literally, the file's only write and its deletion share one commit and
+    # the wording never enters any tree.
+    basefile, repo = "1966:436", export_corpus / "repo"
+    _write_current(basefile, "1990:717", "8 § Lydelse vid upphävandet.",
+                   register=[("1986:176", "ändr. 8, 11 §§"),
+                             ("1990:717", "upph.")])
+    _write_artifact(basefile, ("1986:176", None), repealed_by="1990:717")
+
+    assert export([basefile], repo, forarbete_meta=_meta) == 2
+    subjects = _git(repo, "log", "--reverse", "--format=%s",
+                    gitledger.BRANCH).splitlines()
+    assert subjects == ["Testlag (1966:436) (SFS 1986:176)",
+                        "upphävande av testlagen (1966:436) (SFS 1990:717)"]
+    assert _git(repo, "show", gitledger.BRANCH + "~1:1966/436.txt") \
+        == "8 § Lydelse vid upphävandet."
+    assert "1966/436.txt" not in _git(repo, "ls-tree", "-r", "--name-only",
+                                      gitledger.BRANCH)
+
+
+def test_a_consolidation_cut_off_at_the_repeal_is_a_gap_not_a_cycle(
+        export_corpus):
+    # 2022:1464: repealed by 2023:657, whose transitional provisions 2025:1236
+    # later amended, so the current text postdates the repeal. Read literally
+    # the archived "t.o.m. 2023:657" wording puts the repealing act's commit
+    # both before 2025:1236's (a change) and after it (the deletion).
+    basefile, repo = "2022:1464", export_corpus / "repo"
+    _write_archive(basefile, "2023:584", "1 § Äldre lydelse.")
+    _write_archive(basefile, "2023:657", "1 § Lydelse vid upphävandet.")
+    _write_current(basefile, "2025:1236", "1 § Lydelse med ny p 3.",
+                   register=[("2023:584", "ändr. 1 §"), ("2023:657", "upph."),
+                             ("2025:1236", "ny p 3 övergångsbest.")])
+    _write_artifact(basefile, ("2023:584", None), ("2023:657", None),
+                    ("2025:1236", None), repealed_by="2023:657")
+
+    events, skipped, gaps = collect([basefile])
+    assert skipped == []
+    assert [g["error"] for g in gaps] == [
+        "archived consolidation is cut off at the repealing act SFS 2023:657"]
+    assert export([basefile], repo, forarbete_meta=_meta) == 3
+    subjects = _git(repo, "log", "--reverse", "--format=%s",
+                    gitledger.BRANCH).splitlines()
+    assert subjects == ["Testlag (2022:1464) (SFS 2023:584)",
+                        "ändring i testlagen (2022:1464) (SFS 2025:1236)",
+                        "upphävande av testlagen (2022:1464) (SFS 2023:657)"]
+    assert _git(repo, "show", gitledger.BRANCH + "~1:2022/1464.txt") \
+        == "1 § Lydelse med ny p 3."
+    # the dropped consolidation's amendment is named as folded, not lost
+    assert "innefattar även SFS 2023:657" in _git(
+        repo, "log", "-1", "--format=%b", gitledger.BRANCH + "~1")
+
+
 def test_misfiled_archive_snapshot_is_read_off_its_own_rubrik():
     # 20 archived consolidations hold another act's text, in one shifted chain
     # an old import left behind. Nothing but the snapshot's own Rubrik says so.
@@ -305,16 +496,19 @@ def _events(tmp_path):
     return {
         "SFS 1999:175": Event(
             key="SFS 1999:175", ikraft="1999-07-01",
+            titles={"1999:175": "Testlag (1999:175)"},
             changes=[Change(path="1999/175.txt", src=add, basefile="1999:175",
                             title="Testlag (1999:175)", cutoff="1999:175",
                             add=True, body_hash=_body_sha(add))]),
         "SFS 2001:9": Event(
             key="SFS 2001:9", utfardad="2001-01-11", ikraft="2001-02-01",
+            titles={"1999:175": "Testlag (1999:175)"},
             changes=[Change(path="1999/175.txt", src=amended,
                             basefile="1999:175", title="Testlag (1999:175)",
                             cutoff="2001:9", body_hash=_body_sha(amended))]),
         "SFS 2005:100": Event(
             key="SFS 2005:100", ikraft="2005-03-01",
+            titles={"1999:175": "Testlag (1999:175)"},
             deletes=[("1999/175.txt", "1999:175", "2005:100")]),
     }
 
@@ -330,8 +524,8 @@ def test_stream_golden(tmp_path):
 commit refs/heads/main
 author Regeringen <regeringen@lagen.nu> 930830400 +0000
 committer Riksdagen <riksdagen@lagen.nu> 930830400 +0000
-data 148
-SFS 1999:175: Testlag (1999:175)
+data 134
+Testlag (1999:175)
 
 SFS 1999:175: Testlag (1999:175)
 
@@ -344,8 +538,8 @@ data 26
 commit refs/heads/main
 author Regeringen <regeringen@lagen.nu> 979214400 +0000
 committer Riksdagen <riksdagen@lagen.nu> 981028800 +0000
-data 94
-SFS 2001:9: Testlag (1999:175)
+data 108
+ändring i testlagen (1999:175) (SFS 2001:9)
 
 SFS 1999:175: Testlag (1999:175) -- ändrad t.o.m. SFS 2001:9
 
@@ -356,8 +550,8 @@ data 22
 commit refs/heads/main
 author Regeringen <regeringen@lagen.nu> 1109678400 +0000
 committer Riksdagen <riksdagen@lagen.nu> 1109678400 +0000
-data 150
-SFS 2005:100: upphävande
+data 175
+upphävande av testlagen (1999:175) (SFS 2005:100)
 
 SFS 1999:175: upphävd genom SFS 2005:100
 
@@ -382,9 +576,9 @@ def test_stream_roundtrips_through_git_fast_import(tmp_path):
                          capture_output=True, text=True).stdout.splitlines()
     # git log shows the AUTHOR date: the amendment's utfärdandedatum
     # (2001-01-11), not its ikraftträdandedatum
-    assert log == ["2005-03-01 SFS 2005:100: upphävande",
-                   "2001-01-11 SFS 2001:9: Testlag (1999:175)",
-                   "1999-07-01 SFS 1999:175: Testlag (1999:175)"]
+    assert log == ["2005-03-01 upphävande av testlagen (1999:175) (SFS 2005:100)",
+                   "2001-01-11 ändring i testlagen (1999:175) (SFS 2001:9)",
+                   "1999-07-01 Testlag (1999:175)"]
     show = subprocess.run(["git", "-C", repo, "show", "main~1:1999/175.txt"],
                           check=True, capture_output=True, text=True).stdout
     assert show == "1 § Ändrad lydelse.\n"
@@ -416,16 +610,23 @@ def export_corpus(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _source(basefile, cutoff, text):
+def _source(basefile, cutoff, text, register=()):
+    """A beta-API download; `register` is its andringsforfattningar list as
+    (beteckning, anteckningar) pairs, or (beteckning, anteckningar, borttagen)."""
     return {"beteckning": basefile, "rubrik": "Testlag (%s)" % basefile,
             "fulltext": {"andringInford": "t.o.m. SFS %s" % cutoff,
-                         "forfattningstext": text}}
+                         "forfattningstext": text},
+            "andringsforfattningar": [
+                {"beteckning": e[0], "anteckningar": e[1],
+                 "borttagen": e[2] if len(e) > 2 else False}
+                for e in register]}
 
 
-def _write_current(basefile, cutoff, text):
+def _write_current(basefile, cutoff, text, register=()):
     path = layout.sfs_source(basefile)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_source(basefile, cutoff, text)), encoding="utf-8")
+    path.write_text(json.dumps(_source(basefile, cutoff, text, register)),
+                    encoding="utf-8")
 
 
 def _write_archive(basefile, cutoff, text):
@@ -435,17 +636,20 @@ def _write_archive(basefile, cutoff, text):
     path.write_text(json.dumps(_source(basefile, cutoff, text)), encoding="utf-8")
 
 
-def _write_artifact(basefile, *amendments):
+def _write_artifact(basefile, *amendments, repealed_by=None):
     entries = []
     for cutoff, prop in amendments:
         entries.append({"properties": {"dcterms:identifier": "SFS " + cutoff,
                                         "rpubl:ikrafttradandedatum": "2020-01-01"},
                         "forarbeten": [prop] if prop else []})
+    props = {"dcterms:title": "Testlag (%s)" % basefile}
+    if repealed_by:
+        props["rinfoex:upphavdAv"] = "SFS " + repealed_by
+        props["rpubl:upphavandedatum"] = "2021-01-01"
     path = layout.artifact("sfs", basefile)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"metadata": {"properties": {
-                        "dcterms:title": "Testlag (%s)" % basefile}},
-                        "amendments": entries}), encoding="utf-8")
+    path.write_text(json.dumps({"metadata": {"properties": props},
+                                "amendments": entries}), encoding="utf-8")
 
 
 def test_export_passes_over_an_empty_artifact_placeholder(export_corpus):

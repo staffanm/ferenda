@@ -39,10 +39,10 @@ def epoch(date, *, clamp=False):
     for one instead, confirmed against a pre-1970 EU regulation -- not merely
     a display quirk, since `git fsck` calls the commit corrupt). The clamp
     only affects the git-native date; eurlex still prints the true date in the
-    commit message. sfs does not clamp: its corpus is full of pre-1970
-    statutes, so clamping there would move thousands of author dates to
-    1970-01-01, and that is a decision for that export to make, not a side
-    effect of sharing this helper."""
+    commit message, and so does sfs (`Författardatum:` / `Incheckningsdatum:`
+    lines). GitHub's receive-side fsck rejects a negative timestamp outright
+    (`remote unpack failed: index-pack failed`), so an unclamped export cannot
+    be pushed there at all."""
     d = datetime.fromisoformat(date).replace(hour=12, tzinfo=timezone.utc)
     stamp = int(d.timestamp())
     return "%d +0000" % (max(0, stamp) if clamp else stamp)

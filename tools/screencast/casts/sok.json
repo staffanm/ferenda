@@ -1,0 +1,22 @@
+{"name": "sok", "steps": [
+ {"goto": "/1915:218"},
+ {"caption": "⌘K, Ctrl-K eller ett klick öppnar sökrutan", "wait": 1500},
+ {"click": "button.search"},
+ {"type": "avtalslagen 36 §", "wait": 1800},
+ {"caption": "En hänvisning fästs överst, med paragrafens text", "wait": 2500},
+ {"key": "Escape", "wait": 400},
+ {"click": "button.search"},
+ {"type": "GDPR art 32", "wait": 1800},
+ {"caption": "Samma sak med en EU-artikel", "wait": 2000},
+ {"key": "Escape", "wait": 400},
+ {"click": "button.search"},
+ {"type": "T 3-08", "wait": 1800},
+ {"caption": "… och med ett målnummer", "wait": 2000},
+ {"key": "Escape", "wait": 400},
+ {"click": "button.search"},
+ {"type": "cykelhjälm", "wait": 1800},
+ {"caption": "Vanliga ord söker hela materialet, ner på paragrafnivå", "wait": 2500},
+ {"click": ".search-refine", "wait": 2000},
+ {"caption": "Avgränsa: hela träfflistan, med filter på källa, typ och år", "wait": 3000},
+ {"caption": "", "wait": 500}
+]}

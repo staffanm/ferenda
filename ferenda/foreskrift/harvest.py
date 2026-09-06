@@ -41,6 +41,7 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress
 from ..lib.browser import CamoufoxBrowser
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk, write_record
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import (
@@ -286,8 +287,8 @@ def save_single_pdf_record(root, agency, ref, pdf_url, pdf_data, *, source_url=N
     ``resolve_direct`` source does. Source modules own how they discover and
     fetch the bytes; this shared tail owns the format they write.
     """
-    assert document_extension(pdf_data) == ".pdf", \
-        "%s body is not a PDF" % ref.identifier
+    if document_extension(pdf_data) != ".pdf":
+        raise UpstreamChanged("%s body is not a PDF" % ref.identifier)
     fs = ref.fs or agency.fs
     name = "%s-regulation.pdf" % slug(ref.basefile)
     compress.write_download(Path(root) / fs / name, pdf_data)
@@ -674,8 +675,9 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
         # date watermark; a shape that violates this is this module's own bug,
         # not a data quirk to route around
         year = ref.basefile.split("/", 1)[1].split(":")[0]
-        assert len(year) == 4 and year.isdigit(), \
-            "%s: basefile year %r is not a 4-digit year" % (ref.basefile, year)
+        if not (len(year) == 4 and year.isdigit()):
+            raise UpstreamChanged("%s: basefile year %r is not a 4-digit year"
+                                  % (ref.basefile, year))
         return ItemKey(
             basefile=ref.basefile,
             # the record lives under the document's own fs, which is agency.fs

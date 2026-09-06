@@ -14,6 +14,7 @@ from ferenda.lib import render as lib_render
 from ferenda.site import parse, render
 
 FIX = str(Path(__file__).resolve().parent / "files" / "sitecontent")
+MEDIA = Path(FIX) / "site" / "media"     # what a figure's target must be in
 
 
 def test_sfs_and_eurlex_schemes_resolve():
@@ -63,7 +64,7 @@ def test_spaced_dashes_convert_in_prose_but_never_in_code():
     # its hyphens -- the om pages document CLI flags
     blocks = parse.blocks("## Rubrik -- med inskott\n\n"
                           "texterna i sig -- de finns publicerade -- på "
-                          "andra håll, se `lagen --force`.", "om/x")
+                          "andra håll, se `lagen --force`.", "om/x", MEDIA)
     assert blocks[0].text == "Rubrik – med inskott"
     runs = blocks[1].runs
     assert runs[0] == "texterna i sig – de finns publicerade – på andra håll, se "
@@ -144,20 +145,20 @@ def test_an_html_comment_is_dropped_with_everything_it_encloses():
     # (U1). Both parsers now strip comments through lib.markdown.strip_comments.
     assert [b.runs for b in parse.blocks(
         "Synlig text.\n\n<!-- en notis\n\nsom sträcker sig över stycken -->\n\nOckså synlig.",
-        "om/x")] == [["Synlig text."], ["Också synlig."]]
+        "om/x", MEDIA)] == [["Synlig text."], ["Också synlig."]]
 
 
 def test_unmappable_markdown_names_the_basefile():
     # a construct with no block form must say so rather than drop the prose
     with pytest.raises(ValueError, match="om/x: block markdown 'blockquote'"):
-        parse.blocks("> citat", "om/x")
+        parse.blocks("> citat", "om/x", MEDIA)
 
 
 def test_an_empty_link_label_names_the_basefile():
     # `[](/a)` resolves its target but has nothing to hang it on, so the link
     # would vanish without trace
     with pytest.raises(ValueError, match="om/x: the link to '/a' has an empty"):
-        parse.blocks("se [](/a) här", "om/x")
+        parse.blocks("se [](/a) här", "om/x", MEDIA)
 
 
 def test_subdomain_page_relpath_is_explicit_not_a_passthrough():
@@ -316,3 +317,51 @@ def test_write_site_emits_expected_paths(tmp_path, monkeypatch):
     assert compress.exists(out / "subdomain" / "lagen.nu" / "jante.html")
     assert compress.exists(out / "dataset" / "sitenews" / "feed" / "index.html")
     assert compress.exists(out / "dataset" / "sitenews" / "feed.atom")
+
+
+def test_about_parses_a_standalone_image_and_a_webm_as_figures():
+    # `![alt](file "caption")` on its own line is a figure block; the extension
+    # decides between a still and a screencast, and the target is served from
+    # /media/ (the content repo's site/media/, copied out by write_media)
+    art = parse.artifact("om/lankning", FIX)
+    figures = [b for b in art["blocks"] if b["type"] in ("bild", "film")]
+    assert figures == [
+        {"type": "bild", "src": "/media/sok.png", "alt": "Sökrutan med tre träffar",
+         "caption": "Sökrutan, med en hänvisning fäst överst"},
+        {"type": "film", "src": "/media/sok.webm", "alt": "Sökningen som film",
+         "caption": None}]
+    html = render.render_about(art)
+    assert ('<figure class="bild"><img src="/media/sok.png" alt="Sökrutan med '
+            'tre träffar" loading="lazy"><figcaption>Sökrutan, med en '
+            'hänvisning fäst överst</figcaption></figure>') in html
+    assert ('<figure class="film"><video controls muted playsinline '
+            'preload="metadata" poster="/media/sok.png"><source '
+            'src="/media/sok.webm" type="video/webm">Sökningen som film</video>'
+            '</figure>') in html
+
+
+def test_an_image_inside_running_text_is_refused():
+    with pytest.raises(ValueError, match="no run form"):
+        parse.blocks("Se ![bild](a.png) här.", "om/x", MEDIA)
+
+
+def test_a_figure_whose_file_is_missing_is_refused():
+    # a typo or a recording not yet committed to the content repo would
+    # otherwise ship as a dead <img>; the parse names the page and the file
+    with pytest.raises(ValueError, match="om/x: image target 'sok.pmg' is not in"):
+        parse.blocks("![Sökrutan](sok.pmg)", "om/x", MEDIA)
+
+
+def test_a_film_without_its_poster_is_refused(tmp_path):
+    # the page names <name>.png as the poster; a .webm alone is a dead poster
+    (tmp_path / "ensam.webm").write_bytes(b"webm")
+    with pytest.raises(ValueError, match="om/x: the film 'ensam.webm' has no poster 'ensam.png'"):
+        parse.blocks("![Filmen](ensam.webm)", "om/x", tmp_path)
+
+
+def test_write_media_copies_the_content_repos_media_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(render.layout, "WIKI_ROOT", Path(FIX))
+    out = tmp_path / "out"
+    render.write_media(out)
+    assert (out / "media" / "sok.png").read_bytes() == b"png"
+    assert (out / "media" / "sok.webm").read_bytes() == b"webm"

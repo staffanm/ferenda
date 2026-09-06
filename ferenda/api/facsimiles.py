@@ -29,6 +29,7 @@ must fail loudly rather than read to a caller as "no such page".
 """
 
 import json
+import math
 import re
 import subprocess
 from pathlib import Path
@@ -46,10 +47,29 @@ from . import db
 FAX_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
+# What a public rectangle is rounded to, in PDF points. The cache is keyed by
+# the rounded bbox, so a caller who moves an edge by one point today mints a
+# new PNG; on a 4-point grid a page has 256 times fewer distinct crops, and no
+# reader can tell the difference -- 4 pt is under a millimetre and the crop is
+# shown at 300 DPI. The rounding grows the rectangle, never shrinks it, so a
+# figure never loses an edge to it.
+BBOX_GRID = 4
+
+
+def quantize_bbox(bbox):
+    """`bbox` snapped outward onto the `BBOX_GRID` lattice."""
+    x0, y0, x1, y1 = bbox
+    return [float(math.floor(x0 / BBOX_GRID) * BBOX_GRID),
+            float(math.floor(y0 / BBOX_GRID) * BBOX_GRID),
+            float(math.ceil(x1 / BBOX_GRID) * BBOX_GRID),
+            float(math.ceil(y1 / BBOX_GRID) * BBOX_GRID)]
+
+
 def parse_bbox(raw):
     """A ``bbox=x0,y0,x1,y1`` query value as the float list the crop renderer
-    takes, in PDF points from the page's top-left. A malformed or degenerate
-    rectangle is client input, so it is a 400 rather than an assertion."""
+    takes, in PDF points from the page's top-left, snapped onto `BBOX_GRID`. A
+    malformed or degenerate rectangle is client input, so it is a 400 rather
+    than an assertion."""
     parts = raw.split(",")
     if len(parts) != 4:
         raise HTTPException(400, "bbox needs four comma-separated numbers")
@@ -59,11 +79,11 @@ def parse_bbox(raw):
         raise HTTPException(400, "bbox coordinates must be numbers") from None
     if not facsimile.valid_bbox(bbox):
         raise HTTPException(400, "bbox must satisfy 0 <= x0 < x1, 0 <= y0 < y1")
-    return bbox
+    return quantize_bbox(bbox)
 
 
 def png_path(source, basefile, pdf, page, bbox, missing, *,
-             client_bbox=False, dpi):
+             client_bbox=False, dpi, may_render):
     """The cached facsimile PNG of one source-PDF page (or `bbox` of it at `dpi`)
     as a path on disk, rendering it on first request. `missing` is the 404 detail
     for a page the PDF does not have. `client_bbox` says the rectangle came from the
@@ -74,9 +94,22 @@ def png_path(source, basefile, pdf, page, bbox, missing, *,
     the page does with it, and the callers differ. A förarbete illustration is
     shown once at column width and nowhere else; a recovered SFS graphic is a
     thumbnail among hundreds that also opens full size; a crop under review is
-    shown once, beside the page it was cut from."""
+    shown once, beside the page it was cut from.
+
+    `may_render` has no default: every route that reaches this has to say
+    whether its caller may pay for a render, and a route added later must
+    answer the question rather than inherit an answer (rule:fail-fast)."""
     try:
-        png = facsimile.cached(source, basefile, pdf, page, bbox, dpi=dpi)
+        png = facsimile.cached(source, basefile, pdf, page, bbox, dpi=dpi,
+                               may_render=may_render)
+    except facsimile.RenderRefused as exc:
+        # 403 rather than 404: the page exists and the answer is honest about
+        # why it is withheld. It also makes the refusals countable in one log
+        # grep, which is how we will know whether the gate is set right.
+        raise HTTPException(403, str(exc)) from None
+    except facsimile.RenderBusy as exc:
+        raise HTTPException(503, str(exc),
+                            headers={"Retry-After": "10"}) from None
     except facsimile.OffPage:
         if not client_bbox:
             raise
@@ -211,13 +244,14 @@ def _dv_pdf(local):
 _PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _rs_pdf, _foreskrift_pdf, _sfs_pdf, _dv_pdf)
 
 
-def facsimile_path(local, sid, bbox=None):
+def facsimile_path(local, sid, bbox=None, *, may_render):
     """The facsimile PNG for page `sid` of the document at uri-local path
     `local` ("prop/2013/14:116"), rendering into the disk cache on first
     request. With `bbox`, just that rectangle of the page -- the same renderer
     and cache the SFS graphics layer crops its figures with, so a förarbete's
     illustration needs no extraction path of its own: the pixels are already
-    in the source PDF and this reads them where they are."""
+    in the source PDF and this reads them where they are. `may_render` is
+    `png_path`'s -- may this caller pay for a poppler run."""
     if ".." in local or sid < 1:
         raise HTTPException(404, "no such document: %r" % local)
     resolved = next(filter(None, (r(local) for r in _PDF_RESOLVERS)), None)
@@ -229,12 +263,14 @@ def facsimile_path(local, sid, bbox=None):
     # resolution as the page facsimile it is cut from
     return png_path(source, basefile, pdf, sid, bbox,
                     "%r has no page %d" % (local, sid),
-                    client_bbox=bbox is not None, dpi=facsimile.DPI)
+                    client_bbox=bbox is not None, dpi=facsimile.DPI,
+                    may_render=may_render)
 
 
-def facsimile_response(local, sid, bbox=None):
+def facsimile_response(local, sid, bbox=None, *, may_render):
     """`facsimile_path`'s PNG as an HTTP response."""
-    return FileResponse(facsimile_path(local, sid, bbox),
+    return FileResponse(facsimile_path(local, sid, bbox,
+                                       may_render=may_render),
                         media_type="image/png", headers=FAX_HEADERS)
 
 
@@ -252,7 +288,7 @@ def sfs_source_pdf(src: str) -> Path:
 # viewed statute + gap id; the reviewed .graphics layer holds the geometry AND
 # the provenance -- which amending SFS's PDF the region is cropped from (the act
 # that last set that wording), not the viewed statute's own PDF.
-def sfs_graphic_path(local, node, dpi):
+def sfs_graphic_path(local, node, dpi, *, may_render):
     """The cropped PNG for gap `node` of the SFS at uri-local `local`, its page,
     bbox and source PDF read from the statute's .graphics layer."""
     if ".." in local or not _RE_SFS_BASEFILE.match(local):
@@ -280,12 +316,14 @@ def sfs_graphic_path(local, node, dpi):
     # is no larger render to ask for, so `stor` cannot apply to it
     return png_path("sfs", src, pdf, page, bbox,
                     "SFS %s has no page %d" % (src, page),
-                    dpi=dpi if bbox else facsimile.DPI)
+                    dpi=dpi if bbox else facsimile.DPI,
+                    may_render=may_render)
 
 
-def sfs_graphic_response(local, node, dpi):
+def sfs_graphic_response(local, node, dpi, *, may_render):
     """`sfs_graphic_path`'s PNG as an HTTP response."""
-    return FileResponse(sfs_graphic_path(local, node, dpi),
+    return FileResponse(sfs_graphic_path(local, node, dpi,
+                                         may_render=may_render),
                         media_type="image/png", headers=FAX_HEADERS)
 
 
@@ -315,7 +353,17 @@ def subresource(path_qs):
     `facsimile.cached`, so going through the app to read it cost a full ASGI
     round trip per image for nothing (see the module docstring). Errors stay
     exceptions: the fetcher catches them, records the url, and the export
-    refuses to hand out a PDF that is missing a picture."""
+    refuses to hand out a PDF that is missing a picture.
+
+    `may_render=True` throughout, and it is the one way to reach a render
+    without coming from a lagen.nu page: `/api/v1/pdf` is public, so an
+    anonymous caller can print a document whose facsimiles are not cached yet.
+    Deliberate -- an export that skipped its pictures would be refused whole by
+    `pdf.render_document`, which is a worse answer than rendering them. What
+    bounds it is not this flag but `pdfjob`'s queue: two workers do every
+    render on this server, and a full queue or a wait past `SYNC_WAIT` is a 503
+    with a Retry-After. That is a far tighter ceiling than the 40-thread pool
+    the gate exists to protect."""
     url = urlsplit(path_qs)
     if url.path not in _SUBRESOURCE_PATHS:
         raise ValueError("no subresource at %s" % url.path)
@@ -324,13 +372,15 @@ def subresource(path_qs):
     if url.path == "/api/v1/facsimile":
         raw = query.get("bbox", [None])[0]
         png = facsimile_path(local, int(_one(query, "sid", url.path)),
-                             parse_bbox(raw) if raw else None)
+                             parse_bbox(raw) if raw else None,
+                             may_render=True)
     else:
         png = sfs_graphic_path(
             local, _one(query, "node", url.path),
             facsimile.CROP_DPI_LARGE
             if query.get("stor", ["0"])[0] not in ("0", "")
-            else facsimile.CROP_DPI)
+            else facsimile.CROP_DPI,
+            may_render=True)
     return png.read_bytes(), "image/png"
 
 

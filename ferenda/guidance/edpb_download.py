@@ -52,14 +52,14 @@ Stored per document under ``site/data/downloaded/guidance/edpb/{serie}/``: a
 import io
 import re
 import time
-import zipfile
 from datetime import date
 from functools import partial
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
+from ..lib import archive, compress
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import pdf_path, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, make_session, request
@@ -130,7 +130,8 @@ def sitemap_document_pages(html_texts):
             if match:
                 doctype, slug, lang = match.groups()
                 pages.setdefault((doctype, slug), {})[lang] = loc
-    assert pages, "the EDPB sitemap named no document pages at all"
+    if not pages:
+        raise UpstreamChanged("the EDPB sitemap named no document pages at all")
     return pages
 
 
@@ -150,7 +151,8 @@ def parse_page(html_text, url, lang):
     (which carry no file at all) are told apart from real document pages."""
     soup = BeautifulSoup(html_text, "html.parser")
     heading = soup.find("h1", class_="document-full__title")
-    assert heading is not None, "%s carries no document title" % url
+    if heading is None:
+        raise UpstreamChanged("%s carries no document title" % url)
     adopted = soup.select_one(".document-full__date time[datetime]")
     version = soup.select_one(".document-full__version")
     consultation = soup.select_one(".document-full__public-consultation a[href]")
@@ -235,18 +237,19 @@ def edpb_sync(root, serie, full=False, only=None, limit=None, delay=0.5):
         swedish = (_fetch_page(session, langs["sv"], "sv", delay)
                    if "sv" in langs else None)
         published = swedish if swedish and swedish["document"] else english
-        assert published["document"], (
-            "%s publishes no PDF in either language" % langs["en"])
+        if not published["document"]:
+            raise UpstreamChanged("%s publishes no PDF in either language" % langs["en"])
         # identity off the *English* page: it always states the number, and the
         # Swedish one sometimes drops it (the Swedish page for Guidelines 8/2022
         # is titled "Riktlinjer om fastställande av ansvarig tillsynsmyndighet…")
         number = series_number(english["titel"], english["document"]
                                or published["document"])
-        assert number, ("%s states no series number in its title (%r) or its "
-                        "file name -- an unnumbered guidance page is either a "
-                        "WP29 stub, which belongs to the wp scope, or a new "
-                        "shape this harvest has not seen"
-                        % (langs["en"], english["titel"]))
+        if not number:
+            raise UpstreamChanged("%s states no series number in its title (%r) or its "
+                   "file name -- an unnumbered guidance page is either a "
+                   "WP29 stub, which belongs to the wp scope, or a new "
+                   "shape this harvest has not seen"
+                   % (langs["en"], english["titel"]))
         record = {
             "basefile": basefile(serie, number), "serie": serie,
             "nummer": number,
@@ -284,7 +287,8 @@ def newsroom_documents(html_text, url):
         if re.search(r"redirection/document/\d+|document\.cfm\?doc_id=\d+",
                      target) and target not in links:
             links.append(target)
-    assert links, "newsroom item %s offers no download" % url
+    if not links:
+        raise UpstreamChanged("newsroom item %s offers no download" % url)
     return links
 
 
@@ -301,15 +305,15 @@ def swedish_member(data, number):
     carry the *country* code ``SE`` (its ZIP holds 22 members, one per official
     language bar English, and ``_SE`` is the only one that can be the Swedish
     of them). Both are read; nothing else in these archives ends that way."""
-    archive = zipfile.ZipFile(io.BytesIO(data))
+    zf = archive.open_zip(io.BytesIO(data))
     # no word boundary after the number: the revision runs straight on in most
     # of them ("wp243rev01_sv.pdf"), and only some space it ("wp248 rev.01_
     # sv.pdf"). What must not follow is another digit.
-    name = next((n for n in archive.namelist()
+    name = next((n for n in zf.namelist()
                  if re.match(r"wp\s*%s(?!\d)" % number, n, re.I)
                  and n.lower().endswith(("_sv.pdf", "_se.pdf"))
                  and "annex" not in n.lower()), None)
-    return archive.read(name) if name else None
+    return archive.read(zf, name) if name else None
 
 
 def _wp_document(session, item_url, number, delay):
@@ -330,18 +334,20 @@ def _wp_document(session, item_url, number, delay):
         data = request(session, "GET", link, timeout=300).content
         time.sleep(delay)
         if data[:2] == b"PK":
-            assert number, (
-                "%s serves a language archive, and the document it holds has "
-                "no WP number to name a member by -- the archive's members "
-                "have to be read before this one can take a version from it"
-                % item_url)
+            if not number:
+                raise UpstreamChanged(
+                    "%s serves a language archive, and the document it holds "
+                    "has no WP number to name a member by -- the archive's "
+                    "members have to be read before this one can take a "
+                    "version from it" % item_url)
             swedish = swedish_member(data, number)
             if swedish:
                 return "sv", link, lambda swedish=swedish: swedish
         elif english is None and document_extension(data) == ".pdf":
             english = (link, data)
-    assert english, ("newsroom item %s serves neither a Swedish version nor an "
-                     "English PDF" % item_url)
+    if not english:
+        raise UpstreamChanged("newsroom item %s serves neither a Swedish version nor an "
+               "English PDF" % item_url)
     return "en", english[0], lambda: english[1]
 
 
@@ -387,8 +393,8 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
             "source_url": wp.page, "dokument_url": document_url,
             "newsroom_url": NEWSROOM % wp.item,
         }, fetch))
-    assert pending or held or not only, \
-        "no endorsed WP29 document is called %s" % only
+    if not (pending or held or (not only)):
+        raise ValueError("no endorsed WP29 document is called %s" % only)
     seen, new = walk_records(root, pending, delay=delay, full=full, limit=limit,
                              scope="wp")
     return seen + held, new

@@ -32,6 +32,7 @@ paste into config.yml so a plaintext password is never written down.
 """
 
 import base64
+import getpass
 import hashlib
 import hmac
 import json
@@ -42,7 +43,7 @@ import time
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import config
 
@@ -55,7 +56,17 @@ COOKIE = "lagen_editor"
 # anonymous page load; the session cookie alone remains the credential.
 COOKIE_HINT = "lagen_editor_hint"
 SESSION_TTL = 14 * 24 * 3600          # two weeks; re-login after that
-PBKDF2_ROUNDS = 260_000               # OWASP-ish floor for pbkdf2-sha256
+# OWASP's current floor for pbkdf2-hmac-sha256. Only new hashes are minted at
+# this cost: the rounds travel inside the stored string, so a hash written at
+# 260,000 keeps verifying at 260,000 until it is re-minted. Measured at 50 ms
+# per verification on the dev box, and `_LOGIN_SEM` bounds how many run at once.
+PBKDF2_ROUNDS = 600_000
+
+# Login field ceilings. A password is hashed, so its length costs nothing to
+# store -- but an unbounded field is free work for an attacker, and uvicorn
+# reached directly does not have nginx's body limit in front of it.
+MAX_USERNAME = 64
+MAX_PASSWORD = 1024
 
 
 # --------------------------------------------------------------------------
@@ -245,6 +256,38 @@ def same_origin(request: Request):
         raise HTTPException(403, _CROSS_ORIGIN)
 
 
+def from_own_page(request: Request) -> bool:
+    """Whether a browser made this request from one of our own pages.
+
+    The mirror image of `same_origin`, and the two must not be confused.
+    `same_origin` refuses a request it can prove came from somewhere else, and
+    lets a headerless one through -- curl and the in-process client are callers
+    it wants to serve. This one asks for *proof* that the request came from a
+    page we served, and a headerless request has none. Anything that only reads
+    a URL out of a list answers False.
+
+    Two headers, because they fail in different directions:
+
+      * ``Sec-Fetch-Site: same-origin`` is sent by every current browser
+        loading a subresource of a page it is already on, and by nothing else.
+      * A ``Referer`` whose host is ours catches a browser too old to send the
+        first header. Our pages send it under the deployed
+        ``Referrer-Policy: strict-origin-when-cross-origin`` (set by the prod
+        vhost, and the browser default besides), which keeps the full URL on a
+        same-origin request and trims it to the bare origin cross-origin.
+
+    Neither header is a secret and either can be typed by hand. This is not
+    authentication and cannot be: it is a cheap way to tell a reader looking at
+    a page from a script walking a URL space, and it is only ever used to
+    decide who may pay for expensive work (`lib/facsimile.cached`), never who
+    may read something.
+    """
+    if request.headers.get("sec-fetch-site") == "same-origin":
+        return True
+    referer = request.headers.get("referer", "")
+    return bool(referer) and urlsplit(referer).netloc == request.url.netloc
+
+
 def require_editor(request: Request) -> Editor:
     """The single auth gate on every mutating endpoint. Editing off (no
     ``editor_secret``) -> 403 with a hint; anonymous/expired/unknown -> 401."""
@@ -344,8 +387,8 @@ _LOGIN_SEM = threading.BoundedSemaphore(_LOGIN_MAX_CONCURRENT)
 # --------------------------------------------------------------------------
 
 class LoginBody(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=MAX_USERNAME)
+    password: str = Field(max_length=MAX_PASSWORD)
 
 
 class Me(BaseModel):
@@ -414,9 +457,19 @@ def me(editor: Editor = Depends(require_editor)):
 # --------------------------------------------------------------------------
 
 def _main(argv):
-    if len(argv) != 2 or argv[0] != "hash":
-        sys.exit("usage: python -m ferenda.api.auth hash <password>")
-    print(hash_password(argv[1]))
+    """Mint a pwhash for config.yml.
+
+    The password is read twice from the terminal, never taken from the command
+    line: an argument lands in the shell history file and in every `ps` listing
+    on the box for as long as the process runs."""
+    if argv != ["hash"]:
+        sys.exit("usage: python -m ferenda.api.auth hash")
+    password = getpass.getpass("password: ")
+    if password != getpass.getpass("again: "):
+        sys.exit("the two entries differ")
+    if not password:
+        sys.exit("an empty password is not a password")
+    print(hash_password(password))
 
 
 if __name__ == "__main__":

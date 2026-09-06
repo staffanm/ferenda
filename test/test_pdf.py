@@ -135,17 +135,22 @@ def test_pdf_subresource_reads_the_facsimile_off_disk(client, tmp_path,
     png = tmp_path / "sid1.png"
     png.write_bytes(PNG_1X1)
     seen = []
-    monkeypatch.setattr(facsimiles, "facsimile_path",
-                        lambda local, sid, bbox=None:
-                        (seen.append((local, sid, bbox)), png)[1])
+
+    def stub(local, sid, bbox=None, *, may_render):
+        seen.append((local, sid, bbox, may_render))
+        return png
+
+    monkeypatch.setattr(facsimiles, "facsimile_path", stub)
     compress.write_text(
         tmp_path / "generated" / "1998:9999.html",
         _with_img("/api/v1/facsimile?uri=https%3A%2F%2Flagen.nu%2F1998%3A9999"
                   "&amp;sid=7"))
     r = client.get("/api/v1/pdf", params={"path": "/1998:9999"})
     assert r.status_code == 200 and r.content.startswith(b"%PDF-")
-    # the uri came back decoded to its catalog-local form, and sid as an int
-    assert seen == [("1998:9999", 7, None)]
+    # the uri came back decoded to its catalog-local form, and sid as an int.
+    # may_render is True: the export renders its own pages in-process, so the
+    # gate that keeps scrapers off poppler must never reach it.
+    assert seen == [("1998:9999", 7, None, True)]
 
 
 def test_pdf_subresource_outside_the_served_paths_is_503(client, tmp_path):
@@ -1112,3 +1117,27 @@ def test_paper_transform_holds_on_a_really_rendered_sfs_page(tmp_path):
                                   amendments=True, columns=2)
     start = compact.find_class("paragraf-start")[0]
     assert "paragraf-gutter" in start[0].get("class").split()
+
+
+def test_the_public_route_renders_through_the_bounded_queue(client, monkeypatch):
+    """`GET /api/v1/pdf` used to lay the document out on the request thread, so
+    a script asking for a thousand documents started a thousand WeasyPrint
+    runs. It goes through the same two-worker queue the background jobs use, so
+    a full queue is a 503 with a Retry-After rather than another render."""
+    monkeypatch.setattr(pdfjob, "MAX_LIVE_JOBS", 0)
+    r = client.get("/api/v1/pdf", params={"path": "/1998:9999",
+                                          "kontext": "dv"})
+    assert r.status_code == 503
+    assert r.headers["retry-after"] == "30"
+
+
+def test_a_render_that_outlives_the_wait_is_503_not_a_held_connection(
+        client, monkeypatch):
+    """The render keeps going into the cache; this connection does not wait for
+    it past `SYNC_WAIT`."""
+    monkeypatch.setattr(pdfjob.Job, "wait", lambda self, timeout: False)
+    r = client.get("/api/v1/pdf", params={"path": "/1998:9999",
+                                          "kontext": "forarbete"})
+    assert r.status_code == 503
+    assert r.headers["retry-after"] == "60"
+    assert "jobb" in r.json()["detail"]

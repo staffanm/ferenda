@@ -41,6 +41,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, freshness, layout, util
+from ..lib.errors import UpstreamChanged
 from ..lib.net import is_not_found, request
 from ..lib.util import write_atomic
 
@@ -115,7 +116,8 @@ def _svensk_pdf_url(session, year, nr):
     if not link:
         return None
     href = link.get("href")
-    assert isinstance(href, str), "%s: PDF link has non-string href" % doc
+    if not isinstance(href, str):
+        raise UpstreamChanged("%s: PDF link has non-string href" % doc)
     return urljoin(doc, href)
 
 

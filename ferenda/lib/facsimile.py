@@ -30,11 +30,14 @@ a broken host, and a 500 is the honest answer to it.
 import math
 import os
 import re
+import shutil
 import subprocess
 import tempfile
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 
-from . import layout, util
+from . import cachesweep, layout, util
 
 DPI = 150
 # What a crop is rendered at for the page it is printed on. Twice the page DPI:
@@ -109,6 +112,14 @@ def _pdftoppm(pdf_path, page, out_path, dpi, *crop):
     `out_path`. `mkstemp` reserves the temp name with O_EXCL, so it is unique
     per *call* -- two threads rendering the same page cannot write each
     other's file."""
+    with render_slot():
+        _run_pdftoppm(pdf_path, page, out_path, dpi, crop)
+    _evict_if_low()
+    return out_path
+
+
+def _run_pdftoppm(pdf_path, page, out_path, dpi, crop):
+    """The poppler call itself, inside a held render slot."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fd, root = tempfile.mkstemp(prefix=out_path.stem + ".tmp",
                                 dir=out_path.parent)
@@ -123,7 +134,6 @@ def _pdftoppm(pdf_path, page, out_path, dpi, *crop):
     finally:
         Path(root).unlink(missing_ok=True)
         png.unlink(missing_ok=True)   # only left behind by a failed render
-    return out_path
 
 
 def render_page(pdf_path, page, out_path):
@@ -189,14 +199,160 @@ def png_size(data):
 # facsimile each pay for the render.
 _render_lock = util.KeyedLocks()
 
+# How many poppler processes this server runs at once. The endpoints are
+# synchronous, so FastAPI gives each request a thread and every thread that
+# asked for an uncached page used to start its own pdftoppm -- as many as the
+# thread pool has threads. Four leaves the rest of production's six cores to
+# serve everyone else, and a reader who arrives while four are running waits a
+# moment instead of pushing the box into swap.
+RENDER_WORKERS = 4
+# What a caller waits for a slot before it is told to come back. Short on
+# purpose: a reader opening a spread of pages should queue rather than see a
+# broken image, and nothing beyond that is worth holding a connection for.
+RENDER_WAIT = 10.0
+# How many requests may be waiting for a slot at once. This is the important
+# bound, not the wait: these endpoints are synchronous, so every waiting
+# request holds one of AnyIO's worker threads (40 by default), and a cap on
+# poppler alone would have moved the outage rather than prevented it -- the
+# scrapers sustain about five requests a second, which fills the pool with
+# threads doing nothing but waiting, and ordinary pages stop being served.
+# Four running plus eight waiting leaves the pool most of its threads.
+MAX_WAITING = 8
+_render_slots = threading.BoundedSemaphore(RENDER_WORKERS)
+_waiting = 0
+_waiting_lock = threading.Lock()
 
-def cached(source, basefile, pdf_path, page, bbox=None, *, dpi):
+
+@contextmanager
+def render_slot():
+    """Hold one of the `RENDER_WORKERS` poppler slots, or raise `RenderBusy`.
+
+    Refuses immediately once `MAX_WAITING` requests are already queued, so the
+    number of threads this can occupy is bounded whatever the arrival rate.
+    """
+    global _waiting
+    with _waiting_lock:
+        if _waiting >= MAX_WAITING:
+            raise RenderBusy("%d faksimil-renderingar väntar redan"
+                             % _waiting)
+        _waiting += 1
+    try:
+        taken = _render_slots.acquire(timeout=RENDER_WAIT)
+    finally:
+        with _waiting_lock:
+            _waiting -= 1
+    if not taken:
+        raise RenderBusy("alla %d faksimil-renderingar är upptagna"
+                         % RENDER_WORKERS)
+    try:
+        yield
+    finally:
+        _render_slots.release()
+
+
+class RenderBusy(RuntimeError):
+    """Every facsimile render slot is taken. The API answers 503 with a
+    Retry-After; nothing is cached and nothing is wrong."""
+
+
+class RenderRefused(RuntimeError):
+    """This caller may not pay for a render. The page is not in the cache and
+    the request did not come from one of our own pages, so the API answers 403
+    instead of starting poppler. A *cached* page is still served to everyone --
+    this refuses the work, not the picture."""
+
+
+# The cache is unbounded by construction: one page has more crop rectangles
+# than anyone can enumerate, and nothing here can tell a reader's crop from a
+# script's. Eviction used to be a cron job alone, which failed silently for
+# months and left 658 GB of live cache on the production host. So the writer
+# also evicts, and it evicts on *free space* rather than on a size cap: the
+# cache shares a filesystem with the corpus, and what matters is that the
+# corpus keeps room to write.
+CACHE_MIN_FREE = 20 * 1024**3
+# what a sweep frees, so it is not re-triggered by the next render
+CACHE_FREE_TARGET = 40 * 1024**3
+# a `shutil.disk_usage` per render is cheap but not free, and a sweep walks a
+# large tree; both are worth doing rarely
+RENDERS_BETWEEN_CHECKS = 200
+
+_renders = 0
+# separate locks on purpose: every render bumps the counter, and it must not
+# queue behind a sweep that is walking a tree of hundreds of thousands of files
+_renders_lock = threading.Lock()
+_sweeping = threading.Lock()
+
+
+def evict(root, target_free):
+    """Delete the least recently used PNGs under `root` until the filesystem
+    has `target_free` bytes free. The sweep itself is `lib/cachesweep`, shared
+    with the PDF export cache; this names the files."""
+    return cachesweep.sweep(root, root.rglob("*.png"), target_free=target_free)
+
+
+def _evict_if_low():
+    """Sweep the cache when the filesystem is running out, at most once every
+    `RENDERS_BETWEEN_CHECKS` renders and never more than one sweep at a time.
+
+    A render that arrives while a sweep is running returns at once rather than
+    waiting for it: the sweep walks the whole cache tree, and the render it
+    would block has nothing to do with how full the disk is."""
+    global _renders
+    with _renders_lock:
+        _renders += 1
+        due = _renders % RENDERS_BETWEEN_CHECKS == 0
+    if not due:
+        return
+    root = layout.FACSIMILE
+    if not root.exists() or shutil.disk_usage(root).free >= CACHE_MIN_FREE:
+        return
+    if not _sweeping.acquire(blocking=False):
+        return
+    # off the request thread. The sweep walks the whole cache tree and stats
+    # every file -- on production that tree reached 658 GB -- so running it
+    # inline would hold one of the API's worker threads for minutes and answer
+    # that reader late. That is the very thing `render_slot` bounds, so doing
+    # it here would put the condition back through the other door.
+    try:
+        threading.Thread(target=_sweep, args=(root,), daemon=True,
+                         name="facsimile-evict").start()
+    except RuntimeError:
+        # no thread to be had -- the same overload the render slots exist to
+        # survive. Give the lock back and skip this sweep: holding it would
+        # stop every later one in this process, silently, which is the
+        # cron-failed-for-months failure this eviction was added to replace.
+        _sweeping.release()
+
+
+def _sweep(root):
+    """One eviction sweep, on its own thread. Holds `_sweeping` for its whole
+    length, so the next `RENDERS_BETWEEN_CHECKS` renders start no second one."""
+    try:
+        freed = evict(root, CACHE_FREE_TARGET)
+        print("facsimile cache: freed %.1f GB" % (freed / 1024**3), flush=True)
+    finally:
+        _sweeping.release()
+
+
+def cached(source, basefile, pdf_path, page, bbox=None, *, dpi, may_render):
     """The facsimile PNG for one page of a document's source PDF -- or, with
     `bbox`, just that rectangle of the page at `dpi` -- rendered on the first
     request and served from the cache thereafter. `source`/`basefile` identify
     the *source* PDF (for a crop, the amending SFS the region comes from), so
     crops of the same region are shared and a re-verified bbox lands on a fresh
     file.
+
+    `may_render=False` says this caller gets the cache or nothing: a cache miss
+    raises `RenderRefused` rather than starting poppler. That is what the HTTP
+    routes pass for a request that did not come from one of our own pages. A
+    render is the one expensive thing this server does, and scrapers are what
+    ask for it -- measured on prod over 30 minutes on 2026-09-05, 8795 of 8835
+    `sidN.png` requests carried no `Referer` at all, from 5938 addresses, and
+    275 of 300 sampled addresses never fetched a single HTML page.
+
+    It has no default, here and in `api/facsimiles.png_path`: whether a caller
+    may spend a second of poppler is not a question code should be able to
+    reach this function without answering (rule:fail-fast).
 
     `dpi` is a *crop's* resolution. A whole page has exactly one, chosen for the
     reading view (see the module docstring), and its cache path carries no
@@ -208,6 +364,9 @@ def cached(source, basefile, pdf_path, page, bbox=None, *, dpi):
            else layout.facsimile(source, basefile, page))
     if out.exists():
         return out
+    if not may_render:
+        raise RenderRefused("%s/%s page %d is not rendered yet" %
+                            (source, basefile, page))
     with _render_lock(str(out)):
         if out.exists():                 # rendered while we waited for the lock
             return out

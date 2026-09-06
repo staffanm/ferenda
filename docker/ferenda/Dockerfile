@@ -11,7 +11,11 @@
 #
 # Build context is the repo root (docker-compose.yml sets `context: .`), so the
 # COPY paths below are repo-relative. .dockerignore trims the context.
-FROM python:3.14-slim
+# Pinned by digest, with the readable tag beside it: `python:3.14-slim`
+# is a moving target, and a rebuild that quietly changes the base is a
+# rebuild nobody can reproduce. Bump both together (`docker manifest
+# inspect python:3.14-slim` prints the digest).
+FROM python:3.14-slim@sha256:810da6270e43d30a1f3e0e1eabbeb6fbd9d78ad9dd2e754d5297a3d6cb42df46
 
 # System tools the rebuild pipeline shells out to (installed at build time):
 #   poppler-utils          pdftotext / pdftohtml -- forarbete, eurlex, DV namedcases

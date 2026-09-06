@@ -201,14 +201,30 @@ every source is faceted; an unfaceted one is a `404`. Returns a
 `FacetTree`: `{ source, levels[], default[], buckets[] }` where each bucket is
 `{ key, label, slug, count, children?, documents? }`.
 
-**`GET /api/v1/browse`** — the same tree, but every leaf bucket's `documents` are
-populated (each a `BrowseDoc`: `{ uri, url, display, short_id?, short_title?,
+**`GET /api/v1/browse`** — the same tree, one leaf's documents at a time. A
+whole source is too large for one response — eurlex alone is 36 MB of JSON
+over 172,086 rows on a 435,440-row catalog, and it grows with the corpus — so
+`/browse` pages it:
+
+- `source` alone returns the navigator with every leaf's `count` and
+  `documents: null` on each bucket; `bucket`/`offset`/`limit`/`total` are
+  null.
+- `source` + `bucket` (a leaf's slug path joined by `/`, e.g. `nja/2024`)
+  returns the same navigator, with `documents` populated on that one leaf,
+  sliced by `offset` (default 0) and `limit` (default 500, max 2000). The
+  response states `bucket` (the slug path as a list), `offset`, `limit`, and
+  `total` — how many documents that leaf holds. A `bucket` that names no leaf
+  is a `404`; an `offset` past the end is an empty page, not an error.
+
+Each document is a `BrowseDoc`: `{ uri, url, display, short_id?, short_title?,
 description?, … }`, plus per-source listing extras — `pre`/`key`/`subdued`/`year`
 for statutes, `variant`/`date` for case law, `variant` for an EU act (enacting
 body), a court ruling (court) or a treaty (`current` for a consolidated text,
 else its family) and `pre`/`key` for a treaty,
-`amendments`/`consolidated` for agency regulations). This is the full browse model the static site is generated
-from; `/openapi.json` has the field-by-field description.
+`amendments`/`consolidated` for agency regulations. The static site is
+generated from the full browse model, assembled from these paged calls
+(`site/browse.py:browse_model`); `/openapi.json` has the field-by-field
+description.
 
 ### Get one document — `GET /api/v1/document?uri=…`
 
@@ -360,6 +376,13 @@ pages and citations use. Rendered on demand at retina resolution (150 DPI,
 legacy path grammar, `GET /prop/2022/23:10/sid1.png` /
 `GET /sou/2021:82/sid1.png` (undocumented alias, kept for old links).
 
+A cached page is served to any caller. An uncached page is rendered only for a
+request that shows it came from a lagen.nu page (`Sec-Fetch-Site:
+same-origin`, or a `Referer` on our own host) — a render holds a worker thread
+for about a second, and any other caller gets `403`. All render slots busy is
+`503` with `Retry-After`. A bare `curl` against a page nobody has viewed yet
+gets the `403`; the same URL opened from lagen.nu itself does not.
+
 **Statute graphic — `GET /api/v1/sfs-graphic?uri=…&node=…`** — a PNG crop of a
 figure, formula or map the *consolidated* statute text omits but the published
 PDF carries. `node` is the gap's stable key (the `data-grafik` value on the
@@ -367,7 +390,9 @@ rendered page). The crop is cut from the PDF of the amendment that last set that
 wording, not from the viewed statute's own PDF, per the reviewed `.graphics`
 layer; a gap nobody has signed off on is a `404`. Two resolutions: the default
 is the inline thumbnail, `stor=1` the full-size render — a page of 325 road
-signs asks for hundreds of the first and one of the second.
+signs asks for hundreds of the first and one of the second. Same render gate
+as `/api/v1/facsimile`: a cached crop is served to any caller, an uncached one
+only to a request from a lagen.nu page.
 
 **Original verdict PDF — `GET /api/v1/dv-verdict?court=…&id=…&file=…`** — the
 PDF a decision was first served as, before its NJA referat was published. The

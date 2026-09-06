@@ -60,6 +60,8 @@ FA_CODE = (HERE / "parse.py", HERE / "model.py",
            HERE / "fk.py", HERE / "volumes.py",
            HERE / "lydelse.py", HERE.parent / "lib" / "tabell.py",
            HERE / "legacy_formats.py",
+           # the zip budgets and the hardened parser a .docx is read through
+           HERE.parent / "lib" / "archive.py",
            HERE / "kbtitles.py",
            HERE.parent / "lib" / "pdftext.py", HERE.parent / "lib" / "lagrum.py",
            HERE.parent / "lib" / "emdref.py", *CITATION_DATA, *CASENUMBER_CODE,

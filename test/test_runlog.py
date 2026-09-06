@@ -254,6 +254,31 @@ def test_duration_history_regression_flag(tmp_path):
     assert runlog.duration_history(path, n=1)[("parse", "sfs")]["regression"] is False
 
 
+def test_duration_history_derives_each_step_s_wall_seconds(tmp_path):
+    # a parallel stage reports the sum of its workers' seconds (`secs`); what
+    # the run actually waited is the gap between consecutive stamps, counted
+    # from the run-start for the first segment. `_write_run` stamps the start
+    # at :00 and each segment one second later, so every wall here is 1 s
+    # however large the reported secs
+    path = tmp_path / "runs.ndjson"
+    _write_run(path, "r1", segments=[("parse", "sfs", 42000.0, 0),
+                                     ("parse", "dv", 3.0, 0)])
+    hist = runlog.duration_history(path)
+    assert hist[("parse", "sfs")]["secs"] == [42000.0]
+    assert hist[("parse", "sfs")]["wall"] == [1.0]
+    assert hist[("parse", "dv")]["wall"] == [1.0]
+    # a skipped step still consumes its interval: the next step counts from it
+    _write_run(path, "r2", segments=[("parse", "sfs", 0.0, 0, "skipped"),
+                                     ("parse", "dv", 3.0, 0)])
+    assert runlog.duration_history(path)[("parse", "dv")]["wall"] == [1.0, 1.0]
+    # a run whose run-start was pruned away offers its first segment no base:
+    # that sample keeps its secs and contributes no wall
+    runlog.emit_segment(path, "r3", "parse", "sfs", 7.0, total=10, ran=10,
+                        errors=0, status="ok", t="2026-07-04T11:00:07Z")
+    hist = runlog.duration_history(path)[("parse", "sfs")]
+    assert hist["secs"] == [42000.0, 7.0] and hist["wall"] == [1.0]
+
+
 def test_a_bigger_run_is_not_a_slower_one(tmp_path):
     """Runs are not the same size. A whole-site generate of 329,126 pages and a
     one-page generate are both `generate`; against a median dominated by the

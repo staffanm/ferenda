@@ -17,6 +17,8 @@ settle. Callers still own URL selection and source semantics.
 import time
 from pathlib import Path
 
+from .errors import UpstreamChanged
+
 # a page is finished when its text carries the caller's marker -- or when the
 # WAF says no, which is terminal and must not be waited out
 _READY = """m => { const t = document.body ? document.body.innerText : "";
@@ -180,7 +182,7 @@ class CamoufoxBrowser:
                 # this would store an error page as the document
                 # (rule:errors-drive-retry-use-raise)
                 if not data.startswith(b"%PDF-"):
-                    raise ValueError(
+                    raise UpstreamChanged(
                         "%s served %d bytes under application/pdf that do not "
                         "start a PDF" % (url, len(data)))
                 return data

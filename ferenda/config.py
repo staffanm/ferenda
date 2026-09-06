@@ -338,15 +338,32 @@ def resolve_compress_quality(doc):
                         "expected an integer 0-11", "out of the valid Brotli range 0-11")
 
 
+# The cookie signature is only as strong as this key. 32 characters is the
+# floor because a human-chosen string that reaches it is still guessable and a
+# random one is not: `openssl rand -hex 32` writes 64. Enforced rather than
+# advised -- a short key forges an editor session, and nothing else in the
+# request would look wrong.
+EDITOR_SECRET_MIN = 32
+
+
 def resolve_editor_secret(doc):
     """The HMAC key that signs the inline editor's session cookie (api/auth.py).
     Unset (``None``) disables editing entirely -- every mutating route answers
     403 -- and, since the ops dashboard (`/ops`) now rides the same editor
-    session, disables that too. Precedence: the ``EDITOR_SECRET`` environment
-    variable, then the ``editor_secret`` key in config.yml, else ``None``. A
-    present-but-invalid value raises ``ConfigError`` rather than silently
-    disabling auth."""
-    return _resolve_str(doc, "editor_secret", "EDITOR_SECRET", None)
+    session, disables that too. Precedence: the ``EDITOR_SECRET_FILE``
+    environment variable (a path -- how a Docker/Compose secret arrives, so the
+    key never sits in the environment of every process in the container), then
+    ``EDITOR_SECRET``, then the ``editor_secret`` key in config.yml, else
+    ``None``. A present-but-invalid value raises ``ConfigError`` rather than
+    silently disabling auth."""
+    path = os.environ.get("EDITOR_SECRET_FILE")
+    secret = (Path(path).read_text(encoding="utf-8").strip() if path
+              else _resolve_str(doc, "editor_secret", "EDITOR_SECRET", None))
+    if secret is not None and len(secret) < EDITOR_SECRET_MIN:
+        raise ConfigError("editor_secret is %d characters; at least %d are "
+                          "required (`openssl rand -hex 32`)"
+                          % (len(secret), EDITOR_SECRET_MIN))
+    return secret
 
 
 def resolve_cookie_secure(doc):

@@ -62,6 +62,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, get_text, make_session, request
@@ -163,7 +164,8 @@ def library_rows(html_text):
         reference = tr.select_one("td.views-field-field-document-reference")
         if reference is None:
             # the info panel of the row above it
-            assert rows, "an Esma library page opened with an info panel"
+            if not rows:
+                raise UpstreamChanged("an Esma library page opened with an info panel")
             for sub in tr.select("table > tr"):
                 cells = sub.find_all("td", recursive=False)
                 if len(cells) == 2 and normalize_space(
@@ -177,8 +179,9 @@ def library_rows(html_text):
         document = tr.select_one(
             "td.views-field-field-main-document a.download-tag")
         sections = tr.select_one("td.views-field-field-document-section")
-        assert title is not None, \
-            "an Esma library row named no document: %s" % tr.get_text()[:120]
+        if title is None:
+            raise UpstreamChanged("an Esma library row named no document: %s"
+                              % tr.get_text()[:120])
         rows.append({
             "reference": normalize_space(reference.get_text()),
             "titel": normalize_space(title.get_text()),

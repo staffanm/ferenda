@@ -6,13 +6,16 @@ either importing the other:
 
 * ``runs.ndjson`` -- an append-only run ledger, one flushed JSON line per
   event (run-start, one segment per (step, source) execution, run-end).
-  Written only by the parent build process; single-writer by assumption
-  (the manifest already shares it) -- two concurrent invocations would
-  interleave appends and race `prune`, which is accepted, not defended
-  against. The *readers* do defend against its one visible consequence: a
-  run whose run-start a concurrent prune rewrote away is reported as
-  "damaged" rather than taking the whole ledger read down with it (see
-  `_run_start`).
+  Written only by the parent build process, and only ever by one of them:
+  `build.main` takes the corpus writer lease (lib/writerlock) before it
+  prunes or emits anything, so a second invocation is refused rather than
+  interleaving appends and racing `prune`. The lease is what makes this
+  file's single-writer assumption true; before it, the race was accepted
+  rather than defended against. The *readers* still defend against its one
+  visible consequence, because a lease taken over from a killed run can
+  leave a torn ledger behind: a run whose run-start a prune rewrote away is
+  reported as "damaged" rather than taking the whole ledger read down with
+  it (see `_run_start`).
 * ``errors.json`` -- a keyed latest-outcome store per document
   ("<source>/<stage>/<basefile>"), set on error and deleted on success, so
   "failed" is distinguishable from "never tried" and the store stays
@@ -120,6 +123,11 @@ def emit_run_end(path, run, secs, ok, errors, t=None):
 # --------------------------------------------------------------------------
 # runs.ndjson -- reducers
 # --------------------------------------------------------------------------
+
+def _stamp(t):
+    """A ledger event's `t` (`util.now_iso`) as an aware datetime."""
+    return datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
 
 def _iter_events(path):
     """Every ledger event, in file order -- `util.read_json_lines`, shared with
@@ -247,6 +255,20 @@ def duration_history(path, n=None):
     run stands at against their median. Skipped segments (secs≈0) would poison
     the median, so they are excluded.
 
+    `wall` is what a step cost the run in wall-clock seconds -- the segment's
+    end stamp minus the previous segment's (or the run-start's, for the
+    first), since every step of a run is serial. `secs` is what the step
+    reports of itself, and for a parallel stage that is the sum of its
+    workers' seconds: a forarbete parse reports 42,000 s from 32 workers over
+    a 5,600 s wall. The invocation planner paces its ETA on `wall`;
+    `secs`/`vals` stay the per-document cost measure runs are compared by.
+    A segment with nothing to count from (its run-start pruned away) has no
+    wall and is left out of that list, so it can be shorter than `secs`. A
+    stage emits its segment before its after-hooks run (the sfs versions
+    sidecar assembly, `run_after`), so a hook's seconds land on the step
+    that follows; the run's total is unmoved, one prediction reads a little
+    low and its neighbour a little high.
+
     Per document, not per run, because runs are not the same size. A whole-site
     generate of 329,126 pages and a one-page generate are both `generate`, and
     against a median dominated by the small ones the big one measured 285x --
@@ -254,9 +276,18 @@ def duration_history(path, n=None):
     A segment reporting no counts (a harvest) keeps raw seconds, which is the
     best it can offer; `rate` says which of the two a key is measured in."""
     series = {}
+    stamp = {}                           # run id -> when its latest event ended
     for ev in _iter_events(path):
-        if ev["event"] == "segment" and ev["status"] != "skipped":
-            series.setdefault((ev["step"], ev["source"]), []).append(ev)
+        if ev["event"] == "run-start":
+            stamp[ev["run"]] = _stamp(ev["t"])
+        if ev["event"] != "segment":
+            continue
+        ended = _stamp(ev["t"])
+        began = stamp.get(ev["run"])
+        stamp[ev["run"]] = ended
+        if ev["status"] != "skipped":
+            series.setdefault((ev["step"], ev["source"]), []).append(
+                {**ev, "wall": (ended - began).total_seconds() if began else None})
     out = {}
     for key, evs in series.items():
         if n is not None:
@@ -270,7 +301,9 @@ def duration_history(path, n=None):
         rate = bool(evs[-1]["ran"]) and len(rates) >= 2
         vals = rates if rate else [ev["secs"] for ev in evs]
         median = statistics.median(vals)
-        out[key] = {"secs": [ev["secs"] for ev in evs], "vals": vals,
+        out[key] = {"secs": [ev["secs"] for ev in evs],
+                    "wall": [ev["wall"] for ev in evs if ev["wall"] is not None],
+                    "vals": vals,
                     "latest": vals[-1], "median": median, "rate": rate,
                     "ratio": vals[-1] / median if median else 0,
                     "regression": len(vals) >= 2 and vals[-1] > 1.5 * median}
@@ -343,20 +376,22 @@ def apply_outcomes(path, source, errors, done, run, t=None, *,
     return data
 
 
-def reconcile_orphans(path, source, valid):
-    """Drop `source` error entries whose basefile is no longer in `valid` -- the
-    source's current basefile set. These are orphans: a document that left the
-    corpus, or one an enumerator-bug once emitted (e.g. a `.watermark` mistaken
-    for a basefile) and no longer does, so it is never re-run and its stale error
-    can never self-heal. Only safe after a full-source run, which proves `valid`
-    is complete. Keys are ``source/stage/basefile`` (basefile may contain '/'),
-    so strip the ``source/stage/`` prefix to recover the basefile. Returns the
-    updated store (also written atomically)."""
+def reconcile_orphans(path, source, stage, valid):
+    """Drop the `source`/`stage` error entries whose key is no longer in
+    `valid` -- the keys a full run of that stage just dispatched over. These
+    are orphans: a document that left the corpus, or one an enumerator-bug
+    once emitted (e.g. a `.watermark` mistaken for a basefile) and no longer
+    does, so it is never re-run and its stale error can never self-heal. Only
+    safe after a full-source run, which proves `valid` is complete. Scoped to
+    the one stage because stages key differently: a fan-out stage's keys are
+    ``<basefile>@<version>``, and a versions run reconciled against the whole
+    source would drop every parse failure, a parse run every versions
+    failure. Keys are ``source/stage/basefile`` (basefile may contain '/').
+    Returns the updated store (also written atomically)."""
     data = read_errors(path)
-    prefix = source + "/"
+    prefix = "%s/%s/" % (source, stage)
     dropped = [k for k in data if k.startswith(prefix)
-               and "/" in k[len(prefix):]
-               and k[len(prefix):].split("/", 1)[1] not in valid]
+               and k[len(prefix):] not in valid]
     for k in dropped:
         del data[k]
     write_atomic(path, json.dumps(data, ensure_ascii=False))

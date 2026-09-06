@@ -99,6 +99,15 @@ vertical may not import `api`, so the checker carries one allowlist entry,
 `("site/browse.py", "api.app")`. The dependency is one-way and confined to
 aggregate-page generation.
 
+`GET /api/v1/browse` serves **one leaf bucket at a time**: `source` alone
+returns the navigator with each leaf's `count`, and `source` + `bucket` (a slug
+path, `"nja/2024"`) returns that leaf's documents sliced by `offset`/`limit`,
+with `total` beside them. A whole source in one response is 36 MB for eurlex
+and grows with the corpus. `site.browse.browse_model` assembles the full model
+from those pages, so the generator still sees exactly what it used to; the API
+holds one source's model in memory while that walk runs, so the leaves cost one
+catalog scan between them, not one each.
+
 ## Sources and stages
 
 Everything runs through the `lagen` CLI (`ferenda/build.py`, the
@@ -116,7 +125,8 @@ dataclasses, the `SOURCES` registry, the run-wide `RUN` options and the shared
 shape helpers), `lib/freshness.py` holds the engine that decides what to run
 (the manifest, the fingerprint gates, the per-document driver and its process
 pool, the run ledger), `lib/corpus.py` holds the corpus verbs
-(`relate`/`index`/`dump`/`generate`, the composites and the status verbs), and
+(`relate`/`index`/`dump`/`generate`, the composites and the status verbs),
+`lib/writerlock.py` holds the corpus writer lease, and
 `build.py` holds the CLI. Each source's registration is its own
 `ferenda/<package>/source.py`; `build.py` imports them and fills the registry,
 so adding a source means adding one file.
@@ -396,6 +406,30 @@ Write, in a new `ferenda/<source>/` package:
    `lib/harvest.py` (the shared newest-first incremental walk +
    `HarvestWatermark`) and `lib/net.py` (the resilient HTTP session); state your
    own `lookahead_limit`/`safety_days` window at the call site.
+
+   Two rules that only downloaders meet:
+
+   * **A check about upstream content raises, never asserts**
+     (`rule:errors-drive-retry-use-raise`). `lib/errors.py` names the
+     exception: `raise UpstreamChanged("…")` when a listing parses to no rows,
+     a heading block is gone, or a body's magic bytes are not what the link
+     promised. `assert` stays for invariants whose failure means this program
+     is wrong. Asserts vanish under `python -O`, and one that vanishes writes
+     an HTML error page to disk as a `.pdf` with a record beside it.
+   * **A downloaded archive is opened through `lib/archive.py`**, not
+     `zipfile` directly. `archive.open_zip` reads the directory and refuses the
+     file before a byte expands — member count, each member's size, the total,
+     and the compression ratio — and `archive.read` bounds the member it
+     hands back. `lib/net.request` likewise caps a response body
+     (`MAX_RESPONSE_BYTES`, or a caller's own `max_bytes`).
+
+     One exception, and it is the only one: `eurlex/bulk.py` opens the EUR-Lex
+     bulk dumps with plain `zipfile`. A `LEG_*_FMX_*.zip` is many gigabytes —
+     far past `archive.MAX_TOTAL_BYTES` — and it does not arrive from a
+     harvest at all: an operator fetches the dump by hand and points `lagen
+     eurlex bulk` at it. The budgets exist to bound what an *upstream server*
+     can make this pipeline expand, and there is no server in that path. A new
+     exception needs the same kind of reason, written here.
 4. **The registration** (`source.py`) — a `list_basefiles()`, an
    `artifact(basefile)`/`inputs(basefile)` pair, a `CODE` tuple naming every
    impl file relative to the package's own `HERE`, and the `SOURCES` tuple:

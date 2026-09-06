@@ -44,6 +44,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
+from ..lib.errors import UpstreamChanged
 from ..lib.util import normalize_space
 from .euar import euar_sync
 from .ft import ft_sync
@@ -117,8 +118,9 @@ def _svjt_records_from_page(html, year):
         if link is None:
             raise ValueError("svjt %s: an article card names no page" % year)
         href = link.get("href")
-        assert isinstance(href, str), \
-            "svjt %s: an article card's page is not a link" % year
+        if not isinstance(href, str):
+            raise UpstreamChanged(
+                "svjt %s: an article card's page is not a link" % year)
         # the `find` filter above already applied this rule, so the search is
         # guaranteed to land; the assert keeps ty's `Match | None` honest
         match = RE_SVJT_ARTICLE_HREF.search(href)
@@ -374,6 +376,12 @@ def jp_sync(root, full=False, only=None, limit=None, delay=0.5):
                                "%s/tidskriften/%s/" % (JP.base, slug)).text
             time.sleep(delay)
             return _jp_records_from_page(html, slug, label)
+        except net.ResponseTooLarge:
+            # not this handler's business: `UpstreamChanged` -- and so
+            # `ResponseTooLarge` -- subclasses ValueError, and a body refused
+            # for its size is a transport failure, not an issue that served no
+            # articles. Recorded as a Skip it would read as an empty issue.
+            raise
         except ValueError as err:
             # a challenged or template-less page can read as an articleless
             # issue: one issue that serves no page must not stop the sweep
