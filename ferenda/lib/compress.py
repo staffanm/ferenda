@@ -32,6 +32,7 @@ helps (and can inflate), and it keeps tiny always-served files like ``robots.txt
 and empty ``SkipDocument`` placeholders universally readable with no encoding.
 """
 
+import contextlib
 import fnmatch
 import gzip as _gzip
 import json
@@ -133,12 +134,79 @@ def _variant_suffix(path: Path | str) -> str:
     return ""
 
 
+# --------------------------------------------------------------------------
+# directory cache: one os.scandir per directory instead of a stat per name.
+#
+# The freshness scan asks `exists`/`stat` about a handful of names per
+# document -- its artifact, its inputs, each in plain and compressed spelling
+# -- and `glob` about a directory or two. On the production NFS mount every
+# first stat of a name is a round trip (~0.3 ms), and the plain-name misses
+# are round trips too; a document cost 18 stats and 4-5 round trips
+# (measured 2026-09-06, see docs/operating/README.md). One scandir of the
+# document's directory answers all of them: the names decide existence, and
+# `DirEntry.stat()` answers size+mtime. `dir_cache()` turns that on for the
+# duration of a scan chunk; outside it, every lookup goes to the filesystem
+# as before, so a writer never reads its own stale answer.
+# --------------------------------------------------------------------------
+
+_DIRS: dict[str, dict[str, os.DirEntry] | None] | None = None
+
+
+@contextlib.contextmanager
+def dir_cache():
+    """Answer `resolve`/`exists`/`stat`/`glob` from one `os.scandir` per
+    directory while the block runs. Reads only: a name that appears in a
+    cached directory during the block is not seen until the block ends, so a
+    caller that writes must not be inside one (the scan does not; the build
+    that follows a scan chunk runs after the block). Does not nest."""
+    global _DIRS
+    assert _DIRS is None, "compress.dir_cache does not nest"
+    _DIRS = {}
+    try:
+        yield
+    finally:
+        _DIRS = None
+
+
+def _entries(directory) -> dict[str, os.DirEntry] | None:
+    """The entries of `directory` by name, ``None`` if it is missing or not a
+    directory -- from the cache while `dir_cache` is active, else one scandir."""
+    key = os.fspath(directory)
+    if _DIRS is not None and key in _DIRS:
+        return _DIRS[key]
+    try:
+        with os.scandir(key) as it:
+            entries = {e.name: e for e in it}
+    except (FileNotFoundError, NotADirectoryError):
+        entries = None
+    if _DIRS is not None:
+        _DIRS[key] = entries
+    return entries
+
+
+def _variant_names(p: Path):
+    """The on-disk spellings of a logical path's name, in preference order."""
+    return (p.name, *(p.name + suffix for suffix in SUFFIXES))
+
+
+def _cached_entry(p: Path) -> os.DirEntry | None:
+    """The directory entry backing a logical path under `dir_cache`: the first
+    of its on-disk spellings present in the parent's listing, else None."""
+    entries = _entries(p.parent) or {}
+    return next((entries[name] for name in _variant_names(p) if name in entries), None)
+
+
 def resolve(path: Path | str) -> Path | None:
     """The actual on-disk file for a logical `path`: the plain file if it exists,
     else the ``.br`` then ``.gz`` variant, else ``None``. `path` is taken as the
     logical name even if it already carries a suffix (so passing a resolved path
-    back in is idempotent)."""
+    back in is idempotent). Under `dir_cache`, presence is a name in the
+    directory's listing (a dangling symlink counts as present; none exist in
+    the trees this reads)."""
     p = logical(path)
+    if _DIRS is not None:
+        entry = _cached_entry(p)
+        return p.with_name(entry.name) if entry else None
     if p.exists():
         return p
     for suffix in SUFFIXES:
@@ -164,6 +232,11 @@ def stat(path: Path | str) -> os.stat_result:
     """`os.stat` of the on-disk file backing a logical `path` (its real size +
     mtime -- what the freshness watermarks fingerprint). Raises like `os.stat`
     if nothing is present."""
+    if _DIRS is not None:
+        entry = _cached_entry(logical(path))
+        if entry is None:
+            raise FileNotFoundError(str(path))
+        return entry.stat()
     resolved = resolve(path)
     if resolved is None:
         raise FileNotFoundError(str(path))
@@ -381,24 +454,14 @@ def glob(directory: Path, pattern: str) -> set[Path]:
     for seg in dirs:
         nxt = []
         for d in current:
-            try:
-                entries = os.scandir(d)
-            except (FileNotFoundError, NotADirectoryError):
-                continue
-            with entries:
-                nxt.extend(Path(e.path) for e in entries
-                          if e.is_dir() and fnmatch.fnmatchcase(e.name, seg))
+            nxt.extend(Path(e.path) for e in (_entries(d) or {}).values()
+                       if e.is_dir() and fnmatch.fnmatchcase(e.name, seg))
         current = nxt
     leaf_patterns = [leaf] + [leaf + suffix for suffix in SUFFIXES]
     found = set()
     for d in current:
-        try:
-            entries = os.scandir(d)
-        except (FileNotFoundError, NotADirectoryError):
-            continue
-        with entries:
-            found.update(logical(Path(e.path)) for e in entries
-                        if any(fnmatch.fnmatchcase(e.name, p) for p in leaf_patterns))
+        found.update(logical(Path(e.path)) for e in (_entries(d) or {}).values()
+                     if any(fnmatch.fnmatchcase(e.name, p) for p in leaf_patterns))
     return found
 
 

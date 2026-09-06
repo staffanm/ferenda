@@ -12,6 +12,7 @@ import signal
 import socket
 import sqlite3
 import threading
+import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from urllib.parse import urlparse
 
@@ -59,8 +60,11 @@ from ferenda.wiki import source as wiki_source
 def reset_run():
     stage.set_run(RunOptions())
     freshness.recipe_version.cache_clear()
+    registered = dict(stage.SOURCES)   # the synthetic sources a test registers go at its end
     yield
     stage.set_run(RunOptions())
+    stage.SOURCES.clear()
+    stage.SOURCES.update(registered)
 
 
 def make_source(tmp_path, version_file=None):
@@ -85,11 +89,13 @@ def make_source(tmp_path, version_file=None):
         out(bf).write_text(dl_out(bf).read_text().upper())
 
     code = (version_file,) if version_file else ()
-    return remote, Source("syn", lambda: sorted(remote), {
+    src = Source("syn", lambda: sorted(remote), {
         "download": Stage("download", dl_run, dl_out),
         "parse": Stage("parse", parse_run, out, depends="download",
                        inputs=lambda bf: [dl_out(bf)], code=code),
     })
+    stage.SOURCES[src.name] = src      # a scan job finds its source by name; reset_run restores
+    return remote, src
 
 
 def apply(manifest, res):
@@ -132,6 +138,24 @@ def test_manifest_get_update_and_json_migration(tmp_path, monkeypatch):
     migrated = freshness.load_manifest()
     assert migrated.get("syn/parse/b") == legacy["syn/parse/b"]
     assert not freshness.MANIFEST.exists()
+
+
+def test_manifest_get_many_reads_a_chunk_of_keys_in_a_few_statements(tmp_path):
+    # one `get` is one transaction -- four lock round trips on the production
+    # NFS mount -- so the scan reads a chunk's keys at once, a few hundred per
+    # statement (SQLite's variable ceiling), and hears nothing of the missing
+    m = freshness.Manifest(tmp_path / "m.sqlite")
+    m.update({"syn/parse/%d" % i: {"secs": i} for i in range(2000)})
+    keys = ["syn/parse/%d" % i for i in range(1900)] + ["syn/parse/missing", "x"]
+    statements = []
+    con = m.con
+    con.set_trace_callback(statements.append)
+    found = m.get_many(keys)
+    con.set_trace_callback(None)
+    assert len(found) == 1900 and found["syn/parse/7"] == {"secs": 7}
+    assert "syn/parse/missing" not in found
+    assert len([s for s in statements if s.startswith("SELECT")]) == 3   # 900+900+102
+    assert m.get_many([]) == {}
 
 
 def test_build_then_skip(tmp_path):
@@ -463,6 +487,7 @@ def _isolate_manifest(tmp_path, monkeypatch):
 def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):
     _, src = make_source(tmp_path)
     src.name = "sfs"
+    stage.SOURCES["sfs"] = src         # the scan job looks it up by its new name
     # a published source (one that registers an artifacts lister) is the only
     # kind whose targeted generate falls back to relate
     src.artifacts = lambda: []
@@ -485,6 +510,7 @@ def test_targeted_generate_skips_relate_when_catalog_current(tmp_path, monkeypat
     # never falls back to the whole-source relate
     _, src = make_source(tmp_path)
     src.name = "sfs"
+    stage.SOURCES["sfs"] = src         # the scan job looks it up by its new name
     _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(build, "_catalog_current_for", lambda name, bfs: True)
     monkeypatch.setattr(corpus, "cmd_relate",
@@ -551,6 +577,7 @@ def test_catalog_current_for_matches_rows_against_artifacts(tmp_path, monkeypatc
 def test_targeted_generate_no_deps_leaves_parse_untouched(tmp_path, monkeypatch):
     _, src = make_source(tmp_path)
     src.name = "sfs"
+    stage.SOURCES["sfs"] = src         # the scan job looks it up by its new name
     _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(corpus, "cmd_relate",
                         lambda sources, names, force=None:
@@ -754,14 +781,10 @@ def test_the_scan_sends_a_document_whose_bytes_did_not_change_to_the_worker(
     assert again.updates == {} and ("parse", "a") in again.fresh
 
 
-def test_the_scan_reports_progress_and_throttles(tmp_path, monkeypatch):
-    # the scan reports on the usual status line (silent, it read as a hang on
-    # slow storage); a real util.invocation_bar renders a full nested tqdm
-    # frame per util.status() call, so it reports at most every
-    # _REPORT_INTERVAL -- 500 basefiles scan near-instantly here, and without
-    # throttling that would be one call per basefile. The first and last
-    # always report, whatever the timing.
-    remote = ["doc%d" % i for i in range(500)]
+def _flat_source(tmp_path, n):
+    """A one-stage source over `n` documents whose parse writes nothing --
+    every document is stale forever, so a scan over it is all scan."""
+    remote = ["doc%04d" % i for i in range(n)]
     (tmp_path / "dl").mkdir()
     for bf in remote:
         (tmp_path / "dl" / ("%s.txt" % bf)).write_text(bf)
@@ -770,15 +793,101 @@ def test_the_scan_reports_progress_and_throttles(tmp_path, monkeypatch):
                        lambda bf: tmp_path / ("%s.out" % bf),
                        inputs=lambda bf: [tmp_path / "dl" / ("%s.txt" % bf)]),
     })
+    stage.SOURCES[src.name] = src
+    return sorted(remote), src
+
+
+def test_the_scan_reports_progress_and_throttles(tmp_path, monkeypatch):
+    # the scan reports on the usual status line (silent, it read as a hang on
+    # slow storage) as each chunk of SCAN_CHUNK keys lands; a real
+    # util.invocation_bar renders a full nested tqdm frame per util.status()
+    # call, so it reports at most every util.REPORT_INTERVAL -- three chunks scan
+    # near-instantly here. The first and last chunk always report, whatever
+    # the timing.
+    remote, src = _flat_source(tmp_path, 1200)
     _isolate_manifest(tmp_path, monkeypatch)
     calls = []
     monkeypatch.setattr(freshness.util, "status",
                         lambda done, total, msg, **kw: calls.append((done, total, msg)))
-    freshness.run_action(src, "parse", sorted(remote), 1)
+    freshness.run_action(src, "parse", remote, 1)
     scans = [c for c in calls if "checking staleness" in c[2]]
-    assert len(scans) < 50                 # not one call per basefile
-    assert scans[0][:2] == (1, 500)        # the first basefile reports at once
-    assert scans[-1] == (500, 500, "syn parse  checking staleness  500 stale")
+    assert len(scans) <= 3                 # per chunk at most, never per basefile
+    assert scans[0][:2] == (500, 1200)     # the first chunk reports at once
+    assert scans[-1] == (1200, 1200, "syn parse  checking staleness  1200 stale")
+
+
+def test_scan_chunk_answers_stale_and_fresh_from_one_manifest_query(
+        tmp_path, monkeypatch):
+    # a chunk is the scan's unit of work: every key its chain can ask about is
+    # read in one `get_many`, and the stat traffic goes through one directory
+    # cache. Stale documents come back with their last build seconds (None
+    # when never built), the fresh ones as the (stage, basefile) pairs
+    # `report` heals, and the count of fresh documents
+    _, src = make_source(tmp_path)
+    _isolate_manifest(tmp_path, monkeypatch)
+    stale, fresh, n_fresh = freshness._scan_chunk(src, "parse", ["a", "b"], False, False)
+    assert stale == [("a", None), ("b", None)] and fresh == [] and n_fresh == 0
+    freshness.run_action(src, "parse", ["a", "b"], 1)
+    stale, fresh, n_fresh = freshness._scan_chunk(src, "parse", ["a", "b"], False, False)
+    assert stale == [] and n_fresh == 2
+    assert sorted(fresh) == [("download", "a"), ("download", "b"),
+                             ("parse", "a"), ("parse", "b")]
+    (tmp_path / "dl" / "b.txt").write_text("HELLO AGAIN")
+    stale, fresh, n_fresh = freshness._scan_chunk(src, "parse", ["a", "b"], False, False)
+    assert [bf for bf, _ in stale] == ["b"] and n_fresh == 1
+    assert isinstance(stale[0][1], float)          # b was built once: its secs
+    assert sorted(fresh) == [("download", "a"), ("download", "b"), ("parse", "a")]
+    # --force stales everything without consulting anything
+    stale, fresh, n_fresh = freshness._scan_chunk(src, "parse", ["a", "b"], True, False)
+    assert [bf for bf, _ in stale] == ["a", "b"] and n_fresh == 0
+
+
+class _InlineExecutor:
+    """A ProcessPoolExecutor stand-in that runs each submitted job in the
+    calling process and hands back a finished Future. Records what it was
+    constructed with and every job, in order."""
+
+    def __init__(self, spawned, jobs):
+        self._spawned, self._jobs = spawned, jobs
+
+    def __call__(self, **kw):
+        self._spawned.append(kw)
+        return self
+
+    def submit(self, fn, job):
+        self._jobs.append((fn, job))
+        fut = Future()
+        fut.set_result(fn(job))
+        return fut
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        self._spawned.append("shutdown")
+
+
+def test_the_scan_fans_chunks_out_to_scan_workers(tmp_path, monkeypatch):
+    # with more than one job and more than one chunk the scan runs in a pool of
+    # its own: a chunk per job, in basefile order, each worker looking the
+    # source up in the registry the way the build workers do and carrying the
+    # run options; the parent only books what comes back. A dry run takes the
+    # serial build path, so the scan pool is the only pool here.
+    remote, src = _flat_source(tmp_path, 1200)
+    _isolate_manifest(tmp_path, monkeypatch)
+    monkeypatch.setattr(stage, "RUN", RunOptions(dry_run=True))
+    spawned, jobs = [], []
+    monkeypatch.setattr(util, "ProcessPoolExecutor", _InlineExecutor(spawned, jobs))
+    res = freshness.run_action(src, "parse", remote, 4)
+    assert [bf for _, bf in res.planned] == remote
+    assert spawned[0] == {"max_workers": 3, "initializer": util._child_init,
+                          "initargs": (freshness._worker_init, (stage.RUN,))}
+    assert spawned[-1] == "shutdown"
+    assert [list(chunk) for _fn, chunk in jobs] == [remote[:500], remote[500:1000], remote[1000:]]
+    assert {(fn.func, fn.args) for fn, _chunk in jobs} == {
+        (freshness._scan_job, ("syn", "parse", False, False))}
+    # one job, or one chunk, and the scan stays in the parent
+    spawned.clear()
+    freshness.run_action(src, "parse", remote, 1)
+    freshness.run_action(src, "parse", remote[:10], 4)
+    assert spawned == []
 
 
 def test_file_fingerprint_reports_a_labelled_staleness_scan(tmp_path, monkeypatch):
@@ -892,6 +1001,7 @@ def wire(monkeypatch, tmp_path):
     bd = tmp_path / ".build"
     mock_sources = {}
     monkeypatch.setattr(build, "SOURCES", mock_sources)
+    monkeypatch.setattr(stage, "SOURCES", mock_sources)   # what a scan job looks its source up in
 
     def _wire(src):
         mock_sources[src.name] = src
@@ -1870,6 +1980,7 @@ def test_run_phase_runs_the_stages_that_name_the_verb(tmp_path, monkeypatch):
     sources = {"a": source("a", "dump"), "b": source("b", "parse")}
     _isolate_manifest(tmp_path, monkeypatch)
 
+    stage.SOURCES.update(sources)      # a scan job finds its source by name
     assert corpus.run_phase(sources, ["a", "b"], "dump", 1) is False
     assert ran == [("a", "measure")]
     ran.clear()
@@ -2127,3 +2238,31 @@ def test_a_dry_run_never_records_a_fingerprint_gate(tmp_path, monkeypatch):
     monkeypatch.setattr(stage.RUN, "dry_run", False)
     freshness.save_fingerprints(store)
     assert json.loads((tmp_path / "fingerprints.json").read_text()) == store
+
+
+def test_pooled_chunks_items_and_keeps_order(monkeypatch):
+    # util.pooled: the items are cut into chunks of `chunk`, one call each; one
+    # worker (or one chunk) runs inline, otherwise a process pool answers in
+    # submission order
+    assert list(util.pooled(sum, [1, 2, 3], 1, chunk=2)) == [3, 3]
+    spawned, jobs = [], []
+    monkeypatch.setattr(util, "ProcessPoolExecutor", _InlineExecutor(spawned, jobs))
+    assert list(util.pooled(sum, [1, 2, 3], 2, chunk=1)) == [1, 2, 3]
+    assert spawned[0]["max_workers"] == 2
+    assert [chunk for _fn, chunk in jobs] == [(1,), (2,), (3,)]
+    assert spawned[-1] == "shutdown"
+
+
+def _sleep_chunk(chunk):
+    time.sleep(sum(chunk))
+
+
+def test_pooled_kills_a_hung_worker_and_raises():
+    # a worker that never answers is a hang the caller hears about by name,
+    # within the timeout -- not at the executor's shutdown, which waits for
+    # every running job unless the workers are gone. A real pool: the
+    # executor's shutdown is what a stand-in cannot reproduce.
+    t0 = time.perf_counter()
+    with pytest.raises(RuntimeError, match="_sleep_chunk: no result from a worker in 0 s"):
+        list(util.pooled(_sleep_chunk, [30, 30, 30, 30], 2, chunk=1, timeout=0.5))
+    assert time.perf_counter() - t0 < 15

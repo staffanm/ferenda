@@ -1,5 +1,8 @@
 """Small shared utilities (ported from ferenda.util)."""
 
+import collections
+import faulthandler
+import itertools
 import json
 import os
 import re
@@ -10,6 +13,7 @@ import threading
 import time
 import unicodedata
 import warnings
+from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -677,6 +681,100 @@ class _TqdmRedirect:
 
     def fileno(self):
         return self._real.fileno()
+
+
+# how often a long check reports on the status line -- tqdm's own default
+# mininterval; a real invocation_bar renders a full nested frame per
+# status() call (terminal-size query, refresh, ETA recompute), so reporting
+# every item made the reporting itself the bottleneck on a fast, high-count
+# scan (2026-09-04)
+REPORT_INTERVAL = 0.1
+
+
+def status_throttle(interval=REPORT_INTERVAL):
+    """A `status` that reports at most once per `interval` seconds -- and
+    always when `done == total`, so the last line is the final count. The
+    first call always reports (a scan on slow storage must show a line at
+    once). Shared by the staleness scans (`freshness._scan`,
+    `freshness.stat_records`) and relate's hash pass (`corpus.content_hashes`)."""
+    last = 0.0
+
+    def report(done, total, message, **kw):
+        nonlocal last
+        now = time.perf_counter()
+        if done == total or now - last >= interval:
+            status(done, total, message, **kw)
+            last = now
+    return report
+
+
+# How long a pool waits on one job before declaring the worker hung. It has
+# to clear the slowest single document by a wide margin: the worst on record
+# is `sfs versions 1999:1229` at 1 454 s, so an hour is ~2.5x the observed
+# maximum -- long enough that a legitimately slow document is never mistaken
+# for a hang, short enough that a real hang surfaces the same night instead of
+# never. `freshness.LOST_RESULT_TIMEOUT` is this value for the build pool.
+HANG_TIMEOUT = 3600
+
+
+def _child_init(initializer, initargs):
+    # every pool child dumps its Python stack if it dies hard, so a crash
+    # names the item in flight (as freshness._worker_init's children do); then
+    # the caller's own initializer, if it gave one
+    faulthandler.enable()
+    if initializer is not None:
+        initializer(*initargs)
+
+
+def pooled(fn, items, workers, *, chunk, timeout=HANG_TIMEOUT, initializer=None,
+           initargs=()):
+    """`fn(chunk)` for each run of `chunk` consecutive `items` (a tuple), the
+    results yielded in order -- computed here with one worker or one chunk,
+    else by a ProcessPoolExecutor of `workers` processes with two chunks
+    queued per worker, so a slow chunk never leaves the pool idle and an
+    abandoned iteration has little to cancel. `fn` must pickle: a module-level
+    function, or a `functools.partial` of one carrying the per-call context.
+
+    The per-item costs the build meets on the production NFS mount are round
+    trips (a GETATTR per stat, an OPEN+READ+CLOSE per artifact read) that only
+    overlap across processes -- a thread pool gained 10% against the GIL. A
+    worker that answers nothing within `timeout` seconds is a hang: its
+    workers are killed and RuntimeError raised; a worker that dies on its own
+    is reported by the executor as BrokenProcessPool rather than waited for
+    (rule:fail-fast)."""
+    chunks = list(itertools.batched(items, chunk, strict=False))
+    if workers == 1 or len(chunks) <= 1:
+        for c in chunks:
+            yield fn(c)
+        return
+    todo = iter(chunks)
+    pending = collections.deque()
+    pool = ProcessPoolExecutor(max_workers=min(workers, len(chunks)),
+                               initializer=_child_init, initargs=(initializer, initargs))
+    try:
+        def submit(n):
+            for c in itertools.islice(todo, n):
+                pending.append(pool.submit(fn, c))
+        submit(2 * workers)
+        while pending:
+            try:
+                result = pending.popleft().result(timeout=timeout)
+            except TimeoutError:
+                # shutdown() below waits for every chunk a worker holds, and
+                # the hung one never comes back: kill the workers first, so
+                # the executor sees a broken pool and lets go. `_processes` is
+                # private but has been the worker map since 3.2, and there is
+                # no public way to reach them (compare freshness._run_parallel
+                # on `pool._pool`)
+                for process in pool._processes.values():
+                    process.kill()
+                raise RuntimeError(
+                    "%s: no result from a worker in %d s -- a worker is hung"
+                    % (getattr(fn, "__name__", repr(fn)), timeout)) from None
+            submit(1)
+            yield result
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
 
 
 def reset_worker_state():

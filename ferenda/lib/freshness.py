@@ -50,10 +50,13 @@ STATUS = config.DATA / ".build" / "status.json"           # rolling health snaps
 # recompute), so calling it every completion made the reporting itself the
 # bottleneck on a fast, high-count scan (2026-09-04)
 _REPORT_INTERVAL = 0.1
-# how many keys `_run_parallel` scans between looks at the pool: the scan is
-# the parent's own work while the workers build, and a chunk of this size
-# costs about 10 ms on a 97k-document source (43 µs a key, 2026-09-05)
-SCAN_CHUNK = 200
+# how many keys one staleness-scan job covers (`_scan_chunk`): one manifest
+# query and one directory cache per chunk, and the unit `_run_parallel` pulls
+# from the feed between looks at the pool. On the production NFS mount a key
+# costs ~1.7 ms in a scan worker, so a chunk is about a second of work --
+# enough to amortise the query, small enough that the status line moves
+# (2026-09-06)
+SCAN_CHUNK = 500
 
 
 # --------------------------------------------------------------------------
@@ -431,16 +434,13 @@ SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
 # the driver waited forever on futures no worker would ever take).
 MAX_DOCS_PER_WORKER = 1000
 
-# How long the parent tolerates total result silence before declaring a hang.
+# How long the parent tolerates total result silence before declaring a hang
+# (`util.HANG_TIMEOUT`, sized there against the slowest document on record).
 # Worker *crashes* no longer wait this out -- a dead worker is spotted by the
 # WORKER_POLL sweep and its in-flight document rebuilt (see _run_parallel) --
 # so this backstop only fires for a wedged-but-alive worker, where there is no
-# corpse to find. It has to clear the slowest single document by a wide margin:
-# the worst on record is `sfs versions 1999:1229` at 1 454 s, so an hour is
-# ~2.5x the observed maximum -- long enough that a legitimately slow document
-# is never mistaken for a hang, short enough that a real hang surfaces the
-# same night instead of never.
-LOST_RESULT_TIMEOUT = 3600
+# corpse to find.
+LOST_RESULT_TIMEOUT = util.HANG_TIMEOUT
 
 # Between-results poll interval: with no result arriving for this long, the
 # parent sweeps the pool's workers for corpses. Bounds crash-detection latency
@@ -525,37 +525,85 @@ def _cheaply_fresh(source, stage_name, basefile, manifest, force, no_deps, fresh
     return True
 
 
-def _scan(source, action, basefiles, manifest, force, merged, expected, counts):
-    """Walk `basefiles` once and yield the ones that need a worker, as they
-    are met. A fresh document is booked into `merged.fresh` on the spot and
-    never reaches the pool -- the round-trip a fresh document used to cost
-    (eurlex parse: 43-52 s for 172,000 of them with nothing to parse,
-    2026-09-03) is gone, and so is the separate whole-source fingerprint
-    pass that existed to spare it. `expected[basefile]` gets the manifest's
-    last build seconds (None when never built), what the dispatcher orders
-    on and the ETA weighs. `counts["fresh"]` is the number of documents
-    booked fresh -- `merged.fresh` holds one ``(stage, basefile)`` pair per
-    stage of a fresh document's chain, so its length is not that number.
+def _scan_chunk(source, action, chunk, force, no_deps):
+    """`_cheaply_fresh` over the basefiles in `chunk`, as one unit of scan
+    work: one manifest query for every key the chain can ask about
+    (`Manifest.get_many`) and one directory cache (`compress.dir_cache`) for
+    the chunk's stat traffic. Returns ``(stale, fresh, n_fresh)``: the stale
+    basefiles each with the manifest's last build seconds (None when never
+    built), the ``(stage, basefile)`` pairs found fresh along the way, and
+    the number of documents found fresh. Runs in a scan worker
+    (`_scan_job`) or, with one job, in the parent."""
+    chain = []
+    name = action
+    while name:
+        chain.append(name)
+        name = None if no_deps else source.stages[name].depends
+    known = load_manifest().get_many(
+        manifest_key(source.name, stage, bf) for bf in chunk for stage in chain)
+    stale, fresh = [], []
+    with compress.dir_cache():
+        for bf in chunk:
+            if not _cheaply_fresh(source, action, bf, known, force, no_deps, fresh):
+                entry = known.get(manifest_key(source.name, action, bf))
+                stale.append((bf, entry.get("secs") if entry else None))
+    return stale, fresh, len(chunk) - len(stale)
 
-    Reports as "checking staleness" on the usual status line, throttled to
-    `_REPORT_INTERVAL`; the first and last basefile always report."""
+
+def _scan_job(source_name, action, force, no_deps, chunk):
+    # the scan worker's job: SOURCES is filled the way _worker's is, from
+    # the forkserver's preloaded __main__
+    return _scan_chunk(protocol.SOURCES[source_name], action, chunk, force, no_deps)
+
+
+def _scan_results(source, action, basefiles, force, jobs):
+    """`_scan_chunk`'s answer for each `SCAN_CHUNK` of `basefiles`, in order
+    -- `util.pooled` over `jobs` scan workers, each carrying the run options
+    (`_worker_init`: `_cheaply_fresh` reads `RUN.ignore_code_changes`). On
+    the production NFS mount a document's staleness check is round trips (a
+    directory revalidation, a GETATTR per input) that only overlap across
+    processes: a thread pool gained 10% against the GIL, where sixteen scan
+    workers plus the chunked manifest read and the directory cache took
+    eurlex parse with nothing stale from 1172 s to 127 s (2026-09-06). A
+    ProcessPoolExecutor, not multiprocessing.Pool: a scan worker runs no
+    parser, so the heap corruption that made the build pool grow a corpse
+    sweep (see `_run_parallel`) has nothing to strike, and a worker that dies
+    anyway is a defect the executor reports as BrokenProcessPool rather than
+    silence (rule:fail-fast)."""
+    return util.pooled(
+        functools.partial(_scan_job, source.name, action, force, protocol.RUN.no_deps),
+        basefiles, jobs, chunk=SCAN_CHUNK, timeout=LOST_RESULT_TIMEOUT,
+        initializer=_worker_init, initargs=(protocol.RUN,))
+
+
+def _scan(source, action, basefiles, force, merged, expected, counts, jobs):
+    """Walk `basefiles` once, a chunk of `SCAN_CHUNK` at a time, and yield
+    the ones that need a worker, as each chunk's answer lands. A fresh
+    document is booked into `merged.fresh` on the spot and never reaches the
+    pool -- the round-trip a fresh document used to cost (eurlex parse:
+    43-52 s for 172,000 of them with nothing to parse, 2026-09-03) is gone,
+    and so is the separate whole-source fingerprint pass that existed to
+    spare it. `expected[basefile]` gets the manifest's last build seconds
+    (None when never built), what the dispatcher orders on and the ETA
+    weighs. `counts["fresh"]` is the number of documents booked fresh --
+    `merged.fresh` holds one ``(stage, basefile)`` pair per stage of a fresh
+    document's chain, so its length is not that number.
+
+    Reports as "checking staleness" on the usual status line as chunks
+    land (`util.status_throttle`); the first and last chunk always report."""
     total = len(basefiles)
-    last_report = 0.0
-    stale = 0
-    for done, bf in enumerate(basefiles, 1):
-        if _cheaply_fresh(source, action, bf, manifest, force,
-                          protocol.RUN.no_deps, merged.fresh):
-            counts["fresh"] += 1
-        else:
-            entry = manifest.get(manifest_key(source.name, action, bf))
-            expected[bf] = entry.get("secs") if entry else None
-            stale += 1
+    report = util.status_throttle()
+    done = stale = 0
+    for found, fresh, n_fresh in _scan_results(source, action, basefiles, force, jobs):
+        merged.fresh += fresh
+        counts["fresh"] += n_fresh
+        done += len(found) + n_fresh
+        stale += len(found)
+        report(done, total, "%s %s  checking staleness  %d stale"
+               % (source.name, action, stale))
+        for bf, secs in found:
+            expected[bf] = secs
             yield bf
-        now = time.perf_counter()
-        if done == total or now - last_report >= _REPORT_INTERVAL:
-            util.status(done, total, "%s %s  checking staleness  %d stale"
-                        % (source.name, action, stale))
-            last_report = now
 
 
 def _priority(expected, basefile):
@@ -732,9 +780,9 @@ def run_action(source, action, basefiles, jobs, force=None):
         return w
     def feed():
         nonlocal total_work
-        for bf in _scan(source, action, basefiles, manifest,
+        for bf in _scan(source, action, basefiles,
                         protocol.RUN.force if force is None else force,
-                        merged, expected, counts):
+                        merged, expected, counts, jobs):
             total_work += weight(bf)
             yield bf
     def persist():
@@ -823,6 +871,24 @@ class Manifest:
         row = self.con.execute("SELECT entry FROM manifest WHERE key = ?",
                                (key,)).fetchone()
         return json.loads(row[0]) if row else None
+
+    # SQLite's default variable ceiling is 32,766; well under it per statement
+    GET_MANY_BATCH = 900
+
+    def get_many(self, keys):
+        """``{key: entry}`` for the keys that exist, a few hundred per
+        statement. One `get` is one SQLite transaction, and a transaction on
+        the production NFS mount costs four lock round trips plus the cache
+        invalidation they force -- 2.5 ms, half of what a staleness check per
+        document cost (2026-09-06). The scan asks for a chunk's keys at once
+        instead."""
+        found = {}
+        for batch in itertools.batched(keys, self.GET_MANY_BATCH, strict=False):
+            found.update(
+                (k, json.loads(v)) for k, v in self.con.execute(
+                    "SELECT key, entry FROM manifest WHERE key IN (%s)"
+                    % ",".join("?" * len(batch)), batch))
+        return found
 
     def update(self, entries):
         if not entries:

@@ -7,6 +7,8 @@ policy surface added for the raw ``downloaded/`` tree."""
 import json
 from pathlib import Path
 
+import pytest
+
 from ferenda import config
 from ferenda.lib import compress
 
@@ -235,3 +237,34 @@ def test_write_download_compares_the_logical_bytes_not_the_stored_ones(tmp_path,
     assert compress.write_download(path, payload) is True
     assert (tmp_path / "landing.html.br").exists()
     assert compress.write_download(path, payload) is False
+
+
+def test_dir_cache_answers_from_one_scandir_per_directory(tmp_path, monkeypatch):
+    # the freshness scan's lookups: under dir_cache a logical path resolves,
+    # exists and stats from the directory's one listing (its DirEntry), and a
+    # glob walks the same listings; a name created while the block runs is
+    # not seen until it ends, which is why only readers may sit inside one
+    d = tmp_path / "a"
+    d.mkdir()
+    (d / "x.json.br").write_bytes(b"1")
+    (d / "y.json").write_bytes(b"22")
+    scandirs = []
+    real = compress.os.scandir
+    monkeypatch.setattr(compress.os, "scandir",
+                        lambda p: scandirs.append(str(p)) or real(p))
+    with compress.dir_cache():
+        assert compress.resolve(d / "x.json") == d / "x.json.br"
+        assert compress.exists(d / "y.json") and not compress.exists(d / "z.json")
+        assert compress.stat(d / "y.json").st_size == 2
+        assert compress.glob(tmp_path, "*/*.json") == {d / "x.json", d / "y.json"}
+        assert compress.glob(tmp_path / "missing", "*.json") == set()
+        (d / "z.json").write_bytes(b"3")
+        assert not compress.exists(d / "z.json")
+        with pytest.raises(FileNotFoundError):
+            compress.stat(d / "z.json")
+        with pytest.raises(AssertionError, match="does not nest"):
+            with compress.dir_cache():
+                pass
+    assert scandirs.count(str(d)) == 1 and scandirs.count(str(tmp_path)) == 1
+    assert compress.exists(d / "z.json")          # outside the block: the filesystem
+    assert compress.resolve(d / "x.json") == d / "x.json.br"
