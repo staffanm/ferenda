@@ -220,6 +220,18 @@ services:
     depends_on:
       - opensearch   # start order only, not a health gate: serving + the CLI don't
                       # need a live OpenSearch (see api/app.py), only /search does
+    # What "up" means for this service. `up -d` returning only says the
+    # container started; the deploy needs to know the app answers, and answers
+    # with a readable catalog and a generated site behind it (/healthz, see
+    # api/app.py). OpenSearch is reported by that endpoint but never gates it:
+    # the site serves without search.
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     restart: always
     logging:
       options:

@@ -63,6 +63,9 @@ def client(tmp_path):
 
     # a fake search backend -- the API must not require a live OpenSearch
     class FakeIndex:
+        def alive(self):
+            return True
+
         def search(self, q, source=None, kind=None, year=None, limit=10, offset=0,
                    cursor=None, sort="relevance"):
             self.last_sort = sort
@@ -618,6 +621,26 @@ def test_site_asset_revalidation_304(client, tmp_path, monkeypatch):
                                                   "If-None-Match": etag})
         assert again.status_code == 304
         assert not again.content
+    finally:
+        api.app.router.routes.pop()                               # unmount
+
+
+def test_a_bare_document_url_answers_head_with_no_body(client, tmp_path,
+                                                       monkeypatch):
+    """The deploy's smoke test asks for /1962:700 with HEAD rather than GET --
+    it is one of the largest pages in the corpus and the status code is the
+    whole answer. So HEAD has to resolve the bare-URL grammar exactly as GET
+    does, and return no body."""
+    monkeypatch.setattr(config, "COMPRESS", True)
+    site = tmp_path / "site"
+    site.mkdir()
+    compress.write_text(site / "1998:9999.html", "<html>page</html>")
+    api.app.mount("/", api.SiteFiles(directory=str(site), html=True), name="site")
+    try:
+        assert client.get("/1998:9999").status_code == 200
+        head = client.head("/1998:9999")
+        assert head.status_code == 200
+        assert not head.content
     finally:
         api.app.router.routes.pop()                               # unmount
 
@@ -1248,6 +1271,31 @@ def test_card_answers_names_address_and_opening_words(client):
     assert client.get("/api/v1/card").status_code == 422
     assert client.get("/api/v1/card", params={
         "uri": "https://lagen.nu/x"}).status_code == 404
+
+
+def test_healthz_reports_the_three_things_a_start_gets_wrong(
+        client, monkeypatch, tmp_path):
+    """The deploy's gate. `ok` covers the app, the catalog and the generated
+    tree; OpenSearch is reported beside it, never inside it -- the site serves
+    without search."""
+    monkeypatch.setattr(layout, "GENERATED", tmp_path)
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["catalog"] is True and body["generated"] is True
+    assert "search" in body and "revision" in body
+
+
+def test_healthz_is_503_when_the_generated_tree_is_gone(
+        client, monkeypatch, tmp_path):
+    """A container that started with its corpus mount missing serves 404s and
+    looks alive. The health check has to call that unhealthy, or the deploy
+    reports success over an empty site."""
+    monkeypatch.setattr(layout, "GENERATED", tmp_path / "gone")
+    r = client.get("/healthz")
+    assert r.status_code == 503
+    assert r.json()["ok"] is False and r.json()["generated"] is False
 
 
 def test_concurrent_browse_misses_scan_the_catalog_once(client, monkeypatch):

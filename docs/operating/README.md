@@ -468,9 +468,27 @@ image `CMD`); the `nginx` vhost reverse-proxies to it on `:8000`. The app
 resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
 rules. One SAN certificate covers both vhosts; the `certbot` sidecar renews it.
 
-**Continuous deploy + nightly sync.** Pushes to `main` trigger
-`.github/workflows/deploy.yml` on a self-hosted runner on the prod host (update
-checkout → build → `up -d` → `lagen all rebuild`). `staffan`'s crontab runs the
+**Continuous deploy + nightly sync.** A push to `main` runs
+`.github/workflows/deploy.yml`. Its first job is `checks`
+(`.github/workflows/checks.yml`, a GitHub-hosted runner: pytest, ruff, ty, the
+layer rule, `pip-audit`); the deploy job does not start unless it passes. The
+deploy itself runs on the self-hosted runner on the prod host: update checkout
+→ tag the outgoing image `lagen-ferenda:previous` → build → `up -d` → wait for
+the container health check → smoke-test the public site through nginx →
+publish the browser chrome. Any failure after the build puts
+`lagen-ferenda:previous` back and restarts, so a release that does not come up
+leaves the previous one serving.
+
+The health check is `GET /healthz`: the app imported, `catalog.sqlite` answers
+a query, and the generated tree is mounted. OpenSearch is reported beside those
+three and never gates them — the site serves without search.
+
+The deploy `reset --hard`s `~/wds/ferenda`, which holds the bind-mounted nginx
+confs. It now saves the diff of a dirty tree to `~/wds/deploy-lost/<stamp>.patch`
+first, so a host-side edit is recoverable. A recent git lock file stops the
+deploy instead of being deleted; one older than an hour is removed as stale.
+
+The same push does **not** fold in data. `staffan`'s crontab does that. `staffan`'s crontab runs the
 pipeline as inlined `docker compose exec` lines: `lagen all all` nightly (which
 now skips the browser-shielded föreskrift agencies skvfs/mtfs), plus a weekly
 `lagen foreskrift browser-download` (Sundays) for those — the headful-Chrome

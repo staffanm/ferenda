@@ -1,0 +1,59 @@
+# The mechanical checks, in one place so CI and the deploy run the same ones.
+#
+# Called by ci.yml (every branch and pull request) and by deploy.yml (which
+# will not deploy unless this job passes). GitHub-hosted runner, not the
+# self-hosted one on the production host: the suite is 75 seconds of CPU and
+# the host is busy serving.
+#
+# The apt list is the subset of the image's toolchain the tests actually shell
+# out to -- measured, by shadowing each binary and running the suite: without
+# poppler-utils, antiword and a JRE, 42 tests fail; ocrmypdf, tesseract and
+# raptor2-utils are only used by paths the suite does not run.
+name: checks
+
+on:
+  workflow_call: {}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System tools the tests shell out to
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            poppler-utils antiword default-jre-headless
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install the pinned dependencies
+        run: uv sync --frozen
+
+      # test_poi.py reads .doc/.docx through POI, which needs the jar stack;
+      # the script verifies each jar's SHA-256 before keeping it
+      - name: POI jars
+        run: bash tools/operations/fetch_poi.sh
+
+      - name: ruff
+        run: uv run ruff check ferenda
+
+      - name: ty
+        run: uv run ty check ferenda
+
+      # the layer rule (docs/conventions.md): lib/ must not import a source
+      - name: layers
+        run: uv run python .claude/hooks/check-layers.py
+
+      - name: pytest
+        run: uv run pytest -q
+
+      # advisories against the frozen lock -- reported, not gating: a new CVE
+      # in a transitive dependency must not block a deploy that is unrelated
+      # to it, and the honest place to see it is the run's log
+      - name: pip-audit
+        continue-on-error: true
+        run: uv run pip-audit --local

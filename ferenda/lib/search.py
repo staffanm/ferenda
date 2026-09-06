@@ -35,7 +35,10 @@ import time
 
 from opensearchpy import OpenSearch, helpers
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
-from opensearchpy.exceptions import ConnectionTimeout, TransportError
+from opensearchpy.exceptions import (
+    ConnectionTimeout,
+    TransportError,
+)
 
 from .. import config
 from . import catalog, catalog_rows, compress, facets, layout, malnummer, text
@@ -866,6 +869,19 @@ class SearchIndex:
         self.client = OpenSearch(
             hosts=[url or config.OPENSEARCH_URL], pool_maxsize=pool_maxsize,
             timeout=REQUEST_TIMEOUT, max_retries=3, retry_on_timeout=True)
+
+    def alive(self):
+        """Whether the cluster answers at all. One ping, no retry: the caller
+        is a health check, and "slow to answer" is the answer.
+
+        No `except` around it. `ping` already turns every transport failure --
+        the cluster being down, refusing, or timing out -- into `False`, so a
+        handler here would catch only the faults that are not about the
+        cluster at all: a malformed `OPENSEARCH_URL`, an unsupported server, a
+        serialization bug. Those must be loud. Swallowed, they would show as
+        `search: false` for ever, and since `/healthz` keeps `search` outside
+        `ok`, nothing would ever go red (rule:fail-fast)."""
+        return bool(self.client.ping())
 
     def ensure_index(self, recreate=False):
         def go():

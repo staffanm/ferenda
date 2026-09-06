@@ -1256,6 +1256,39 @@ def outbound_endpoint(uri: str = Query(..., description="citing document uri"),
     return [Citation(**row) for row in reads.outbound(con, uri)]
 
 
+class Health(BaseModel):
+    """What `/healthz` reports. `ok` is the deploy gate; `search` is beside it
+    rather than inside it, because the site serves without OpenSearch."""
+
+    ok: bool = Field(description="the app started, the catalog reads and the "
+                     "generated site is on disk")
+    catalog: bool = Field(description="catalog.sqlite answers a query")
+    generated: bool = Field(description="the generated site root is present")
+    search: bool = Field(description="OpenSearch answers -- reported, never "
+                         "part of `ok`: only /search needs it")
+    revision: str = Field(description="the deployed git revision, as baked in")
+
+
+@app.get("/healthz", response_model=Health, include_in_schema=False)
+def healthz(response: Response, con: sqlite3.Connection = Depends(get_con)):
+    """Whether this instance is serving. The Compose health check and the
+    deploy's smoke test read it, so it has to test the three things a start
+    can silently get wrong -- the app imported, the catalog is readable, the
+    generated tree is mounted -- and nothing that takes real work.
+
+    OpenSearch is reported separately on purpose. The site is a static tree
+    plus a catalog; only /search needs the cluster, and gating the deploy on
+    it would refuse a perfectly good release because a sidecar was slow to
+    start."""
+    catalog_ok = bool(con.execute("select 1 from documents limit 1").fetchone())
+    generated_ok = layout.GENERATED.is_dir()
+    search_ok = _index.alive()
+    ok = catalog_ok and generated_ok
+    response.status_code = 200 if ok else 503
+    return Health(ok=ok, catalog=catalog_ok, generated=generated_ok,
+                  search=search_ok, revision=os.environ.get("GIT_SHA", "unknown"))
+
+
 @app.get("/api/v1/sources", response_model=list[SourceInfo], tags=["catalog"],
          summary="The corpus' sources and their document counts")
 def sources_endpoint(con: sqlite3.Connection = Depends(get_con)):

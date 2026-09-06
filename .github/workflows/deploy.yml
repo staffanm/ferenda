@@ -52,7 +52,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Tests, lint, types and the layer rule, on a GitHub-hosted runner. The
+  # deploy waits for it: a push used to go straight to `docker compose build`
+  # on the production host, so a commit that did not import was found by
+  # readers rather than by CI.
+  checks:
+    uses: ./.github/workflows/checks.yml
+
   deploy:
+    needs: checks
     runs-on: [self-hosted, lagen-nu]
     # No actions/checkout: we deploy the persistent on-box checkout, not the
     # runner's throwaway workspace.
@@ -65,9 +73,32 @@ jobs:
         run: |
           set -euo pipefail
           cd "$CODE"
-          # A prior run cancelled mid-git (e.g. a rebuild timeout) can leave a
-          # stale lock that fails the next fetch/reset with exit 128; clear it first.
-          rm -f .git/index.lock .git/shallow.lock .git/refs/remotes/origin/*.lock || true
+          # A prior run cancelled part way through (e.g. a rebuild timeout) can
+          # leave a stale lock that fails the next fetch/reset with exit 128.
+          # Only a lock nothing can still own is removed: an hour is far longer
+          # than any operation here takes, and deleting a live one corrupts the
+          # repository of whoever holds it.
+          for lock in .git/index.lock .git/shallow.lock .git/refs/remotes/origin/*.lock; do
+            [ -e "$lock" ] || continue
+            if [ -n "$(find "$lock" -mmin +60 2>/dev/null)" ]; then
+              echo "removing stale $lock (older than an hour)" >&2
+              rm -f "$lock"
+            else
+              echo "$lock exists and is recent -- something may still hold it." >&2
+              echo "Stopping here; remove it by hand to continue." >&2
+              exit 1
+            fi
+          done
+          # `reset --hard` below destroys uncommitted work in this tree, and
+          # this tree holds the bind-mounted nginx confs -- edited on the host
+          # more than once. Keep a copy of whatever is about to be lost.
+          if [ -n "$(git status --porcelain)" ]; then
+            mkdir -p ~/wds/deploy-lost
+            patch=~/wds/deploy-lost/$(date +%Y%m%d-%H%M%S).patch
+            git diff HEAD > "$patch"
+            git status --porcelain > "$patch.status"
+            echo "the checkout was dirty; saved the diff to $patch" >&2
+          fi
           # Retry the fetch: transient GitHub connectivity has intermittently 128'd
           # this step (it self-heals on the next push, but shouldn't fail a deploy).
           # git's own stderr is printed, so a genuine, persistent failure is visible.
@@ -83,6 +114,15 @@ jobs:
         run: |
           set -euo pipefail
           cd "$CODE"
+          # Keep the image that is serving right now under a fixed tag, so the
+          # rollback step has something to put back. `docker compose build`
+          # overwrites the project's tag, and without this the previous image
+          # becomes a dangling layer nobody can name.
+          current="$(docker compose images -q ferenda || true)"
+          if [ -n "$current" ]; then
+            docker tag "$current" lagen-ferenda:previous
+            echo "$current" > /tmp/ferenda-previous-image
+          fi
           # bake the deployed revision into the image (the ops dashboard reads it);
           # .git is dockerignored, so there's no repo to rev-parse at runtime.
           GIT_SHA="${GITHUB_SHA}" docker compose build ferenda
@@ -92,6 +132,59 @@ jobs:
           set -euo pipefail
           cd "$CODE"
           docker compose --profile prod up -d ferenda
+
+      # `up -d` returning says the container started, nothing more. The
+      # container's health check asks the app itself (/healthz: it imported,
+      # the catalog reads, the generated tree is mounted -- see api/app.py), so
+      # this waits for that to pass. Before this step existed, a release that
+      # started and answered 500 to everything was reported as a successful
+      # deploy.
+      - name: Wait for the app to report healthy
+        id: health
+        run: |
+          set -euo pipefail
+          cd "$CODE"
+          for attempt in $(seq 1 60); do
+            cid="$(docker compose ps -q ferenda || true)"
+            status="$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || true)"
+            [ "$status" = healthy ] && exit 0
+            [ "$status" = unhealthy ] && break
+            echo "ferenda health is '${status:-unknown}' -- waiting ($attempt/60)"
+            sleep 5
+          done
+          echo "ferenda never became healthy" >&2
+          docker compose logs --tail 100 ferenda >&2
+          exit 1
+
+      # Through nginx, the way a reader arrives: the health check above talks to
+      # the app on the compose network, which says nothing about the proxy in
+      # front of it. One document page and the API's own root.
+      - name: Smoke-test the public site
+        run: |
+          set -euo pipefail
+          # Two small JSON answers, fetched whole.
+          for path in /healthz /api/v1/sources; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' \
+                    --resolve lagen.nu:443:127.0.0.1 "https://lagen.nu$path")"
+            echo "GET $path -> $code"
+            [ "$code" = 200 ] || { echo "$path answered $code" >&2; exit 1; }
+          done
+          # One real document page, to prove the bare-URL grammar still
+          # resolves (/1962:700 -> generated/1962:700.html, inside the app, not
+          # in nginx). HEAD, not GET: this is the most stable URL in the
+          # corpus and also one of the largest pages in it, and the status code
+          # is the whole answer a smoke test needs.
+          code="$(curl -sS -I -o /dev/null -w '%{http_code}' \
+                  --resolve lagen.nu:443:127.0.0.1 https://lagen.nu/1962:700)"
+          echo "HEAD /1962:700 -> $code"
+          [ "$code" = 200 ] || { echo "/1962:700 answered $code" >&2; exit 1; }
+          # the headers the vhost is supposed to add (docker/nginx/*.conf)
+          headers="$(curl -sSI --resolve lagen.nu:443:127.0.0.1 https://lagen.nu/)"
+          for header in Strict-Transport-Security X-Content-Type-Options \
+                        Content-Security-Policy X-Frame-Options; do
+            echo "$headers" | grep -qi "^$header:" \
+              || { echo "missing $header" >&2; exit 1; }
+          done
 
       # The pages link /style.css and /script.js by URL, and the serve reads them
       # from `generated/` -- a bind-mounted host tree, not the image. Without this
@@ -128,3 +221,17 @@ jobs:
             sleep 2
           done
           docker compose exec -T ferenda lagen all generate --assets-only
+
+      # Put the previous image back when the candidate does not come up. The
+      # site is then serving the release before this one, which is a working
+      # site -- the alternative is a container that restarts forever while
+      # nobody is looking.
+      - name: Roll back to the previous image
+        if: failure()
+        run: |
+          set -euo pipefail
+          cd "$CODE"
+          [ -f /tmp/ferenda-previous-image ] || { echo "no previous image recorded" >&2; exit 1; }
+          docker tag "$(cat /tmp/ferenda-previous-image)" lagen-ferenda:current
+          docker compose --profile prod up -d ferenda
+          echo "rolled back to the image that was serving before this run" >&2
