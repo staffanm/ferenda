@@ -6,9 +6,18 @@
 # the host is busy serving.
 #
 # The apt list is the subset of the image's toolchain the tests actually shell
-# out to -- measured, by shadowing each binary and running the suite: without
-# poppler-utils, antiword and a JRE, 42 tests fail; ocrmypdf, tesseract and
-# raptor2-utils are only used by paths the suite does not run.
+# out to: without poppler-utils, antiword and a JRE, 42 tests fail, and
+# ghostscript is needed by the one test that exercises `pdftext.repair_pdf`
+# (test_a_pdf_with_an_unreadable_xref_is_repaired_not_lost, which rebuilds an
+# unreadable cross-reference table). ocrmypdf, tesseract and raptor2-utils are
+# only used by paths the suite does not run.
+#
+# The list to check this against is every binary the package shells out to:
+#   grep -rhoE 'subprocess\.(run|Popen|check_output)\(\s*\[\s*"[a-z0-9_-]+"' \
+#     --include=*.py ferenda/ | grep -oE '"[a-z0-9_-]+"$' | sort -u
+# which today is antiword, git, gs, ocrmypdf, pdfinfo, pdftohtml and
+# pdftotext. It misses a call site that builds its argv in a variable --
+# `facsimile._pdftoppm` is one -- so it is a starting point, not the answer.
 name: checks
 
 on:
@@ -24,7 +33,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            poppler-utils antiword default-jre-headless
+            poppler-utils antiword default-jre-headless ghostscript
 
       - uses: astral-sh/setup-uv@v5
         with:
