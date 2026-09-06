@@ -94,10 +94,9 @@ services:
       # parent-child join). Raise it only against evidence -- an old-GC count
       # that climbs, or fielddata/query-cache evictions in _nodes/stats.
       #
-      # Room came from retiring the legacy Elasticsearch container entirely
-      # (2026-08-17: it held 3g of heap and a 15GB index) and from fuseki (2g)
-      # now running ONLY during the nightly legacy regen, which the host cron
-      # start/stops around `build all all`, so it isn't resident by day.
+      # Room came from retiring two legacy containers: Elasticsearch
+      # (2026-08-17: 3g of heap and a 15GB index) and fuseki (2026-09-06: 2g,
+      # see the note below), neither of which is on this host any more.
       - OPENSEARCH_JAVA_OPTS=-Xms1536m -Xmx1536m
     ulimits:
       memlock:
@@ -400,8 +399,6 @@ services:
       - /home/staffan/wds/ferenda-legacy:/usr/share/ferenda
       - /home/staffan/wds/ferenda-legacy/lagen/nu/res/patches:/usr/share/lagen/nu/res/patches
     restart: always
-    depends_on:
-      - fuseki
     stdin_open: true
     logging:
       options:
@@ -414,30 +411,23 @@ services:
   # handle_retired_search) and ferenda.ini sets fulltextindex = False, so relate
   # writes nothing. The data is still at /mnt/data/elasticsearch (15 GB) if the
   # decision has to be revisited; git history holds the service definition.
-  fuseki:
-    # The legacy triple store. Its build context (docker/fuseki/) lives on the
-    # `legacy` branch, not here, and it no longer builds anyway: the base image
-    # is old enough that its `apt-get` step fails (exit 100, 2026-08-19). The
-    # tag is the artifact. `pull_policy: never` makes a missing tag say "image
-    # not found locally" instead of a misleading "pull access denied".
-    image: lagen-fuseki:legacy
-    pull_policy: never
-    container_name: lagen-fuseki
-    profiles: [prod]
-    volumes:
-      - fuseki:/fuseki
-    environment:
-      - "JVM_ARGS=-Xmx2g"
-      - "FUSEKI_DATASET_1=lagen"
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
+  # fuseki (the legacy triple store) retired 2026-09-06: it held 2 GB of heap
+  # for a corpus nothing writes any more. Only the legacy `build all all`
+  # wrote triples, and that nightly is gone from the crontab; old.lagen.nu is
+  # frozen and serves from its generated files. Measured before removal: with
+  # the legacy site live, fuseki logged zero requests over 20 minutes and
+  # ferenda-legacy held no established connection to it. Its ferenda.ini still
+  # reads `storetype = FUSEKI` / `storelocation = http://fuseki:3030/`, which
+  # now names nothing -- harmless while nothing queries, and the thing to
+  # change first if a legacy page ever turns out to need SPARQL.
+  #
+  # The data survives in the docker volume `ferenda_fuseki`, which is
+  # deliberately NOT declared below any more but is not deleted by that; remove
+  # it with `docker volume rm` once you are sure. git history holds the service
+  # definition, and the `lagen-fuseki:legacy` image tag is still on the host.
   mediawiki:
-    # The legacy wiki, still serving /wiki/ and /w/ on lagen.nu. Same
-    # arrangement as fuseki: the build context is on the `legacy` branch and the
-    # pre-built tag is the artifact.
+    # The legacy wiki, still serving /wiki/ and /w/ on lagen.nu. Its build
+    # context is on the `legacy` branch and the pre-built tag is the artifact.
     image: lagen-mediawiki:legacy
     pull_policy: never
     container_name: lagen-mediawiki
@@ -524,7 +514,6 @@ volumes:
   # Matomo's application tree -- see the matomo service for why it is named and
   # what an upgrade of it involves.
   matomo-app:
-  fuseki:
   # The OpenSearch index (~28 G) lives on the roomy /mnt/forstor NFS, not the
   # local docker-root disk. A bind-type local volume keeps the volume NAME
   # (ferenda_opensearch-data) stable -- so `sync-up index` still targets it by
