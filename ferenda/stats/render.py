@@ -53,12 +53,8 @@ _PAGE = charts.ENV.get_template("stats.html")
 
 
 def _as_row(d):
-    """One artifact row back as a `Row`, its `steps` with it -- a row that
-    carries a chain holds rows of its own, and `Row(**d)` would leave them as
-    the dicts they are on disk."""
-    row = Row(**{k: v for k, v in d.items() if k != "steps"})
-    row.steps = [Row(**step) for step in d.get("steps", [])]
-    return row
+    """One artifact row back as a `Row`."""
+    return Row(**d)
 
 
 def _as_measure(d):

@@ -362,8 +362,8 @@ def eurlex_refresh_metadata(args):
     already record a repeal -- a repeal never lifts, so the audit shrinks each
     time it runs. `--all` widens that to the whole corpus, repealed acts
     included: the audit's skip is right for repeals but wrong for a *new*
-    metadata field, and the amends/implements relations measure 56 needs are
-    one (a repealed act amends things too). Re-run `parse` and `relate`
+    metadata field, and the amends/implements relations are one (a repealed act
+    amends things too). Re-run `parse` and `relate`
     afterwards: the metadata reaches the catalog through the artifact, the way
     every other extracted fact does."""
     celexes = (download.list_basefiles(layout.EURLEX_DOWNLOADED)
