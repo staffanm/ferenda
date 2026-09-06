@@ -161,6 +161,42 @@ def test_a_key_two_cases_claim_identifies_neither(tmp_path):
         "ECLI:OWN": "001-3"}
 
 
+def test_one_walk_indexes_both_joins_exactly_as_two_would(tmp_path, monkeypatch):
+    """Both joins need an index over the same records, and reading the store is
+    what the step costs -- 0.739 ms per record on the production NFS against
+    0.006 ms to parse one, over 47,253 records. `unique_indexes` reads it once
+    for both. It has to give exactly what two separate walks gave, ambiguity
+    dropped per key function and not shared between them: the pair here is
+    claimed twice, the ECLI once."""
+    root = _store(tmp_path, [
+        {"itemid": "001-1", "appno": "1/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "ENG", "ecli": "ECLI:ONE"},
+        {"itemid": "001-2", "appno": "1/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "ENG", "ecli": "ECLI:TWO"},
+        {"itemid": "001-3", "appno": "3/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "ENG", "ecli": "ECLI:THREE"},
+    ])
+    quiet = lambda _: None
+    # count the reads: the point of unique_indexes is ONE pass over the store,
+    # and equality alone would stay green if the second walk came back
+    reads = []
+    real = download.compress.read_json
+    monkeypatch.setattr(download.compress, "read_json",
+                        lambda p, *a, **k: (reads.append(p), real(p, *a, **k))[1])
+    both = download.unique_indexes(
+        root, {"summaries": summaries.INDEX_SPEC,
+               "translations": translations.INDEX_SPEC}, log=quiet)
+    assert len(reads) == 3, "three stored cases, one walk -- got %d reads" % len(reads)
+    monkeypatch.undo()
+    assert both["summaries"] == summaries.held_index(root, log=quiet)
+    assert both["translations"] == translations.held_by_ecli(root, log=quiet)
+    # and the two do not contaminate each other: the shared pair is gone from
+    # one index while both ECLIs survive in the other
+    assert both["summaries"] == {("3/11", "2015-12-04"): "001-3"}
+    assert both["translations"] == {"ECLI:ONE": "001-1", "ECLI:TWO": "001-2",
+                                    "ECLI:THREE": "001-3"}
+
+
 def test_two_language_versions_of_one_case_refuse_to_index(tmp_path):
     """The other cause of a shared key: a store harvested with --lang ENG,FRE
     holds every case twice, and no join can tell the two apart."""

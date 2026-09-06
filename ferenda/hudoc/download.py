@@ -287,29 +287,56 @@ def unique_index(root, key_of, label, log=print):
     date) pairs are claimed by more than one case, every one of them
     same-language, costing 51 cases their key. The judgments-only store this
     started from had none, which is why both joins first assumed uniqueness."""
+    return unique_indexes(root, {label: (key_of, label)}, log=log)[label]
+
+
+def unique_indexes(root, specs, log=print):
+    """`unique_index` for several key functions at once, from **one** walk of
+    the store -- `specs` is `{name: (key_of, label)}` and the answer is
+    `{name: index}`.
+
+    The walk is the whole cost. A record is 0.6 kB and parsing one takes
+    0.006 ms, so a pass is 47,253 file reads and nothing else: 0.739 ms each on
+    the production NFS against 0.042 ms on a local disk. Both joins need an
+    index over the same records, and building them separately read the store
+    twice -- 70 s of a 224 s hudoc step on 2026-09-06, for a harvest that saw
+    84 cases and changed none.
+
+    (Concurrency was measured and not kept. Eight readers cut a pass from 35 s
+    to 16 s on the NFS but cost 40% on a local disk, where there is no latency
+    to hide and the JSON parsing holds the GIL. This halves the work on every
+    machine instead.)"""
     basefiles = list_basefiles(root)
-    index, languages, ambiguous = {}, {}, set()
+    indexes = {name: {} for name in specs}
+    languages = {name: {} for name in specs}
+    ambiguous = {name: set() for name in specs}
     for done, basefile in enumerate(basefiles, 1):
         util.status(done, len(basefiles), "hudoc  indexing stored cases")
         record = compress.read_json(record_path(root, basefile))
         language = record.get("languageisocode")
-        for key in key_of(record):
-            if key not in index:
-                index[key], languages[key] = basefile, language
-            elif language != languages[key]:
-                raise ValueError(
-                    "%s and %s share %s %s in different languages -- the store "
-                    "holds more than one expression of this case, and no join "
-                    "can tell them apart (see --lang)"
-                    % (index[key], basefile, label, key))
-            else:
-                ambiguous.add(key)
+        for name, (key_of, label) in specs.items():
+            index, seen, dropped = indexes[name], languages[name], ambiguous[name]
+            for key in key_of(record):
+                if key not in index:
+                    index[key], seen[key] = basefile, language
+                elif language != seen[key]:
+                    raise ValueError(
+                        "%s and %s share %s %s in different languages -- the "
+                        "store holds more than one expression of this case, "
+                        "and no join can tell them apart (see --lang)"
+                        % (index[key], basefile, label, key))
+                else:
+                    dropped.add(key)
     sys.stderr.write("\n")                 # close the live counter's line
-    for key in ambiguous:
-        del index[key]
-    log("  indexed %d stored cases; %d %s claimed by more than one case "
-        "identify none" % (len(basefiles), len(ambiguous), label))
-    return index
+    # the corpus total once, then one line per key function -- repeating the
+    # total per spec reads to an operator as the two walks this replaced
+    log("  indexed %d stored cases" % len(basefiles))
+    for name, (_key_of, label) in specs.items():
+        for key in ambiguous[name]:
+            del indexes[name][key]
+        log("    %d %s claimed by more than one case identify none"
+            % (len(ambiguous[name]), label))
+    return indexes
 
 
 def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES,

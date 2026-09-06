@@ -78,12 +78,16 @@ def _ecli(record):
     return [record["ecli"]] if record.get("ecli") else []
 
 
+# see summaries.INDEX_SPEC -- the other half of the one walk source.py makes
+INDEX_SPEC = (_ecli, "ECLI")
+
+
 def held_by_ecli(root, log=print):
     """ECLI -> item id over the harvested records. An ECLI claimed by two stored
     cases identifies neither and is dropped; see `download.unique_index` for why
     that is the honest answer and when it raises instead. None of the 87
     translations reaches such an ECLI today."""
-    return download.unique_index(root, _ecli, "ECLI", log=log)
+    return download.unique_index(root, *INDEX_SPEC, log=log)
 
 
 def _translator(record):
@@ -93,7 +97,7 @@ def _translator(record):
     return tail.strip().removeprefix("by ").strip() if marker else None
 
 
-def proposals(session, root, log=print):
+def proposals(session, root, log=print, index=None):
     """`(matched, unmatched, doubled)` -- matched pairs each held item id with
     the translation record to link from it; unmatched are translations whose
     original the store does not hold; doubled are the further translations of a
@@ -104,7 +108,7 @@ def proposals(session, root, log=print):
     Swedish text, so a draft links the newest and the rest are returned to be
     named in the log -- dropping them silently would leave the choice of item id
     to result order."""
-    index = held_by_ecli(root, log=log)
+    index = held_by_ecli(root, log=log) if index is None else index
     matched, unmatched, doubled = {}, [], []
     for record in translation_records(session):
         translator = _translator(record)
@@ -145,9 +149,9 @@ def write_drafts(wiki_root, matched, log=print):
     return written, kept
 
 
-def propose(root, wiki_root, dry_run=False, log=print):
+def propose(root, wiki_root, dry_run=False, log=print, index=None):
     session = make_session(download.USER_AGENT)
-    matched, unmatched, doubled = proposals(session, root, log=log)
+    matched, unmatched, doubled = proposals(session, root, log=log, index=index)
     for record in unmatched:
         log("  no stored original for %s (%s) -- %s"
             % (record["itemid"], record.get("ecli"),

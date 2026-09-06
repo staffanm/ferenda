@@ -56,13 +56,20 @@ def _key(record):
             if appno and day]
 
 
+# what `download.unique_indexes` needs to build this join's index, exported so
+# one walk of the store can serve this join and translations' at once
+INDEX_SPEC = (_key, "application number and date")
+
+
 def held_index(root, log=print):
     """`(appno, date)` -> item id over the harvested records. A pair claimed by
     two stored cases identifies neither and is dropped; see
     `download.unique_index` for why that is the honest answer and when it
-    raises instead."""
-    return download.unique_index(root, _key, "application number and date",
-                                 log=log)
+    raises instead.
+
+    Builds its own walk. `sync` takes a prebuilt `index` instead, so a run that
+    also drafts translations reads the store once rather than twice."""
+    return download.unique_index(root, *INDEX_SPEC, log=log)
 
 
 def summary_records(session, delay=0.2):
@@ -73,10 +80,11 @@ def summary_records(session, delay=0.2):
                                       delay=delay)
 
 
-def resolve(root, records, log=print):
+def resolve(root, records, log=print, index=None):
     """Match each summary to the case it summarises. Returns
-    `(matched, unmatched)`, matched as `{basefile: record}`."""
-    index = held_index(root, log=log)
+    `(matched, unmatched)`, matched as `{basefile: record}`. `index` is a
+    prebuilt `held_index`; without one this walks the store itself."""
+    index = held_index(root, log=log) if index is None else index
     matched, unmatched = {}, 0
     for record in records:
         hosts = {index[key] for key in _key(record) if key in index}
@@ -133,10 +141,10 @@ def store(root, matched, log=print):
     return changed, removed
 
 
-def sync(root, delay=0.2, log=print):
+def sync(root, delay=0.2, log=print, index=None):
     session = make_session(download.USER_AGENT)
     matched, unmatched = resolve(
-        root, summary_records(session, delay=delay), log=log)
+        root, summary_records(session, delay=delay), log=log, index=index)
     changed, removed = store(root, matched, log=log)
     log("hudoc summaries: %d matched, %d written or updated, %d removed, "
         "%d without a stored case"

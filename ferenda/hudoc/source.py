@@ -83,8 +83,17 @@ def hudoc_harvest(scopes):
         print("hudoc download: bounded run -- the Court's summaries and the "
               "Swedish translations are left for an unbounded one")
         return seen, changed
-    summaries.sync(layout.HUDOC_DOWNLOADED, delay=POLITENESS)
-    translations.propose(layout.HUDOC_DOWNLOADED, layout.WIKI_ROOT)
+    # Both sweeps join on a key, so both need an index over every stored
+    # record -- and that walk, not the joining, is what the step costs. Built
+    # once here and handed to each; separately it read the whole store twice.
+    indexes = download.unique_indexes(
+        layout.HUDOC_DOWNLOADED,
+        {"summaries": summaries.INDEX_SPEC,
+         "translations": translations.INDEX_SPEC})
+    summaries.sync(layout.HUDOC_DOWNLOADED, delay=POLITENESS,
+                   index=indexes["summaries"])
+    translations.propose(layout.HUDOC_DOWNLOADED, layout.WIKI_ROOT,
+                         index=indexes["translations"])
     # the case harvest's numbers; the two ride-along sweeps produce inputs for
     # other stages, not hudoc documents, so they do not add to the count
     return seen, changed
