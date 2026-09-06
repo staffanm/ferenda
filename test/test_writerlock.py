@@ -69,6 +69,34 @@ def test_a_malformed_lease_is_not_a_deadlock(lock):
         assert lease.holder["command"] == "all relate"
 
 
+def test_the_lease_reports_itself_to_a_shell_caller(lock, capsys):
+    """The deploy asks whether anything is writing before it recreates the
+    container -- `docker compose exec` dies with its container, so a deploy
+    that lands mid-pipeline truncates the run with no error at all. A shell
+    caller gets the answer as an exit code: 3 while a writer holds the corpus,
+    0 when it is free, and the two are distinct so a check that could not run
+    is never read as `free`."""
+    assert writerlock.holder(lock) is None
+    assert writerlock.main(lock=lock) == 0
+    with writerlock.acquire("all rebuild", lock=lock):
+        held = writerlock.holder(lock)
+        assert held is not None and held["command"] == "all rebuild"
+        assert writerlock.main(lock=lock) == 3
+    assert writerlock.holder(lock) is None
+    assert writerlock.main(lock=lock) == 0
+
+
+def test_a_lease_nobody_owns_reads_as_free_to_the_deploy(lock):
+    """The deploy must use the same judgement the next writer would: a lease
+    whose process is gone is not a reason to hold a release back, or a crashed
+    pipeline would block every deploy for five hours and then give up."""
+    writerlock.acquire("sfs parse", lock=lock)
+    holder = json.loads((lock / "holder.json").read_text())
+    holder["pid"] = _dead_pid()
+    (lock / "holder.json").write_text(json.dumps(holder))
+    assert writerlock.holder(lock) is None
+
+
 def test_scratch_files_are_named_per_run(tmp_path):
     base = tmp_path / "catalog.sqlite"
     mine = writerlock.scratch_name(base, "r1")

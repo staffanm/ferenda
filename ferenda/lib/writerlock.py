@@ -310,3 +310,49 @@ def sweep_scratch(base: Path, keep: str) -> list[Path]:
             removed.append(path)
     return removed
 
+
+def holder(lock=LOCK):
+    """The live lease's holder record, or None when the corpus is free.
+
+    The same judgement `acquire` makes, exposed for a reader that only wants to
+    know: a lease whose holder is gone reads as free, because that is what the
+    next writer would do with it.
+    """
+    if not lock.is_dir():
+        return None
+    record = _read(lock)
+    return None if _stale(record, lock) else record
+
+
+def main(lock=LOCK):
+    """``python -m ferenda.lib.writerlock`` -- 0 when the corpus is free, 3
+    while a writer holds it, printing who.
+
+    Takes `lock` like everything else in this module, so the contract the
+    deploy turns on can be tested against a temporary lease rather than the
+    machine's own.
+
+    An exit code because the caller is a shell script, and a *separate* code
+    for "held" because the deploy has to tell it apart from a check that could
+    not run: `docker compose exec` dies with its container, so a deploy that
+    recreates the container mid-pipeline truncates the run with no error and a
+    partly written corpus. That is not hypothetical -- it cost a 24-minute
+    production run on 2026-09-06, killed four scopes into `avg download`.
+
+    Run it INSIDE the container. The lease records the writer's pid and pid
+    namespace, so only a process sharing that namespace can ask whether the
+    holder is still alive; from the host the pid means nothing and the answer
+    would fall back to age alone.
+    """
+    held = holder(lock)
+    if held is None:
+        print("writer lock: free")
+        return 0
+    print("writer lock: held by %s (%s, pid %d on %s, started %s)"
+          % (held["command"], held.get("run_id", "-"), held["pid"],
+             held["host"], held["started"]))
+    return 3
+
+
+if __name__ == "__main__":
+    sys.exit(main())

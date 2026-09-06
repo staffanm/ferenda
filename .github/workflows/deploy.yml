@@ -127,7 +127,65 @@ jobs:
           # .git is dockerignored, so there's no repo to rev-parse at runtime.
           GIT_SHA="${GITHUB_SHA}" docker compose build ferenda
 
+      # `docker compose exec` dies with its container, so recreating the
+      # container while a pipeline is writing truncates that run: no error, no
+      # traceback, a partly written corpus and a nightly that simply stops. On
+      # 2026-09-06 a deploy killed a 24-minute run four scopes into `avg
+      # download`, before parse, relate, index or generate had run at all.
+      #
+      # The corpus writer lease (ferenda/lib/writerlock) is what the pipeline
+      # already uses to keep two writers apart. The deploy asks it the same
+      # question through tools/operations/writer_lease.sh -- one copy, shared
+      # with the deferred retry -- and defers rather than fails: the image is
+      # built and tagged, so waiting costs only the delay.
+      #
+      # This NARROWS the window, it does not close it. Between this step and
+      # `up -d` in the next one there are seconds in which the 03:00 cron can
+      # take the lease, and the recreate would truncate that run with the same
+      # silence. Closing it properly means not running the pipeline inside the
+      # container the deploy replaces; holding a lease across a restart is not
+      # possible when `exec` dies with its container.
+      - name: Defer the restart while a pipeline is writing
+        id: lease
+        run: |
+          set -uo pipefail
+          held="$(sh "$CODE/tools/operations/writer_lease.sh" 2>&1)"; rc=$?
+          case "$rc" in
+            0) deferred=no ;;
+            3) deferred=yes ;;
+            *) deferred=unknown ;;
+          esac
+          # Written BEFORE any exit. If the step dies with this unset, every
+          # later `!= 'yes'` guard reads empty as "go ahead" -- including the
+          # rollback, which would recreate the container in the one case where
+          # the lease is unknown. That is the failure this whole step exists to
+          # prevent.
+          echo "deferred=$deferred" >> "$GITHUB_OUTPUT"
+          echo "$held"
+          if [ "$deferred" = unknown ]; then
+            echo "the writer-lease check answered $rc, which is neither free" >&2
+            echo "nor held; refusing to guess (rule:fail-fast)" >&2
+            exit 1
+          fi
+          if [ "$deferred" = yes ]; then
+            echo "::warning::deploy deferred -- $held"
+            # the image to put back is fixed now, not read from a global
+            # slot hours later that another deploy may have overwritten
+            if ! echo "sh $CODE/tools/operations/deferred_restart.sh 1 \
+                       $(cat /tmp/ferenda-previous-image)" | at now + 1 hour; then
+              echo "the retry could not be scheduled -- is atd running?" >&2
+              echo "nothing will restart the container; do it by hand once the" >&2
+              echo "pipeline finishes: docker compose --profile prod up -d ferenda" >&2
+              exit 1
+            fi
+            echo "The image is built and tagged. A retry is scheduled an hour"
+            echo "out and re-asks, up to five times; it logs to"
+            echo "~/deferred-restart.log."
+          fi
+
       - name: Restart the ferenda service (legacy stack left untouched)
+        id: restart
+        if: steps.lease.outputs.deferred == 'no'
         run: |
           set -euo pipefail
           cd "$CODE"
@@ -140,6 +198,7 @@ jobs:
       # started and answered 500 to everything was reported as a successful
       # deploy.
       - name: Wait for the app to report healthy
+        if: steps.lease.outputs.deferred == 'no'
         id: health
         run: |
           set -euo pipefail
@@ -160,6 +219,7 @@ jobs:
       # the app on the compose network, which says nothing about the proxy in
       # front of it. One document page and the API's own root.
       - name: Smoke-test the public site
+        if: steps.lease.outputs.deferred == 'no'
         run: |
           set -euo pipefail
           # Two small JSON answers, fetched whole.
@@ -202,6 +262,7 @@ jobs:
       # app (docker/nginx/ferenda.lagen.nu.conf `location /`), and the serve reads
       # the asset off disk per request rather than memoizing it at import.
       - name: Publish the static browser chrome (style.css + the script bundle)
+        if: steps.lease.outputs.deferred == 'no'
         run: |
           set -euo pipefail
           cd "$CODE"
@@ -226,8 +287,12 @@ jobs:
       # site is then serving the release before this one, which is a working
       # site -- the alternative is a container that restarts forever while
       # nobody is looking.
+      # Gated on the restart having actually run and succeeded, not on the
+      # absence of a deferral: a step that dies before writing its output leaves
+      # an empty string, and `!= 'yes'` would let the rollback recreate the
+      # container in exactly the case where nothing had replaced it.
       - name: Roll back to the previous image
-        if: failure()
+        if: failure() && steps.restart.outcome == 'success'
         run: |
           set -euo pipefail
           cd "$CODE"
