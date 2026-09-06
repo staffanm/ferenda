@@ -27,6 +27,15 @@ MINI_PDF = (b"%PDF-1.4\n"
 PNG_MAGIC = b"\x89PNG"
 
 
+def reader_client():
+    """A client that reads as one of our own pages, which is what a render now
+    needs (`auth.from_own_page`). A browser loading an <img> off a lagen.nu
+    page sends `Sec-Fetch-Site: same-origin`; a bare TestClient sends nothing
+    and is refused, which is the behaviour `test_a_render_needs_our_own_page`
+    pins."""
+    return TestClient(api.app, headers={"sec-fetch-site": "same-origin"})
+
+
 @pytest.fixture
 def corpus(tmp_path, monkeypatch):
     """A downloaded förarbete + föreskrift with one-page PDFs, and the
@@ -95,16 +104,16 @@ def test_cached_renders_once(corpus, monkeypatch):
     monkeypatch.setattr(facsimile, "render_page",
                         lambda *a: calls.append(a) or real(*a))
     first = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1,
-                                dpi=facsimile.DPI)
+                                dpi=facsimile.DPI, may_render=True)
     second = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1,
-                                dpi=facsimile.DPI)
+                                dpi=facsimile.DPI, may_render=True)
     assert first == second == layout.facsimile("forarbete",
                                                "prop/2013-14-116", 1)
     assert len(calls) == 1                           # second hit from cache
 
 
 def test_api_endpoint_serves_png_with_immutable_cache(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/facsimile",
                    params={"uri": "https://lagen.nu/prop/2013/14:116",
                            "sid": 1})
@@ -115,13 +124,13 @@ def test_api_endpoint_serves_png_with_immutable_cache(corpus):
 
 
 def test_legacy_path_grammar_both_arities(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     assert client.get("/prop/2013/14:116/sid1.png").status_code == 200
     assert client.get("/mcffs/2026:1/sid1.png").status_code == 200
 
 
 def test_missing_document_page_and_source_404(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     assert client.get("/prop/2099/00:1/sid1.png").status_code == 404
     assert client.get("/prop/2013/14:116/sid99.png").status_code == 404
     # no downloaded avg corpus in the fixture
@@ -129,11 +138,56 @@ def test_missing_document_page_and_source_404(corpus):
 
 
 def test_path_traversal_shapes_rejected(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/facsimile",
                    params={"uri": "https://lagen.nu/prop/../14:116", "sid": 1})
     assert r.status_code == 404
     assert client.get("/sou/..%2F..%2Fetc/sid1.png").status_code == 404
+
+
+# ---- the render gate -------------------------------------------------------
+
+def test_a_render_needs_our_own_page(corpus):
+    """An uncached page is 403 to a caller that cannot show it came from a
+    lagen.nu page, and 200 to that same caller once the page is rendered.
+
+    A render is a second of poppler on a worker thread the request holds
+    throughout, and scrapers are what ask for it: on 2026-09-05 they took all
+    40 threads and lagen.nu answered nothing for an hour. The picture itself
+    is nobody's secret -- only the work is rationed."""
+    anon = TestClient(api.app)
+    url = "/prop/2013/14:116/sid1.png"
+    assert anon.get(url).status_code == 403
+    assert not layout.facsimile("forarbete", "prop/2013-14-116", 1).exists()
+    assert reader_client().get(url).status_code == 200
+    assert anon.get(url).status_code == 200
+
+
+def test_a_same_origin_referer_also_opens_the_render(corpus):
+    """The Referer is the second half of the signal, for a browser too old to
+    send `Sec-Fetch-Site`. Our pages send it under the deployed
+    `Referrer-Policy: strict-origin-when-cross-origin`, which keeps the full
+    URL on a same-origin request."""
+    client = TestClient(
+        api.app, headers={"referer": "http://testserver/prop/2013/14:116"})
+    assert client.get("/prop/2013/14:116/sid1.png").status_code == 200
+
+
+def test_a_foreign_referer_does_not(corpus):
+    """A site that hotlinks our facsimiles pays for nothing."""
+    client = TestClient(api.app,
+                        headers={"referer": "https://example.com/mirror"})
+    assert client.get("/mcffs/2026:1/sid1.png").status_code == 403
+
+
+def test_the_documented_endpoint_carries_the_gate_too(corpus):
+    """Both public entrances, or the scrapers just use the other one."""
+    anon = TestClient(api.app)
+    assert anon.get("/api/v1/facsimile", params={
+        "uri": "https://lagen.nu/prop/2013/14:116",
+        "sid": 1}).status_code == 403
+    assert anon.get("/api/v1/sfs-graphic", params={
+        "uri": "https://lagen.nu/2002:780", "node": "G1"}).status_code == 403
 
 
 # ---- sfs-graphic crops -----------------------------------------------------
@@ -158,20 +212,20 @@ def test_cached_crop_renders_once_keyed_by_bbox(corpus, monkeypatch):
     monkeypatch.setattr(facsimile, "render_region",
                         lambda *a: calls.append(a) or real(*a))
     a = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200],
-                         dpi=facsimile.CROP_DPI)
+                         dpi=facsimile.CROP_DPI, may_render=True)
     b = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200],
-                         dpi=facsimile.CROP_DPI)
+                         dpi=facsimile.CROP_DPI, may_render=True)
     assert a == b == layout.facsimile_crop("sfs", "2021:734", 1,
                                            [72, 72, 300, 200], facsimile.CROP_DPI)
     assert len(calls) == 1                            # second hit from cache
     # a different bbox is a different cache file (re-verification never stale)
     facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 300],
-                     dpi=facsimile.CROP_DPI)
+                     dpi=facsimile.CROP_DPI, may_render=True)
     assert len(calls) == 2
 
 
 def test_sfs_graphic_endpoint_crops_from_provenance_pdf(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/sfs-graphic",
                    params={"uri": "https://lagen.nu/2002:780", "node": "G1"})
     assert r.status_code == 200
@@ -186,7 +240,7 @@ def test_sfs_graphic_endpoint_crops_from_provenance_pdf(corpus):
 
 
 def test_sfs_graphic_whole_page_when_bbox_omitted(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/sfs-graphic",
                    params={"uri": "https://lagen.nu/2002:780", "node": "G2"})
     assert r.status_code == 200
@@ -197,7 +251,7 @@ def test_sfs_graphic_whole_page_when_bbox_omitted(corpus):
 
 
 def test_sfs_graphic_cache_buster_is_ignored(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/sfs-graphic",
                    params={"uri": "https://lagen.nu/2002:780", "node": "G1",
                            "v": "deadbeef"})
@@ -205,7 +259,7 @@ def test_sfs_graphic_cache_buster_is_ignored(corpus):
 
 
 def test_sfs_graphic_404s(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     # unknown gap id in an existing layer
     assert client.get("/api/v1/sfs-graphic", params={
         "uri": "https://lagen.nu/2002:780", "node": "G7"}).status_code == 404
@@ -222,7 +276,7 @@ def test_sfs_graphic_404s(corpus):
 
 def test_sfs_full_page_facsimile_resolver(corpus):
     # the _sfs_pdf resolver also serves a full published-SFS page facsimile
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/facsimile",
                    params={"uri": "https://lagen.nu/2021:734", "sid": 1})
     assert r.status_code == 200
@@ -295,7 +349,7 @@ def test_a_stored_off_page_bbox_fails_loudly(corpus):
     """The same rectangle out of a reviewed .graphics layer is not client input.
     It is a corpus fault, and a 400 would report it to the reader as their
     mistake and leave the bad layer in place. It raises instead."""
-    client = TestClient(api.app)
+    client = reader_client()
     with pytest.raises(facsimile.OffPage):
         client.get("/api/v1/sfs-graphic",
                    params={"uri": "https://lagen.nu/2002:780", "node": "G8"})
@@ -306,7 +360,7 @@ def test_an_off_page_crop_is_a_400_and_mints_no_cache_entry(corpus):
     it renders whitespace, and writes that whitespace into a cache file. The
     check refuses the render; it is not a bound on cache size (the in-page
     crops alone are past counting -- eviction is the cron job)."""
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/facsimile",
                    params={"uri": "https://lagen.nu/2021:734", "sid": 1,
                            "bbox": "0,0,5000,5000"})
@@ -317,7 +371,7 @@ def test_an_off_page_crop_is_a_400_and_mints_no_cache_entry(corpus):
 
 
 def test_a_page_the_pdf_lacks_is_still_a_404_with_a_crop(corpus):
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/facsimile",
                    params={"uri": "https://lagen.nu/2021:734", "sid": 9,
                            "bbox": "0,0,100,100"})
@@ -341,7 +395,7 @@ def test_concurrent_requests_for_one_page_render_it_once(corpus, monkeypatch):
     threads = [threading.Thread(
         target=lambda: out.append(
             facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1,
-                                dpi=facsimile.DPI)))
+                                dpi=facsimile.DPI, may_render=True)))
         for _ in range(4)]
     for t in threads:
         t.start()
@@ -357,7 +411,7 @@ def test_stor_asks_for_the_full_size_render(corpus):
     """The lightbox and the thumbnail are two renders of one crop, not one
     stretched: `stor=1` is what asks for the larger, and it must actually
     arrive, or the overlay shows a blown-up thumbnail."""
-    client = TestClient(api.app)
+    client = reader_client()
     params = {"uri": "https://lagen.nu/2002:780", "node": "G1"}
     small = client.get("/api/v1/sfs-graphic", params=params)
     large = client.get("/api/v1/sfs-graphic", params={**params, "stor": 1})
@@ -378,9 +432,9 @@ def test_two_resolutions_of_one_bbox_are_two_cache_files(corpus):
     pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
     bbox = [72, 72, 300, 200]
     small = facsimile.cached("sfs", "2021:734", pdf, 1, bbox,
-                             dpi=facsimile.CROP_DPI)
+                             dpi=facsimile.CROP_DPI, may_render=True)
     large = facsimile.cached("sfs", "2021:734", pdf, 1, bbox,
-                             dpi=facsimile.CROP_DPI_LARGE)
+                             dpi=facsimile.CROP_DPI_LARGE, may_render=True)
     assert small != large
     assert facsimile.png_size(large.read_bytes())[0] > \
         facsimile.png_size(small.read_bytes())[0]
@@ -394,7 +448,7 @@ def test_a_forarbete_illustration_keeps_the_page_resolution(corpus, monkeypatch)
     real = facsimile.cached
     monkeypatch.setattr(facsimile, "cached",
                         lambda *a, **kw: asked.append(kw["dpi"]) or real(*a, **kw))
-    client = TestClient(api.app)
+    client = reader_client()
     r = client.get("/api/v1/facsimile",
                    params={"uri": "https://lagen.nu/2021:734", "sid": 1,
                            "bbox": "72,72,300,200"})

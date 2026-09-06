@@ -78,9 +78,13 @@ def page_endpoint(sfs: str = Query(..., description="provenance SFS basefile"),
     """The whole source page, for drawing the rectangle on and for paging
     through when the model picked the wrong page. Rendered at the same DPI as
     a facsimile, so client coordinates convert with one scale factor."""
+    # may_render: a signed-in editor is the one caller who always may. The
+    # public gate exists to keep scrapers off poppler, and these routes are
+    # already behind `require_editor`.
     return facsimiles.png_response(
         "sfs", sfs, facsimiles.sfs_source_pdf(sfs), page, None,
-        "SFS %s has no page %d" % (sfs, page), dpi=facsimile.DPI)
+        "SFS %s has no page %d" % (sfs, page), dpi=facsimile.DPI,
+        may_render=True)
 
 
 @router.get("/pagesize")
@@ -104,7 +108,7 @@ def crop_endpoint(sfs: str = Query(...), page: int = Query(..., ge=1),
     return facsimiles.png_response(
         "sfs", sfs, facsimiles.sfs_source_pdf(sfs), page,
         facsimiles.parse_bbox(bbox), "SFS %s has no page %d" % (sfs, page),
-        client_bbox=True, dpi=facsimile.CROP_DPI)
+        client_bbox=True, dpi=facsimile.CROP_DPI, may_render=True)
 
 
 @router.post("/cart")

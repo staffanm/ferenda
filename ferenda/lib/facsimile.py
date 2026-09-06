@@ -255,6 +255,13 @@ class RenderBusy(RuntimeError):
     Retry-After; nothing is cached and nothing is wrong."""
 
 
+class RenderRefused(RuntimeError):
+    """This caller may not pay for a render. The page is not in the cache and
+    the request did not come from one of our own pages, so the API answers 403
+    instead of starting poppler. A *cached* page is still served to everyone --
+    this refuses the work, not the picture."""
+
+
 # The cache is unbounded by construction: one page has more crop rectangles
 # than anyone can enumerate, and nothing here can tell a reader's crop from a
 # script's. Eviction used to be a cron job alone, which failed silently for
@@ -327,13 +334,25 @@ def _sweep(root):
         _sweeping.release()
 
 
-def cached(source, basefile, pdf_path, page, bbox=None, *, dpi):
+def cached(source, basefile, pdf_path, page, bbox=None, *, dpi, may_render):
     """The facsimile PNG for one page of a document's source PDF -- or, with
     `bbox`, just that rectangle of the page at `dpi` -- rendered on the first
     request and served from the cache thereafter. `source`/`basefile` identify
     the *source* PDF (for a crop, the amending SFS the region comes from), so
     crops of the same region are shared and a re-verified bbox lands on a fresh
     file.
+
+    `may_render=False` says this caller gets the cache or nothing: a cache miss
+    raises `RenderRefused` rather than starting poppler. That is what the HTTP
+    routes pass for a request that did not come from one of our own pages. A
+    render is the one expensive thing this server does, and scrapers are what
+    ask for it -- measured on prod over 30 minutes on 2026-09-05, 8795 of 8835
+    `sidN.png` requests carried no `Referer` at all, from 5938 addresses, and
+    275 of 300 sampled addresses never fetched a single HTML page.
+
+    It has no default, here and in `api/facsimiles.png_path`: whether a caller
+    may spend a second of poppler is not a question code should be able to
+    reach this function without answering (rule:fail-fast).
 
     `dpi` is a *crop's* resolution. A whole page has exactly one, chosen for the
     reading view (see the module docstring), and its cache path carries no
@@ -345,6 +364,9 @@ def cached(source, basefile, pdf_path, page, bbox=None, *, dpi):
            else layout.facsimile(source, basefile, page))
     if out.exists():
         return out
+    if not may_render:
+        raise RenderRefused("%s/%s page %d is not rendered yet" %
+                            (source, basefile, page))
     with _render_lock(str(out)):
         if out.exists():                 # rendered while we waited for the lock
             return out

@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Literal
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (
     FileResponse,
@@ -69,6 +69,7 @@ from ..lib import (
 )
 from . import (
     analytics,
+    auth,
     db,
     errors,
     facsimiles,
@@ -165,6 +166,15 @@ app = FastAPI(
 # surface is a GET whose body is nobody else's business.
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["GET"], allow_headers=["*"])
+
+
+# No Referrer-Policy here. The prod vhost already sets it at server scope
+# (`docker/nginx/ferenda.lagen.nu.conf`), and `add_header` appends rather than
+# replaces an upstream one, so a second value from the app would reach the
+# browser as a duplicate and lose to nginx's anyway. The deployed value,
+# `strict-origin-when-cross-origin`, sends the *full* URL on a same-origin
+# request, which is exactly what `auth.from_own_page` reads -- the render gate
+# needs no policy change.
 
 # FastAPI serves the interactive docs at exactly /docs and /redoc, and the ops
 # dashboard sits at exactly /ops; the trailing-slash forms are different paths.
@@ -1688,12 +1698,27 @@ def _hop_count(con, a, b, direction):
 # every page-oriented PDF source: each resolver maps a uri-local document id
 # to (source, build-basefile, pdf path) from layout rules + the downloaded
 # record -- adding a source is one resolver.
+#
+# A render is the one expensive thing this server does: poppler for about a
+# second, on a thread the request holds the whole time. So a *render* is
+# reserved for a request that came from one of our own pages
+# (`auth.from_own_page`); everyone else gets the cache or a 403. This is not
+# access control -- an already-rendered page is served to anyone, and the
+# headers it reads can be typed by hand. It is the cheapest thing that
+# separates a reader looking at a page from a script walking a URL space, and
+# on 2026-09-05 that was the difference between serving the site and not:
+# 8795 of 8835 `sidN.png` requests in 30 minutes carried no `Referer`, from
+# 5938 addresses, and they held all 40 worker threads until every other route
+# timed out.
 # --------------------------------------------------------------------------
 
 @app.get("/api/v1/facsimile", response_class=FileResponse, tags=["document"],
-         responses={200: {"content": {"image/png": {}}}},
+         responses={200: {"content": {"image/png": {}}},
+                    403: {"description": "not rendered yet, and this caller "
+                          "may not start a render"}},
          summary="A PNG of one printed page of the source PDF")
 def facsimile_endpoint(
+        request: Request,
         uri: str = Query(..., description="full lagen.nu document uri"),
         sid: int = Query(..., ge=1, description="printed page number "
                          "(the #sid{N} anchor)"),
@@ -1703,10 +1728,15 @@ def facsimile_endpoint(
     """A facsimile PNG of one printed page of the document's source PDF
     (förarbeten, myndighetsföreskrifter, avgöranden), rendered at retina
     resolution (150 DPI) on first request and cached on disk. `bbox` crops to a
-    region of that page -- what a figure inside a förarbete is."""
+    region of that page -- what a figure inside a förarbete is.
+
+    An already-rendered page is served to any caller. A page that is *not* yet
+    rendered is 403 unless the request came from a lagen.nu page, because a
+    render costs a second of CPU and a whole worker thread."""
     return facsimiles.facsimile_response(
         catalog.uri_local(uri), sid,
-        facsimiles.parse_bbox(bbox) if bbox else None)
+        facsimiles.parse_bbox(bbox) if bbox else None,
+        may_render=auth.from_own_page(request))
 
 
 _DV_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
@@ -1784,20 +1814,25 @@ def pdf_collection_page():
 # "/avg/jo/2340-2025/sid1.png"); year-numbered ids do not
 # ("/sou/2021:82/sid1.png", "/mcffs/2026:1/sid1.png")
 @app.get("/{a}/{b}/{c}/sid{sid:int}.png", include_in_schema=False)
-def facsimile_legacy_3(a: str, b: str, c: str, sid: int):
-    return facsimiles.facsimile_response("%s/%s/%s" % (a, b, c), sid)
+def facsimile_legacy_3(request: Request, a: str, b: str, c: str, sid: int):
+    return facsimiles.facsimile_response(
+        "%s/%s/%s" % (a, b, c), sid, may_render=auth.from_own_page(request))
 
 
 @app.get("/{a}/{b}/sid{sid:int}.png", include_in_schema=False)
-def facsimile_legacy_2(a: str, b: str, sid: int):
-    return facsimiles.facsimile_response("%s/%s" % (a, b), sid)
+def facsimile_legacy_2(request: Request, a: str, b: str, sid: int):
+    return facsimiles.facsimile_response(
+        "%s/%s" % (a, b), sid, may_render=auth.from_own_page(request))
 
 
 @app.get("/api/v1/sfs-graphic", response_class=FileResponse,
          tags=["document"],
-         responses={200: {"content": {"image/png": {}}}},
+         responses={200: {"content": {"image/png": {}}},
+                    403: {"description": "not rendered yet, and this caller "
+                          "may not start a render"}},
          summary="A graphic the consolidated statute text omits")
 def sfs_graphic_endpoint(
+        request: Request,
         uri: str = Query(..., description="full lagen.nu SFS uri"),
         node: str = Query(..., description="stable graphic-gap key (the "
                           "data-grafik value, e.g. g-a1b2…)"),
@@ -1813,10 +1848,14 @@ def sfs_graphic_endpoint(
     .graphics layer), rendered on first request and cached. Two resolutions, one
     per use: the inline thumbnail, and `stor=1` for the lightbox. A page of road
     signs asks for hundreds of the first and one of the second, so serving the
-    large one to both would cost the reader megabytes nothing on screen uses."""
+    large one to both would cost the reader megabytes nothing on screen uses.
+
+    Same render gate as `/api/v1/facsimile`: a cached crop is served to any
+    caller, an uncached one only to a request from a lagen.nu page."""
     return facsimiles.sfs_graphic_response(
         catalog.uri_local(uri), node,
-        facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI)
+        facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI,
+        may_render=auth.from_own_page(request))
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"],

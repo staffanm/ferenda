@@ -503,6 +503,26 @@ minutes. A weekly run costs the register plus what moved. The first run takes
 stranded — a run stores a record only once its page is on disk. Run both browser
 jobs **one at a time**: they share the process-global `DISPLAY`.
 
+### The facsimile render gate
+
+A facsimile render holds a worker thread in poppler for about a second. On
+2026-09-05 scrapers filled all 40 worker threads this way and every other route
+on lagen.nu timed out. Measured over 30 minutes of that wedge: 8795 of 8835
+`sidN.png` requests carried no `Referer` at all, from 5938 addresses, and 275
+of 300 sampled addresses never fetched a single HTML page.
+
+`/api/v1/facsimile`, `/api/v1/sfs-graphic` and the legacy `sidN.png` paths now
+serve a cached PNG to any caller, but refuse to *start a render* unless the
+request shows it came from a lagen.nu page — `Sec-Fetch-Site: same-origin`, or
+a `Referer` on our own host (`auth.from_own_page`). No header change was
+needed for that: the vhost's `Referrer-Policy: strict-origin-when-cross-origin`
+already sends the full URL on a same-origin request, and trims it to the bare
+origin cross-origin. A refused render is `403`; every
+render slot busy (`facsimile.RENDER_WORKERS`, 4) is `503` with `Retry-After`.
+This is not access control — an already-rendered page stays public, and both
+headers can be typed by hand — only a floor under how much CPU a script
+walking URLs can spend on the box.
+
 ### Evicting the facsimile cache
 
 `data/cache/facsimile` holds the page PNGs `lib/facsimile` renders on demand.

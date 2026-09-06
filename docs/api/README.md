@@ -376,6 +376,13 @@ pages and citations use. Rendered on demand at retina resolution (150 DPI,
 legacy path grammar, `GET /prop/2022/23:10/sid1.png` /
 `GET /sou/2021:82/sid1.png` (undocumented alias, kept for old links).
 
+A cached page is served to any caller. An uncached page is rendered only for a
+request that shows it came from a lagen.nu page (`Sec-Fetch-Site:
+same-origin`, or a `Referer` on our own host) — a render holds a worker thread
+for about a second, and any other caller gets `403`. All render slots busy is
+`503` with `Retry-After`. A bare `curl` against a page nobody has viewed yet
+gets the `403`; the same URL opened from lagen.nu itself does not.
+
 **Statute graphic — `GET /api/v1/sfs-graphic?uri=…&node=…`** — a PNG crop of a
 figure, formula or map the *consolidated* statute text omits but the published
 PDF carries. `node` is the gap's stable key (the `data-grafik` value on the
@@ -383,7 +390,9 @@ rendered page). The crop is cut from the PDF of the amendment that last set that
 wording, not from the viewed statute's own PDF, per the reviewed `.graphics`
 layer; a gap nobody has signed off on is a `404`. Two resolutions: the default
 is the inline thumbnail, `stor=1` the full-size render — a page of 325 road
-signs asks for hundreds of the first and one of the second.
+signs asks for hundreds of the first and one of the second. Same render gate
+as `/api/v1/facsimile`: a cached crop is served to any caller, an uncached one
+only to a request from a lagen.nu page.
 
 **Original verdict PDF — `GET /api/v1/dv-verdict?court=…&id=…&file=…`** — the
 PDF a decision was first served as, before its NJA referat was published. The

@@ -135,17 +135,22 @@ def test_pdf_subresource_reads_the_facsimile_off_disk(client, tmp_path,
     png = tmp_path / "sid1.png"
     png.write_bytes(PNG_1X1)
     seen = []
-    monkeypatch.setattr(facsimiles, "facsimile_path",
-                        lambda local, sid, bbox=None:
-                        (seen.append((local, sid, bbox)), png)[1])
+
+    def stub(local, sid, bbox=None, *, may_render):
+        seen.append((local, sid, bbox, may_render))
+        return png
+
+    monkeypatch.setattr(facsimiles, "facsimile_path", stub)
     compress.write_text(
         tmp_path / "generated" / "1998:9999.html",
         _with_img("/api/v1/facsimile?uri=https%3A%2F%2Flagen.nu%2F1998%3A9999"
                   "&amp;sid=7"))
     r = client.get("/api/v1/pdf", params={"path": "/1998:9999"})
     assert r.status_code == 200 and r.content.startswith(b"%PDF-")
-    # the uri came back decoded to its catalog-local form, and sid as an int
-    assert seen == [("1998:9999", 7, None)]
+    # the uri came back decoded to its catalog-local form, and sid as an int.
+    # may_render is True: the export renders its own pages in-process, so the
+    # gate that keeps scrapers off poppler must never reach it.
+    assert seen == [("1998:9999", 7, None, True)]
 
 
 def test_pdf_subresource_outside_the_served_paths_is_503(client, tmp_path):

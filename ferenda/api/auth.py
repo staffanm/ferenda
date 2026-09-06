@@ -256,6 +256,38 @@ def same_origin(request: Request):
         raise HTTPException(403, _CROSS_ORIGIN)
 
 
+def from_own_page(request: Request) -> bool:
+    """Whether a browser made this request from one of our own pages.
+
+    The mirror image of `same_origin`, and the two must not be confused.
+    `same_origin` refuses a request it can prove came from somewhere else, and
+    lets a headerless one through -- curl and the in-process client are callers
+    it wants to serve. This one asks for *proof* that the request came from a
+    page we served, and a headerless request has none. Anything that only reads
+    a URL out of a list answers False.
+
+    Two headers, because they fail in different directions:
+
+      * ``Sec-Fetch-Site: same-origin`` is sent by every current browser
+        loading a subresource of a page it is already on, and by nothing else.
+      * A ``Referer`` whose host is ours catches a browser too old to send the
+        first header. Our pages send it under the deployed
+        ``Referrer-Policy: strict-origin-when-cross-origin`` (set by the prod
+        vhost, and the browser default besides), which keeps the full URL on a
+        same-origin request and trims it to the bare origin cross-origin.
+
+    Neither header is a secret and either can be typed by hand. This is not
+    authentication and cannot be: it is a cheap way to tell a reader looking at
+    a page from a script walking a URL space, and it is only ever used to
+    decide who may pay for expensive work (`lib/facsimile.cached`), never who
+    may read something.
+    """
+    if request.headers.get("sec-fetch-site") == "same-origin":
+        return True
+    referer = request.headers.get("referer", "")
+    return bool(referer) and urlsplit(referer).netloc == request.url.netloc
+
+
 def require_editor(request: Request) -> Editor:
     """The single auth gate on every mutating endpoint. Editing off (no
     ``editor_secret``) -> 403 with a hint; anonymous/expired/unknown -> 401."""

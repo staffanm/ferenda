@@ -38,12 +38,12 @@ import queue
 import secrets
 import threading
 import time
-from urllib.parse import urlsplit
 
 import httpx
 from starlette.requests import Request
 
 from .. import config
+from .auth import from_own_page
 from .errors import under
 
 log = logging.getLogger(__name__)
@@ -153,14 +153,11 @@ def _hit(url, title, request):
 
 
 def _own_page_xhr(request):
-    """Whether this is one of our own pages calling the API from the browser.
-    `Sec-Fetch-Site` is sent by every current browser and by nothing else, so a
-    same-origin value identifies site chatter precisely; the Referer check
-    catches a browser old enough to lack the header."""
-    if request.headers.get("sec-fetch-site") == "same-origin":
-        return True
-    referer = request.headers.get("referer", "")
-    return bool(referer) and urlsplit(referer).netloc == request.url.netloc
+    """Whether this is one of our own pages calling the API from the browser --
+    site chatter rather than an audience, so it is not counted. The same
+    question the facsimile render gate asks, and the same answer
+    (`auth.from_own_page`)."""
+    return from_own_page(request)
 
 
 def _keep_warm(request):
