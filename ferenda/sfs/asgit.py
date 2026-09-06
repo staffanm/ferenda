@@ -174,7 +174,11 @@ def snapshot_text(path):
             raise SkipDocument("no forfattningstext")
     else:
         text = extract_body(path)
-    return text.rstrip("\n") + "\n"
+    # the beta JSON carries CRLF where the legacy HTML carries LF, so a change
+    # of generation alone would otherwise rewrite every line of an act. Same
+    # rule as the parse path (`parse_sfs_source`, `sfs_intermediate`), which is
+    # what makes the docstring's "the same text the parser consumes" true
+    return text.replace("\r", "").rstrip("\n") + "\n"
 
 
 def snapshot_header(path):

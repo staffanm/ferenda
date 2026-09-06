@@ -595,6 +595,21 @@ def test_snapshot_text_normalizes_trailing_newline(tmp_path):
         snapshot_text(_snapshot(tmp_path, "none.json", None))
 
 
+def test_snapshot_text_removes_cr_exactly_as_the_parser_does(tmp_path):
+    """The beta JSON carries CRLF, the legacy HTML LF, so an unnormalized
+    export rewrote every line of an act at the generation change. The export
+    removes CR by the parse path's own rule, so the repo text and the parsed
+    artifact never disagree."""
+    body = "1 \u00a7 Text.\r\n\r\n2 \u00a7 Mer.\r\n"
+    crlf = _snapshot(tmp_path, "crlf.json", body)
+    lf = _snapshot(tmp_path, "lf.json", "1 \u00a7 Text.\n\n2 \u00a7 Mer.\n")
+    assert snapshot_text(crlf) == snapshot_text(lf) == "1 \u00a7 Text.\n\n2 \u00a7 Mer.\n"
+    # a lone CR is removed, never turned into a newline: `parse_sfs_source`
+    # and `sfs_intermediate` both spell this `text.replace("\\r", "")`
+    assert snapshot_text(_snapshot(tmp_path, "cr.json", "1 \u00a7 A.\r2 \u00a7 B.")) \
+        == "1 \u00a7 A.2 \u00a7 B.\n"
+
+
 def _git(repo, *args):
     return subprocess.run(["git", "-C", str(repo), *args], check=True,
                           text=True, capture_output=True).stdout.strip()
