@@ -6,7 +6,7 @@ view on edps.europa.eu answers ``202`` with an empty body and the header
 ``/feed/news_en``. The static pages answer 200, and so does every document:
 ``/system/files/…`` and ``/sites/default/files/publication/…`` hand back a PDF
 to a plain GET. So this harvest is split by what each half needs. The 90 index
-pages go through `lib.browser.DetachedChrome`, which solves the challenge once
+pages go through `lib.browser.CamoufoxBrowser`, which solves the challenge once
 per run and reuses the cookie, exactly as `rs.skv`, `foreskrift.harvest`,
 `untc.download` and `icj.download` do. The 442 documents go through
 `lib.net`, at one request each and no browser.
@@ -80,12 +80,11 @@ from .issuers import EDPS, LOPNUMMER_FORST, number_slug
 BASE = EDPS.base
 # the by-type view of one series; the EDPS's own doctype segment names it
 VIEW = BASE + "/data-protection/our-work/our-work-by-type/%s_en"
-# a Chrome profile shared across the run, so the WAF challenge is solved once
-PROFILE = ".chrome-profile"
-# seconds a challenged navigation is left alone before the DOM is read. Measured
-# against this site: 7 completes every page, and the two longer waits are what a
-# page that came back short is retried with.
-SETTLE = (7.0, 20.0, 30.0)
+# a browser profile shared across the run, so the WAF challenge is solved once
+PROFILE = ".browser-profile"
+# seconds a challenged navigation is given to become the page. A page that ran
+# out of time is retried with the next, longer one.
+TIMEOUTS = (7.0, 20.0, 30.0)
 
 # the EDPS's own number as its cover prints it: "Opinion 11/2023", on the line
 # under the date. Some covers set the body's name in front of it ("EDPS Opinion
@@ -278,12 +277,12 @@ def known_identities(root):
 
 
 def _navigate(chrome, url):
-    """One challenged page, retried with a longer settle. A page that never
+    """One challenged page, retried with a longer timeout. A page that never
     completes raises: an index page silently missing is a slice of the corpus
     silently missing."""
-    for settle in SETTLE:
+    for timeout in TIMEOUTS:
         try:
-            return chrome.html(url, marker="EDPS", settle=settle)
+            return chrome.html(url, marker="EDPS", timeout=timeout)
         except browser.IncompleteNavigation:
             continue
     raise RuntimeError("%s never completed behind the WAF challenge" % url)
@@ -329,8 +328,8 @@ def edps_sync(root, full=False, only=None, limit=None, delay=0.5):
         ("rows", "no pdf", "swedish", "english", "cover number",
          "number from title only", "cover disagrees with title", "unnumbered",
          "covers read"), 0)
-    with browser.DetachedChrome(Path(root) / EDPS.kod / PROFILE,
-                                settle=SETTLE[0]) as chrome:
+    with browser.CamoufoxBrowser(Path(root) / EDPS.kod / PROFILE,
+                                 timeout=TIMEOUTS[0]) as chrome:
         rows = [(serie, row) for serie in EDPS.koder
                 for row in walk_view(chrome, EDPS.serie(serie).doctype, delay)]
     for serie, row in rows:

@@ -1,77 +1,148 @@
-"""The headful-Chrome transport's display handling and its completed-document
-check.
+"""The Camoufox transport's pacing and its completed-document check.
 
-The display: a real DISPLAY is used as is; a headless host gets a private Xvfb
-virtual framebuffer so Chrome still runs *headful* (what the F5/Shape WAF
-requires). Chrome itself isn't launched here -- only the display lifecycle,
-which is the headless-server-specific part.
-
-The check: `verify_document` is pure over what the browser read, so the three
-ways a protected navigation ends short are exercised without a browser."""
+Both are exercised without a browser. `verify_document` is pure over what the
+browser read, so the three ways a protected navigation ends short are covered
+here; the pace is the one piece of navigation policy this module owns, and
+Skatteverkets rate rule depends on it holding."""
 
 import inspect
-import os
-import shutil
+import time
 
 import pytest
 
+from ferenda.lib import browser as browser_module
 from ferenda.lib.browser import (
-    DetachedChrome,
+    PDF_ATTEMPTS,
+    CamoufoxBrowser,
     IncompleteNavigation,
     WafRejected,
     verify_document,
 )
 
 
-@pytest.fixture
-def fake_chrome(monkeypatch):
-    # DetachedChrome.__init__ requires google-chrome on PATH; stand it in (and
-    # keep every other binary lookup, notably Xvfb, resolving for real)
-    real_which = shutil.which
-    monkeypatch.setattr(shutil, "which",
-                        lambda name: "/usr/bin/google-chrome" if name == "google-chrome"
-                        else real_which(name))
+# --------------------------------------------------------------------------
+# pacing: the minimum interval between navigations
+# --------------------------------------------------------------------------
+
+class FakePage:
+    """Records when each navigation was asked for."""
+
+    def __init__(self):
+        self.times = []
+
+    def goto(self, url, timeout=None):
+        self.times.append(time.monotonic())
+        return url
 
 
-def test_existing_display_is_used_as_is(fake_chrome, monkeypatch):
-    monkeypatch.setenv("DISPLAY", ":77")
-    chrome = DetachedChrome("/tmp/prof", settle=1)
-    chrome._ensure_display()
-    assert chrome.xvfb is None            # no virtual display started
-    assert os.environ["DISPLAY"] == ":77"
+def test_navigations_are_spaced_by_the_pace():
+    """Skatteverkets front rejects everything for minutes once some 30
+    navigations land inside two, so the pace is what keeps a 2,614-document
+    backfill under its limit."""
+    browser = CamoufoxBrowser("/tmp/prof", pace=0.2)
+    browser.page = FakePage()
+    for _ in range(3):
+        browser._goto("https://example.se/", timeout=5)
+    gaps = [b - a for a, b in zip(browser.page.times, browser.page.times[1:])]
+    assert all(gap >= 0.2 for gap in gaps), gaps
 
 
-@pytest.mark.skipif(not shutil.which("Xvfb"), reason="Xvfb not installed")
-def test_headless_host_starts_and_tears_down_xvfb(fake_chrome, monkeypatch):
-    monkeypatch.delenv("DISPLAY", raising=False)
-    chrome = DetachedChrome("/tmp/prof", settle=1)
-    chrome._ensure_display()
-    xvfb = chrome.xvfb
-    try:
-        assert xvfb is not None and xvfb.poll() is None
-        assert os.environ["DISPLAY"].startswith(":")
-    finally:
-        chrome._teardown_display()                 # the failure-safe teardown half
-    assert xvfb.poll() is not None                 # Xvfb stopped
-    assert "DISPLAY" not in os.environ             # restored (was unset)
+def test_an_unpaced_session_does_not_wait():
+    browser = CamoufoxBrowser("/tmp/prof")
+    browser.page = FakePage()
+    started = time.monotonic()
+    for _ in range(3):
+        browser._goto("https://example.se/", timeout=5)
+    assert time.monotonic() - started < 0.2
 
 
-@pytest.mark.skipif(not shutil.which("Xvfb"), reason="Xvfb not installed")
-def test_enter_failure_tears_down_the_display(fake_chrome, monkeypatch):
-    # Chrome launch fails *after* _ensure_display started Xvfb; __exit__ never
-    # runs (the `with` never bound), so __enter__ must tear the display back down
-    # itself rather than leak the Xvfb process and a mutated DISPLAY.
-    monkeypatch.delenv("DISPLAY", raising=False)
-    chrome = DetachedChrome("/tmp/prof", settle=1)
+def test_a_navigation_without_a_session_fails_loudly():
+    browser = CamoufoxBrowser("/tmp/prof")
+    with pytest.raises(AssertionError, match="not open"):
+        browser._goto("https://example.se/", timeout=5)
 
-    def boom(self):
-        raise RuntimeError("chrome launch blew up")
 
-    monkeypatch.setattr(DetachedChrome, "_launch_chrome", boom)
-    with pytest.raises(RuntimeError, match="chrome launch blew up"):
-        chrome.__enter__()
-    assert chrome.xvfb is None                     # Xvfb torn down, handle cleared
-    assert "DISPLAY" not in os.environ             # DISPLAY restored (was unset)
+# --------------------------------------------------------------------------
+# the PDF fetch: a challenged host answers once with its challenge page
+# --------------------------------------------------------------------------
+
+class FakeResponse:
+    def __init__(self, content_type, body=b"", text=""):
+        self.headers = {"content-type": content_type}
+        self._body = body
+        self._text = text
+
+    def body(self):
+        return self._body
+
+    def text(self):
+        return self._text
+
+
+class ScriptedPage:
+    """Answers each navigation with the next scripted response."""
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.navigations = 0
+
+    def goto(self, _url, timeout=None):
+        self.navigations += 1
+        return self.responses.pop(0)
+
+
+def _browser(responses, monkeypatch):
+    monkeypatch.setattr(browser_module, "CHALLENGE_WAIT", 0.0)
+    browser = CamoufoxBrowser("/tmp/prof")
+    browser.page = ScriptedPage(responses)
+    return browser
+
+
+def test_a_pdf_is_returned_from_the_navigation_itself(monkeypatch):
+    browser = _browser([FakeResponse("application/pdf", b"%PDF-1.7 body")],
+                       monkeypatch)
+    assert browser.pdf("https://example.se/x.pdf") == b"%PDF-1.7 body"
+
+
+def test_a_challenge_page_is_retried_until_the_pdf_arrives(monkeypatch):
+    """icj-cij.org answers the first navigation with Cloudflare's interstitial
+    and mints its cookie while that page runs; the next navigation gets the
+    file."""
+    browser = _browser([FakeResponse("text/html", text="Just a moment..."),
+                        FakeResponse("application/pdf", b"%PDF-1.4 body")],
+                       monkeypatch)
+    assert browser.pdf("https://example.se/x.pdf") == b"%PDF-1.4 body"
+    assert browser.page.navigations == 2
+
+
+def test_a_rejected_pdf_navigation_stops_at_once(monkeypatch):
+    """A WAF rejection is terminal, so it must not spend the retries: the front
+    has closed and the caller counts it (`rs.download.until_blocked`)."""
+    browser = _browser([FakeResponse(
+        "text/html", text="The requested URL was rejected.")], monkeypatch)
+    with pytest.raises(WafRejected):
+        browser.pdf("https://example.se/x.pdf")
+    assert browser.page.navigations == 1
+
+
+def test_a_host_that_never_serves_the_pdf_gives_up(monkeypatch):
+    browser = _browser([FakeResponse("text/html")] * PDF_ATTEMPTS, monkeypatch)
+    with pytest.raises(IncompleteNavigation):
+        browser.pdf("https://example.se/x.pdf")
+    assert browser.page.navigations == PDF_ATTEMPTS
+
+
+def test_a_body_that_is_not_a_pdf_raises_rather_than_asserts(monkeypatch):
+    """The far end served an error page under `application/pdf`. That is a
+    remote condition, so it raises: under `python -O` an assert would strip and
+    the error page would be stored as the document
+    (rule:errors-drive-retry-use-raise)."""
+    browser = _browser([FakeResponse("application/pdf", b"<html>oops</html>")],
+                       monkeypatch)
+    with pytest.raises(ValueError, match="do not start a PDF"):
+        browser.pdf("https://example.se/x.pdf")
+    source = inspect.getsource(CamoufoxBrowser.pdf)
+    assert "assert data" not in source
 
 
 # --------------------------------------------------------------------------
@@ -88,10 +159,10 @@ def test_a_finished_document_passes():
 
 def test_a_waf_rejection_is_its_own_error():
     """A caller acts on this one: an F5/Shape front that has started rejecting
-    keeps rejecting whatever profile asks, so a harvester should stop rather
+    keeps rejecting whatever the browser asks, so a harvester should stop rather
     than retry. Rejection is checked first, because a rejection page carries no
     marker either and reading it as an incomplete navigation would send the
-    caller into a longer-settle retry against a closed front."""
+    caller into a longer-timeout retry against a closed front."""
     with pytest.raises(WafRejected):
         verify_document(URL, "<html><body>The requested URL was rejected.</body>"
                         "</html>", "The requested URL was rejected. Please "

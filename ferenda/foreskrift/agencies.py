@@ -9,7 +9,7 @@ is None, so the fs code is the scope name) -- 66 live-harvested and 4 closed
 series with no live harvester (RSFS, SOSFS, SJVFS, SVKFS), whose documents live
 in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
 samling with seven issuing agencies (:mod:`hslffs`). SKVFS and MTFS select a
-detached headful-Chrome transport in config; ordinary agencies stay on HTTP.
+Camoufox transport in config; ordinary agencies stay on HTTP.
 
 An agency is *config*, not a pipeline. Many sites are covered by the three
 generic enumerate shapes (``indexed``/``paginated``/``json``) plus a
@@ -2262,9 +2262,9 @@ PFS = Agency(
 # Closed and browser-gated författningssamlingar. Socialstyrelsen's SOSFS is a
 # closed series (no live harvester; its documents live in the corpus, and its
 # successor HSLF-FS is harvested by the six scopes below). SKVFS is live but
-# must use detached headful Chrome because F5 rejects both HTTP clients and
-# Playwright-instrumented navigation; its Agency.browser flag selects that
-# transport without affecting any other agency. The one SKVFS register also
+# must use Camoufox because F5 rejects plain HTTP clients and ordinary
+# Playwright Chromium alike; its Agency.browser flag selects that transport
+# without affecting any other agency. The one SKVFS register also
 # enumerates the closed RSFS predecessor (cited "RSFS 1985:20", so its own code
 # + URIs) into its own namespace, so RSFS needs no second sweep.
 # --------------------------------------------------------------------------
@@ -2296,7 +2296,7 @@ SVKFS = frozen_agency("svkfs", "Affärsverket svenska kraftnät",
 
 # MTFS (Tillväxtanalys) sits behind the same F5/Shape JavaScript bot-defense as
 # SKVFS. Its one-page Sitevision register and direct PDFs work through the same
-# detached headful-Chrome transport, selected only by these two Agency configs.
+# Camoufox transport, selected only by these two Agency configs.
 MTFS = Agency(
     fs="mtfs", name="Tillväxtanalys",
     publisher="Myndigheten för tillväxtpolitiska utvärderingar och analyser",
@@ -2306,7 +2306,9 @@ MTFS = Agency(
     resolve=mtfs.resolve,
     designation="MTFS",
     browser=True,
-    browser_settle=20.0,
+    # a courtesy interval, not a measured limit: this register is 16 documents
+    # and Tillväxtanalys has never rate-limited the walk (rule:respect-politeness)
+    browser_pace=2.0,
 )
 
 SKVFS = Agency(
@@ -2317,7 +2319,9 @@ SKVFS = Agency(
     resolve=skvfs.resolve,
     designation="SKVFS",
     browser=True,
-    browser_settle=20.0,
+    # www4.skatteverket.se rejects everything for minutes once some 30
+    # navigations land inside two -- the same rate rule `rs.download` paces for
+    browser_pace=20.0,
 )
 RSFS = frozen_agency("rsfs", "Riksskatteverket", "Skatteverket", "RSFS",
                      "https://www.skatteverket.se")
@@ -2496,7 +2500,7 @@ REGISTRY = {a.scope or a.fs: a for a in (
     AFS, TSFS, TRVFS,
     AFFS, AGVFS, FKFS, PFS,
     SJVFS, SVKFS,                                      # closed: no public documents/register
-    MTFS, SKVFS,                                       # live: detached Chrome for the F5 wall
+    MTFS, SKVFS,                                       # live: Camoufox for the F5 wall
     RSFS, SOSFS,                                       # closed series; RSFS also emitted by SKVFS
     HSLFFS_SOS, HSLFFS_FOHM, HSLFFS_IVO,               # one samling, six publishing
     HSLFFS_MFOF, HSLFFS_TLV, HSLFFS_LV,                #   sites (fs="hslffs")

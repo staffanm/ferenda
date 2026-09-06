@@ -75,7 +75,7 @@ SYNC = {**{"%s/%s" % (EDPB.kod, kod): runner
         BEREC.kod: berec_download.berec_sync,
         # the EDPS for a fourth reason: its two series *are* two separate
         # views, but every view on edps.europa.eu is behind an AWS WAF
-        # challenge, so a second scope would run a second headful Chrome at
+        # challenge, so a second scope would run a second browser at
         # the same host and pay the challenge twice.
         EDPS.kod: edps_download.edps_sync,
         # Eiopa for the first reason: its two facets are two pages of one

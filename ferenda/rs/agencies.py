@@ -33,9 +33,10 @@ designation and this rule points at it rather than away from it.
 
 Transport. Six agencies serve ordinary HTTP. Skatteverket sits behind the same
 F5/Shape JavaScript challenge the SKVFS föreskrift harvest meets, so it needs
-the detached headful-Chrome transport (`lib.browser`) -- slow, serial and
-process-global in its display, which is why `browser` splits it out of the
-default `lagen rs download` sweep and onto `lagen rs browser-download`.
+the Camoufox transport (`lib.browser`) -- serial, and paced at one document
+every 20 seconds because the front rate-limits, which is why `browser` splits it
+out of the default `lagen rs download` sweep and onto `lagen rs
+browser-download`.
 """
 
 from dataclasses import dataclass
@@ -59,7 +60,7 @@ class Agency:
     # an agency whose citation form is already short needs no second form.
     designation: str | None = None
     note: str = ""               # what is peculiar about this agency's listing
-    browser: bool = False        # detached headful Chrome instead of HTTP (F5: skv)
+    browser: bool = False        # Camoufox instead of an HTTP session (F5: skv)
     page_body: bool = False      # the document is a web page, not a PDF (skv)
 
 
@@ -122,9 +123,9 @@ REGISTRY = (
 
 BY_ORG = {agency.org: agency for agency in REGISTRY}
 ORGS = tuple(agency.org for agency in REGISTRY)
-# The transport split. A browser agency drives headful Chrome on the
-# process-global DISPLAY, one navigation at a time, so it cannot share a run
-# with the HTTP agencies and is kept off the default sweep -- the föreskrift
+# The transport split. A browser agency drives Camoufox one navigation at a
+# time, paced for the front's rate rule, so it cannot share a run with the HTTP
+# agencies and is kept off the default sweep -- the föreskrift
 # `browser_scopes`/`default_scopes` rule, at rs scale.
 BROWSER_ORGS = tuple(agency.org for agency in REGISTRY if agency.browser)
 DEFAULT_ORGS = tuple(agency.org for agency in REGISTRY if not agency.browser)

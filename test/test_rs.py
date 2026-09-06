@@ -1085,7 +1085,7 @@ class _ClosedFront:
         self.error = error
         self.attempts = 0
 
-    def __call__(self, _profile, settle=None):     # stands in for DetachedChrome
+    def __call__(self, _profile, pace=None):       # stands in for CamoufoxBrowser
         return self
 
     def __enter__(self):
@@ -1094,7 +1094,7 @@ class _ClosedFront:
     def __exit__(self, *_exc):
         return False
 
-    def html(self, url, _marker, settle=None):
+    def html(self, url, _marker, timeout=None):
         if url == skv.INDEX_URL:
             return fixture("skv-register.html")
         self.attempts += 1
@@ -1111,7 +1111,7 @@ class _ClosedFront:
 def test_skv_stops_once_the_front_stops_answering(tmp_path, monkeypatch, capsys,
                                                   error):
     front = _ClosedFront(error)
-    monkeypatch.setattr(rs_download, "DetachedChrome", front)
+    monkeypatch.setattr(rs_download, "CamoufoxBrowser", front)
     seen, new = rs_download.skv_sync(tmp_path)
     assert new == 0
     # the register holds 8 filable entries; the run gives up after a row of

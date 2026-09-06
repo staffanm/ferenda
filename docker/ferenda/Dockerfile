@@ -85,33 +85,31 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project \
     && chown -R app:app /app/.venv
 
-# Headful Chrome + Xvfb for the föreskrift browser transport: skvfs/mtfs sit
-# behind an F5/Shape WAF that rejects non-browser clients, so lib/browser.py drives
-# real google-chrome on a private Xvfb framebuffer (Playwright only connects over
-# CDP -- no `playwright install` browser download needed). google-chrome-stable
-# isn't in Debian, so add Google's apt repo (armored key via signed-by, no gnupg
-# needed). This is a large layer (~half a GB); it only serves `lagen foreskrift
-# browser-download`, which runs on its own weekly cron, not the nightly sweep.
+# Camoufox for the browser transport: skvfs/mtfs/skv sit behind an F5/Shape WAF
+# and the EDPS/ICJ/OHCHR pages behind Cloudflare, all of which reject plain HTTP
+# clients. lib/browser.py drives Camoufox -- a Firefox build whose fingerprint
+# spoofing sits in its own C++ -- headless, so no Xvfb and no system browser.
+# `camoufox fetch` downloads the browser itself (~1.2 GB) into the *app* user's
+# cache, which is why it runs through `su app`: the runtime process is `app`,
+# and a root-owned /root/.cache would be unreadable to it.
+#
+# The apt line is Firefox's runtime library set: it links GTK, dbus-glib, ALSA
+# and the X client libraries even when it never opens a window.
 #
 # Placed AFTER fetch_poi + the dependency `uv sync` (whose downloads hit Maven /
 # PyPI) and BEFORE `COPY . .`: a new layer invalidates everything below it, so
-# inserting Chrome up top forced those network-bound layers to re-fetch and a
-# Maven blip failed the build. Here Chrome rides on their cache and, being above
+# inserting the browser up top forced those network-bound layers to re-fetch and
+# a Maven blip failed the build. Here it rides on their cache and, being above
 # the code copy, is itself cached across code-only pushes.
-RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
-        -o /usr/share/keyrings/google-chrome.asc \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" \
-        > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
-        google-chrome-stable \
-        xvfb \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgtk-3-0 \
+        libdbus-glib-1-2 \
+        libasound2 \
+        libx11-xcb1 \
+        libxtst6 \
         fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
-# Chrome's sandbox can't initialise as the unprivileged `app` uid in a container
-# without host userns/SUID setup; the container is itself the isolation boundary,
-# so tell browser.py to pass --no-sandbox (env-gated so dev's desktop Chrome keeps
-# its sandbox).
-ENV FERENDA_CHROME_NO_SANDBOX=1
+RUN su app -c "/app/.venv/bin/python -m camoufox fetch"
 
 # 2) the project itself. `COPY --chown` keeps the code app-owned; the editable
 #    install only adds a few console-script/.pth entries to the (already app-

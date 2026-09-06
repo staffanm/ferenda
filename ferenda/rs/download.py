@@ -70,9 +70,9 @@ from the förteckning row alone.
 the odd one out on every axis -- 2,614 documents, no PDFs, no series number, and
 an F5/Shape JavaScript challenge in front of the lot. Its register and page
 semantics live in `skv.py`; what is here is the walk that drives them over the
-detached headful-Chrome transport. That transport is serial and owns the
-process-global DISPLAY, so this agency is kept off the default sweep and run on
-its own schedule by ``lagen rs browser-download``.
+Camoufox transport. The front rate-limits hard, so every document navigation is
+paced and the agency is kept off the default sweep and run on its own schedule
+by ``lagen rs browser-download``.
 
 Stored per ställningstagande under ``site/data/downloaded/rs/{org}/``: a
 ``<slug>.json`` record and the document -- ``<slug>.pdf`` for six agencies,
@@ -87,7 +87,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.browser import DetachedChrome, IncompleteNavigation, WafRejected
+from ..lib.browser import CamoufoxBrowser, IncompleteNavigation, WafRejected
 from ..lib.harvest import (
     dispatch_scopes,
     page_path,
@@ -810,16 +810,15 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
 # --------------------------------------------------------------------------
 
 # The register renders 2,619 rows and is slow even for a real browser, so it is
-# given minutes. A document page is done in a few seconds -- but the *pace*, not
-# the page, is what the settle has to respect here: measured against the live
-# site, some 30 navigations at 5-second spacing trip the front's rate defence,
-# after which every navigation is rejected for a good while whatever profile
-# asks. So a document waits far longer than it needs to, which is affordable
-# precisely because this agency runs on a weekly schedule of its own: 20 seconds
-# apiece is roughly 15 hours for the whole register once, and a few minutes for
-# what a week adds.
-SKV_INDEX_SETTLE = 180.0
-SKV_PAGE_SETTLE = 20.0
+# given minutes to finish; it takes about half of one. A document page is done
+# in a second -- but the *pace*, not the page, is what has to be respected here:
+# measured against the live site, navigation 31 at 2-second spacing was rejected
+# and every navigation after it stayed rejected for some minutes. So a document
+# waits far longer than it needs to, which is affordable precisely because this
+# agency runs on a weekly schedule of its own: 20 seconds apiece is roughly 15
+# hours for the whole register once, and a few minutes for what a week adds.
+SKV_INDEX_TIMEOUT = 180.0
+SKV_PAGE_PACE = 20.0
 # Once the front starts rejecting, it keeps rejecting: knocking through the
 # remaining thousands of documents would be both useless and rude. The run stops
 # and says so, and because a stored record is only ever written with its page,
@@ -856,7 +855,7 @@ def skv_verify(html_text):
 
 
 def skv_sync(root, full=False, only=None, limit=None, delay=0.5):
-    """Harvest Skatteverkets ställningstaganden through detached headful Chrome.
+    """Harvest Skatteverkets ställningstaganden through Camoufox.
 
     One register navigation gives every document's identity, title, date,
     områden and currency (`skv.parse_index`); each document then costs one more
@@ -867,14 +866,14 @@ def skv_sync(root, full=False, only=None, limit=None, delay=0.5):
     agency has a command of its own. ``--limit N`` slices that backfill into
     runs; a resumed run skips whatever is already stored.
 
-    `delay` is ignored: the browser's settle already paces every navigation, and
-    sleeping on top of it would only make a long backfill longer."""
+    `delay` is ignored: the browser's own pace already spaces every navigation,
+    and sleeping on top of it would only make a long backfill longer."""
     profile = Path(root) / "skv" / ".browser-profile"
     blocked = 0
-    with DetachedChrome(profile, settle=SKV_PAGE_SETTLE) as browser:
+    with CamoufoxBrowser(profile, pace=SKV_PAGE_PACE) as browser:
         records, unidentified = skv.parse_index(
             browser.html(skv.INDEX_URL, skv.INDEX_MARKER,
-                         settle=SKV_INDEX_SETTLE))
+                         timeout=SKV_INDEX_TIMEOUT))
         if unidentified:
             print("skv: %d register entr%s name no diarienummer and cannot be "
                   "filed: %s" % (len(unidentified),
@@ -918,7 +917,7 @@ SYNC = {"imy": imy_sync, "fi": fi_sync, "fk": fk_sync, "kfm": kfm_sync,
 
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5, jobs=1):
     """Download the named agencies' ställningstaganden. With no scopes named,
-    the six ordinary HTTP agencies -- Skatteverket needs the serial headful
+    the six ordinary HTTP agencies -- Skatteverket needs the serial Camoufox
     browser and runs on its own schedule (`agencies.BROWSER_ORGS`), though
     naming it explicitly still harvests it. Returns {org: (seen, new)}."""
     return dispatch_scopes(root, scopes, SYNC, DEFAULT_ORGS, full=full,

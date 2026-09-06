@@ -9,9 +9,9 @@ One index, two transports:
     is what makes the harvest complete, not a paging loop.
   * the decision PDFs -- behind a Cloudflare challenge that no header or cookie
     from the index page satisfies. They are fetched through
-    `lib.browser.DetachedChrome`, the same headful transport ``rs`` and
-    ``foreskrift`` use, which clears the challenge and hands back the exact
-    bytes Chrome cached.
+    `lib.browser.CamoufoxBrowser`, the same transport ``rs`` and ``foreskrift``
+    use, which clears the challenge and hands back the exact bytes the browser
+    read.
 
 A record is stored as one JSON (the index row: case, kind, procedure, date)
 plus the English PDF.
@@ -52,7 +52,7 @@ FIRST_YEAR = 1946
 CASE_FILES = "/sites/default/files/case-related/"
 # a Chrome profile shared across a run, so one challenge clears the whole
 # harvest rather than one per document
-PROFILE = ".chrome-profile"
+PROFILE = ".browser-profile"
 
 # The Court's own word on the law. Judgments and advisory opinions are taken
 # whole; of the 688 orders only those indicating provisional measures are --
@@ -210,10 +210,10 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
                        and compress.exists(body_path(root, record["basefile"])),
                        record["date"])
 
-    # one Chrome for the whole run: the Cloudflare challenge is cleared once and
-    # its cookie then serves every fetch, and a browser launch per document
+    # one browser for the whole run: the Cloudflare challenge is cleared once
+    # and its cookie then serves every fetch, and a browser launch per document
     # would cost more than the download
-    with browser.DetachedChrome(root / PROFILE, settle=8.0) as chrome:
+    with browser.CamoufoxBrowser(root / PROFILE) as chrome:
         result = walk(records,
                       resolve=lambda r: resolve(chrome, root, r, full=full,
                                                 delay=delay),

@@ -29,7 +29,7 @@ and deployment. For the architecture and module map, read
 | **tesseract (+ swe), ocrmypdf** | OCR of scanned PDFs | forarbete re-OCR sidecars (optional) |
 | **git** | the wiki/site content repo is git-backed; the inline editor commits to it | wiki/site parse, inline editing |
 | **antiword** | reads the Word 6/95 binaries POI refuses | förarbete `.doc` bodies |
-| **Xvfb** | private framebuffer for the headful-Chrome transport | SKVFS/MTFS download on a headless host |
+| **Camoufox** | the browser transport's own Firefox build (`python -m camoufox fetch`, ~1.2 GB) | skvfs/mtfs/skv/edps/icj/untc download |
 
 Everything except the DV Word path is pure Python. SFS, the citation engine,
 the DV API path, search and the web service need no Java.
@@ -421,17 +421,18 @@ rules. One SAN certificate covers both vhosts; the `certbot` sidecar renews it.
 checkout → build → `up -d` → `lagen all rebuild`). `staffan`'s crontab runs the
 pipeline as inlined `docker compose exec` lines: `lagen all all` nightly (which
 now skips the browser-shielded föreskrift agencies skvfs/mtfs), plus a weekly
-`lagen foreskrift browser-download` (Sundays) for those — the headful-Chrome
-transport is too slow and serial for the nightly sweep.
+`lagen foreskrift browser-download` (Sundays) for those — the browser transport
+runs one navigation at a time, so it stays off the nightly sweep.
 
 `lagen rs browser-download` wants the same weekly slot, for the same reason and
 one more. Skatteverkets 2,614 ställningstaganden are one browser navigation
-each. The run paces them 20 seconds apart: at 5-second spacing the site's front
-refuses everything after about 30 navigations, and keeps refusing for some 40
-minutes. A weekly run costs the register plus what moved. The first run takes
-~15 hours, so slice it with `--limit N` and let the next run resume. Nothing is
-stranded — a run stores a record only once its page is on disk. Run both browser
-jobs **one at a time**: they share the process-global `DISPLAY`.
+each. The run paces them 20 seconds apart: at 2-second spacing the site's front
+refuses navigation 31 and keeps refusing for minutes. That is a rate rule, not a
+bot verdict — no browser gets around it. A weekly run costs the register plus
+what moved. The first run takes ~15 hours, so slice it with `--limit N` and let
+the next run resume. Nothing is stranded — a run stores a record only once its
+page is on disk. Run both browser jobs **one at a time**: Playwright's sync API
+is not built for one browser per thread.
 
 ### Evicting the facsimile cache
 

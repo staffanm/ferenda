@@ -876,9 +876,8 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
     decides that, since only it knows what its runner takes.
 
     `serial` names scopes that must not run concurrently with each other -- the
-    browser-driven ones, where `DetachedChrome` points a *process-global* DISPLAY
-    at its own Xvfb and Playwright's sync API is single-threaded, so two at once
-    corrupt each other's display and stall. They still overlap the HTTP scopes,
+    browser-driven ones, which drive Playwright's sync API -- one browser per
+    thread is not what it is built for, and two at once stall. They still overlap the HTTP scopes,
     which are the overwhelming majority.
 
     `strict` says a scope that raises takes the whole run down with it. A run

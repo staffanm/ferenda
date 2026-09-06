@@ -23,7 +23,7 @@ Three ``enumerate`` shapes are implemented (``indexed``/``paginated``/``json``,
 plus bespoke per-agency enumerators) and two ordinary HTTP
 ``resolve`` shapes (``resolve_landing``, ``resolve_direct`` -- the listing
 anchor already *is* the PDF). Browser-protected sources supply the same two
-seams but select the detached headful-Chrome transport in their ``Agency``
+seams but select the Camoufox transport in their ``Agency``
 config. New shapes are added only when an agency needs one
 (rule:no-speculative-code).
 """
@@ -40,7 +40,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.browser import DetachedChrome
+from ..lib.browser import CamoufoxBrowser
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk, write_record
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import (
@@ -108,8 +108,8 @@ class Agency:
     headers: dict | None = None            # extra request headers (e.g. Accept-Language)
     designation: str | None = None         # printed FS prefix ("HSLF-FS") when != fs.upper()
     http2: bool = False                    # use the HTTP/2 client (Cloudflare front that 403s HTTP/1.1: KKVFS)
-    browser: bool = False                  # detached headful Chrome instead of HTTP (F5: SKVFS/MTFS)
-    browser_settle: float = 20.0           # CDP-free seconds per protected browser navigation
+    browser: bool = False                  # Camoufox instead of an HTTP session (F5: SKVFS/MTFS)
+    browser_pace: float = 0.0              # minimum seconds between navigations (rate-limited fronts)
 
 
 def fs_code(designation):
@@ -620,8 +620,8 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
     if agency.browser:
         assert not agency.http2 and agency.headers is None and agency.user_agent is None, \
             "%s browser transport cannot also configure an HTTP session" % agency.fs
-        with DetachedChrome(Path(root) / agency.fs / ".browser-profile",
-                            settle=agency.browser_settle) as session:
+        with CamoufoxBrowser(Path(root) / agency.fs / ".browser-profile",
+                             pace=agency.browser_pace) as session:
             return _harvest_session(agency, root, session, full, only, limit, delay,
                                     log, reporter)
     session = (make_http2_session if agency.http2 else make_session)(

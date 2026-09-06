@@ -1,8 +1,8 @@
 """Pure SKVFS/RSFS catalogue parsing and live-record storage.
 
 Skatteverket's register is behind an F5/Shape JavaScript challenge, so its
-``Agency`` selects the detached headful-Chrome transport. This module owns the
-source semantics that can be tested without a browser: register HTML to
+``Agency`` selects the Camoufox transport. This module owns the source
+semantics that can be tested without a browser: register HTML to
 ``DocRef`` objects, a detail page to its official PDF, and those source bytes
 to the ordinary föreskrift download layout.
 """
@@ -98,7 +98,7 @@ def save_record(root, agency, ref, detail_html, pdf_url, pdf_data):
 
 
 def resolve(browser, agency, ref, root, _delay=0.5, *, log=print, rejects=None):
-    """Resolve one register ref through detached detail/PDF browser loads."""
+    """Resolve one register ref through browser detail/PDF loads."""
     assert rejects is not None, "SKVFS resolver requires the harvest rejection ledger"
     log("  %s: protected detail page" % ref.identifier)
     detail_html = browser.html(ref.url, ref.identifier)

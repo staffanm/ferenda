@@ -1,12 +1,13 @@
 # SKVFS (and MTFS): the F5/Shape bot-wall — harvest handover
 
-**Status (2026-07-15):** **live incremental SKVFS and MTFS work** through the
+**Status (2026-09-06):** **live incremental SKVFS and MTFS work** through the
 ordinary `lagen foreskrift download {skvfs|mtfs}` sweep. SKVFS layers over the
 frozen SKVFS/RSFS baseline (§7g); MTFS has no frozen baseline. Their two
-`Agency.browser` flags select a real headful Chrome transport; every other
-agency keeps `requests`/HTTP2. F5 still blocks direct HTTP and any browser
-instrumented while the challenge runs, so the working transport is
-operationally heavier and more fragile than an open-data feed.
+`Agency.browser` flags select the Camoufox transport; every other agency keeps
+`requests`/HTTP2. F5 still blocks direct HTTP, so the working transport is
+operationally heavier than an open-data feed — but since the move to Camoufox
+(2026-09-06) it is headless, needs no system browser and no X display, and waits
+for the page rather than for a fixed settle.
 
 ## The sources
 
@@ -78,7 +79,32 @@ Isolated venv, `chromium` + `chromium_headless_shell`. Against the register:
 bot classification, and is actively banned** — strictly worse than a dumb client
 (which at least gets the challenge page). Do **not** ship a headless harvester.
 
-### Headful Chrome with delayed Playwright attachment — **works**
+### Camoufox, headless — **what runs now (2026-09-06)**
+
+Camoufox is a Firefox build whose fingerprint spoofing sits in the browser's own
+C++ rather than in injected JavaScript. Playwright drives it normally: no
+detached navigation, no CDP re-attach, no Xvfb, no fixed settle.
+
+Measured from this environment, first attempt, `headless=True`:
+
+| page | Camoufox, waiting for its marker | the settle it replaced |
+| --- | --- | --- |
+| SKVFS register 115.html | 15.5 s | 20 s |
+| rättsliga ställningstaganden register 121.html (2,614 rows) | 29–34 s | 180 s |
+| MTFS register (tillvaxtanalys.se) | 3–6 s | 20 s |
+| one ställningstagande page | 0.6–1.8 s | 20 s |
+| MTFS 2023:3 PDF | 720,726 bytes, identical to the CDP route | — |
+
+The register HTML it returns parses to the same 2,614 records + 5 unidentified
+entries as before, and a document page to the same metadata and blocks.
+
+**What Camoufox does not change: the rate rule.** 40 document pages at 2-second
+spacing: pages 1–30 served, navigation 31 rejected (255 bytes), and the front
+stayed shut for some minutes. That is a rate limit, not a bot verdict, so the
+20-second pace stays — it is now `browser_pace`/`SKV_PAGE_PACE` rather than a
+settle, and it is the only wait left.
+
+### Headful Chrome with delayed Playwright attachment — **the previous transport**
 
 The differentiator was not more fingerprint spoofing. It was keeping
 Playwright's Chrome DevTools Protocol (CDP) connection absent while F5 ran:
@@ -159,21 +185,21 @@ Ranked by realism and durability.
    scale for continuous updates.
 
 2. **Current nightly posture.** `Agency.browser=True` is configured only for
-   SKVFS and MTFS. `foreskrift.harvest` selects `lib.browser.DetachedChrome` for
-   those two; all other agencies still select `requests` or `Agency.http2`. The job requires:
-   Playwright (a project dependency), system `google-chrome`, and a real X display
-   exported as `DISPLAY` to the nightly process. It fails fast if any is absent.
-   Each dedicated profile/cache lives under
-   `downloaded/foreskrift/{skvfs|mtfs}/.browser-profile/`.
+   SKVFS and MTFS. `foreskrift.harvest` selects `lib.browser.CamoufoxBrowser` for
+   those two; all other agencies still select `requests` or `Agency.http2`. The
+   job requires the `camoufox` dependency plus its downloaded browser
+   (`python -m camoufox fetch`, ~1.2 GB; the Docker image does this at build
+   time). No system browser, no `DISPLAY`. Each dedicated profile lives under
+   `downloaded/foreskrift/{skvfs|mtfs}/.browser-profile/` and keeps the solved
+   challenge cookie between runs.
 
-   A no-change run pays one 20-second register navigation per selected browser
-   source. The normal SKVFS incremental walk then skips every frozen/live record;
-   each genuinely new document adds two protected navigations (~40 seconds:
-   detail + PDF). MTFS links directly from its register, so a new document adds
-   one protected PDF navigation (~20 seconds). Do not reduce
-   `browser_settle=20.0` without a fresh live measurement; attaching at four
-   seconds observed the challenge stub, and challenge-time attachment is exactly
-   the rejected posture.
+   A no-change run pays one register navigation per selected browser source,
+   which now ends when the register has rendered (15 s for SKVFS, 3–6 s for
+   MTFS). Each genuinely new SKVFS document adds two navigations, each paced 20
+   seconds apart by `browser_pace`; MTFS links directly from its register, so a
+   new document there adds one PDF navigation. Do not reduce SKVFS's
+   `browser_pace=20.0` without a fresh live measurement: the front rejected
+   navigation 31 at 2-second spacing.
 
 ## How it is wired
 
@@ -208,7 +234,7 @@ that channel. Keep the RSFS entry (the SKVFS register is its only source).
 - SKVFS Agency config: `ferenda/foreskrift/agencies.py`
 - SKVFS register/detail semantics: `ferenda/foreskrift/skvfs.py`
 - MTFS register/direct-PDF semantics: `ferenda/foreskrift/mtfs.py`
-- Detached headful transport: `ferenda/lib/browser.py`
+- Camoufox transport: `ferenda/lib/browser.py`
 - Shared frozen-import core (other verticals): `lib/legacy_import.py`
 - HTTP/2 transport (KKVFS precedent, wrong tool for this wall):
   `Agency.http2`, `lib/net.make_http2_session`

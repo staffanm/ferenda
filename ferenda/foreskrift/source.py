@@ -43,7 +43,7 @@ def foreskrift_harvest(scopes):
     scope names -- the fs code for a samling one agency owns, 'fffs', and
     'hslffs-<publisher>' for the six sites that publish into HSLF-FS; empty =
     all *non-browser* scopes). The browser-shielded ones (skvfs, mtfs) are
-    excluded from the default sweep -- they need the slow, serial DetachedChrome
+    excluded from the default sweep -- they need the serial Camoufox
     transport, so they run on their own schedule via `lagen foreskrift
     browser-download`. Naming one explicitly still harvests it. `--force`
     re-walks and refreshes existing base regulations; `--only fs/year:num` (one
@@ -70,7 +70,7 @@ def foreskrift_harvest(scopes):
 
 def foreskrift_browser_download(_basefiles):
     """`lagen foreskrift browser-download`: harvest only the browser-shielded
-    scopes (skvfs, mtfs), which need the slow headful-Chrome transport and are
+    scopes (skvfs, mtfs), which need the Camoufox transport and are
     kept off the default parallel sweep. Run sequentially (they share the
     process-global DISPLAY and Playwright's single-thread sync API), on its own,
     less frequent schedule."""
@@ -80,7 +80,7 @@ def foreskrift_browser_download(_basefiles):
               % (", ".join(scopes), layout.FORESKRIFT_DOWNLOADED))
         return
     util.harvest_start("foreskrift browser-download",
-                       "the headful-Chrome agency sites (%s)" % ", ".join(scopes))
+                       "the Camoufox agency sites (%s)" % ", ".join(scopes))
     download.sync(str(layout.FORESKRIFT_DOWNLOADED), scopes=scopes,
                              full=protocol.RUN.force, only=protocol.RUN.only, jobs=1)
 
@@ -250,7 +250,7 @@ SOURCES: tuple[Source, ...] = (Source("foreskrift", foreskrift_list, {
           "that publish into the shared HSLF-FS samling (hslffs-sos, "
           "hslffs-fohm, hslffs-ivo, hslffs-lv, hslffs-mfof, hslffs-tlv); "
           "empty = all non-browser scopes\n"
-          "browser-download: harvest just the headful-Chrome scopes (skvfs, "
+          "browser-download: harvest just the Camoufox scopes (skvfs, "
           "mtfs), kept off the default sweep for a separate schedule\n"
           "reap: remove records an fs reassignment left behind under the old "
           "författningssamling (--dry-run lists them)"),)

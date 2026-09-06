@@ -68,9 +68,15 @@ dependencies = [
     "mcp>=2.0",
     "opensearch-py",
     "pillow>=12.3.0",  # 12.2.0 carries PYSEC-2026-2253..2257
-    # Headful, detached-CDP transport for the F5-protected SKVFS/MTFS registers.
-    # It drives the system google-chrome; Playwright does not download a browser.
-    "playwright>=1.61",
+    # The browser transport for the JavaScript-challenged registers (SKVFS,
+    # MTFS, skv, EDPS, ICJ, OHCHR): a Firefox build whose fingerprint spoofing
+    # sits in its own C++, so it clears those challenges headless where ordinary
+    # Playwright Chromium was hard-rejected. `python -m camoufox fetch` installs
+    # the browser itself (see docker/ferenda/Dockerfile).
+    "camoufox",
+    # camoufox drives Playwright and pins it below 1.61; tools/corpus/og_image.py
+    # and lib/browser.py both work on that line.
+    "playwright>=1.60,<1.61",
     "python-dotenv>=1.2.2",
     "rdflib",
     "requests",
@@ -175,8 +181,8 @@ select = ["F", "I", "B", "BLE", "PLC0415", "S110", "S112", "RUF100"]
 "ferenda/api/patch.py" = ["B008"]
 "ferenda/api/graphics.py" = ["B008"]
 # Sanctioned in-function-import sites (rule:no-infunction-imports): POI/jpype
-# classes resolve only after startJVM (poi_worker), and the playwright import
-# is deferred so build workers never load the greenlet C extension they
+# classes resolve only after startJVM (poi_worker), and the camoufox/playwright
+# import is deferred so build workers never load the greenlet C extension they
 # don't use.
 "ferenda/lib/poi_worker.py" = ["PLC0415"]
 "ferenda/lib/browser.py" = ["PLC0415"]

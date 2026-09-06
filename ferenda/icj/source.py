@@ -40,4 +40,4 @@ SOURCES: tuple[Source, ...] = (simple_source(
     dry_label="the ICJ's judgments, advisory opinions and provisional-measures orders",
     notes="download flags: --only <decision stem, e.g. 070-19860627-JUD-01-00>, --limit N\n"
           "scope: 255 of the Court's 877 decisions; the ~620 time-limit orders are out\n"
-          "the PDFs are Cloudflare-walled and fetched through headful Chrome"),)
+          "the PDFs are Cloudflare-walled and fetched through Camoufox"),)

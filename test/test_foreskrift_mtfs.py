@@ -47,4 +47,4 @@ def test_resolve_fetches_browser_pdf_and_writes_direct_layout(tmp_path):
 def test_mtfs_alone_joins_skvfs_on_browser_transport():
     browser_fs = {fs for fs, agency in REGISTRY.items() if agency.browser}
     assert browser_fs == {"skvfs", "mtfs"}
-    assert REGISTRY["mtfs"].browser_settle == 20.0
+    assert REGISTRY["mtfs"].browser_pace == 2.0

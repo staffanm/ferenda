@@ -21,11 +21,10 @@ from .agencies import REGISTRY
 
 def browser_scopes():
     """The scopes whose sites gate public documents behind a
-    headful-browser (F5/Shape) WAF, so they need the slow, serial DetachedChrome
+    JavaScript-challenge (F5/Shape) WAF, so they need the serial Camoufox
     transport (skvfs, mtfs). Kept out of the default parallel `download` and run
-    on their own schedule via the `browser-download` action -- concurrent Chrome
-    would fight over the process-global DISPLAY and Playwright's single-thread
-    sync API."""
+    on their own schedule via the `browser-download` action -- Playwright's sync
+    API is not built for one browser per thread."""
     return [scope for scope in REGISTRY if REGISTRY[scope].browser]
 
 

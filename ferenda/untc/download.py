@@ -16,7 +16,7 @@ twice from two different publishers, because no one page carries both:
     authentic text as HTML or as a born-digital PDF.
 
 OHCHR sits behind the same Cloudflare challenge as the ICJ, so its pages come
-through `lib.browser.DetachedChrome`; the two PDF texts answer ordinary HTTP.
+through `lib.browser.CamoufoxBrowser`; the two PDF texts answer ordinary HTTP.
 The stored record is the raw page or PDF; parse scrapes it offline.  The corpus is a tiny fixed set, so the shared walk runs with **no
 watermark** (the edpb/rs idiom: a complete listing has no depth to stop short
 of) -- a page already on disk is skipped unless ``--full`` re-fetches it (a new
@@ -35,7 +35,7 @@ from .model import DETAIL, load_treaties
 
 # a Chrome profile shared across the run, so one Cloudflare challenge clears
 # every OHCHR fetch rather than one per treaty
-PROFILE = ".chrome-profile"
+PROFILE = ".browser-profile"
 # what the OHCHR page must carry to be the treaty and not the challenge page
 OHCHR_MARKER = "Article"
 
@@ -127,7 +127,7 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
 
     def chrome():
         if not opened:
-            session_ = browser.DetachedChrome(root / PROFILE, settle=8.0)
+            session_ = browser.CamoufoxBrowser(root / PROFILE)
             session_.__enter__()
             opened.append(session_)
         return opened[0]

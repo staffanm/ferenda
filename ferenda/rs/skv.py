@@ -4,10 +4,10 @@ Skatteverket is the odd one out among the seven agencies in `agencies.py`, in
 three ways that all follow from where it publishes:
 
   * **Behind the F5/Shape challenge.** rattsligvagledning is served from the same
-    front that gates SKVFS, so every navigation runs through the detached
-    headful-Chrome transport (`lib.browser`) rather than an HTTP session. That
-    is why this agency has its own weekly command instead of riding the ordinary
-    ``lagen rs download`` sweep.
+    front that gates SKVFS, so every navigation runs through the Camoufox
+    transport (`lib.browser`) rather than an HTTP session. That front also
+    rate-limits, which is why this agency has its own weekly command instead of
+    riding the ordinary ``lagen rs download`` sweep.
 
   * **The document is a web page.** The other six publish a letterhead PDF; here
     the ställningstagande *is* its page, the way a JK-beslut is (`avg.parse`).
@@ -49,7 +49,7 @@ from .agencies import BY_ORG, number_slug
 
 INDEX_URL = BY_ORG["skv"].listing
 BASE = "https://www4.skatteverket.se"
-# what `DetachedChrome.html` verifies the completed page by: the register's own
+# what `CamoufoxBrowser.html` waits for and verifies the page by: the register's own
 # heading, and the label every ställningstagande page prints its dnr under
 INDEX_MARKER = "Ställningstaganden"
 PAGE_MARKER = "Dnr:"

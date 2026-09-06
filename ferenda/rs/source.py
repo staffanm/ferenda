@@ -58,8 +58,8 @@ def rs_inputs(basefile):
 def rs_harvest(scopes):
     """Bulk harvest of the agencies' rättsliga ställningstaganden (scopes =
     agency codes; empty = every *non-browser* agency). Skatteverket is excluded
-    from the default sweep -- it needs the slow, serial DetachedChrome
-    transport, so it runs on its own schedule via `lagen rs browser-download`.
+    from the default sweep -- it needs the paced, serial Camoufox transport,
+    so it runs on its own schedule via `lagen rs browser-download`.
     Naming it explicitly still harvests it. `--force` refetches every document;
     `--only fk/2025:01` fetches a single ställningstagande (needs its agency
     scope)."""
@@ -82,7 +82,7 @@ def rs_harvest(scopes):
 
 def rs_browser_download(_basefiles):
     """`lagen rs browser-download`: harvest only the browser-shielded agencies
-    (skv), which need the headful-Chrome transport and are kept off the default
+    (skv), which need the Camoufox transport and are kept off the default
     sweep.
 
     Skatteverkets register alone is 2,614 ställningstaganden, each one browser
@@ -95,7 +95,7 @@ def rs_browser_download(_basefiles):
               % (protocol.RUN.only or ", ".join(scopes), layout.RS_DOWNLOADED))
         return
     util.harvest_start("rs browser-download",
-                       "the headful-Chrome agency sites (%s)" % ", ".join(scopes))
+                       "the Camoufox agency sites (%s)" % ", ".join(scopes))
     totals = download.sync(layout.RS_DOWNLOADED, scopes=scopes,
                               full=protocol.RUN.force, only=protocol.RUN.only, limit=protocol.RUN.limit)
     for org, (seen, new) in totals.items():
@@ -137,7 +137,7 @@ SOURCES: tuple[Source, ...] = (Source("rs", rs_list, {
           "scopes are the myndigheter: " + ", ".join(
               "%s (%s)" % (a.org, a.name) for a in agencies.REGISTRY)
           + "; empty = all non-browser agencies\n"
-          "browser-download: harvest just the headful-Chrome agencies (skv), "
+          "browser-download: harvest just the Camoufox agencies (skv), "
           "kept off the default sweep for a separate weekly schedule\n"
           "identity is the agency's own number, not a diarienummer -- a "
           "ställningstagande is published as a numbered item in the agency's "

@@ -208,7 +208,7 @@ uv run python -m ferenda.build rs download          # the six HTTP agencies; or:
 uv run python -m ferenda.build rs parse             # incremental, like every source
 uv run python -m ferenda.build rs download fk --only fk/2025:01   # one statement
 uv run python -m ferenda.build rs download migr     # Lifos (RS + RK), AIA-completed TLS
-uv run python -m ferenda.build rs browser-download  # Skatteverket, weekly, headful Chrome
+uv run python -m ferenda.build rs browser-download  # Skatteverket, weekly, browser transport
 ```
 
 Identity is the agency's own number (`rs/fk/2025:01`, `rs/kfm/1-23-VER`,
@@ -219,8 +219,8 @@ stored records and cost one listing request.
 
 Skatteverket is the seventh agency and runs on its own command. It sits behind
 the F5/Shape challenge SKVFS sits behind, so every navigation goes through
-headful Chrome one at a time, and the run is paced well under the rate the
-front tolerates. A first `rs browser-download` is 2,614 paced navigations —
+Camoufox one at a time, and the run is paced well under the rate the front
+tolerates. A first `rs browser-download` is 2,614 paced navigations —
 some fifteen hours, sliceable with `--limit N`, and a resumed run skips
 whatever is already stored — while a weekly run costs the register plus the
 handful of documents that moved. Its documents are stored as `.html`, not
@@ -362,8 +362,8 @@ UNTS itself, which reproduces each instrument as registered and so is a scanned
 corpus: volume 999 carries the ICCPR over 92 pages with an image on all 92, and
 volume 1161 the Berne Convention over 44 of 44. OHCHR sits behind the same
 Cloudflare challenge as the ICJ and un.org refuses the harvester's user agent on
-the UNCLOS PDF, so every text comes through `lib.browser.DetachedChrome` — one
-session for the run, about 9 s per treaty. `untc parse` reads both offline.
+the UNCLOS PDF, so every text comes through `lib.browser.CamoufoxBrowser` — one
+session for the run, a few seconds per treaty. `untc parse` reads both offline.
 `icc download` also avoids the Cloudflare-fronted `/court-record` pages: it
 facet-scrapes icc-cpi.int `/decisions` for the curated Rome-Statute decision
 types to get each record's document number, then resolves that number
@@ -373,8 +373,9 @@ PDF text and never touches the network either. `icj download` is the one
 folkrätt harvest that needs a browser: the `/decisions` index answers ordinary
 HTTP, but every decision PDF under `/sites/default/files/case-related/` returns
 a Cloudflare challenge that no header or cookie from the index clears, so the
-bodies come through `lib.browser.DetachedChrome` — one headful session for the
-whole run, about 9 s per document, ~40 minutes for the 255 in scope. Rerun
+bodies come through `lib.browser.CamoufoxBrowser` — one session for the whole
+run, which pays the Cloudflare challenge once (~8 s) and then about a second per
+document. Rerun
 `tools/corpus/icj_vocabulary.py` after a harvest that adds a year of decisions: it
 rebuilds `icj/data/vocabulary.txt`, the word list that guides the OCR repair of
 the pre-2002 scans, and the file is a recipe input so a rebuild re-stales every

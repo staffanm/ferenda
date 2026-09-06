@@ -215,9 +215,9 @@ neither.
 All imports at the top of the file, grouped stdlib / third-party / local.
 Sanctioned exceptions (cited inline, per-file-ignored in pyproject):
 `lib/poi_worker.py`'s POI class imports (they resolve only after JVM
-start) and `lib/browser.py`'s playwright import (keeps the greenlet C
+start) and `lib/browser.py`'s camoufox/playwright import (keeps the greenlet C
 extension out of the build workers, which import the module transitively
-but never drive Chrome; a stray C extension in every worker widens the
+but never drive a browser; a stray C extension in every worker widens the
 suspect list for any native crash). jpype itself never loads in-process
 at all: `lib/poi.py` is a client that runs all Java through the
 `poi_worker` subprocess, which nothing may import.

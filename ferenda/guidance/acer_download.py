@@ -4,7 +4,7 @@
 server-rendered Drupal: one ``curl`` with a browser UA against
 ``/documents/official-documents/opinions`` returns the same 235 document links
 a browser shows, and the recommendations pager is plain ``?page=N`` markup. No
-headful Chrome, no JavaScript, no API -- ``/jsonapi`` and a REST endpoint are
+browser, no JavaScript, no API -- ``/jsonapi`` and a REST endpoint are
 both absent and the site's own search (below) does not hold these documents.
 
 **Two page shapes, and they are two different things.**

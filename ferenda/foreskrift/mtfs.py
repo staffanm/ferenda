@@ -2,7 +2,7 @@
 
 The Sitevision register is behind the same F5/Shape challenge as SKVFS, but its
 source shape is simpler: each ``MTFS YYYY:N`` heading is immediately followed
-by the official PDF link. The ``Agency`` selects detached headful Chrome while
+by the official PDF link. The ``Agency`` selects the Camoufox transport while
 this module owns those testable source semantics.
 """
 
@@ -67,7 +67,7 @@ def enumerate_register(browser, _agency):
 
 
 def resolve(browser, agency, ref, root, _delay=0.5, *, log=print, rejects=None):
-    """Fetch and store one direct official PDF through detached Chrome."""
+    """Fetch and store one direct official PDF through Camoufox."""
     assert rejects is not None, "MTFS resolver requires the harvest rejection ledger"
     log("  %s: protected PDF" % ref.identifier)
     return save_single_pdf_record(
