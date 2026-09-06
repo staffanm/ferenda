@@ -32,6 +32,7 @@ paste into config.yml so a plaintext password is never written down.
 """
 
 import base64
+import getpass
 import hashlib
 import hmac
 import json
@@ -42,7 +43,7 @@ import time
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import config
 
@@ -55,7 +56,17 @@ COOKIE = "lagen_editor"
 # anonymous page load; the session cookie alone remains the credential.
 COOKIE_HINT = "lagen_editor_hint"
 SESSION_TTL = 14 * 24 * 3600          # two weeks; re-login after that
-PBKDF2_ROUNDS = 260_000               # OWASP-ish floor for pbkdf2-sha256
+# OWASP's current floor for pbkdf2-hmac-sha256. Only new hashes are minted at
+# this cost: the rounds travel inside the stored string, so a hash written at
+# 260,000 keeps verifying at 260,000 until it is re-minted. Measured at 50 ms
+# per verification on the dev box, and `_LOGIN_SEM` bounds how many run at once.
+PBKDF2_ROUNDS = 600_000
+
+# Login field ceilings. A password is hashed, so its length costs nothing to
+# store -- but an unbounded field is free work for an attacker, and uvicorn
+# reached directly does not have nginx's body limit in front of it.
+MAX_USERNAME = 64
+MAX_PASSWORD = 1024
 
 
 # --------------------------------------------------------------------------
@@ -344,8 +355,8 @@ _LOGIN_SEM = threading.BoundedSemaphore(_LOGIN_MAX_CONCURRENT)
 # --------------------------------------------------------------------------
 
 class LoginBody(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=MAX_USERNAME)
+    password: str = Field(max_length=MAX_PASSWORD)
 
 
 class Me(BaseModel):
@@ -414,9 +425,19 @@ def me(editor: Editor = Depends(require_editor)):
 # --------------------------------------------------------------------------
 
 def _main(argv):
-    if len(argv) != 2 or argv[0] != "hash":
-        sys.exit("usage: python -m ferenda.api.auth hash <password>")
-    print(hash_password(argv[1]))
+    """Mint a pwhash for config.yml.
+
+    The password is read twice from the terminal, never taken from the command
+    line: an argument lands in the shell history file and in every `ps` listing
+    on the box for as long as the process runs."""
+    if argv != ["hash"]:
+        sys.exit("usage: python -m ferenda.api.auth hash")
+    password = getpass.getpass("password: ")
+    if password != getpass.getpass("again: "):
+        sys.exit("the two entries differ")
+    if not password:
+        sys.exit("an empty password is not a password")
+    print(hash_password(password))
 
 
 if __name__ == "__main__":

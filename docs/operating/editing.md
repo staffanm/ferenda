@@ -16,17 +16,29 @@ editors:
   staffan:
     name: Staffan Malmgren           # -> GIT_AUTHOR_NAME / GIT_COMMITTER_NAME
     email: staffan@example.org        # -> GIT_AUTHOR_EMAIL / GIT_COMMITTER_EMAIL
-    pwhash: "pbkdf2$260000$…$…"        # never a plaintext password
+    pwhash: "pbkdf2$600000$…$…"        # never a plaintext password
 ```
 
-Mint a `pwhash` (nothing is stored in the clear):
+`editor_secret` must be at least 32 characters. Write one with
+`openssl rand -hex 32`, which prints 64. A shorter value raises `ConfigError`
+at startup rather than signing sessions with a guessable key.
+
+Mint a `pwhash` (nothing is stored in the clear). The command reads the
+password twice from the terminal and takes no argument — a password on the
+command line lands in the shell history and in every `ps` listing:
 
 ```sh
-uv run python -m ferenda.api.auth hash '<the password>'   # prints the pbkdf2$… line
+uv run python -m ferenda.api.auth hash        # prompts twice, prints the pbkdf2$… line
 ```
 
+New hashes are minted at 600,000 pbkdf2-sha256 rounds. The cost travels inside
+the stored string, so an existing `pbkdf2$260000$…` keeps working until it is
+re-minted.
+
 `editor_secret`/`editors` follow the same env→config.yml precedence as the other
-knobs (`EDITOR_SECRET` env; `editors` is config-only). Leaving `editor_secret`
+knobs (`EDITOR_SECRET` env, or `EDITOR_SECRET_FILE` naming a file — how a
+Docker secret arrives, so the key is not in every process's environment;
+`editors` is config-only). Leaving `editor_secret`
 unset disables editing wholesale — every `/internal-api/v1/{auth,edit}/*` route, and the
 `/ops` dashboard that rides the same session, answers 403.
 

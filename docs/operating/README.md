@@ -165,8 +165,18 @@ Editors are a hand-curated registry; there is no self-signup. Mint a `pwhash`
 (nothing is ever stored in the clear):
 
 ```sh
-python -m ferenda.api.auth hash '<the password>'   # prints the pbkdf2$… line
+python -m ferenda.api.auth hash    # prompts twice, prints the pbkdf2$… line
 ```
+
+The command takes no argument: a password on the command line lands in the
+shell history and in every `ps` listing. New hashes are minted at 600,000
+pbkdf2-sha256 rounds; the cost travels inside the stored string, so an existing
+`pbkdf2$260000$…` keeps working until it is re-minted.
+
+`editor_secret` must be at least 32 characters — `openssl rand -hex 32` writes
+64. A shorter one raises `ConfigError` at startup rather than signing sessions
+with a guessable key. It can also come from a file named by `EDITOR_SECRET_FILE`
+(how a Docker secret arrives), so the key is not in every process's environment.
 
 Paste the line into the editor's entry. A password change plus a restart
 invalidates every outstanding session for that editor (the cookie embeds a

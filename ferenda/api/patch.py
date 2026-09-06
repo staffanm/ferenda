@@ -24,7 +24,7 @@ gated by `auth.require_editor` (401 anonymous / 403 editing-off). The flow:
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import config, patchsource
 from ..lib import git, layout, tpl
@@ -74,13 +74,22 @@ class PatchView(BaseModel):
     base_sha: str             # fingerprint of the pristine text (concurrency guard)
 
 
+# Ceilings on what one save may carry. The largest intermediate text in the
+# corpus is a förarbete of about 4 MB, so 16 MB is room to spare; the point is
+# that the field has a ceiling at all, because uvicorn reached directly has no
+# nginx body limit in front of it.
+MAX_TEXT = 16 * 1024 * 1024
+MAX_DESCRIPTION = 4096
+MAX_ID = 200
+
+
 class SaveBody(BaseModel):
-    source: str
-    basefile: str
-    edited_text: str
-    description: str = ""
+    source: str = Field(max_length=MAX_ID)
+    basefile: str = Field(max_length=MAX_ID)
+    edited_text: str = Field(max_length=MAX_TEXT)
+    description: str = Field(default="", max_length=MAX_DESCRIPTION)
     obfuscated: bool = False
-    base_sha: str
+    base_sha: str = Field(max_length=MAX_ID)
 
 
 @router.get("/document", response_model=PatchView)
