@@ -1112,3 +1112,27 @@ def test_paper_transform_holds_on_a_really_rendered_sfs_page(tmp_path):
                                   amendments=True, columns=2)
     start = compact.find_class("paragraf-start")[0]
     assert "paragraf-gutter" in start[0].get("class").split()
+
+
+def test_the_public_route_renders_through_the_bounded_queue(client, monkeypatch):
+    """`GET /api/v1/pdf` used to lay the document out on the request thread, so
+    a script asking for a thousand documents started a thousand WeasyPrint
+    runs. It goes through the same two-worker queue the background jobs use, so
+    a full queue is a 503 with a Retry-After rather than another render."""
+    monkeypatch.setattr(pdfjob, "MAX_LIVE_JOBS", 0)
+    r = client.get("/api/v1/pdf", params={"path": "/1998:9999",
+                                          "kontext": "dv"})
+    assert r.status_code == 503
+    assert r.headers["retry-after"] == "30"
+
+
+def test_a_render_that_outlives_the_wait_is_503_not_a_held_connection(
+        client, monkeypatch):
+    """The render keeps going into the cache; this connection does not wait for
+    it past `SYNC_WAIT`."""
+    monkeypatch.setattr(pdfjob.Job, "wait", lambda self, timeout: False)
+    r = client.get("/api/v1/pdf", params={"path": "/1998:9999",
+                                          "kontext": "forarbete"})
+    assert r.status_code == 503
+    assert r.headers["retry-after"] == "60"
+    assert "jobb" in r.json()["detail"]

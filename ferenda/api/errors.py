@@ -179,6 +179,14 @@ async def queue_full_handler(request, exc):
         503, str(exc), headers={"Retry-After": "30"}))
 
 
+async def render_unavailable_handler(request, exc):
+    """A synchronous export that timed out or failed -- 503 with a
+    Retry-After. A timeout leaves the render running into the cache, so the
+    retry this asks for is usually answered from disk."""
+    return await http_exception_handler(request, StarletteHTTPException(
+        503, str(exc), headers={"Retry-After": "60"}))
+
+
 def install(app):
     """Register the handlers on the app.
 
@@ -199,3 +207,5 @@ def install(app):
     app.add_exception_handler(pdf.PageNotGenerated, page_not_generated_handler)
     app.add_exception_handler(pdf.InvalidExportRequest, invalid_export_handler)
     app.add_exception_handler(pdfjob.QueueFull, queue_full_handler)
+    app.add_exception_handler(pdfjob.RenderTimeout, render_unavailable_handler)
+    app.add_exception_handler(pdfjob.RenderFailed, render_unavailable_handler)

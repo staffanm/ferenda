@@ -110,6 +110,9 @@ class Job:
     _peak: float = 0.0           # the bar never walks backwards
     finished: float | None = None
     error: str | None = None
+    # set the moment the job reaches a result, so a synchronous caller waits
+    # on the render instead of polling it
+    _over: threading.Event = field(default_factory=threading.Event)
 
     # -- written by the rendering thread ------------------------------------
 
@@ -125,6 +128,7 @@ class Job:
         exc = future.exception()
         self.error = None if exc is None else "%s: %s" % (type(exc).__name__, exc)
         self.finished = time.monotonic()
+        self._over.set()
         if self.error:
             # a failed export must not be joinable: the causes are transient
             # (a facsimile render, NFS), so "Försök igen" has to mean a fresh
@@ -154,6 +158,12 @@ class Job:
     @property
     def done(self) -> bool:
         return self.finished is not None
+
+    def wait(self, timeout: float) -> bool:
+        """Block until the render is over, or `timeout` runs out. False means
+        it is still running -- the job keeps going and its result is still
+        collectable through `/pdf/jobb/<id>`."""
+        return self._over.wait(timeout)
 
     def _raw_fraction(self, now: float) -> float:
         """How far the render has come."""
@@ -224,6 +234,23 @@ class QueueFull(RuntimeError):
     503 with a Retry-After by `api/errors`, on both apps."""
 
 
+class RenderTimeout(RuntimeError):
+    """A synchronous export waited out `SYNC_WAIT` without its render
+    finishing. The render is not cancelled -- it keeps a worker and fills the
+    cache -- so the same request a minute later is answered from disk."""
+
+
+class RenderFailed(RuntimeError):
+    """A synchronous export's render ended in an error. Answered 503: the
+    causes are transient (a facsimile render, NFS)."""
+
+
+# How long `GET /api/v1/pdf` waits for its own render before it hands the
+# reader back to the job endpoints. Under nginx's 600 s for this route, so the
+# app answers rather than the proxy timing the connection out.
+SYNC_WAIT = 300.0
+
+
 class _Handler(logging.Handler):
     """Every WeasyPrint progress line, routed to whichever job the emitting
     thread is rendering. Lines from a render outside a job (none today) are
@@ -285,6 +312,7 @@ def _start(entry, filename, run) -> Job:
         _by_key[job.key] = job
         if entry.is_file():
             job.finished = job.started
+            job._over.set()
             return job
         pool = _install()
     pool.submit(_run, job, run).add_done_callback(job.settle)
@@ -313,6 +341,32 @@ def start_collection(manifest: pdfcollection.CollectionManifest, *, subresource,
                   lambda progress: pdfcollection.export(
                       manifest, subresource=subresource, generated=generated,
                       progress=progress))
+
+
+def render_sync(page, *, toc: bool, kinds: frozenset[str], subresource,
+                amendments: bool, columns: int) -> bytes:
+    """One export's bytes, rendered through the same bounded queue the
+    background jobs use.
+
+    `GET /api/v1/pdf` used to lay a document out on the request thread. Two
+    workers now do every render on this server, however many requests ask for
+    one: a reader who wants the PDF still gets the PDF, and a script that asks
+    for a thousand distinct documents queues behind the same two workers
+    instead of starting a thousand WeasyPrint runs. An export that outlives
+    `SYNC_WAIT` is not lost -- it keeps rendering into the cache -- but this
+    connection is answered 503 rather than held."""
+    job = start(page, toc=toc, kinds=kinds, subresource=subresource,
+                amendments=amendments, columns=columns)
+    if not job.wait(SYNC_WAIT):
+        raise RenderTimeout(
+            "exporten tar längre tid än %d s; hämta den via /api/v1/pdf/jobb"
+            % SYNC_WAIT)
+    if job.error:
+        raise RenderFailed(job.error)
+    entry = result(job)
+    if entry is None:
+        raise RenderFailed("exporten gav ingen PDF")
+    return entry.read_bytes()
 
 
 def _run(job: Job, run) -> None:

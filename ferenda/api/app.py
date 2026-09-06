@@ -1605,14 +1605,14 @@ def pdf_endpoint(
     `andringar` controls the SFS amendment register. `kolumner=2` uses the
     compact two-column layout and omits context."""
     generated, kinds = pdfjob.parse_request(path, kontext, kolumner)
-    try:
-        data = pdf.export(generated, toc=toc, kinds=kinds,
-                          subresource=facsimiles.subresource,
-                          amendments=andringar, columns=kolumner)
-    except pdf.SubresourceUnavailable as exc:
-        # a degraded PDF is never served or cached; the failure is usually
-        # transient (facsimile render, NFS), so the client should retry
-        raise HTTPException(503, "subresource failed: %s" % exc) from None
+    # through the bounded job queue, not on this thread: two workers do every
+    # render on this server, so a script asking for a thousand documents waits
+    # in one queue instead of starting a thousand WeasyPrint runs. A queue with
+    # no slot, a render past `SYNC_WAIT` and a failed render are all 503 with a
+    # Retry-After (api/errors).
+    data = pdfjob.render_sync(generated, toc=toc, kinds=kinds,
+                              subresource=facsimiles.subresource,
+                              amendments=andringar, columns=kolumner)
     return Response(data, media_type="application/pdf", headers={
         "Content-Disposition": '%s; filename="%s"' % (
             "attachment" if download else "inline", pdf.filename_for(path))})
