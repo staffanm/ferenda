@@ -265,13 +265,51 @@ a big source reads every artifact's size and mtime and can take tens of
 seconds. That scan reports as `checking staleness` on the same line the step's
 own counter uses. A parse or versions step first lists its documents
 (`listing basefiles`, the walk that reads as a pause on a cold cache), then
-scans them once: a document found up to date is booked on the spot, a stale
-one goes to a worker the moment it is found, most expensive first, so the
-counter moves seconds into the scan and a source with nothing stale answers
-`up to date -- skipped` at the scan's end. Measured on the dev box with
-nothing stale: eurlex parse 21 s end to end, forarbete parse 8 s. Download
-has no such scan — nothing on disk decides what it fetches — so its line
-names the harvest watermark instead: `(from 2026-01-10)`, or
+scans them once, in chunks of 500 keys. With more than one job the chunks go
+to a pool of scan workers. A worker reads its chunk's manifest entries in one
+query and answers the file checks from one directory listing per directory
+(`compress.dir_cache`). A document found up to date is booked on the spot; a
+stale one goes to a build worker the moment its chunk lands, most expensive
+first, so the counter moves seconds into the scan and a source with nothing
+stale answers `up to date -- skipped` at the scan's end. On the production
+NFS mount the per-document checks used to be round trips: one sqlite
+transaction per document (four lock round trips) and 18 stats. Measured with
+nothing stale and 16 jobs, 2026-09-06: eurlex parse 1172 s → 127 s,
+forarbete parse 409 s → 13 s, hudoc parse 273 s → 15 s on production; on
+the dev box eurlex parse 17 s end to end, forarbete parse 10 s. Most of
+eurlex's 127 s is now the listing itself, one directory read per document.
+
+`relate`, `dump` and `generate` open with the same kind of pass over every
+artifact of a source (`freshness.stat_records`), and it runs across the same
+number of processes: forarbete's 97,000 artifacts took 25–54 s serially on
+production and take 5.5 s with 16 jobs. A relate whose fingerprint changed
+then compares each artifact's size and mtime with the row's; only the ones
+whose mark moved are read and hashed, `relate <source>  hashing rewritten
+artifacts`, again across the pool — each read is an NFS round trip of 13–44
+ms. After a sync that moves every artifact's mtime this is the whole source:
+hudoc's 46,000 artifacts hashed in 40 s cold (66 s serially with a warm
+cache, 207 s cold in the run before the change), forarbete's 97,000 in about
+three minutes (2213 s before). The step then counts the source's links once
+more for its summary line; on a cold catalog that count is tens of seconds
+to minutes of index reads and is the same either way.
+
+The cross-passes at the end of relate (`relate cross-passes`, ledger key
+`relate __corr__`) took 5581 s in the same run. Almost all of it was
+förarbete's hook: `fk.resolve` reads every proposition artifact (28,278) to
+pin its författningskommentar entries, `genomforande.resolve` reads the
+propositions with genomför-direktiv edges and then every statute a pinpoint
+names, one artifact at a time. On a copy of the catalog with a cold cache and
+a busy disk that hook ran for 86 minutes without finishing. Those reads now
+go across the run's jobs too. The hook's opening query — which förarbeten
+carry a genomför-direktiv link — had no index to use and fetched every
+forarbete document's link rows to test the predicate, 20 minutes and more on
+the same copy; relate now builds a partial index over those links
+(`idx_links_genomfor`, one scan of `links` the first time) and the query is
+a covering index scan. The other passes are sqlite work on the catalog and
+were not changed.
+
+Download has no such scan — nothing on disk decides what it fetches — so its
+line names the harvest watermark instead: `(from 2026-01-10)`, or
 `(first harvest)` / `(full sweep)` when there is no boundary to work back to.
 
 A run piped to a file or a cron log (`docker compose exec ferenda lagen all
