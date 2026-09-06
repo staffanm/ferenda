@@ -41,6 +41,7 @@ from urllib.parse import quote
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
+from ..lib.errors import UpstreamChanged
 from ..lib.util import normalize_hints
 from .journals import LOD
 
@@ -108,7 +109,8 @@ def _lod_records_from_page(html, issue_url):
     no entries is a page the journal did not set (the print-only volumes'
     addresses answer with an empty shell), and the walk says so."""
     m = RE_ISSUE_HREF.search(issue_url)
-    assert m is not None, issue_url
+    if m is None:
+        raise UpstreamChanged(issue_url)
     url_issue, url_year = m.group(2), m.group(1)
     soup = BeautifulSoup(html, "html.parser")
     contents = soup.select_one("section#frontcol2")

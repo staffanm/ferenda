@@ -23,6 +23,7 @@ import time
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
+from ..lib.errors import UpstreamChanged
 from ..lib.util import normalize_space
 from .journals import URT
 
@@ -100,7 +101,8 @@ def _urt_entries(session):
         # a link's slug is the match, not a split of the link: the journal
         # sets some links with a trailing slash and some without
         href = links[0].get("href")
-        assert isinstance(href, str), "an urt entry link is not a link"
+        if not isinstance(href, str):
+            raise UpstreamChanged("an urt entry link is not a link")
         slug = RE_URT_SLUG.search(href)
         if slug is None:
             continue

@@ -76,6 +76,7 @@ import re
 import time
 from collections import Counter
 
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, make_session, request
@@ -134,11 +135,13 @@ def unit_nummer(part_scope, section_scope):
     when EUIPO publishes the Swedish translation of an edition we first took in
     English."""
     part = RE_PART_SCOPE.match(part_scope)
-    assert part, "not a del designation: %r" % part_scope
+    if not part:
+        raise UpstreamChanged("not a del designation: %r" % part_scope)
     if not section_scope:
         return "part-%s" % part.group(1).lower()
     section = RE_SECTION_SCOPE.match(section_scope)
-    assert section, "not an avsnitt designation: %r" % section_scope
+    if not section:
+        raise UpstreamChanged("not an avsnitt designation: %r" % section_scope)
     return "part-%s-section-%s" % (part.group(1).lower(), section.group(1))
 
 
@@ -169,8 +172,8 @@ COVER_PARAGRAPHS = 6
 def iso_date(stamp):
     """The ISO date of an API timestamp ("2026-07-01T00:00:00" ->
     "2026-07-01")."""
-    assert re.match(r"^\d{4}-\d{2}-\d{2}T", stamp or ""), \
-        "not an EUIPO timestamp: %r" % stamp
+    if not re.match(r"^\d{4}-\d{2}-\d{2}T", stamp or ""):
+        raise UpstreamChanged("not an EUIPO timestamp: %r" % stamp)
     return stamp[:10]
 
 
@@ -185,7 +188,8 @@ def pick_publication(publications, family):
     2023 one is superseded whatever the flag says."""
     live = [p for p in publications
             if p["ProductFamily"] == [family] and not p["IsPubObsolete"]]
-    assert live, "EUIPO publishes no current %s" % family
+    if not live:
+        raise UpstreamChanged("EUIPO publishes no current %s" % family)
     latest = max(iso_date(p["EntryIntoForce"]) for p in live)
     edition = [p for p in live if iso_date(p["EntryIntoForce"]) == latest]
     by_sprak = {p["Language"]: p for p in edition}
@@ -272,7 +276,8 @@ def _node_page(node):
     """The topic id behind one innehållsförteckningsnod, off the address the
     node states ("/2319054/2231948/trade-mark-guidelines/section-4-…" ->
     "2231948"). Every node in a published publication states one."""
-    assert node["Url"], "EUIPO node %r states no address" % node["Title"]
+    if not node["Url"]:
+        raise UpstreamChanged("EUIPO node %r states no address" % node["Title"])
     return node["Url"].split("/")[2]
 
 

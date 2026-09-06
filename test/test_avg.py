@@ -13,6 +13,7 @@ from ferenda.avg import download as avg_download
 from ferenda.avg import parse as avg_parse
 from ferenda.avg.model import Beslut, Block, Fotnot, beslut_uri
 from ferenda.lib import catalog, catalog_rows, compress, facets, layout
+from ferenda.lib.errors import UpstreamChanged
 from ferenda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
 from ferenda.lib.pdftext import Para
 from ferenda.lib.util import document_extension, record_path, write_atomic
@@ -702,7 +703,7 @@ def test_imy_parse_praxis():
 
 def test_imy_praxis_rejects_an_unknown_field():
     # the curated schema growing a field must be looked at, not guessed past
-    with pytest.raises(AssertionError, match="unknown field"):
+    with pytest.raises(UpstreamChanged, match="unknown field"):
         avg_download.imy_parse_praxis(
             '<div class="imy-body imy-contentpage__main-content">'
             '<div class="imy-expandable-box">'

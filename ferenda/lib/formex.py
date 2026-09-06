@@ -31,6 +31,7 @@ from pathlib import Path
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from . import compress, markup, patch
+from .errors import UpstreamChanged
 from .util import from_roman
 
 
@@ -290,8 +291,9 @@ def _quote_mark(el):
         return chr(int(el.get("CODE"), 16))
     assert el.tag == "QUOT.START", "only a QUOT.START prints an empty CODE"
     partner = el.getroottree().getroot().find(".//*[@ID='%s']" % el.get("REF.END"))
-    assert partner is not None and partner.get("CODE"), \
-        "a QUOT.START with an empty CODE names a QUOT.END that carries one"
+    if partner is None or not partner.get("CODE"):
+        raise UpstreamChanged("a QUOT.START with an empty CODE names a "
+                              "QUOT.END that carries one")
     return QUOTE_PAIRS[chr(int(partner.get("CODE"), 16))]
 
 

@@ -88,6 +88,7 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress
 from ..lib.browser import DetachedChrome, IncompleteNavigation, WafRejected
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import (
     dispatch_scopes,
     page_path,
@@ -238,16 +239,19 @@ def imy_parse_listing(html_text):
     HTML so the rules are testable without network."""
     soup = BeautifulSoup(html_text, "html.parser")
     main = soup.find("div", class_="imy-contentpage__main-content")
-    assert main is not None, "imy.se ställningstagande listing has no main content"
+    if main is None:
+        raise UpstreamChanged("imy.se ställningstagande listing has no main content")
     items = []
     for block in main.find_all("div", class_="imy-info-block"):
         heading = block.find(class_="imy-info-block__heading")
         anchor = block.find("a", href=True)
-        assert heading is not None and anchor is not None, \
-            "imy.se ställningstagande block has no heading or link"
+        if heading is None or anchor is None:
+            raise UpstreamChanged(
+                "imy.se ställningstagande block has no heading or link")
         number = RE_IMY_NUMBER.search(element_text(anchor))
-        assert number, ("imy.se ställningstagande %r names no IMYRS number"
-                        % element_text(heading))
+        if not number:
+            raise UpstreamChanged("imy.se ställningstagande %r names no IMYRS "
+                                  "number" % element_text(heading))
         items.append({"titel": element_text(heading), "nummer": number.group(1),
                       "url": urljoin(IMY_BASE, href(anchor))})
     return items
@@ -260,7 +264,8 @@ def imy_parse_page(html_text, url):
     it is the document."""
     soup = BeautifulSoup(html_text, "html.parser")
     main = soup.find("div", class_="imy-contentpage__main-content")
-    assert main is not None, "imy.se ställningstagande page has no main content"
+    if main is None:
+        raise UpstreamChanged("imy.se ställningstagande page has no main content")
     summary = []
     for el in main.find_all(["h2", "h3", "p"]):
         if el.name != "p":
@@ -303,7 +308,8 @@ def fi_parse_listing(html_text):
     first cell is not a number -- is skipped. Pure over the HTML."""
     soup = BeautifulSoup(html_text, "html.parser")
     content = soup.find("div", class_="editor-content")
-    assert content is not None, "fi.se ställningstagande page has no editor content"
+    if content is None:
+        raise UpstreamChanged("fi.se ställningstagande page has no editor content")
     items = []
     for row in content.find_all("tr"):
         cells = row.find_all("td")
@@ -317,7 +323,9 @@ def fi_parse_listing(html_text):
             "beslutsdatum": normalize_space(cells[2].get_text(" ", strip=True)),
             "status": fi_status(normalize_space(cells[3].get_text(" ", strip=True))),
             "dokument_url": urljoin(FI_BASE, href(anchor)) if anchor else None})
-    assert items, "fi.se förteckning parsed to no rows -- page structure changed?"
+    if not items:
+        raise UpstreamChanged(
+            "fi.se förteckning parsed to no rows -- page structure changed?")
     return items
 
 
@@ -372,13 +380,15 @@ def fk_parse_listing(html_text):
         text = normalize_space(el.get_text(" ", strip=True)).replace(
             "Pdf, öppnas i nytt fönster.", "").strip()
         listed = RE_FK_LISTED.search(text)
-        assert listed, ("forsakringskassan.se lists %r with no ställningstagande "
-                        "number" % text)
+        if not listed:
+            raise UpstreamChanged("forsakringskassan.se lists %r with no "
+                                  "ställningstagande number" % text)
         items.append({"arsgrupp": year,
                       "titel": normalize_space(RE_FK_LISTED.sub("", text)),
                       "nummer": "%s:%02d" % (listed.group(1), int(listed.group(2))),
                       "dokument_url": urljoin(FK_BASE, href(el))})
-    assert items, "forsakringskassan.se listing parsed to no entries"
+    if not items:
+        raise UpstreamChanged("forsakringskassan.se listing parsed to no entries")
     return items
 
 
@@ -489,7 +499,8 @@ def kfm_parse_listing(html_text):
     separately for the caller to report. Pure over the HTML."""
     soup = BeautifulSoup(html_text, "html.parser")
     listing = soup.find("ul", class_="iw-kfm-document-list")
-    assert listing is not None, "kronofogden.se page has no iw-kfm-document-list"
+    if listing is None:
+        raise UpstreamChanged("kronofogden.se page has no iw-kfm-document-list")
     items, unnumbered, year = [], [], None
     for el in listing.find_all(["p", "li"]):
         if el.name == "p":
@@ -498,7 +509,8 @@ def kfm_parse_listing(html_text):
                 year = text
             continue
         anchor = el.find("a", href=True)
-        assert anchor is not None, "kronofogden.se list entry has no link"
+        if anchor is None:
+            raise UpstreamChanged("kronofogden.se list entry has no link")
         description = anchor.find("span")
         detail = normalize_space(description.get_text(" ", strip=True)) \
             if description else ""
@@ -512,7 +524,8 @@ def kfm_parse_listing(html_text):
         items.append({"arsgrupp": year, "titel": titel,
                       "nummer": number.group(1),
                       "dokument_url": urljoin(KFM_BASE, href(anchor))})
-    assert items, "kronofogden.se listing parsed to no entries"
+    if not items:
+        raise UpstreamChanged("kronofogden.se listing parsed to no entries")
     return items, unnumbered
 
 
@@ -566,7 +579,8 @@ def _migr_metadata(soup):
     a run of paired label/value divs rather than a table, so the pairing is
     positional -- but the classes naming the two columns are its own and stable."""
     block = soup.find(id="metadataDisplayInformation")
-    assert block is not None, "lifos document page has no Dokumentinformation"
+    if block is None:
+        raise UpstreamChanged("lifos document page has no Dokumentinformation")
     labels = block.find_all("div", class_="metadataDisplayLeftColumn")
     values = block.find_all("div", class_="metadataDisplayRightColumn")
     return {normalize_space(label.get_text(" ", strip=True)).rstrip(":"):
@@ -588,7 +602,8 @@ def migr_parse_document(html_text):
     Försäkringskassan route). Pure over the HTML."""
     soup = BeautifulSoup(html_text, "html.parser")
     heading = soup.find("div", class_="DocumentHeader")
-    assert heading is not None, "lifos document page has no DocumentHeader"
+    if heading is None:
+        raise UpstreamChanged("lifos document page has no DocumentHeader")
     heading_text = normalize_space(heading.get_text(" ", strip=True))
     number = RE_MIGR_NUMBER.search(heading_text)
     version = RE_MIGR_VERSION.search(heading_text)
@@ -749,7 +764,8 @@ def kkv_parse_listing(html_text):
             "ersatt_av": upphavd.group(1) if upphavd else None,
             "ersatter": ersatter.group(1) if ersatter else None,
             "url": urljoin(KKV_BASE, href(anchor)) if anchor else None})
-    assert items, "konkurrensverket.se förteckning parsed to no rows"
+    if not items:
+        raise UpstreamChanged("konkurrensverket.se förteckning parsed to no rows")
     return items
 
 

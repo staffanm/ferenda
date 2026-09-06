@@ -217,8 +217,11 @@ def test_author_raises_after_one_failed_retry(monkeypatch):
 
 
 def test_annotate_rejects_non_sector3(monkeypatch):
-    # a judgment (sector 6) is out of scope; fails before any network call
-    with pytest.raises(AssertionError):
+    # a judgment (sector 6) is out of scope; fails before any network call.
+    # ValueError, not AssertionError: the CELEX comes off the command line and
+    # the check is load-bearing, so it has to survive `python -O`
+    # (rule:errors-drive-retry-use-raise)
+    with pytest.raises(ValueError, match="sector-3"):
         annotate.annotate("62019CJ0311")
 
 

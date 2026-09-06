@@ -136,6 +136,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from bs4 import BeautifulSoup
 
 from ..lib import compress
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import (
     HarvestWatermark,
     ItemKey,
@@ -294,7 +295,9 @@ def jo_nonce(session):
     same session for the POSTs)."""
     response = request(session, "GET", JO_SEARCH_PAGE, timeout=60)
     match = RE_JO_NONCE.search(response.text)
-    assert match, "jo.se search page carries no ajaxNonce -- site changed?"
+    if not match:
+        raise UpstreamChanged(
+            "jo.se search page carries no ajaxNonce -- site changed?")
     return match.group(1)
 
 
@@ -373,7 +376,8 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5, log=print):
                                  "page": "1", "combine_type": "{}",
                                  "language": "sv", "advanced_search": "0"})
         hits = [h for h in envelope["search_hits"] if dnr in jo_dnrs(h.get("diary_number"))]
-        assert hits, "jo.se search finds no decision with dnr %s" % dnr
+        if not hits:
+            raise ValueError("jo.se search finds no decision with dnr %s" % dnr)
         return 1, int(jo_save(root, hits[0], session, delay, full=full))
 
     marker = Path(root) / "jo" / COMPLETE
@@ -505,7 +509,8 @@ def jk_sync(root, full=False, only=None, limit=None, delay=0.5):
     if only:
         dnr = only.split("/", 1)[1]
         items = [i for i in items if jk_canonical(i["dnr_raw"]) == dnr]
-        assert items, "jk.se listing carries no decision with dnr %s" % dnr
+        if not items:
+            raise ValueError("jk.se listing carries no decision with dnr %s" % dnr)
     seen = new = 0
     rep = Reporter()
     for item in items:
@@ -538,8 +543,9 @@ def arn_parse_listing(html_text):
     soup = BeautifulSoup(html_text, "html.parser")
     heading = next((h for h in soup.find_all("h2")
                     if "senaste" in h.get_text().lower()), None)
-    assert heading is not None, \
-        "arn.se listing has no 'De senaste ...' section -- site changed?"
+    if heading is None:
+        raise UpstreamChanged(
+            "arn.se listing has no 'De senaste ...' section -- site changed?")
     # collect element refs first, then mutate (extract the link) -- never during
     # the find_all_next walk
     entries, cur = [], None
@@ -619,7 +625,8 @@ def arn_sync(root, full=False, only=None, limit=None, delay=0.5):
     if only:
         dnr = only.split("/", 1)[1]
         items = [i for i in items if i["dnrs"][0] == dnr]
-        assert items, "arn.se listing carries no decision with dnr %s" % dnr
+        if not items:
+            raise ValueError("arn.se listing carries no decision with dnr %s" % dnr)
     seen = new = 0
     rep = Reporter()
     for item in items:
@@ -675,12 +682,15 @@ def imy_parse_listing(html_text):
     listing component declares, so :func:`imy_listing` knows when to stop."""
     soup = BeautifulSoup(html_text, "html.parser")
     pagecount = RE_IMY_PAGECOUNT.search(html_text)
-    assert pagecount, "imy.se listing carries no data-pagecount -- site changed?"
+    if not pagecount:
+        raise UpstreamChanged(
+            "imy.se listing carries no data-pagecount -- site changed?")
     items = []
     for anchor in soup.select("a.imy-search-hit[href]"):
         url = str(anchor["href"]).split("?", 1)[0]
         heading = anchor.find(class_="imy-search-hit__heading")
-        assert heading is not None, "imy.se search hit %s has no heading" % url
+        if heading is None:
+            raise UpstreamChanged("imy.se search hit %s has no heading" % url)
         # the desktop and mobile detail sections repeat status and categories,
         # so the first occurrence of each is the whole story
         status = anchor.find(class_="imy-search-hit__detail-text")
@@ -744,7 +754,9 @@ def imy_praxis_fields(paragraph):
         label = element_text(strong).rstrip(":").lower()
         key = next((k for stem, k in IMY_PRAXIS_FIELDS if label.startswith(stem)),
                    None)
-        assert key, "imy.se praxisbeslut carries an unknown field %r" % label
+        if not key:
+            raise UpstreamChanged(
+                "imy.se praxisbeslut carries an unknown field %r" % label)
         # the value runs from this label to the *next* one -- the fields are one
         # paragraph of "<strong>label:</strong> value<br />" rows
         value = []
@@ -768,7 +780,8 @@ def imy_parse_praxis(html_text, guid_map):
     decisions), and then every one of them carries it."""
     soup = BeautifulSoup(html_text, "html.parser")
     main = soup.find("div", class_="imy-contentpage__main-content")
-    assert main is not None, "imy.se praxisbeslut page has no main content"
+    if main is None:
+        raise UpstreamChanged("imy.se praxisbeslut page has no main content")
     curated, amne = {}, None
     for el in main.find_all(["h3", "div"]):
         if el.name == "h3":
@@ -777,7 +790,8 @@ def imy_parse_praxis(html_text, guid_map):
         if "imy-expandable-box" not in (el.get("class") or []):
             continue
         heading = el.find(class_="imy-expandable-box__heading")
-        assert heading is not None, "imy.se praxis box has no heading"
+        if heading is None:
+            raise UpstreamChanged("imy.se praxis box has no heading")
         labelled = [p for p in el.find_all("p") if p.find("strong")]
         entry = {"amne": amne, "rubrik": element_text(heading),
                  "sammanfattning": normalize_space(" ".join(
@@ -798,7 +812,8 @@ def imy_parse_sanktion(html_text, guid_map):
     tillsyn page itself never says."""
     soup = BeautifulSoup(html_text, "html.parser")
     main = soup.find("div", class_="imy-contentpage__main-content")
-    assert main is not None, "imy.se sanktionsavgift page has no main content"
+    if main is None:
+        raise UpstreamChanged("imy.se sanktionsavgift page has no main content")
     curated = {}
     for anchor in main.find_all("a", href=True):
         slugs = imy_curated_slugs(anchor, guid_map)
@@ -806,7 +821,9 @@ def imy_parse_sanktion(html_text, guid_map):
             continue
         text = element_text(anchor).replace("\xa0", " ")
         _who, sep, belopp = text.rpartition(": ")
-        assert sep, "imy.se sanktionsavgift entry %r names no amount" % text
+        if not sep:
+            raise UpstreamChanged(
+                "imy.se sanktionsavgift entry %r names no amount" % text)
         for slug in slugs:
             curated[slug] = belopp
     return curated
@@ -820,7 +837,8 @@ def imy_page_metadata(landing_html):
     thing to an editor-written abstract these decisions have."""
     soup = BeautifulSoup(landing_html, "html.parser")
     heading = soup.select_one("h1.imy-contentpage__heading")
-    assert heading is not None, "imy.se tillsyn page has no h1 -- site changed?"
+    if heading is None:
+        raise UpstreamChanged("imy.se tillsyn page has no h1 -- site changed?")
     ingress = soup.select_one(".imy-contentpage__preamble")
     step = soup.select_one(".imy-status-in-process__visualization-item--current"
                            " .imy-status-in-process__heading")
@@ -991,14 +1009,16 @@ def imy_sync(root, full=False, only=None, limit=None, delay=0.5):
     items = imy_listing(session, delay)
     if only:
         path = record_path(root, "imy", only)
-        assert compress.exists(path), (
-            "imy --only %s: no record on disk, so the tillsyn page that "
-            "publishes it is unknown -- run a full `lagen avg download imy` "
-            "first" % only)
+        if not compress.exists(path):
+            raise ValueError(
+                "imy --only %s: no record on disk, so the tillsyn page that "
+                "publishes it is unknown -- run a full `lagen avg download imy` "
+                "first" % only)
         slugs = {t["slug"] for t in
                  compress.read_json(path)["tillsyner"]}
         items = [i for i in items if i["slug"] in slugs]
-        assert items, "imy.se listing no longer carries %s" % only
+        if not items:
+            raise ValueError("imy.se listing no longer carries %s" % only)
     if limit:
         items = items[:limit]
 
@@ -1085,9 +1105,9 @@ def kkv_arendelista(session, delay):
     for page in range(2, first["pagination"]["pageCount"] + 1):
         time.sleep(delay)
         items.extend(kkv_arendelista_page(session, page)["items"])
-    assert len(items) == first["pagination"]["total"], (
-        "kkv ärendelista: collected %d of %d cases"
-        % (len(items), first["pagination"]["total"]))
+    if len(items) != first["pagination"]["total"]:
+        raise UpstreamChanged("kkv ärendelista: collected %d of %d cases"
+                              % (len(items), first["pagination"]["total"]))
     return items
 
 
@@ -1414,8 +1434,9 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
         curated = kkv_curated(session, delay, wanted={case_number})
         item = kkv_cases(session, delay).get(case_number)
         if item is None:
-            assert case_number in curated, \
-                "kkv: %s is neither a narrowed diarium case nor on the ärendelista" % only
+            if case_number not in curated:
+                raise ValueError("kkv: %s is neither a narrowed diarium case "
+                                 "nor on the ärendelista" % only)
             return 1, int(kkv_save_curated(root, case_number, curated[case_number],
                                            session, delay, full=full))
         return 1, int(kkv_save(root, item, curated.get(case_number), session,

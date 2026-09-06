@@ -66,6 +66,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import (
     pdf_path,
     select_pending,
@@ -113,7 +114,8 @@ def topic_pages(index_html):
     """The ämnessidor named by the single-rulebook index, as absolute URLs.
     Pure over the HTML so the index can be tested without network."""
     topics = sorted(set(RE_TOPIC.findall(index_html)))
-    assert topics, "the EBA single-rulebook page named no ämnessidor at all"
+    if not topics:
+        raise UpstreamChanged("the EBA single-rulebook page named no ämnessidor at all")
     return [BASE + path for path in topics]
 
 
@@ -396,7 +398,8 @@ def parse_leaf(html_text, url):
     file name."""
     soup = BeautifulSoup(html_text, "html.parser")
     heading = soup.find("h1")
-    assert heading is not None, "%s carries no document title" % url
+    if heading is None:
+        raise UpstreamChanged("%s carries no document title" % url)
     files = {}
     for item in soup.select(".document-download__item"):
         badge = item.select_one(".badge--langcode")

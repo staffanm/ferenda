@@ -75,6 +75,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import (
     paginated,
     pdf_path,
@@ -163,9 +164,11 @@ def parse_leaf(html_text, url):
     -- see the module docstring for the five documents that costs."""
     soup = BeautifulSoup(html_text, "html.parser")
     article = soup.select_one("article.node--type-easa-amcgm")
-    assert article is not None, "%s is not an AMC/GM document page" % url
+    if article is None:
+        raise UpstreamChanged("%s is not an AMC/GM document page" % url)
     heading = soup.find("h1")
-    assert heading is not None, "%s carries no document title" % url
+    if heading is None:
+        raise UpstreamChanged("%s carries no document title" % url)
     published = article.select_one(
         ".field-name-field-easa-official-publication")
     beslut = article.select_one(".field-name-field-easa-related-ed-decision a")

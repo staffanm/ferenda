@@ -50,6 +50,7 @@ from ferenda.guidance.model import (
 )
 from ferenda.lib import compress, lagrum
 from ferenda.lib import formex as lib_formex
+from ferenda.lib.errors import UpstreamChanged
 from ferenda.lib.harvest import pdf_path
 from ferenda.lib.util import record_path
 
@@ -189,7 +190,7 @@ def test_sitemap_groups_document_pages_by_type_slug_and_language():
 
 
 def test_sitemap_with_no_document_pages_is_a_broken_index_not_an_empty_corpus():
-    with pytest.raises(AssertionError):
+    with pytest.raises(UpstreamChanged):
         edpb_download.sitemap_document_pages(["<urlset></urlset>"])
 
 
@@ -1408,7 +1409,7 @@ def test_euipo_unit_nummer_reads_the_scope_codes():
     assert euipo_download.unit_nummer("PARTM", "") == "part-m"
     # a leading zero is a real avsnitt here: Del C opens with Avsnitt 0
     assert euipo_download.unit_nummer("PARTC", "SECTION0") == "part-c-section-0"
-    with pytest.raises(AssertionError):
+    with pytest.raises(UpstreamChanged):
         euipo_download.unit_nummer("PARTEXA RCD", "")
 
 
@@ -1482,7 +1483,7 @@ def test_euipo_pick_publication_takes_the_current_edition_in_swedish():
     # the trade mark edition in force has no Swedish text yet, so English
     assert euipo_download.pick_publication(
         publications, "Trade mark Guidelines")["Id"] == "6"
-    with pytest.raises(AssertionError):
+    with pytest.raises(UpstreamChanged):
         euipo_download.pick_publication(publications, "Craft GI Guidelines")
 
 

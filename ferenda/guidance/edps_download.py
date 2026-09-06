@@ -70,6 +70,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from ..lib import browser
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import fetcher, make_session
@@ -125,7 +126,8 @@ def citation(serie, nummer, antagen):
     match = RE_SLUGGAT_NUMMER.fullmatch(nummer)
     if match:
         return "%s %s/%s" % (KALLAS[serie], *match.groups())
-    assert antagen, "%s/%s is undated and unnumbered both" % (serie, nummer)
+    if not antagen:
+        raise UpstreamChanged("%s/%s is undated and unnumbered both" % (serie, nummer))
     return "%s (%s)" % (KALLAS[serie], antagen[:4])
 
 
@@ -196,9 +198,11 @@ def listing_rows(html):
     for article in BeautifulSoup(html, "html.parser").select(
             "article.node--type-edpsweb-publication"):
         title = article.select_one("h3.node__title a")
-        assert title is not None, "an EDPS listing row carries no title link"
+        if title is None:
+            raise UpstreamChanged("an EDPS listing row carries no title link")
         date = article.select_one(".edpsweb-publication-date")
-        assert date is not None, "%s is listed with no date" % href(title)
+        if date is None:
+            raise UpstreamChanged("%s is listed with no date" % href(title))
         rows.append({
             "titel": normalize_space(title.get_text()),
             "url": BASE + href(title),
@@ -224,7 +228,8 @@ def date_slug(url, antagen):
     ``2025-11-11-guidance-risk-management-…`` and the older ones plain
     ``web-services``, and both come out dated once."""
     segment = RE_URL_LANG.sub("", url.rstrip("/").rsplit("/", 1)[-1])
-    assert antagen, "%s is listed with no date to file it under" % url
+    if not antagen:
+        raise UpstreamChanged("%s is listed with no date to file it under" % url)
     return "%s-%s" % (antagen, RE_URL_DATE.sub("", segment))
 
 

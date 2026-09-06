@@ -225,19 +225,24 @@ def annotate(basefile, wiki_root, force=False):
     meta, _ = markdown.frontmatter(src.read_text(encoding="utf-8"))
     celex = str(meta["annotates"])
     sources = meta.get("guidance", [])
-    assert sources, \
-        "%s declares no `guidance:` sources in frontmatter -- nothing to link" % src
+    if not sources:
+        raise ValueError("%s declares no `guidance:` sources in frontmatter "
+                         "-- nothing to link" % src)
     host_path = layout.artifact("eurlex", celex)
-    assert compress.exists(host_path), \
-        ("%s: no parsed host artifact at %s -- run `lagen eurlex parse %s` first"
-         % (basefile, host_path, celex))
+    if not compress.exists(host_path):
+        raise ValueError("%s: no parsed host artifact at %s -- run "
+                         "`lagen eurlex parse %s` first"
+                         % (basefile, host_path, celex))
     host_art = compress.read_json(host_path)
     act, anchors = act_map(host_art)
-    assert anchors, "%s host act %s has no anchors to link against" % (basefile, celex)
+    if not anchors:
+        raise ValueError("%s host act %s has no anchors to link against"
+                         % (basefile, celex))
 
     out = {}
     for source in sources:
-        assert source.get("pdf"), "a guidance source for %s has no `pdf:` url" % basefile
+        if not source.get("pdf"):
+            raise ValueError("a guidance source for %s has no `pdf:` url" % basefile)
         text = guidance_text(fetch_pdf(source["pdf"]))
         pages = _pages(text)
         prompt = (PROMPT.read_text().replace(ACT_PLACEHOLDER, act)

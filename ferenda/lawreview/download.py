@@ -44,6 +44,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
+from ..lib.errors import UpstreamChanged
 from ..lib.util import normalize_space
 from .euar import euar_sync
 from .ft import ft_sync
@@ -117,8 +118,9 @@ def _svjt_records_from_page(html, year):
         if link is None:
             raise ValueError("svjt %s: an article card names no page" % year)
         href = link.get("href")
-        assert isinstance(href, str), \
-            "svjt %s: an article card's page is not a link" % year
+        if not isinstance(href, str):
+            raise UpstreamChanged(
+                "svjt %s: an article card's page is not a link" % year)
         # the `find` filter above already applied this rule, so the search is
         # guaranteed to land; the assert keeps ty's `Match | None` honest
         match = RE_SVJT_ARTICLE_HREF.search(href)

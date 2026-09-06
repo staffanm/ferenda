@@ -396,6 +396,16 @@ Write, in a new `ferenda/<source>/` package:
    `lib/harvest.py` (the shared newest-first incremental walk +
    `HarvestWatermark`) and `lib/net.py` (the resilient HTTP session); state your
    own `lookahead_limit`/`safety_days` window at the call site.
+
+   Two rules that only downloaders meet:
+
+   * **A check about upstream content raises, never asserts**
+     (`rule:errors-drive-retry-use-raise`). `lib/errors.py` names the
+     exception: `raise UpstreamChanged("…")` when a listing parses to no rows,
+     a heading block is gone, or a body's magic bytes are not what the link
+     promised. `assert` stays for invariants whose failure means this program
+     is wrong. Asserts vanish under `python -O`, and one that vanishes writes
+     an HTML error page to disk as a `.pdf` with a record beside it.
 4. **The registration** (`source.py`) — a `list_basefiles()`, an
    `artifact(basefile)`/`inputs(basefile)` pair, a `CODE` tuple naming every
    impl file relative to the package's own `HERE`, and the `SOURCES` tuple:

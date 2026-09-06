@@ -18,6 +18,8 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from .errors import UpstreamChanged
+
 
 def _sync_playwright():
     # deferred: importing playwright loads the greenlet C extension, and
@@ -287,11 +289,13 @@ class DetachedChrome:
                 "url": url,
                 "options": {"disableCache": False, "includeCredentials": True},
             })["resource"]
-            assert resource["success"] and resource["httpStatusCode"] == 200, \
-                "%s did not load successfully through Chrome" % url
+            if not resource["success"] or resource["httpStatusCode"] != 200:
+                raise UpstreamChanged(
+                    "%s did not load successfully through Chrome" % url)
             headers = {key.lower(): value for key, value in resource["headers"].items()}
-            assert headers.get("content-type") == "application/pdf", \
-                "%s served %r instead of PDF" % (url, headers.get("content-type"))
+            if headers.get("content-type") != "application/pdf":
+                raise UpstreamChanged("%s served %r instead of PDF"
+                                      % (url, headers.get("content-type")))
             data = bytearray()
             while True:
                 chunk = session.send("IO.read", {"handle": resource["stream"]})
@@ -301,7 +305,8 @@ class DetachedChrome:
                     break
             session.send("IO.close", {"handle": resource["stream"]})
             page.close()
-            assert data.startswith(b"%PDF-"), "%s cached body is not a PDF" % url
+            if not data.startswith(b"%PDF-"):
+                raise UpstreamChanged("%s cached body is not a PDF" % url)
             return bytes(data)
         finally:
             playwright.stop()
