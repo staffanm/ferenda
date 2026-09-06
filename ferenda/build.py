@@ -907,7 +907,7 @@ def _prepare_targeted_generate(source, basefiles, jobs):
             and not _catalog_current_for(source.name, basefiles):
         # a --force meant for one page's generate must not re-extract every
         # artifact of its source
-        corpus.cmd_relate(SOURCES, [source.name], force=False)
+        corpus.cmd_relate(SOURCES, [source.name], force=False, jobs=jobs)
     return had_errors
 
 
@@ -995,7 +995,7 @@ def _dispatch(args, p, jobs):
     with util.invocation_bar({s.label: s.secs for s in plan},
                              desc="lagen %s %s" % (args.source, args.action)):
         if args.action == "relate":
-            corpus.cmd_relate(SOURCES, names)
+            corpus.cmd_relate(SOURCES, names, jobs=jobs)
             corpus.run_after(SOURCES, names, "relate")
             return
         if args.action == "index":
@@ -1005,7 +1005,7 @@ def _dispatch(args, p, jobs):
                 sys.exit(1)
             return
         if args.action == "dump":
-            corpus.cmd_dump(SOURCES, names)
+            corpus.cmd_dump(SOURCES, names, jobs)
             corpus.run_after(SOURCES, names, "dump")
             return
 

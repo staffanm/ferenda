@@ -1177,8 +1177,20 @@ def _relativize_paths(con, source, root):
                     (util.store_relpath(path, root), uri))
 
 
+def content_hashes(paths):
+    """`content_hash` of the decompressed bytes behind each path, keyed by the
+    path as a string; None for an empty SkipDocument placeholder. What
+    `rebuild`'s `digests` callback computes -- serially here,
+    corpus.pooled_content_hashes fans the same reads across processes."""
+    hashes = {}
+    for p in paths:
+        raw = compress.read_bytes(p)
+        hashes[str(p)] = content_hash(raw) if raw.strip() else None
+    return hashes
+
+
 def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
-            data_root=None, exclusive=False):
+            data_root=None, exclusive=False, stats=None, digests=None):
     """Sync one source's rows in the catalog to its artifacts on disk.
     Incremental by content hash: an artifact whose bytes are unchanged since the
     last relate is left in place (not re-parsed); new/changed ones are
@@ -1186,6 +1198,18 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     re-extracts every artifact regardless of hash. Single-process and
     transactional -- it sidesteps multi-writer SQLite contention. Empty artifacts
     (SkipDocument placeholders) carry no document.
+
+    Three passes. First the stat fast path: an artifact whose (size, mtime)
+    match the row's recorded ones is untouched and skipped without a read.
+    Then the content hashes of what fell through -- `digests(paths)`, a
+    ``{str(path): hash or None}`` the caller may compute across processes
+    (corpus.pooled_content_hashes), since each read is an NFS round trip on
+    production: 13-44 ms an artifact, and after a sync that moved every
+    mtime this was 2213 s for förarbete alone (2026-09-06). Last, the single
+    writer: a hash that matches the row's only refreshes its stat columns; a
+    new one re-extracts the document. `stats` is ``{str(path): (size,
+    mtime_ns)}`` for every artifact when the caller has just stat'd them
+    (cmd_relate's fingerprint pass); left unset, both are done here, serially.
 
     Returns (documents, links, changed): the source's row + link totals after the
     sync, and how many documents were (re)written this run."""
@@ -1208,58 +1232,65 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
         "FROM documents WHERE source = ?", (source,)) if row[0]}
     seen = set()
     written = set()          # uris (re)indexed this run, keyed independently of path
-    changed = 0
+    changed = done = 0
     total = len(artifact_paths)
-    for i, path in enumerate(map(Path, artifact_paths)):
+    pending = []             # (path, key, size, mtime_ns, prev): fell through the stat check
+    for path in map(Path, artifact_paths):
         # `path` (absolute) is stat'd and read on disk; `key` (data_root-relative)
         # is what the row stores and `have` is keyed by -- so the incremental match
         # and the stored path both stay host-independent.
         key = util.store_relpath(path, root)
         seen.add(key)
-        st = compress.stat(path)             # the on-disk (possibly .br) variant
+        if stats is None:
+            st = compress.stat(path)         # the on-disk (possibly .br) variant
+            size, mtime_ns = st.st_size, st.st_mtime_ns
+        else:
+            size, mtime_ns = stats[str(path)]
         prev = have.get(key)
         # stat fast path: an artifact whose (size, mtime) match the ones recorded
         # at the last relate is untouched (parse rewrites bump the mtime), so trust
         # them like file_fingerprint does and skip the read + hash entirely. size 0
         # is an artifact-backed doc's row that never happens (a SkipDocument
         # placeholder carries no row, so prev is None), so it always falls through.
-        if (not force and prev and prev[2] == st.st_size
-                and prev[3] == st.st_mtime_ns):
-            current = local(prev[0])
+        if not force and prev and prev[2] == size and prev[3] == mtime_ns:
             written.add(prev[0])
+            done += 1
             if progress:
-                progress(i + 1, total, changed, current)
+                progress(done, total, changed, local(prev[0]))
             continue
-        raw = compress.read_bytes(path)      # decompressed artifact bytes
-        if not raw.strip():
+        pending.append((path, key, size, mtime_ns, prev))
+    hashes = (digests or content_hashes)([path for path, *_ in pending])
+    for path, key, size, mtime_ns, prev in pending:
+        digest = hashes[str(path)]
+        if digest is None:
             # a SkipDocument placeholder: ensure no stale row survives at this path
             if prev:
                 _drop_document(con, prev[0])
             current = path.stem
+        elif not force and prev and prev[1] == digest:
+            # bytes unchanged but the file was rewritten (mtime moved) -- skip
+            # the parse, but refresh the stored stat so the next run hits the
+            # fast path above instead of re-hashing this artifact again
+            con.execute("UPDATE documents SET art_size = ?, art_mtime_ns = ? "
+                        "WHERE uri = ?", (size, mtime_ns, prev[0]))
+            current = local(prev[0])
+            written.add(prev[0])
         else:
-            digest = content_hash(raw)
-            if not force and prev and prev[1] == digest:
-                # bytes unchanged but the file was rewritten (mtime moved) -- skip
-                # the parse, but refresh the stored stat so the next run hits the
-                # fast path above instead of re-hashing this artifact again
-                con.execute("UPDATE documents SET art_size = ?, art_mtime_ns = ? "
-                            "WHERE uri = ?",
-                            (st.st_size, st.st_mtime_ns, prev[0]))
-                current = local(prev[0])
-                written.add(prev[0])
-            else:
-                art = json.loads(raw)
-                if prev and prev[0] != art["uri"]:   # uri moved under this path
-                    _drop_document(con, prev[0])
-                _index_document(con, art, key, source)
-                con.execute("UPDATE documents SET content_hash = ?, art_size = ?, "
-                            "art_mtime_ns = ? WHERE uri = ?",
-                            (digest, st.st_size, st.st_mtime_ns, art["uri"]))
-                changed += 1
-                written.add(art["uri"])
-                current = local(art["uri"])
+            # the changed minority is read again here: the hash pass hands
+            # back digests, not megabytes of artifact, across processes
+            art = json.loads(compress.read_bytes(path))
+            if prev and prev[0] != art["uri"]:   # uri moved under this path
+                _drop_document(con, prev[0])
+            _index_document(con, art, key, source)
+            con.execute("UPDATE documents SET content_hash = ?, art_size = ?, "
+                        "art_mtime_ns = ? WHERE uri = ?",
+                        (digest, size, mtime_ns, art["uri"]))
+            changed += 1
+            written.add(art["uri"])
+            current = local(art["uri"])
+        done += 1
         if progress:
-            progress(i + 1, total, changed, current)
+            progress(done, total, changed, current)
     # drop rows whose artifact vanished -- but a document's identity is its uri, not
     # its path: when an artifact moves to a new path (e.g. a storage-layout change)
     # its uri is re-indexed above under the new path, so it must NOT be dropped here

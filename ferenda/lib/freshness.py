@@ -44,12 +44,9 @@ RUNS = config.DATA / ".build" / "runs.ndjson"             # append-only run ledg
 ERRORS = config.DATA / ".build" / "errors.json"           # per-doc latest-outcome store
 STATUS = config.DATA / ".build" / "status.json"           # rolling health snapshot
 
-# how often a staleness scan (`_scan`, `file_fingerprint`) reports progress
-# -- tqdm's own default mininterval; a real util.invocation_bar renders a
-# full nested frame per util.status() call (terminal-size query, refresh, ETA
-# recompute), so calling it every completion made the reporting itself the
-# bottleneck on a fast, high-count scan (2026-09-04)
-_REPORT_INTERVAL = 0.1
+# how many paths one stat job covers (`stat_records`): a GETATTR per path on
+# the production NFS mount, ~0.37 ms, so a job is under a second
+FINGERPRINT_CHUNK = 2000
 # how many keys one staleness-scan job covers (`_scan_chunk`): one manifest
 # query and one directory cache per chunk, and the unit `_run_parallel` pulls
 # from the feed between looks at the pool. On the production NFS mount a key
@@ -168,31 +165,61 @@ def record_code_version(store, kind, source, code):
         "version": recipe_version(code)}
 
 
-def file_fingerprint(paths, *, label=None):
+def _stat_job(chunk):
+    # one stat job: the real (possibly .br) file's size+mtime for each path,
+    # through the directory cache so the plain-name misses cost no lookups
+    records = []
+    with compress.dir_cache():
+        for p in chunk:
+            st = compress.stat(p)
+            records.append((p, st.st_size, st.st_mtime_ns))
+    return records
+
+
+def stat_records(paths, *, label=None, jobs=1):
+    """``(path, size, mtime_ns)`` for every path, in the caller's order -- the
+    real (possibly .br) file's stat, `FINGERPRINT_CHUNK` paths per job across
+    `jobs` processes (`util.pooled`). A stat is a GETATTR round trip on the
+    production NFS mount, ~0.37 ms each and serial: 36 s over förarbete's
+    97,000 artifacts, 63 s over eurlex's 172,000, at the start of every
+    relate, dump and generate (2026-09-06). Sixteen processes overlap them.
+    A missing path raises FileNotFoundError, from the worker.
+
+    `label` ("<source> <verb>") turns the walk into a reported "checking
+    staleness" line as each chunk lands (`util.status_throttle`): over a
+    source with 200,000 artifacts this is seconds that otherwise print
+    nothing at all. A caller with nothing to report (a test, a walk too
+    short to notice) leaves it out and the walk stays silent."""
+    paths = [str(p) for p in paths]
+    report = util.status_throttle() if label else None
+    records = []
+    for part in util.pooled(_stat_job, paths, jobs, chunk=FINGERPRINT_CHUNK):
+        records += part
+        if report:
+            report(len(records), len(paths), "%s  checking staleness" % label)
+    return records
+
+
+def fingerprint_of(records):
+    """The digest over `stat_records` output: each path with its size + mtime,
+    in order. The same bytes `file_fingerprint` hashed before the stat pass
+    was split out, so a stored fingerprint stays valid across that change."""
+    h = hashlib.sha256()
+    for p, size, mtime_ns in records:
+        h.update(("%s\x1f%d\x1f%d\x1e" % (p, size, mtime_ns)).encode())
+    return h.hexdigest()
+
+
+def file_fingerprint(paths, *, label=None, jobs=1):
     """A cheap, content-insensitive fingerprint of a file set: each path with its
     size + mtime, no contents read. Detects any add / remove / rewrite (parse
     rewrites an artifact, bumping its mtime), so relate/dump can skip a source
     whose artifacts are all untouched since last run -- instead of re-reading and
     re-hashing every file. --force or a code-version change overrides it.
-
-    `label` ("<source> <verb>") turns the walk into a reported "checking
-    staleness" line, throttled to `_REPORT_INTERVAL` exactly as the
-    per-document `_scan` reports its own: over a source with 200,000 artifacts
-    this is tens of seconds that otherwise print nothing at all. A caller with
-    nothing to report (a test, a scan too short to notice) leaves it out and
-    the walk stays silent."""
-    h = hashlib.sha256()
-    total = len(paths) if label else 0
-    last_report = 0.0
-    for done, p in enumerate(paths, 1):      # a source's lister yields them sorted
-        st = compress.stat(p)                # the real (possibly .br) file's size+mtime
-        h.update(("%s\x1f%d\x1f%d\x1e" % (p, st.st_size, st.st_mtime_ns)).encode())
-        if label:
-            now = time.perf_counter()
-            if done == total or now - last_report >= _REPORT_INTERVAL:
-                util.status(done, total, "%s  checking staleness" % label)
-                last_report = now
-    return h.hexdigest()
+    `label` and `jobs` are `stat_records`'. A caller that also needs the
+    stats themselves (relate, whose per-artifact loop compares them) takes
+    `stat_records` and `fingerprint_of` apart."""
+    return fingerprint_of(stat_records(paths, label=label, jobs=jobs))
 
 
 def fingerprint_fresh(store, kind, source, wm):

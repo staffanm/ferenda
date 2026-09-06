@@ -140,16 +140,42 @@ def _layers(sources):
     return sorted({p for s in sources.values() if s.layers for p in s.layers()})
 
 
-def _corr_watermark(sources):
+def _corr_watermark(sources, jobs=1):
     """The fingerprint over what the relate cross-passes read: every source's
     layers and the cross-pass code (CORR_CODE + each `Source.cross_code`) --
     the gate for re-running them, shared by cmd_relate and the targeted relate
     check (build._catalog_current_for), so both notice the same layer or code
-    edits."""
+    edits. 270,000 paths; `jobs` stat them in parallel."""
     return freshness.file_fingerprint(
         _layers(sources) + list(CORR_CODE)
         + [p for s in sources.values() for p in s.cross_code],
-        label="relate cross-passes")
+        label="relate cross-passes", jobs=jobs)
+
+
+# how many artifacts one hash job reads: at 13-44 ms an artifact on the
+# production NFS mount a job is a few seconds, and the status line moves
+HASH_CHUNK = 200
+
+
+def _hash_job(chunk):
+    # one hash job: catalog.content_hashes over one chunk of paths
+    return list(catalog.content_hashes(chunk).items())
+
+
+def pooled_content_hashes(paths, jobs, label):
+    """`catalog.rebuild`'s `digests` callback: ``{str(path): content hash or
+    None}`` for `paths`, `HASH_CHUNK` artifacts per job across `jobs`
+    processes. Each artifact read is an OPEN+READ+CLOSE round trip on the
+    production NFS mount, 13 ms (eurlex) to 44 ms (förarbete), and after a
+    sync that moved every artifact's mtime relate read all of them: 2213 s
+    for förarbete, 431 s for eurlex, serially (2026-09-06). Reports as
+    "hashing rewritten artifacts" under `label` as chunks land."""
+    report = util.status_throttle()
+    hashes = {}
+    for part in util.pooled(_hash_job, paths, jobs, chunk=HASH_CHUNK):
+        hashes.update(part)
+        report(len(hashes), len(paths), "%s  hashing rewritten artifacts" % label)
+    return hashes
 
 
 # how many dangling anchors relate names individually before the count stands
@@ -181,13 +207,15 @@ def _plan_artifact_verb(verb, sources, names, destination):
               % (verb, name, len(sources[name].artifacts()), destination(name)))
 
 
-def cmd_relate(sources, names, force=None):
+def cmd_relate(sources, names, force=None, jobs=1):
     """(Re)build each named source's rows in the shared catalog from its
     artifacts on disk -- documents + the citation edges they carry inline.
     Incremental on artifact content (unchanged artifacts are skipped); editing
     the extraction code (catalog.py) or passing --force re-extracts every
     artifact of the affected source. `force=None` reads the run's --force;
-    a targeted generate passes False so its override stays local."""
+    a targeted generate passes False so its override stays local. `jobs`
+    processes share the stat pass over the artifacts and the read + hash of
+    the ones whose stat mark moved; the catalog writes stay single-process."""
     if protocol.RUN.dry_run:
         _plan_artifact_verb("relate", sources, names, lambda _name: layout.CATALOG)
         print("relate: would run the cross-document passes (norm chain, "
@@ -239,7 +267,8 @@ def cmd_relate(sources, names, force=None):
             # the step -- announced, not silent (see `util.checking`)
             util.checking("%s relate" % name)
             paths = source.artifacts()
-            wm = freshness.file_fingerprint(paths, label="%s relate" % name)
+            records = freshness.stat_records(paths, label="%s relate" % name, jobs=jobs)
+            wm = freshness.fingerprint_of(records)
             if not catalog_missing and freshness.up_to_date(store, "relate", name, wm,
                                                   RELATE_CODE):
                 print("relate %s: up to date (%d artifacts unchanged) -- skipped"
@@ -258,7 +287,10 @@ def cmd_relate(sources, names, force=None):
             t0 = time.perf_counter()
             docs, edges, changed = catalog.rebuild(
                 target, name, paths, progress=progress, force=force or recode,
-                data_root=DATA, exclusive=full_rebuild)
+                data_root=DATA, exclusive=full_rebuild,
+                stats={p: (size, mtime_ns) for p, size, mtime_ns in records},
+                digests=lambda stale, name=name: pooled_content_hashes(
+                    stale, jobs, "relate %s" % name))
             freshness._emit_segment("relate", name, time.perf_counter() - t0, total=docs,
                           ran=changed, status="ok")
             freshness.record_step(store, "relate", name, wm, RELATE_CODE)
@@ -278,7 +310,7 @@ def cmd_relate(sources, names, force=None):
     # one step of a multi-step run whichever way the gate falls, so the
     # outer bar counts the same sequence it planned
     with util.step("relate cross-passes"):
-        corr_wm = _corr_watermark(sources)
+        corr_wm = _corr_watermark(sources, jobs)
         if dirty or force or not freshness.fingerprint_fresh(store, "relate", "__corr__",
                                                    corr_wm):
             t0 = time.perf_counter()
@@ -519,11 +551,12 @@ def _report_index_errors(name, errors):
               % (name, len(reasons) - INDEX_ERROR_SAMPLES))
 
 
-def cmd_dump(sources, names):
+def cmd_dump(sources, names, jobs=1):
     """Write a gzipped NDJSON bulk dump per named source -- every artifact, one
     compact JSON per line, byte-equivalent to the on-disk artifact (the citation
     graph is already inline, so each line is self-contained). The machine-
-    readable corpus export that replaces the retired RDF/Fuseki dumps."""
+    readable corpus export that replaces the retired RDF/Fuseki dumps. `jobs`
+    processes share the stat pass that gates each source."""
     if protocol.RUN.dry_run:
         _plan_artifact_verb("dump", sources, names,
                             lambda name: DUMPS / ("%s.ndjson.gz" % name))
@@ -539,7 +572,7 @@ def cmd_dump(sources, names):
         with util.step("%s dump" % name):
             util.checking("%s dump" % name)
             paths = source.artifacts()
-            wm = freshness.file_fingerprint(paths, label="%s dump" % name)
+            wm = freshness.file_fingerprint(paths, label="%s dump" % name, jobs=jobs)
             if out.exists() and freshness.up_to_date(store, "dump", name, wm, DUMP_CODE):
                 print("dump %s: up to date (%d artifacts unchanged) -- skipped"
                       % (name, len(paths)))
@@ -937,13 +970,13 @@ def cmd_all(sources, names, jobs, *, whole_corpus, download=False, aggregates):
                     continue
                 with util.step(plan_by[(name, step)].label):
                     had_errors |= _run_stage_full(source, step, jobs)
-        cmd_relate(sources, names)
+        cmd_relate(sources, names, jobs=jobs)
         run_after(sources, names, "relate")
         # a bulk item the cluster rejected is a *unit missing from search*, so it
         # belongs in the run's verdict like a failed parse -- one rebuild dropped
         # 1,497 eurlex and 241 förarbete documents from the index and still exited 0
         had_errors |= _run_index_step(sources, names, jobs)
-        cmd_dump(sources, names)
+        cmd_dump(sources, names, jobs)
         run_after(sources, names, "dump")
         # a stage that must run after the catalog and the dumps exist, not in the
         # parse loop above -- it reads what relate and dump have just written. The
@@ -990,19 +1023,21 @@ def _run_index_step(sources, names, jobs):
     return had_errors
 
 
-def stale_sources(sources):
+def stale_sources(sources, jobs=1):
     """Sources whose artifacts have changed since the catalog was last built
     (make's rule: a prerequisite newer than the target). A missing catalog
-    makes every source stale; --force re-relates all."""
+    makes every source stale; --force re-relates all. `jobs` processes share
+    the stat pass (every artifact of every source)."""
     if protocol.RUN.force or not layout.CATALOG.exists():
         return [name for name, s in sources.items() if s.artifacts]
-    cutoff = layout.CATALOG.stat().st_mtime
+    cutoff = layout.CATALOG.stat().st_mtime_ns
     # artifacts are stored precompressed (.json.br); the listers yield logical
-    # .json names, so stat the real backing file (compress.stat) -- a plain
-    # p.stat() would raise FileNotFoundError on every compressed tree, exactly
-    # as file_fingerprint() already does when fingerprinting these same paths
+    # .json names, so stat the real backing file (stat_records goes through
+    # compress.stat) -- a plain p.stat() would raise FileNotFoundError on every
+    # compressed tree
     return [name for name, s in sources.items() if s.artifacts
-            and any(compress.stat(p).st_mtime > cutoff for p in s.artifacts())]
+            and any(mtime_ns > cutoff for _p, _size, mtime_ns
+                    in freshness.stat_records(s.artifacts(), jobs=jobs))]
 
 
 # a page's rendered HTML is a function of the render/query code plus the
@@ -1064,7 +1099,7 @@ GENERATE_CODE = (PKG / "lib" / "page.py", PKG / "lib" / "margins.py",
                          if p.relative_to(PKG).parts[0] != "api"))
 
 
-def generate_fingerprint(sources):
+def generate_fingerprint(sources, jobs=1):
     """The coarse gate for a full-corpus generate: the whole-catalog content
     signature plus the .corr/.ann LLM layers (lib.annstore) and .versions.json
     sidecars that relate doesn't fold into content_hash, plus the set of
@@ -1084,7 +1119,7 @@ def generate_fingerprint(sources):
     # versions-stage sidecars, the remiss answers and the site artifacts. A
     # layer that rides another document's rail enters that page's dependency
     # digest per page (page.site_cross_digests); here it reopens the coarse gate
-    sides = freshness.file_fingerprint(_layers(sources), label="generate")
+    sides = freshness.file_fingerprint(_layers(sources), label="generate", jobs=jobs)
     return hashlib.sha256(
         (sig + "\x1f" + sides + "\x1f" + expired).encode()).hexdigest()
 
@@ -1198,10 +1233,10 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
         # cold cache, and until now not a single line said so (`lagen all
         # generate` looked hung before it had printed anything at all)
         util.checking("generate")
-    stale = [] if scoped else stale_sources(sources)
+    stale = [] if scoped else stale_sources(sources, jobs)
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
-        cmd_relate(sources, stale)
+        cmd_relate(sources, stale, jobs=jobs)
 
     # full-corpus generate: a coarse gate over the whole catalog + .corr/.ann
     # layers + render code. All unchanged since the last full generate ⟹ every
@@ -1211,7 +1246,7 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     if not scoped:
         store = freshness.load_fingerprints()
         util.checking("generate")
-        site_wm = generate_fingerprint(sources)
+        site_wm = generate_fingerprint(sources, jobs)
         if freshness.up_to_date(store, "generate", "__site__", site_wm, GENERATE_CODE):
             print("generate: up to date -- skipped (%s)" % layout.GENERATED)
             freshness._emit_segment("generate", "__site__", 0.0, ran=0, status="skipped")

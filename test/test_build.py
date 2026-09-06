@@ -5,6 +5,7 @@ temp files -- no real corpus, no JVM, fast."""
 
 import contextlib
 import dataclasses
+import hashlib
 import json
 import os
 import shutil
@@ -497,7 +498,7 @@ def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):
     monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")
     related = []
     monkeypatch.setattr(corpus, "cmd_relate",
-                        lambda sources, names, force=None: related.append(names))
+                        lambda sources, names, force=None, jobs=1: related.append(names))
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
     assert src.stages["parse"].output("a").read_text() == "HELLO"
@@ -514,7 +515,7 @@ def test_targeted_generate_skips_relate_when_catalog_current(tmp_path, monkeypat
     _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(build, "_catalog_current_for", lambda name, bfs: True)
     monkeypatch.setattr(corpus, "cmd_relate",
-                        lambda sources, names, force=None:
+                        lambda sources, names, force=None, jobs=1:
                         pytest.fail("must not relate when current"))
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
@@ -558,7 +559,7 @@ def test_catalog_current_for_matches_rows_against_artifacts(tmp_path, monkeypatc
     monkeypatch.setattr(build.layout, "artifact", lambda source, bf: art)
     monkeypatch.setattr(freshness, "load_fingerprints", lambda: {})
     monkeypatch.setattr(freshness, "code_changed", lambda *a: False)
-    monkeypatch.setattr(corpus, "_corr_watermark", lambda sources: "wm")
+    monkeypatch.setattr(corpus, "_corr_watermark", lambda sources, jobs=1: "wm")
     monkeypatch.setattr(freshness, "fingerprint_fresh", lambda *a: True)
 
     assert build._catalog_current_for("sfs", ["1999:1"])
@@ -580,7 +581,7 @@ def test_targeted_generate_no_deps_leaves_parse_untouched(tmp_path, monkeypatch)
     stage.SOURCES["sfs"] = src         # the scan job looks it up by its new name
     _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(corpus, "cmd_relate",
-                        lambda sources, names, force=None:
+                        lambda sources, names, force=None, jobs=1:
                         pytest.fail("must not relate with --no-deps"))
     monkeypatch.setattr(stage.RUN, "no_deps", True)
 
@@ -902,9 +903,32 @@ def test_file_fingerprint_reports_a_labelled_staleness_scan(tmp_path, monkeypatc
     calls = []
     monkeypatch.setattr(freshness.util, "status",
                         lambda done, total, msg, **kw: calls.append((done, total, msg)))
+    monkeypatch.setattr(freshness, "FINGERPRINT_CHUNK", 1)   # a chunk per path: one report each
     freshness.file_fingerprint(paths, label="syn relate")
     assert calls == [(1, 2, "syn relate  checking staleness"),
                      (2, 2, "syn relate  checking staleness")]
+
+
+def test_stat_records_and_fingerprint_keep_the_stored_digest_stable(tmp_path):
+    # the fingerprint over a file set is stored in fingerprints.json and gates
+    # relate/dump/generate: splitting the stat pass out (and fanning it across
+    # processes) must produce the very digest the one-pass walk did, or every
+    # source re-relates once after deploy. The digest is path, size, mtime in
+    # the caller's order; a compressed variant is stat'd through compress.
+    a = tmp_path / "a.json"
+    a.write_text("{}")
+    b = tmp_path / "b.json.br"
+    b.write_bytes(b"xx")
+    paths = [a, tmp_path / "b.json"]
+    records = freshness.stat_records(paths)
+    assert records == [(str(a), 2, a.stat().st_mtime_ns),
+                       (str(tmp_path / "b.json"), 2, b.stat().st_mtime_ns)]
+    h = hashlib.sha256()
+    for p, size, mtime_ns in records:
+        h.update(("%s\x1f%d\x1f%d\x1e" % (p, size, mtime_ns)).encode())
+    assert freshness.file_fingerprint(paths) == h.hexdigest()
+    with pytest.raises(FileNotFoundError):
+        freshness.stat_records([tmp_path / "missing.json"])
 
 
 def test_file_fingerprint_stays_silent_without_a_label(tmp_path):
@@ -1494,7 +1518,7 @@ def test_rebuild_after_commit_drives_the_right_stages(monkeypatch):
     monkeypatch.setattr(wiki_source, "begrepp_parse_run", lambda bf: parsed.append(("begrepp", bf)))
     monkeypatch.setattr(site_source, "site_parse_run", lambda bf: parsed.append(("site", bf)))
     monkeypatch.setattr(corpus, "cmd_relate",
-                        lambda sources, names, force=None: related.append(list(names)))
+                        lambda sources, names, force=None, jobs=1: related.append(list(names)))
     monkeypatch.setattr(
         corpus, "cmd_generate",
         lambda sources, only=None, source=None, jobs=1, force=False, aggregates=None:
@@ -2238,6 +2262,56 @@ def test_a_dry_run_never_records_a_fingerprint_gate(tmp_path, monkeypatch):
     monkeypatch.setattr(stage.RUN, "dry_run", False)
     freshness.save_fingerprints(store)
     assert json.loads((tmp_path / "fingerprints.json").read_text()) == store
+
+
+def test_rebuild_hashes_only_what_the_stat_check_lets_through(tmp_path):
+    # relate in three passes: the stat check clears the untouched artifacts
+    # without a read, the `digests` callback gets exactly the ones whose mark
+    # moved (the caller fans that across processes -- an NFS read each), and
+    # the writer re-extracts only a document whose bytes really changed. A
+    # rewrite with the same bytes only refreshes the row's stat columns.
+    art = tmp_path / "artifact"
+    art.mkdir()
+
+    def write(name, uri, text):
+        p = art / name
+        p.write_text(json.dumps({
+            "uri": uri, "metadata": {"properties": {"dcterms:title": "T"}},
+            "structure": [{"type": "artikel", "id": "A1", "text": [text]}]}))
+        return p
+
+    a = write("a.json", "https://lagen.nu/icrc/1", "one")
+    b = write("b.json", "https://lagen.nu/icrc/2", "two")
+    db = tmp_path / "catalog.sqlite"
+    asked = []
+
+    def digests(paths):
+        asked.append([p.name for p in paths])
+        return catalog.content_hashes(paths)
+
+    def stats():
+        return {str(p): (p.stat().st_size, p.stat().st_mtime_ns) for p in (a, b)}
+
+    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    assert (docs, changed, asked[-1]) == (2, 2, ["a.json", "b.json"])   # no rows yet
+    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    assert (changed, asked[-1]) == (0, [])                              # marks match: no read
+    b.write_text(b.read_text())                                        # same bytes, new mtime
+    os.utime(b, ns=(b.stat().st_atime_ns, b.stat().st_mtime_ns + 5_000_000_000))
+    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    assert (changed, asked[-1]) == (0, ["b.json"])
+    con = catalog.connect(db)
+    assert con.execute("SELECT art_mtime_ns FROM documents WHERE uri = ?",
+                       ("https://lagen.nu/icrc/2",)).fetchone()[0] == b.stat().st_mtime_ns
+    con.close()
+    write("b.json", "https://lagen.nu/icrc/2", "three")                # bytes changed
+    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    assert (changed, asked[-1]) == (1, ["b.json"])
+    a.write_text("")                                                   # a SkipDocument placeholder
+    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    assert (docs, changed, asked[-1]) == (1, 0, ["a.json"])
+    # without stats/digests the serial form stats and hashes here, same answer
+    assert catalog.rebuild(db, "icrc", [a, b])[2] == 0
 
 
 def test_pooled_chunks_items_and_keeps_order(monkeypatch):
