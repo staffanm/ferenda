@@ -80,16 +80,21 @@ DUMPS = DATA / "dumps"                         # NDJSON bulk exports
 # imported helper leaves the step "up to date -- skipped" and ships stale
 # output until --force. catalog.py's per-artifact extraction lives in
 # catalog_rows (the rows and edges one artifact becomes) and imports begrepp
-# (alias synthesis), text (run flattening) and markdown (begrepp uris); a
-# change to any re-stales relate.
+# (alias synthesis), text (run flattening), markdown (begrepp uris),
+# eu_structure (the eurlex description a row carries) and pinpoint (the
+# provision label a row carries); a change to any re-stales relate.
 RELATE_CODE = (PKG / "lib" / "catalog.py", PKG / "lib" / "catalog_rows.py",
                PKG / "lib" / "begrepp.py",
                PKG / "lib" / "text.py", PKG / "lib" / "markdown.py",
-               PKG / "lib" / "labels.py")
+               PKG / "lib" / "labels.py",
+               PKG / "lib" / "eu_structure.py", PKG / "lib" / "pinpoint.py")
 # index reads the catalog rows (source signature, inbound-count ranking) it
 # denormalises onto the search units, so a change to catalog.py re-stales it too.
 INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py",
               PKG / "lib" / "catalog.py", PKG / "lib" / "catalog_rows.py",
+              # the row fields catalog_rows derives through these two reach the
+              # search unit the same way they reach the catalog row
+              PKG / "lib" / "eu_structure.py", PKG / "lib" / "pinpoint.py",
               # doc_actions stores the case number through malnummer.normalize,
               # so a change to the shape changes what is indexed
               PKG / "lib" / "malnummer.py")
