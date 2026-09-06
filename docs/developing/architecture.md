@@ -99,6 +99,15 @@ vertical may not import `api`, so the checker carries one allowlist entry,
 `("site/browse.py", "api.app")`. The dependency is one-way and confined to
 aggregate-page generation.
 
+`GET /api/v1/browse` serves **one leaf bucket at a time**: `source` alone
+returns the navigator with each leaf's `count`, and `source` + `bucket` (a slug
+path, `"nja/2024"`) returns that leaf's documents sliced by `offset`/`limit`,
+with `total` beside them. A whole source in one response is 36 MB for eurlex
+and grows with the corpus. `site.browse.browse_model` assembles the full model
+from those pages, so the generator still sees exactly what it used to; the API
+holds one source's model in memory while that walk runs, so the leaves cost one
+catalog scan between them, not one each.
+
 ## Sources and stages
 
 Everything runs through the `lagen` CLI (`ferenda/build.py`, the

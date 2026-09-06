@@ -201,14 +201,30 @@ every source is faceted; an unfaceted one is a `404`. Returns a
 `FacetTree`: `{ source, levels[], default[], buckets[] }` where each bucket is
 `{ key, label, slug, count, children?, documents? }`.
 
-**`GET /api/v1/browse`** — the same tree, but every leaf bucket's `documents` are
-populated (each a `BrowseDoc`: `{ uri, url, display, short_id?, short_title?,
+**`GET /api/v1/browse`** — the same tree, one leaf's documents at a time. A
+whole source is too large for one response — eurlex alone is 36 MB of JSON
+over 172,086 rows on a 435,440-row catalog, and it grows with the corpus — so
+`/browse` pages it:
+
+- `source` alone returns the navigator with every leaf's `count` and
+  `documents: null` on each bucket; `bucket`/`offset`/`limit`/`total` are
+  null.
+- `source` + `bucket` (a leaf's slug path joined by `/`, e.g. `nja/2024`)
+  returns the same navigator, with `documents` populated on that one leaf,
+  sliced by `offset` (default 0) and `limit` (default 500, max 2000). The
+  response states `bucket` (the slug path as a list), `offset`, `limit`, and
+  `total` — how many documents that leaf holds. A `bucket` that names no leaf
+  is a `404`; an `offset` past the end is an empty page, not an error.
+
+Each document is a `BrowseDoc`: `{ uri, url, display, short_id?, short_title?,
 description?, … }`, plus per-source listing extras — `pre`/`key`/`subdued`/`year`
 for statutes, `variant`/`date` for case law, `variant` for an EU act (enacting
 body), a court ruling (court) or a treaty (`current` for a consolidated text,
 else its family) and `pre`/`key` for a treaty,
-`amendments`/`consolidated` for agency regulations). This is the full browse model the static site is generated
-from; `/openapi.json` has the field-by-field description.
+`amendments`/`consolidated` for agency regulations. The static site is
+generated from the full browse model, assembled from these paged calls
+(`site/browse.py:browse_model`); `/openapi.json` has the field-by-field
+description.
 
 ### Get one document — `GET /api/v1/document?uri=…`
 

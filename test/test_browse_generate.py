@@ -8,6 +8,7 @@ Hermetic -- no catalog and no API client; both units take the browse *view*
 
 import re
 
+from ferenda.api import app
 from ferenda.site import browse
 from ferenda.lib import compress
 
@@ -139,16 +140,35 @@ def test_reap_still_works_for_a_source_nested_inside_another(tmp_path):
 # --------------------------------------------------------------------------
 
 class _FakeClient:
-    """Stands in for the API: `generate_browse` asks it for one browse view."""
+    """Stands in for the API. `/api/v1/browse` answers one leaf bucket at a
+    time, so the fake pages the same way the route does -- the navigator
+    without documents, then a named leaf's slice."""
 
     def __init__(self, view):
         self.view = view
+        self.answer = view
 
     def get(self, _path, params=None):
+        params = params or {}
+        bucket = params.get("bucket")
+        if not bucket:
+            self.answer = {**self.view,
+                           "buckets": app._without_documents(self.view["buckets"])}
+            return self
+        path = bucket.split("/")
+        node = app._leaf(self.view["buckets"], path)
+        documents = node["documents"] or []
+        offset, limit = params.get("offset", 0), params.get("limit", 2000)
+        self.answer = {
+            **self.view,
+            "buckets": app._without_documents(
+                self.view["buckets"],
+                keep=(id(node), documents[offset:offset + limit])),
+            "total": len(documents)}
         return self
 
     def json(self):
-        return self.view
+        return self.answer
 
 
 def _agency_view(source, level, buckets, variant=None):

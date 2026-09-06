@@ -65,6 +65,7 @@ from ..lib import (
     pathgraph,
     pins,
     search,
+    util,
 )
 from . import (
     analytics,
@@ -582,6 +583,17 @@ class FacetTree(BaseModel):
                               "(e.g. [\"court\", \"year\"])")
     default: list[str] = Field(description="the landing bucket's key path")
     buckets: list[FacetBucket]
+    bucket: list[str] | None = Field(
+        None, description="/browse only: the leaf whose documents this "
+        "response carries, as its slug path")
+    offset: int | None = Field(
+        None, description="/browse only: the index the returned documents "
+        "start at within that leaf")
+    limit: int | None = Field(
+        None, description="/browse only: how many documents were asked for")
+    total: int | None = Field(
+        None, description="/browse only: documents in that leaf, of which "
+        "this response carries at most `limit`")
 
 
 class SourceInfo(BaseModel):
@@ -798,21 +810,131 @@ def facets_endpoint(
     return FacetTree(**facets.tree(con, source))
 
 
+# The browse model of a whole source is large -- eurlex is 36 MB of JSON over
+# 172,000 rows, and it grows with the corpus -- so it is built once per source
+# and served one leaf bucket at a time. The cache holds exactly one source: a
+# reader pages through one bucket, and `generate` walks one source's leaves in
+# order, so both pay a single catalog scan. It is keyed on the catalog file's
+# identity and mtime, so a `relate` that swaps a new catalog in is picked up on
+# the next request rather than served stale.
+BROWSE_PAGE = 500
+BROWSE_PAGE_MAX = 2000
+
+
+def _catalog_stamp(con):
+    """What identifies the catalog this connection reads, cheaply: its path,
+    size and mtime. `relate` publishes by atomic rename, so a new catalog is a
+    new inode with a new mtime and never the same stamp."""
+    path = Path(con.execute("PRAGMA database_list").fetchone()[2])
+    st = path.stat()
+    return (str(path), st.st_size, st.st_mtime_ns)
+
+
+_browse_cache: tuple | None = None
+_browse_cache_lock = threading.Lock()
+# One build per source at a time. A miss is a full catalog scan producing tens
+# of megabytes, and the cache holds one source -- so a client alternating
+# `?source=` across the faceted sources would otherwise have every request miss
+# and every miss scan, concurrently, on an anonymous route. That is the shape
+# of the uncached-facsimile flood that took the site down on 2026-09-05. The
+# second asker for a source waits and reads the first one's result.
+_browse_build = util.KeyedLocks()
+
+
+def _browse_model(source, stamp, con):
+    """The cached browse model for one source. Not `functools.lru_cache`: the
+    connection is a per-request dependency and would key every call apart, so
+    the key is the source and the catalog stamp and the connection is only
+    what builds a miss."""
+    global _browse_cache
+    cached = _browse_hit(source, stamp)
+    if cached is not None:
+        return cached
+    with _browse_build(source):
+        # another thread may have built it while this one waited
+        cached = _browse_hit(source, stamp)
+        if cached is not None:
+            return cached
+        view = facets.browse_view(con, source)
+        with _browse_cache_lock:
+            _browse_cache = ((source, stamp), view)
+    return view
+
+
+def _browse_hit(source, stamp):
+    """The cached model for `(source, stamp)`, or None."""
+    with _browse_cache_lock:
+        if _browse_cache is not None and _browse_cache[0] == (source, stamp):
+            return _browse_cache[1]
+    return None
+
+
+def _leaf(nodes, path):
+    """The bucket `path` (slugs, outermost first) names, or None."""
+    for slug in path:
+        node = next((n for n in nodes if n["slug"] == slug), None)
+        if node is None:
+            return None
+        nodes = node["children"]
+        if nodes is None:
+            return node if slug == path[-1] else None
+    return None
+
+
 @app.get("/api/v1/browse", response_model=FacetTree, tags=["catalog"],
-         summary="The same buckets, with each leaf's documents")
+         summary="One leaf bucket's documents, with the navigator around them")
 def browse_endpoint(
         source: str = Query(..., description="a faceted source: sfs, dv, "
                             "forarbete, foreskrift, avg, rs, begrepp, "
                             "eurlex, edpb, hudoc, coe, icrc, untc, icc, "
                             "icj. A source with no facet scheme is a 404."),
+        bucket: str | None = Query(None, description="the leaf to list, as its "
+                                   "slug path joined by \"/\" (\"nja/2024\"). "
+                                   "Omit for the navigator alone."),
+        offset: int = Query(0, ge=0, description="where in the leaf's ordered "
+                            "documents to start"),
+        limit: int = Query(BROWSE_PAGE, ge=1, le=BROWSE_PAGE_MAX,
+                           description="how many documents to return"),
         con: sqlite3.Connection = Depends(get_con)):
-    """The complete browse model for a source: the facet navigator *plus* each
-    leaf bucket's ordered, display-labelled documents. The single payload the
-    static-site generator consumes to write the browse pages -- it has no other
-    access to the data store."""
+    """The facet navigator for a source, plus one leaf bucket's ordered,
+    display-labelled documents.
+
+    Without `bucket` this is the navigator alone with every leaf's `count`,
+    which is what tells a client how many pages a leaf has. With `bucket` the
+    named leaf carries `documents`, sliced by `offset`/`limit`, and the
+    response states `total` for that leaf. A whole source at once is not
+    served: eurlex alone is 36 MB of JSON.
+    """
     if source not in facets.sources():
         raise HTTPException(404, "source %r is not faceted" % source)
-    return FacetTree(**facets.browse_view(con, source))
+    view = _browse_model(source, _catalog_stamp(con), con)
+    if bucket is None:
+        return FacetTree(source=view["source"], levels=view["levels"],
+                         default=view["default"],
+                         buckets=_without_documents(view["buckets"]))
+    path = [seg for seg in bucket.split("/") if seg]
+    node = _leaf(view["buckets"], path)
+    if node is None:
+        raise HTTPException(404, "%r names no leaf bucket of %s" % (bucket, source))
+    documents = node.get("documents") or []
+    return FacetTree(
+        source=view["source"], levels=view["levels"], default=view["default"],
+        buckets=_without_documents(view["buckets"],
+                                   keep=(id(node), documents[offset:offset + limit])),
+        bucket=path, offset=offset, limit=limit, total=len(documents))
+
+
+def _without_documents(nodes, keep=None):
+    """`nodes` with every leaf's `documents` dropped -- except the one leaf
+    `keep` names, which carries the page. Copies rather than mutates: the
+    nodes belong to the cached model."""
+    out = []
+    for node in nodes:
+        children = (_without_documents(node["children"], keep)
+                    if node["children"] is not None else None)
+        documents = keep[1] if keep and id(node) == keep[0] else None
+        out.append({**node, "children": children, "documents": documents})
+    return out
 
 
 @app.get("/api/v1/documents", response_model=DocumentList, tags=["document"],
