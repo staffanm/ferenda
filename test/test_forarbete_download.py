@@ -14,7 +14,7 @@ from ferenda.forarbete.download import (
     iter_listing,
     parse_listing,
 )
-from ferenda.lib import compress, layout
+from ferenda.lib import compress, layout, regeringen
 from ferenda.lib.util import write_atomic
 
 # the real regeringen.se listing-item shape: ul.list--block > li >
@@ -137,6 +137,30 @@ def test_parse_listing_skips_a_misleading_url():
     dup = LISTING_SO.replace("1979/06/so-198072/", "1994/01/so-198072-/")
     items, raw = parse_listing(dup, "so")
     assert raw == 1 and items == []
+
+
+def test_parse_listing_skips_a_landing_the_site_cannot_serve():
+    """A page regeringen.se lists but answers 500 for is dropped before any
+    fetch: otherwise net.request climbs its full retry ladder (~62 s) and the
+    per-document error leaves the watermark store dirty for every later run."""
+    broken = "/rattsliga-dokument/skrivelse/2016/03/skr.-201516115"
+    assert broken in regeringen.BROKEN_LANDINGS
+    html = """
+    <ul class="list--block">
+      <li><div class="sortcompact">
+        <a href="%s/">Verksamheten i Europeiska unionen under 2015,
+          Skr. 2015/16:115</a>
+        <time datetime="2016-03-10">10 mars 2016</time>
+      </div></li>
+      <li><div class="sortcompact">
+        <a href="/rattsliga-dokument/skrivelse/2016/03/skr.-201516116/">
+          En annan skrivelse, Skr. 2015/16:116</a>
+        <time datetime="2016-03-11">11 mars 2016</time>
+      </div></li>
+    </ul>""" % broken
+    items, raw = parse_listing(html, "skr")
+    assert raw == 2                        # still counted: the listing served it
+    assert [i["basefile"] for i in items] == ["2015/16:116"]
 
 
 def test_resolve_identity_so_authoritative_from_vignette():

@@ -64,6 +64,7 @@ from ..lib.regeringen import (
     BASE,
     SHARED_CATEGORY,
     TYPES,
+    broken_landing,
     find_number,
     is_misleading,
     landing_vignette,
@@ -197,6 +198,12 @@ def parse_listing(html, typ):
         raw += 1
         if is_misleading(url):
             continue  # curated skip: dual-published / mislabelled / wrong-number
+        if broken_landing(url):
+            # curated skip: the page is listed but answers 500 on every attempt.
+            # Skipped here, before any fetch, so the walk neither climbs the
+            # retry ladder for it nor records an error that leaves the store
+            # dirty for every later run (lib.regeringen.BROKEN_LANDINGS).
+            continue
         slug = href.rstrip("/").rsplit("/", 1)[-1]
         time_el = li.find("time")
         date = time_el.get("datetime") if time_el else None

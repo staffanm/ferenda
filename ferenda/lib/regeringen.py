@@ -52,6 +52,39 @@ def is_misleading(url):
     return regeringen_path(url) in MISLEADING_URLS
 
 
+# Landing pages regeringen.se lists but cannot serve: path -> the evidence.
+# Not an inference from a status code -- a 500 is an outage until proven
+# otherwise, and reading one as "this document does not exist" is how a bad
+# afternoon becomes a permanent hole in the corpus. An entry here says the
+# stronger, curated thing: this page has answered the same way long enough to
+# stop paying for it. Same posture, and the same one-line-of-evidence rule, as
+# `remisser.download.BROKEN_ANSWERS` for a content file.
+#
+# The cost of NOT curating one is not just the fetch: `net.request` climbs its
+# full retry ladder on a 5xx (6 attempts, ~62 s of backoff), the walk records a
+# per-document error, and that leaves the watermark store dirty -- so every
+# later run distrusts its consecutive-hit stop and walks deeper, for a page
+# that will fail again.
+#
+# Drop an entry to re-test: the item comes straight back into the walk.
+BROKEN_LANDINGS = {
+    # Skr. 2015/16:115 "Verksamheten i Europeiska unionen under 2015". The
+    # listing carries exactly one row for it and that row's page answers HTTP
+    # 500 with EPiServer's own "Något gick fel" error body -- 6 attempts in a
+    # harvest run on 2026-09-07, 3 more directly, and the two slug variants
+    # regeringen.se also accepts 404 rather than 500. So the corpus does not
+    # hold this skrivelse; riksdagen publishes the same document if it is ever
+    # wanted.
+    "/rattsliga-dokument/skrivelse/2016/03/skr.-201516115",
+}
+
+
+def broken_landing(url):
+    """Whether `url` is a landing page regeringen.se lists but cannot serve
+    (`BROKEN_LANDINGS`), normalized like `is_misleading`."""
+    return regeringen_path(url) in BROKEN_LANDINGS
+
+
 # The landing slug of a plainly-numbered series is regeringen's own machine-made
 # form of the identifier -- `.../2023/06/sou-202327/` is SOU 2023:27 -- so it
 # recovers the number where the *printed* one is malformed. It regularly is: the

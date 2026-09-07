@@ -469,6 +469,15 @@ against the basefile you asked for without resolving it first, so
 item it passes on the way down the listing. Those are documents the corpus
 wants, but they are not the one you named.
 
+A page the site lists but cannot serve is skipped before it is fetched, by
+curated url (`lib/regeringen.BROKEN_LANDINGS`, one line of evidence per entry).
+That is not inferred from the status code -- a 500 is an outage until proven
+otherwise -- but an uncurated one is expensive: `net.request` climbs its full
+retry ladder (~62 s), the walk records an error, and the watermark store then
+stays dirty, so every later run distrusts its stop and walks deeper for a page
+that will fail again. One entry today: Skr. 2015/16:115, which the corpus
+therefore does not hold. Drop an entry to re-test it.
+
 An item that names no number **anywhere** is rejected. That is the ordinary
 case for the kommittédirektiv index, which also holds regeringsuppdrag: 34 of
 the newest 400 items (8.5%) carry no `Dir.` number at all. Nothing on disk
