@@ -188,6 +188,11 @@ def _run_start(run, events):
             "pid": int(run.rpartition("-")[2])}, True
 
 
+def runs_events(path):
+    """Every run on the ledger with its events, oldest first: [(run_id, [events])]."""
+    return _group_runs(_iter_events(path))
+
+
 def _run_summary(run, events):
     start, headless = _run_start(run, events)
     end = next((ev for ev in events if ev["event"] == "run-end"), None)

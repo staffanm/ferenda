@@ -862,7 +862,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     if source is not None:                       # whole-source scope (incl. stubs)
         rows = [r for r in rows if r[1] == source]
     if only is not None:                         # specific-document scope
-        rows = [r for r in rows if r[2] in only]
+        rows = [r for r in rows if r[2] in only or r[0] in only]
     # a source with no renderer (kommentar, lawreview) is an annotation or a
     # mined-for-citations corpus: its rows reach the reader through rails, never
     # through a page of their own

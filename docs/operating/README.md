@@ -360,6 +360,27 @@ file, and the manifest lives beside the catalog under `catalog_root`
 copies the manifest there from the data tree once and leaves the old file in
 place; a machine that rsyncs the corpus copies the manifest with the catalog.
 
+A run that changes nothing still paid about 900 s of staleness scans on
+2026-09-07 (parse 461 s cold, then versions, relate, dump and generate's
+gate re-walking the same trees warm) plus 790 s of `stats compute`. Three
+rules now cut that:
+
+- One stat pass per run. `freshness.stat_records` keeps every path's size
+  and mtime for the run, so relate's walk serves dump, the cross-pass gate
+  and generate's gate. A stage or hook that writes files drops the cache.
+- `stats compute` is gated on the catalog's change stamp
+  (`catalog.sqlite.stamp`, written by every relate that wrote rows) instead
+  of running unconditionally. A run where relate skipped every source skips
+  it too, and the dated snapshot is only taken when the corpus moved.
+- A full generate whose only moved input is the catalog signature renders
+  just the documents this run parsed and the pages that show them, both ends
+  of every link, instead of checking all 458,674 pages. The run must prove
+  that is the whole set: every published source's parse ran in this run, the
+  layers, the repeal dates and the render code are unchanged, and the ledger
+  shows the last run that parsed anything also completed a full generate.
+  Otherwise the per-page scan runs as before. The aggregate pages and the
+  gate record are written either way, so the next unchanged run skips.
+
 Download has no such scan — nothing on disk decides what it fetches — so its
 line names the harvest watermark instead: `(from 2026-01-10)`, or
 `(first harvest)` / `(full sweep)` when there is no boundary to work back to.

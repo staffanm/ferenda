@@ -452,6 +452,10 @@ def cmd_relate(sources, names, force=None, jobs=1):
     if full_rebuild and target.exists():
         _swap_catalog(target, layout.CATALOG)
     if dirty and layout.CATALOG.exists():
+        # the stamp is what `stats compute` is gated on: the corpus measurements
+        # are facts about the whole catalog, whose 7 GB no stage can hash per
+        # run, and every change to it comes through here (parse -> relate)
+        catalog.write_stamp(layout.CATALOG)
         # the /api/v1/path graph as a sidecar beside the catalog (rsync'd with
         # it): the serving process then loads arrays in under a second instead
         # of scanning 15.6M link rows -- which on prod's ~80-IOPS disk is the
@@ -752,6 +756,7 @@ def _run_stage_full(source, step, jobs):
         store[owed] = {"since": util.now_iso()}
         freshness.save_fingerprints(store)
     _after_hooks(source, step)
+    freshness.forget_stats()          # the hooks may have written sidecars
     store.pop(owed, None)
     freshness.save_fingerprints(store)
     return bool(result.errors)
@@ -776,6 +781,7 @@ def run_after(sources, names, verb):
     own hooks from `_run_stage_full`, and only when the stage ran."""
     for name in names:
         _after_hooks(sources[name], verb)
+    freshness.forget_stats()          # a hook may have written layers or artifacts
 
 
 def run_phase(sources, names, verb, jobs):
@@ -1150,11 +1156,24 @@ GENERATE_CODE = (PKG / "lib" / "page.py", PKG / "lib" / "margins.py",
 
 
 def generate_fingerprint(sources, jobs=1):
-    """The coarse gate for a full-corpus generate: the whole-catalog content
-    signature plus the .corr/.ann LLM layers (lib.annstore) and .versions.json
-    sidecars that relate doesn't fold into content_hash, plus the set of
-    currently-effective repeal dates. Unchanged (with the render code) ⟹ every page is fresh, so the
-    ~100k-page freshness scan can be skipped wholesale."""
+    """The coarse gate for a full-corpus generate, joined from
+    `generate_fingerprint_parts`. Unchanged (with the render code) ⟹ every
+    page is fresh, so the ~460k-page freshness scan can be skipped wholesale."""
+    return _join_fingerprint(*generate_fingerprint_parts(sources, jobs))
+
+
+def _join_fingerprint(sig, sides, expired):
+    return hashlib.sha256(
+        (sig + "\x1f" + sides + "\x1f" + expired).encode()).hexdigest()
+
+
+def generate_fingerprint_parts(sources, jobs=1):
+    """The three inputs of the coarse generate gate, separately: the
+    whole-catalog content signature, the .corr/.ann LLM layers (lib.annstore)
+    and .versions.json sidecars that relate doesn't fold into content_hash,
+    and the set of currently-effective repeal dates. Kept apart so a run
+    whose only moved part is the catalog signature can render just the
+    documents it parsed and the pages that show them (`_run_dirty_pages`)."""
     con = catalog.connect(layout.CATALOG)
     sig = catalog.catalog_signature(con)
     # a statute's repeal is presented against *today* (page watermark, browse
@@ -1170,8 +1189,64 @@ def generate_fingerprint(sources, jobs=1):
     # layer that rides another document's rail enters that page's dependency
     # digest per page (page.site_cross_digests); here it reopens the coarse gate
     sides = freshness.file_fingerprint(_layers(sources), label="generate", jobs=jobs)
-    return hashlib.sha256(
-        (sig + "\x1f" + sides + "\x1f" + expired).encode()).hexdigest()
+    return sig, sides, hashlib.sha256(expired.encode()).hexdigest()
+
+
+GENERATE_PARTS_KEY = freshness.manifest_key("generate", "__parts__", "__site__")
+
+
+def _run_dirty_pages(sources, store, sides, expired):
+    """The pages a full generate must render when only the catalog signature
+    moved since the last full generate: the documents this run parsed
+    (`freshness.RUN_REBUILT`) and every document whose page shows one of them
+    -- the citing and the cited, both ends of every link -- as the uris and
+    artifact paths `generate_site`'s `only` takes. None when the run cannot
+    prove that is the whole set, and the per-page scan over the corpus runs
+    instead: a layer, a repeal date or the render code changed too; a
+    published source's parse did not run in this run; an earlier run parsed
+    documents no full generate has seen (`freshness.generate_caught_up`); or
+    no full generate has recorded its parts yet.
+
+    The neighbourhood is exactly what `catalog.page_dependency_digests_for`
+    reads: a page's digest is its inbound rows and its outbound targets, so
+    a document outside it cannot have a changed digest."""
+    if store.get(GENERATE_PARTS_KEY) != {"sides": sides, "expired": expired}:
+        return None
+    published = [name for name, s in sources.items() if s.artifacts and "parse" in s.stages]
+    if any((name, "parse") not in freshness.RUN_REBUILT for name in published):
+        return None
+    if freshness.code_changed(store, "generate", "__site__", GENERATE_CODE):
+        return None
+    if not freshness.generate_caught_up():
+        return None
+    con = catalog.connect(layout.CATALOG)
+    root = catalog.data_root(con)
+    rebuilt = {str(Path(sources[name].stages["parse"].output(bf)).relative_to(root))
+               for name in published for bf in freshness.RUN_REBUILT[(name, "parse")]}
+    uris = {uri for (uri,) in con.execute(
+        "SELECT uri FROM documents WHERE path IN (%s)" % ",".join("?" * len(rebuilt)),
+        sorted(rebuilt))} if rebuilt else set()
+    if not uris:                 # the signature moved, but not through this run's parse
+        con.close()
+        return None
+    around = set()
+    for uri in uris:
+        around.update(u for (u,) in con.execute(
+            "SELECT from_uri FROM links WHERE to_root = ?", (uri,)))
+        around.update(u for (u,) in con.execute(
+            "SELECT to_root FROM links WHERE from_uri = ?", (uri,)))
+    around -= uris
+    only = set()
+    for uri, path in con.execute(
+            "SELECT uri, path FROM documents WHERE uri IN (%s)"
+            % ",".join("?" * len(uris | around)), sorted(uris | around)):
+        only.add(uri)
+        if path:
+            only.add(str(root / path))
+    con.close()
+    print("generate: %d document(s) parsed this run and %d page(s) that show "
+          "them -- rendering those, not scanning the corpus" % (len(uris), len(around)))
+    return only
 
 
 def write_source_pages(sources):
@@ -1296,11 +1371,14 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     if not scoped:
         store = freshness.load_fingerprints()
         util.checking("generate")
-        site_wm = generate_fingerprint(sources, jobs)
+        sig, sides, expired = generate_fingerprint_parts(sources, jobs)
+        site_wm = _join_fingerprint(sig, sides, expired)
         if freshness.up_to_date(store, "generate", "__site__", site_wm, GENERATE_CODE):
             print("generate: up to date -- skipped (%s)" % layout.GENERATED)
             freshness._emit_segment("generate", "__site__", 0.0, ran=0, status="skipped")
             return
+        if not (force or protocol.RUN.force):
+            only = _run_dirty_pages(sources, store, sides, expired)
 
     manifest = freshness.load_manifest()
     code_version = freshness.recipe_version(GENERATE_CODE)
@@ -1395,6 +1473,7 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
         manifest.update(updates)
     if not scoped:                       # record the site fingerprint for next time
         freshness.record_step(store, "generate", "__site__", site_wm, GENERATE_CODE)
+        store[GENERATE_PARTS_KEY] = {"sides": sides, "expired": expired}
         freshness.save_fingerprints(store)
     freshness._emit_segment("generate", seg_source, time.perf_counter() - t0, total=total,
                   ran=rendered, status="ok")

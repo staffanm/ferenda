@@ -592,10 +592,11 @@ uv run python -m ferenda.build stats generate  # render /statistik
 
 `compute` reads the catalog and the sfs/eurlex/forarbete/dv artifact trees, so
 it must run **after `relate`**. It is not incremental — every measurement is a
-fact about the whole corpus, so there is no subset to refresh — and its stage
-declares no per-document `inputs` and is marked `always=True`, so there is no
-freshness gate: every invocation re-measures, `--force` or not, and archives a
-dated copy under `artifact/stats/archive/`. `generate` raises if no artifact
+fact about the whole corpus, so there is no subset to refresh — and its one
+input is the catalog's change stamp (`catalog.sqlite.stamp`, written by every
+relate that wrote rows): a run where relate changed nothing skips it, any
+other run re-measures and archives a dated copy under
+`artifact/stats/archive/`. `--force` re-measures. `generate` raises if no artifact
 has been computed; a statistics page without measurements would publish an
 empty claim. A `rebuild` that names `stats` runs `compute` automatically,
 between `dump` and `generate` — that covers both `lagen all rebuild` and

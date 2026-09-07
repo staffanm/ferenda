@@ -1975,13 +1975,21 @@ def test_an_always_stage_is_never_fresh(tmp_path):
     assert is_fresh(manifest, source, always, "statistik") is False
 
 
-def test_the_real_stats_compute_stage_is_marked_always():
-    # the mark is what keeps `lagen all rebuild` re-measuring the corpus rather
-    # than publishing one day's figures for ever
-    assert build.SOURCES["stats"].stages["compute"].always is True
+def test_the_real_stats_compute_stage_is_gated_on_the_catalog_stamp(tmp_path, monkeypatch):
+    # the measurements are facts about the whole catalog, which no stage can
+    # hash per run: the stage's declared input is the stamp relate writes when
+    # it changed rows, so a run where relate skipped everything skips this too
+    stage = build.SOURCES["stats"].stages["compute"]
+    assert stage.always is False
+    assert stage.inputs("statistik") == [catalog.stamp_path(layout.CATALOG)]
+    db = tmp_path / "catalog.sqlite"
+    catalog.write_stamp(db)
+    first = catalog.stamp_path(db).read_text()
+    catalog.write_stamp(db)
+    assert catalog.stamp_path(db).read_text() != first
     # and the phase is what puts it after dump rather than in the rebuild's
     # leading parse loop, where it would measure the previous run's catalog
-    assert build.SOURCES["stats"].stages["compute"].phase == "dump"
+    assert stage.phase == "dump"
 
 
 def test_run_phase_runs_the_stages_that_name_the_verb(tmp_path, monkeypatch):
@@ -2399,3 +2407,112 @@ def test_manifest_moves_beside_the_catalog_once(tmp_path, monkeypatch):
     freshness.Manifest(old).update({"parse/doc/b": {"inputs": "y", "version": "v"}})
     monkeypatch.setattr(freshness, "_MANIFEST_CACHE", None)
     assert freshness.load_manifest().get("parse/doc/b") is None
+
+
+def test_stat_records_walks_each_path_once_per_run(tmp_path, monkeypatch):
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    a.write_text("{}")
+    b.write_text("{}")
+    walked = []
+    pooled = freshness.util.pooled
+
+    def counting(fn, items, workers, **kw):
+        walked.append(list(items))
+        return pooled(fn, items, workers, **kw)
+
+    monkeypatch.setattr(freshness.util, "pooled", counting)
+    monkeypatch.setattr(freshness, "RUN_ID", "r1")        # the cache lives in a run
+    freshness.forget_stats()
+    first = freshness.stat_records([a, b])
+    assert freshness.stat_records([b, a]) == first[::-1]   # served from the run's cache
+    assert walked == [[str(a), str(b)], []]
+    freshness.forget_stats()                               # a stage wrote files
+    freshness.stat_records([a])
+    assert walked[-1] == [str(a)]
+    monkeypatch.setattr(freshness, "RUN_ID", None)        # outside a run: no cache
+    freshness.stat_records([a])
+    assert walked[-1] == [str(a)]
+
+
+def test_run_action_records_what_it_rebuilt_for_the_run(tmp_path, monkeypatch):
+    _isolate_manifest(tmp_path, monkeypatch)
+    _, src = make_source(tmp_path)
+    freshness.run_action(src, "parse", ["a", "b"], 1)
+    assert freshness.RUN_REBUILT[("syn", "parse")] == {"a", "b"}
+    freshness.run_action(src, "parse", ["a", "b"], 1)      # everything fresh now
+    assert freshness.RUN_REBUILT[("syn", "parse")] == set()
+
+
+def _ledger(path, runs):
+    """A ledger of (run, documents parsed, run-end ok or None, generate status or None)."""
+    lines = []
+    for run, parsed, ended, generate in runs:
+        lines.append({"event": "run-start", "run": run, "t": run, "argv": ["lagen"], "pid": 1})
+        lines.append({"event": "segment", "run": run, "t": run, "step": "parse",
+                      "source": "syn", "secs": 1, "ran": parsed, "errors": 0,
+                      "status": "ok" if parsed else "skipped"})
+        if generate:
+            lines.append({"event": "segment", "run": run, "t": run, "step": "generate",
+                          "source": "__site__", "secs": 1, "ran": 0, "errors": 0,
+                          "status": generate})
+        if ended is not None:
+            lines.append({"event": "run-end", "run": run, "t": run, "secs": 2,
+                          "ok": ended, "errors": 0})
+    path.write_text("".join(json.dumps(line) + "\n" for line in lines))
+
+
+def test_generate_is_caught_up_only_when_the_last_parsing_run_generated(tmp_path, monkeypatch):
+    ledger = tmp_path / "runs.ndjson"
+    monkeypatch.setattr(freshness, "RUNS", ledger)
+    monkeypatch.setattr(freshness, "RUN_ID", None)
+    _ledger(ledger, [("r1", 3, True, "ok")])
+    assert freshness.generate_caught_up() is False       # no run id: never
+    monkeypatch.setattr(freshness, "RUN_ID", "r9")
+    assert freshness.generate_caught_up() is True
+    _ledger(ledger, [("r1", 3, True, "ok"), ("r2", 0, True, "skipped")])
+    assert freshness.generate_caught_up() is True        # r2 parsed nothing; r1 counts
+    _ledger(ledger, [("r1", 3, None, None)])             # crashed after parsing
+    assert freshness.generate_caught_up() is False
+    _ledger(ledger, [("r1", 3, True, None)])             # a standalone parse run
+    assert freshness.generate_caught_up() is False
+    _ledger(ledger, [("r1", 0, True, None)])             # nothing parsed on record
+    assert freshness.generate_caught_up() is True
+    _ledger(ledger, [("r9", 5, None, None)])             # this run's own parse is not counted
+    assert freshness.generate_caught_up() is True
+
+
+def test_run_dirty_pages_is_the_parsed_documents_and_their_neighbours(tmp_path, monkeypatch):
+    root = tmp_path / "data"
+    (root / "syn").mkdir(parents=True)
+    db = tmp_path / "catalog.sqlite"
+    monkeypatch.setattr(layout, "CATALOG", db)
+    con = catalog.connect(db, data_root=root)
+    for name in "abc":
+        (root / "syn" / ("%s.json" % name)).write_text("{}")
+        con.execute("INSERT INTO documents (uri, source, path) VALUES (?, 'syn', ?)",
+                    ("https://lagen.nu/%s" % name, "syn/%s.json" % name))
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES "
+                "('https://lagen.nu/a', 'dcterms:references', "
+                "'https://lagen.nu/b#P1', 'https://lagen.nu/b')")
+    con.commit()
+    con.close()
+    src = Source("syn", lambda: ["a", "b", "c"],
+                 {"parse": Stage("parse", lambda bf: None,
+                                 lambda bf: root / "syn" / ("%s.json" % bf))},
+                 artifacts=lambda: sorted((root / "syn").glob("*.json")))
+    store = {corpus.GENERATE_PARTS_KEY: {"sides": "S", "expired": "E"}}
+    monkeypatch.setattr(freshness, "RUN_REBUILT", {("syn", "parse"): {"a"}})
+    monkeypatch.setattr(freshness, "generate_caught_up", lambda: True)
+    monkeypatch.setattr(freshness, "code_changed", lambda *a: False)
+    # a: parsed; b: cited by a, its page shows a in its inbound rail; c: untouched
+    assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") == {
+        "https://lagen.nu/a", str(root / "syn" / "a.json"),
+        "https://lagen.nu/b", str(root / "syn" / "b.json")}
+    # a changed layer set, an unparsed source, or an uncaught-up ledger: the
+    # corpus scan runs instead
+    assert corpus._run_dirty_pages({"syn": src}, store, "S2", "E") is None
+    monkeypatch.setattr(freshness, "generate_caught_up", lambda: False)
+    assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") is None
+    monkeypatch.setattr(freshness, "generate_caught_up", lambda: True)
+    monkeypatch.setattr(freshness, "RUN_REBUILT", {})
+    assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") is None

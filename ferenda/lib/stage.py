@@ -65,7 +65,8 @@ class Stage:
     # hash, so the driver cannot answer "has anything changed" and must not
     # pretend it can. Without this a no-inputs stage is judged on its recipe
     # hash alone -- constant between edits -- so it runs once and is skipped
-    # for ever after, silently freezing its output (see `stats compute`).
+    # for ever after, silently freezing its output (how `stats compute` was
+    # gated until the catalog stamp gave it a real input, 2026-09-07).
     always: bool = False
     # the corpus verb a rebuild runs this stage after. The default keeps a
     # stage in the rebuild's leading parse/versions loop; `phase="dump"` runs

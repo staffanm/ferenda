@@ -11,7 +11,7 @@ import functools
 import sys
 from pathlib import Path
 
-from ..lib import compress, layout
+from ..lib import catalog, compress, layout
 from ..lib.stage import Source, Stage, write_artifact, write_artifact_to
 from . import compute, render
 
@@ -21,18 +21,17 @@ STATS_CODE = (HERE / "compute.py", HERE / "scan.py", HERE / "model.py")
 
 
 def stats_compute_run(basefile):
-    """Measure the corpus and write the artifact. Deliberately not incremental:
-    every measurement is a fact about the *whole* corpus, so there is no subset
-    of it that could be refreshed on its own -- the freshness question is "has
-    anything anywhere changed", and the inputs that would answer it are the
-    entire artifact tree, far too large to hash per run.
-
-    The stage therefore declares no `inputs` and is marked `always=True`, so
-    every invocation re-measures with or without `--force`. The mark is
-    load-bearing, not decoration: a no-inputs stage is otherwise judged fresh on
-    its recipe hash alone, which is constant between edits to stats/ -- so
-    compute would run once, record a manifest entry, and be skipped for ever
-    after, freezing /statistik at whatever the corpus looked like that day.
+    """Measure the corpus and write the artifact. Not incremental: every
+    measurement is a fact about the *whole* corpus, so there is no subset of it
+    that could be refreshed on its own. The freshness question is "has anything
+    anywhere changed", and the stage answers it through the catalog's change
+    stamp (`catalog.write_stamp`, written by every relate that wrote rows): a
+    run where relate skipped every source leaves the stamp alone and this
+    stage is skipped with it (790 s per no-op nightly on 2026-09-07). The
+    stamp, not the catalog, is the declared input: the driver content-hashes
+    inputs whose stat moved, and the catalog is 7 GB. What the stamp misses
+    -- downloaded but unparsed files (`SFS_DOWNLOADED` in compute) -- also
+    reaches the measurements through the next parse.
 
     Each run also archives the measurement under its own date
     (`layout.stats_snapshot`): the live artifact answers "how big is the corpus
@@ -76,7 +75,8 @@ SOURCES: tuple[Source, ...] = (Source(
     # run's catalog and /statistik would publish figures one rebuild out of date.
     {"compute": Stage("compute", stats_compute_run,
                       functools.partial(layout.artifact, "stats"),
-                      code=STATS_CODE, always=True, phase="dump")},
+                      inputs=lambda bf: [catalog.stamp_path(layout.CATALOG)],
+                      code=STATS_CODE, phase="dump")},
     write_pages=stats_write_pages,
     notes="compute: measure the whole corpus (catalog + artifact trees) into "
           "artifact/stats/statistik.json -- minutes, not incremental. Runs as "

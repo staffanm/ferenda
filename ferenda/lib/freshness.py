@@ -183,6 +183,47 @@ def _stat_job(chunk):
     return records
 
 
+# One stat pass per run: relate, dump, the cross-pass gate and generate's gate
+# each walk the same artifact and layer sets, and on the production NFS mount
+# the first walk is the cold one (parse: 461 s on 2026-09-07) while every
+# repeat is round trips for an answer already in hand. Keyed per path; a step
+# that writes artifacts or layers drops the cache (`forget_stats`), so a
+# later walk sees what it wrote.
+_STAT_CACHE: dict[str, tuple[str, int, int]] = {}
+# what this run rebuilt, per (source, stage): the basefiles whose recipe ran.
+# A downstream step reads it to act on exactly those documents (generate
+# renders them and the pages that show them) instead of re-deriving the
+# answer from the filesystem. Absent for a stage this run did not drive.
+RUN_REBUILT: dict[tuple[str, str], set[str]] = {}
+
+
+def generate_caught_up():
+    """Whether every document an earlier run parsed has been through a full
+    generate since: the last run on the ledger (other than this one) that
+    rebuilt any document also completed and carried a full generate, ok or
+    skipped. False when it did not -- that run's documents are not in this
+    run's `RUN_REBUILT`, so a generate that renders only this run's changes
+    and their neighbours would leave them stale. True with no such run on
+    record. A run without an id (a test, a dry run) is never caught up."""
+    if RUN_ID is None:
+        return False
+    for run, events in reversed(runlog.runs_events(RUNS)):
+        if run == RUN_ID:
+            continue
+        segments = [ev for ev in events if ev["event"] == "segment"]
+        if not any(ev["step"] == "parse" and ev.get("ran") for ev in segments):
+            continue
+        return (any(ev["event"] == "run-end" and ev.get("ok") for ev in events)
+                and any(ev["step"] == "generate" and ev["source"] == "__site__"
+                        and ev["status"] in ("ok", "skipped") for ev in segments))
+    return True
+
+
+def forget_stats():
+    """Drop the run's stat cache: a stage or hook wrote files it covers."""
+    _STAT_CACHE.clear()
+
+
 def stat_records(paths, *, label=None, jobs=1):
     """``(path, size, mtime_ns)`` for every path, in the caller's order -- the
     real (possibly .br) file's stat, `FINGERPRINT_CHUNK` paths per job across
@@ -198,13 +239,20 @@ def stat_records(paths, *, label=None, jobs=1):
     nothing at all. A caller with nothing to report (a test, a walk too
     short to notice) leaves it out and the walk stays silent."""
     paths = [str(p) for p in paths]
-    report = util.status_throttle() if label else None
-    records = []
-    for part in util.pooled(_stat_job, paths, jobs, chunk=FINGERPRINT_CHUNK):
-        records += part
+    # cached only inside a pipeline run, where every write to these trees goes
+    # through a stage or hook that drops the cache; a bare call (a test, a
+    # tool) reads the filesystem as it is
+    if RUN_ID is None:
+        _STAT_CACHE.clear()
+    missing = [p for p in paths if p not in _STAT_CACHE]
+    report = util.status_throttle() if label and missing else None
+    seen = 0
+    for part in util.pooled(_stat_job, missing, jobs, chunk=FINGERPRINT_CHUNK):
+        _STAT_CACHE.update((p, rec) for rec in part for p in [rec[0]])
+        seen += len(part)
         if report:
-            report(len(records), len(paths), "%s  checking staleness" % label)
-    return records
+            report(seen, len(missing), "%s  checking staleness" % label)
+    return [_STAT_CACHE[p] for p in paths]
 
 
 def fingerprint_of(records):
@@ -363,6 +411,8 @@ def start_run(pid=None):
     global RUN_ID, RUN_ERRORS
     RUN_ID = None
     RUN_ERRORS = 0
+    _STAT_CACHE.clear()
+    RUN_REBUILT.clear()
     if pid is not None:
         RUN_ID = runlog.make_run_id(pid)
     return RUN_ID
@@ -852,6 +902,11 @@ def run_action(source, action, basefiles, jobs, force=None):
         if total:
             sys.stderr.write("\n")
         persist()
+    if not protocol.RUN.dry_run:
+        RUN_REBUILT[(source.name, action)] = {
+            bf for stage, bf in merged.done if stage == action}
+        if merged.done:
+            forget_stats()
     return merged
 
 

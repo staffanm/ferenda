@@ -25,6 +25,7 @@ import json
 import re
 import sqlite3
 import threading
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -310,6 +311,22 @@ _CREATE_GENOMFOR = ("CREATE INDEX IF NOT EXISTS idx_links_genomfor ON links(from
 INDEX_TO_URI_COLUMNS = ("to_uri", "from_uri")
 _CREATE_TO_URI = ("CREATE INDEX IF NOT EXISTS idx_links_to_uri ON links(%s)"
                   % ", ".join(INDEX_TO_URI_COLUMNS))
+
+
+def stamp_path(path: Path | str) -> Path:
+    """The catalog's change stamp, beside it: `<catalog>.stamp`."""
+    path = Path(path)
+    return path.with_name(path.name + ".stamp")
+
+
+def write_stamp(path: Path | str) -> None:
+    """Mark the catalog at `path` as changed by this run (`corpus.cmd_relate`,
+    after any source or cross-pass wrote rows). A few bytes whose content and
+    mtime move with every changing relate, so a stage whose real input is the
+    whole catalog (`stats compute`) can be gated on this file instead of on
+    7 GB it cannot hash, and skip the runs where relate skipped everything."""
+    stamp_path(path).write_text("%s %d\n" % (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                             time.time_ns()))
 
 
 def connect(path: Path | str, data_root: Path | None = None,
