@@ -545,8 +545,8 @@ def main(argv=None):
                    % ", ".join(SOURCES))
     p.add_argument("action",
                    help="download | parse | relate | generate | index | dump "
-                        "| rebuild | all | serve | status | errors | patch-show "
-                        "| mkpatch "
+                        "| rebuild | all | compact | serve | status | errors "
+                        "| patch-show | mkpatch "
                         "| a source action (e.g. dv reindex). `errors` prints "
                         "the served site's error ledger, newest first (the "
                         "newest 50, or N with `lagen all errors 200`), or one "
@@ -979,6 +979,9 @@ def _dispatch(args, p, jobs):
     if any(n not in SOURCES for n in names):
         p.error("unknown source %r (have: %s)" % (args.source, ", ".join(SOURCES)))
 
+    if args.action == "compact":
+        corpus.cmd_compact()
+        return
     if args.action in ("rebuild", "all"):
         had_errors = corpus.cmd_all(SOURCES, names, jobs,
                                     whole_corpus=args.source == "all",

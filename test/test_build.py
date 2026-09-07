@@ -2363,3 +2363,39 @@ def test_pooled_kills_a_hung_worker_and_raises():
     with pytest.raises(RuntimeError, match="_sleep_chunk: no result from a worker in 0 s"):
         list(util.pooled(_sleep_chunk, [30, 30, 30, 30], 2, chunk=1, timeout=0.5))
     assert time.perf_counter() - t0 < 15
+
+def test_compact_rewrites_the_catalog_contiguously_and_keeps_every_row(tmp_path, monkeypatch):
+    db = tmp_path / "catalog.sqlite"
+    monkeypatch.setattr(layout, "CATALOG", db)
+    con = catalog.connect(db)
+    con.executemany("INSERT INTO documents (uri, source, path) VALUES (?, 'sfs', '')",
+                    [("https://lagen.nu/%d" % i,) for i in range(2000)])
+    con.commit()
+    con.execute("DELETE FROM documents WHERE rowid % 2 = 0")   # leaves free pages
+    con.commit()
+    before = sorted(con.execute("SELECT uri FROM documents"))
+    assert con.execute("PRAGMA freelist_count").fetchone()[0] > 0
+    con.close()
+    corpus.cmd_compact()
+    assert not db.with_name("catalog.sqlite-wal").exists()
+    assert not db.with_name("catalog.sqlite.compact").exists()
+    con = catalog.connect_ro(db)
+    assert sorted(con.execute("SELECT uri FROM documents")) == before
+    assert con.execute("PRAGMA freelist_count").fetchone()[0] == 0
+    con.close()
+
+def test_manifest_moves_beside_the_catalog_once(tmp_path, monkeypatch):
+    old = tmp_path / "data" / ".build" / "manifest.sqlite"
+    new = tmp_path / "catalog" / ".build" / "manifest.sqlite"
+    old.parent.mkdir(parents=True)
+    freshness.Manifest(old).update({"parse/doc/a": {"inputs": "x", "version": "v"}})
+    monkeypatch.setattr(freshness, "MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(freshness, "MANIFEST_DB", new)
+    monkeypatch.setattr(freshness, "_MANIFEST_DB_ON_DATA", old)
+    monkeypatch.setattr(freshness, "_MANIFEST_CACHE", None)
+    assert freshness.load_manifest().get("parse/doc/a") == {"inputs": "x", "version": "v"}
+    assert new.exists() and old.exists()             # copied, the old one left in place
+    # a later run reads the copy, never the data-tree file again
+    freshness.Manifest(old).update({"parse/doc/b": {"inputs": "y", "version": "v"}})
+    monkeypatch.setattr(freshness, "_MANIFEST_CACHE", None)
+    assert freshness.load_manifest().get("parse/doc/b") is None

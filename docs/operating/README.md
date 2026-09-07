@@ -326,18 +326,39 @@ The cross-passes also avoid repeated SQLite reads and writes:
   instead of scanning them pairwise.
 - Each cross-pass prints its name and elapsed time. The batch connection
   uses a 64 MiB SQLite page cache and keeps temporary sorts in memory.
-  It first reads the catalog and WAL sequentially to warm the OS page cache
-  (`catalog.warm_cache`). Cold, scattered index reads otherwise dominate the
-  run: the inbound count alone took 468 s cold against 16 s warm. The
-  sequential read of the 7.2 GB catalog takes about 150 s cold and seconds
-  when the pages are already cached.
 
-On a copy of the production catalog on 2026-09-07, with the page cache
-evicted first, the whole block took 271 s: 154 s of read-ahead, 44 s for
-the regleringshierarki, 23 s for fk, 17 s for genomförande, 16 s for
-inbound counts, and under 6 s for each other pass. The same run took
-5581 s in the nightly before these changes. The first run also builds the
-three new indexes; that one-time cost was 348 s on the same copy.
+The passes are then bound by the catalog file's page layout. A full relate
+leaves every table and index scattered one page at a time: on the production
+catalog of 2026-09-07 the cited-by index held 399,000 pages in 294,000
+separate runs, and the documents table 90,000 pages in 81,000 runs. The disk
+under it streams at about 50 MB/s but seeks a few hundred times per second,
+so a cold scan of that index took 468 s. `lagen all compact` rewrites the
+catalog contiguously (`VACUUM INTO` a sibling file, then the same atomic
+swap a full rebuild uses; about 8 minutes, one extra file's worth of disk,
+readers unaffected). On the compacted file the same cold scan took 57 s and
+the whole block 200 s. Incremental relates fragment the file slowly, so
+production runs `lagen all compact` weekly from cron (Sunday 14:00, after
+the nightly and the browser downloads are done); a full rebuild should be
+followed by one by hand. The pipeline's writer lease keeps a compaction and
+a relate from overlapping.
+
+Cold timings on that compacted copy, 2026-09-07: 57 s inbound counts, 45 s
+fk, 38 s regleringshierarki, 32 s genomförande, 11 s sfs, under 6 s each for
+the rest; 200 s in all. The same block took 5581 s in the nightly before
+these changes. The first run after deploying them also builds the three new
+indexes, which on the fragmented production file took about 1300 s more.
+
+The generate step has the same two costs on its own side. Its planning loop
+asks, for every catalogued page, whether the output and the page's sidecar
+layers exist, and looks the page up in the per-document manifest. On
+2026-09-07 that loop ran 1 h 46 min over 458,674 pages with nothing to
+render: one GETATTR per file on the NFS mount, and the manifest, a 488 MB
+SQLite file, paged in over NFS at 400 reads per second. The loop now runs
+under `compress.dir_cache`, one scandir per directory instead of a stat per
+file, and the manifest lives beside the catalog under `catalog_root`
+(`<catalog_root>/.build/manifest.sqlite`). The first run after that change
+copies the manifest there from the data tree once and leaves the old file in
+place; a machine that rsyncs the corpus copies the manifest with the catalog.
 
 Download has no such scan — nothing on disk decides what it fetches — so its
 line names the harvest watermark instead: `(from 2026-01-10)`, or

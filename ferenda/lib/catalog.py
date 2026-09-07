@@ -312,24 +312,6 @@ _CREATE_TO_URI = ("CREATE INDEX IF NOT EXISTS idx_links_to_uri ON links(%s)"
                   % ", ".join(INDEX_TO_URI_COLUMNS))
 
 
-def warm_cache(path):
-    """Read a batch catalog in file order before its scattered B-tree walks.
-
-    Even a covering index has scattered pages after incremental updates.
-    On production, reading the 7.2 GiB file sequentially takes about two
-    minutes; cold index walks take much longer while reading fewer bytes.
-    The reusable buffer is 8 MiB; the OS owns the reclaimable page cache.
-    Include committed pages that still live in the WAL.
-    """
-    path = Path(path)
-    wal = Path(str(path) + "-wal")
-    buf = bytearray(8 * 1024 * 1024)
-    for part in [path] + ([wal] if wal.exists() else []):
-        with part.open("rb", buffering=0) as stream:
-            while stream.readinto(buf):
-                pass
-
-
 def connect(path: Path | str, data_root: Path | None = None,
             exclusive: bool = False) -> sqlite3.Connection:
     """A read-write connection to the catalog at `path`, schema ensured.

@@ -125,6 +125,38 @@ def _swap_catalog(scratch, dest):
     os.close(dfd)
 
 
+def cmd_compact():
+    """Rewrite the live catalog contiguously: `VACUUM INTO` a sibling scratch,
+    then swap it in like a full rebuild's (`_swap_catalog`).
+
+    A full relate leaves every table and index scattered one page at a time
+    across the file (the cited-by index: 399,000 pages in 294,000 runs on the
+    2026-09-07 production catalog), and the disk under it streams at 50 MB/s
+    but seeks at a few hundred per second -- so a cold index scan in the relate
+    cross-passes ran for minutes where a contiguous one takes seconds (inbound
+    counts: 468 s against 57 s). Incremental relates fragment slowly; the
+    weekly cron job (docs/operating) keeps the layout close to contiguous.
+
+    The pipeline's writer lease (build._dispatch) keeps this off a running
+    relate and a relate off this; the copy reads one consistent snapshot, and
+    serving connections open per request, so they pick the new file up at
+    the next request. Prints the elapsed time and both sizes."""
+    dest = layout.CATALOG
+    assert dest.exists(), "no catalog at %s" % dest
+    scratch = dest.with_name(dest.name + ".compact")
+    if scratch.exists():
+        scratch.unlink()                   # a crashed earlier run's leftover
+    t0 = time.perf_counter()
+    before = dest.stat().st_size
+    con = catalog.connect_ro(dest)
+    con.execute("VACUUM INTO ?", (str(scratch),))
+    con.close()
+    _swap_catalog(scratch, dest)
+    print("compact: catalog rewritten contiguously -- %.1f GB -> %.1f GB "
+          "(%.0fs)" % (before / 1e9, dest.stat().st_size / 1e9,
+                       time.perf_counter() - t0))
+
+
 # the lib code the relate cross-passes run -- their own recipe, apart from
 # RELATE_CODE: an edit here re-runs only the __corr__ block (cheap), where an
 # entry in RELATE_CODE re-extracts every document of every source. Each
@@ -330,7 +362,6 @@ def cmd_relate(sources, names, force=None, jobs=1):
             # serving connections retain their small per-request cache.
             con.execute("PRAGMA cache_size=-65536")
             con.execute("PRAGMA temp_store=MEMORY")
-            _relate_pass("catalog read-ahead", catalog.warm_cache, target)
             # each source's own contribution first (pinning a genomför-direktiv
             # statement to the paragraf it transposes, loading the .corr layers,
             # auditing a commentary's anchors): they read and write their own rows
@@ -1305,8 +1336,9 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
             base = content_hash if content_hash is not None else (
                 catalog.content_hash(compress.read_bytes(fp))
                 if fp and compress.exists(fp) else "")
+            # compress.exists answers from generate_site's directory cache
             own_hash[p] = hashlib.sha256(base.encode() + b"".join(
-                s.read_bytes() if s.exists() else b"" for s in sides)).hexdigest()
+                s.read_bytes() if compress.exists(s) else b"" for s in sides)).hexdigest()
         return hashlib.sha256((own_hash[p] + dep_digest).encode()).hexdigest()
 
     def fresh(uri, out_path, art_path, dep_digest, content_hash):

@@ -929,27 +929,32 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     # can continue correctly, and the warning names what to fold).
     outs: dict = {}          # output relpath -> uri
     collisions = []          # (winner uri, dropped uri, shared relpath)
-    for (uri, src, path, title, chash) in rows:
-        rel = doc_relpath(uri)
-        if outs.setdefault(rel, uri) != uri:
-            collisions.append((outs[rel], uri, rel))
-            done += 1        # counted as handled, so the progress total still adds up
-            continue
-        out = out_root / rel
-        dep = deps.get(uri, catalog.EMPTY_DEP_DIGEST)
-        future = future_lydelse(uri)
-        if uri in cross or uri in expired or future:
-            dep = hashlib.sha256(
-                ("%s\x1f%s\x1f%s%s" % (dep, cross.get(uri, ""),
-                                       "expired" if uri in expired else "",
-                                       "future" if future else "")
-                 ).encode()).hexdigest()
-        if fresh and fresh(uri, out, path, dep, chash):
-            done += 1
-            if progress and done % 500 == 0:
-                progress(done, total, catalog.local(uri), rendered)
-        else:
-            plan.append((uri, src, path, title, dep, chash))
+    # `fresh` asks whether each page's output and sidecar layers exist: one
+    # scandir per directory instead of a GETATTR per file on the NFS mount,
+    # where the loop over 458,674 pages stood at 780 stats/s for 1 h 46 min
+    # (2026-09-07). Reads only; the renders that write run after the block.
+    with compress.dir_cache():
+        for (uri, src, path, title, chash) in rows:
+            rel = doc_relpath(uri)
+            if outs.setdefault(rel, uri) != uri:
+                collisions.append((outs[rel], uri, rel))
+                done += 1        # counted as handled, so the progress total still adds up
+                continue
+            out = out_root / rel
+            dep = deps.get(uri, catalog.EMPTY_DEP_DIGEST)
+            future = future_lydelse(uri)
+            if uri in cross or uri in expired or future:
+                dep = hashlib.sha256(
+                    ("%s\x1f%s\x1f%s%s" % (dep, cross.get(uri, ""),
+                                           "expired" if uri in expired else "",
+                                           "future" if future else "")
+                     ).encode()).hexdigest()
+            if fresh and fresh(uri, out, path, dep, chash):
+                done += 1
+                if progress and done % 500 == 0:
+                    progress(done, total, catalog.local(uri), rendered)
+            else:
+                plan.append((uri, src, path, title, dep, chash))
 
     skipped = []                 # uris whose artifact vanished (stale catalog rows)
 

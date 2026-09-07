@@ -1720,7 +1720,12 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
     def signature(chash, dep):
         return hashlib.sha256(((chash or "") + dep).encode()).hexdigest()
 
+    cached = []
+
     def fresh(uri, out_path, art_path, dep, chash):
+        # the planning loop answers existence from one scandir per directory
+        # (compress.dir_cache), never a stat per page on the NFS mount
+        cached.append(compress._DIRS is not None)
         return (uri in manifest and compress.exists(out_path)   # page precompressed
                 and manifest[uri] == signature(chash, dep))
 
@@ -1731,6 +1736,7 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
     total, rendered = render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert total >= 2 and rendered == total          # first run renders every page
+    assert cached and all(cached)
     assert LAW["uri"] in rendered_uris and CASE["uri"] in rendered_uris
 
     rendered_uris.clear()

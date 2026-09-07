@@ -21,6 +21,7 @@ import itertools
 import json
 import multiprocessing
 import os
+import shutil
 import sqlite3
 import sys
 import threading
@@ -37,7 +38,13 @@ from . import stage as protocol
 from .errors import SkipDocument
 
 MANIFEST = config.DATA / ".build" / "manifest.json"     # legacy; migrated into the DB
-MANIFEST_DB = config.DATA / ".build" / "manifest.sqlite"
+# The per-document manifest is SQLite, and SQLite over NFS pays a round trip
+# per page read and per lock: generate's planning loop looked up 458,674
+# pages in it at 400 NFS reads/s (2026-09-07). It lives beside the catalog,
+# on the local disk `catalog_root` exists for; a machine that rsyncs the
+# corpus copies it with the catalog, not with the data tree.
+MANIFEST_DB = config.CATALOG_ROOT / ".build" / "manifest.sqlite"
+_MANIFEST_DB_ON_DATA = config.DATA / ".build" / "manifest.sqlite"   # until 2026-09-07
 INFLIGHT = config.DATA / ".build" / "inflight"    # per-pid last-started slot files (_run_parallel)
 FINGERPRINTS = config.DATA / ".build" / "fingerprints.json"   # small per-(step,source) gates
 RUNS = config.DATA / ".build" / "runs.ndjson"             # append-only run ledger
@@ -935,6 +942,14 @@ def load_manifest():
     global _MANIFEST_CACHE
     if _MANIFEST_CACHE is None:
         MANIFEST_DB.parent.mkdir(parents=True, exist_ok=True)
+        if not MANIFEST_DB.exists() and _MANIFEST_DB_ON_DATA != MANIFEST_DB \
+                and _MANIFEST_DB_ON_DATA.exists():
+            # one-time move off the data tree: copy under a scratch name and
+            # rename, so a run interrupted mid-copy finds no half manifest and
+            # copies again. The old file stays where it was for an older image.
+            part = MANIFEST_DB.with_name(MANIFEST_DB.name + ".part")
+            shutil.copy2(_MANIFEST_DB_ON_DATA, part)
+            os.replace(part, MANIFEST_DB)
         m = Manifest(MANIFEST_DB)
         if MANIFEST.exists():
             # one-time migration from the retired JSON manifest. The JSON's
