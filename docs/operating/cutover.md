@@ -89,7 +89,7 @@ recreates the containers; the volumes and the bind-mounted data do not move.
 
 ## The switch
 
-Six edits and a reload. Every line to change is marked `CUTOVER` in its file.
+Seven edits and a reload. Every line to change is marked `CUTOVER` in its file.
 
 1. `docker/nginx/default.conf` — the legacy vhost. Two `server_name` lines:
    `lagen.nu` becomes `old.lagen.nu`.
@@ -107,7 +107,14 @@ Six edits and a reload. Every line to change is marked `CUTOVER` in its file.
    by reference, and a crawler that may not fetch a page never sees a noindex.)
 6. `docker/nginx/subdomains.conf`: the three marked `302` targets become
    `lagen.nu`.
-7. Reload:
+7. `ferenda/lib/assets/matomo.js`: the `SITES` table, hostname to Matomo site
+   id. **Missed on 2026-09-05, and it cost two days of reader analytics.** The
+   snippet returns before loading anything when it does not recognise the host,
+   so nothing errored, nothing warned, and the reports were simply empty until
+   somebody looked. `test_site.test_every_page_serving_vhost_has_a_matomo_site_id`
+   now fails on this, and publishing it needs `lagen all generate
+   --assets-only` (the deploy runs that), not a page rebuild.
+8. Reload:
 
    ```sh
    docker compose exec nginx nginx -t

@@ -742,7 +742,7 @@ Den ligger i *samma* process som allt annat (`lagen all serve`) och nås över
 **Streamable HTTP** på:
 
 ```
-https://ferenda.lagen.nu/mcp
+https://lagen.nu/mcp
 ```
 
 Lägg till den URL:en som en anpassad ("custom"/"remote") MCP-server i din

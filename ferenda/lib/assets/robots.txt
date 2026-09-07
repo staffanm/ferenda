@@ -1,9 +1,10 @@
 # lagen.nu's crawl policy. Every page a reader can open is crawlable. What is
 # kept out is machinery, not content: the JSON API and its docs, the MCP
 # endpoint, the search shell (an unbounded query space), the editor login and
-# the bulk dumps. Nothing here says noindex: on the preview host
-# (ferenda.lagen.nu) that is nginx's X-Robots-Tag header, which a crawler only
-# sees by fetching the page -- so this file must never Disallow the pages.
+# the bulk dumps. Nothing here says noindex: the host that carries one is the
+# legacy duplicate (old.lagen.nu, since the 2026-09-05 cutover), and it carries
+# it as nginx's X-Robots-Tag header, which a crawler only sees by fetching the
+# page -- so this file must never Disallow the pages.
 User-agent: *
 Disallow: /api/
 Disallow: /mcp

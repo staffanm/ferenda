@@ -14,6 +14,14 @@
      returned before loading anything, and no reader page was counted at all.
      ferenda.lagen.nu is gone from the table because it no longer serves a page
      to run this in: its vhost is a 308 to lagen.nu.
+   * The subdomain projections are deliberately NOT here yet, and so report
+     nothing: <slug> under each of the four zones -- lagen.nu, direktivet.nu,
+     forordningen.nu and its IDN twin xn--frordningen-rfb.nu -- serves an
+     act's own generated page (site/subdomains.py symlinks it),
+     bundle included. Adding them is not just a table entry -- setCustomUrl
+     below sends pathname+search, which is "/" for every one of them, so they
+     would all merge into the apex's "/" row. It needs either a site id per
+     zone or a custom url that keeps the host. Staffan's call, asked 2026-09-07.
 
    Kept first in the script.js bundle deliberately: the bundle is one
    concatenated script, so an uncaught error anywhere in it stops everything

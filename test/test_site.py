@@ -3901,3 +3901,59 @@ def test_concept_stub_styles_are_reachable_css():
             depth = 0
     assert not stray, "unbalanced CSS comment at line(s) %s" % stray
     assert ".stub-lede {" in css
+
+
+def test_every_page_serving_vhost_has_a_matomo_site_id():
+    """The 2026-09-05 cutover moved the pages from ferenda.lagen.nu to lagen.nu
+    and nobody moved `lib/assets/matomo.js`'s hostname table with them. The
+    snippet returns before loading anything when it does not recognise the
+    host, so the only symptom was two days of empty reports.
+
+    The nginx vhosts are the repo's own record of which hostnames serve pages,
+    so they are what the table is checked against: a server block whose
+    `location /` proxies to the app serves pages and must have a site id; one
+    that only returns a redirect (ferenda.lagen.nu since the cutover) must not,
+    since no page is served under it to run the snippet in.
+
+    The subdomain projections (`docker/nginx/subdomains.conf`) serve pages from
+    a root rather than the app and are deliberately outside this check -- they
+    carry the same bundle and report nothing, which is a decision still to be
+    made, not an oversight this test would settle."""
+    sites = re.search(r"var SITES = (\{[^}]*\})",
+                      Path("ferenda/lib/assets/matomo.js").read_text())
+    assert sites, "matomo.js no longer declares a SITES table"
+    tracked = set(json.loads(sites.group(1)))
+
+    serving, redirecting = set(), set()
+    conf = Path("docker/nginx/ferenda.lagen.nu.conf").read_text()
+    # each `server { ... }` block, split on the top-level keyword: the file
+    # nests only locations, so the keyword at column 0 starts a new block
+    for block in re.split(r"^server\s*\{", conf, flags=re.M)[1:]:
+        names = re.search(r"^\s*server_name\s+([^;]+);", block, re.M)
+        if not names:
+            continue
+        # the root location in either shape the file writes it -- a braced
+        # block, or the one-liner the redirect vhosts use -- and, failing
+        # both, a server-scope `return`, which is how the 443 redirect vhost
+        # answers everything without a location at all
+        root = re.search(r"^\s*location / \{(.*?)^\s*\}", block, re.M | re.S) \
+            or re.search(r"^\s*location / \{([^}]*)\}", block, re.M) \
+            or re.search(r"^\s{4}(return\s+30\d\b[^;]*);", block, re.M)
+        if not root:
+            continue
+        target = serving if "proxy_pass" in root.group(1) else redirecting
+        target.update(names.group(1).split())
+
+    # a hostname has both a :80 and a :443 block; the plain-http one redirects
+    # to https, so serving anywhere is what counts
+    redirecting -= serving
+    # both halves need a staleness guard: an empty set here would make the
+    # assertion below a no-op that still passes, which is worse than no test
+    assert serving, "no page-serving vhost found -- the parse above went stale"
+    assert redirecting, "no redirect-only vhost found -- the parse went stale"
+    assert serving <= tracked, (
+        "these hostnames serve pages but have no Matomo site id in "
+        "lib/assets/matomo.js: %s" % ", ".join(sorted(serving - tracked)))
+    assert not (tracked & redirecting), (
+        "these hostnames only redirect, so no page is served under them to run "
+        "the snippet: %s" % ", ".join(sorted(tracked & redirecting)))
