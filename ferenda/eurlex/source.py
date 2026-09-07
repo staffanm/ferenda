@@ -53,9 +53,11 @@ from . import (
     render,
 )
 from .parse import (
-    base_preamble_for,
+    base_context_for,
     content_file,
     parse_consolidation,
+    repeal_date,
+    repeal_marker,
     to_artifact,
     version_dirs,
 )
@@ -181,12 +183,16 @@ def eurlex_version_output(key):
 
 def eurlex_version_inputs(key):
     """Freshness inputs of one superseded consolidation: its own content
-    file, plus the base act's own (its preamble is spliced into every
-    version artifact) and the statute's patch."""
+    file, the base act's own (its preamble is spliced into every version
+    artifact), the statute's patch, and the notices that carry the act's
+    repeal date -- a wording dated from the repeal is dropped rather than
+    published (`parse.repeal_marker`), so the date arriving has to restale
+    it."""
     basefile, version = split_fanout_key(key)
     vdir = dict(version_dirs(layout.eurlex_dir(basefile))).get(version)
     path, _lang, _route = content_file(vdir) if vdir else (None, None, None)
     return (([path] if path else []) + eurlex_content(basefile)
+           + eurlex_parse_notices(basefile)
            + patch_input("eurlex", basefile))
 
 
@@ -204,7 +210,7 @@ def eurlex_version_run(key):
     if vdir is None:
         raise SkipDocument("%s: consolidation %s no longer present"
                           % (basefile, version))
-    preamble = base_preamble_for(doc_dir, basefile)
+    preamble, reach = base_context_for(doc_dir, basefile)
     try:
         cons = parse_consolidation(vdir, basefile, version, preamble=preamble)
     except (ValueError, etree.XMLSyntaxError) as exc:
@@ -212,6 +218,9 @@ def eurlex_version_run(key):
     if cons is None:
         raise SkipDocument("no Formex manifestation (pre-Formex "
                           "consolidations are PDF-only)")
+    if repeal_marker(version, cons, reach, repeal_date(doc_dir, basefile)):
+        raise SkipDocument("the repeal marker CELLAR dates from the act's "
+                           "repeal, not a wording of it")
     compress.write_json(layout.eurlex_version_artifact(basefile, version),
                         to_artifact(cons))
 
@@ -246,7 +255,7 @@ def eurlex_versions_rebuild_sidecars():
                        for v, _d in downloads]):
             continue    # nothing under this act changed since
         versions_out, skipped = [], []
-        preamble = None
+        preamble, reach = None, 0
         main = _eurlex_main_version(basefile) if downloads else None
         for version, vdir in downloads:
             if version == main:
@@ -269,7 +278,7 @@ def eurlex_versions_rebuild_sidecars():
             # an empty placeholder: a benign skip the driver could not keep
             # the message for -- re-derive it directly
             if preamble is None:
-                preamble = base_preamble_for(doc_dir, basefile)
+                preamble, reach = base_context_for(doc_dir, basefile)
             try:
                 cons = parse_consolidation(vdir, basefile, version,
                                            preamble=preamble)
@@ -281,6 +290,12 @@ def eurlex_versions_rebuild_sidecars():
                 skipped.append({"version": version, "error": "no Formex "
                                 "manifestation (pre-Formex consolidations "
                                 "are PDF-only)"})
+                continue
+            if repeal_marker(version, cons, reach,
+                             repeal_date(doc_dir, basefile)):
+                skipped.append({"version": version, "error": "the repeal "
+                                "marker CELLAR dates from the act's repeal, "
+                                "not a wording of it"})
                 continue
             art = to_artifact(cons)
             compress.write_json(layout.eurlex_version_artifact(basefile, version),

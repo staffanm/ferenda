@@ -223,6 +223,13 @@ def annex_strip(text, annex_words):
 # an upper-case letter, a digit, a quote or a separating dash. Deliberately *not*
 # a lower-case letter -- that is prose continuing an article reference.
 _RUBRIC_OPEN = r"(?:[^\Wa-zà-ÿ\d_]|[\d\"'“«(–—-])"
+# the same, letters only -- what has to follow a run of parenthesized numbers
+# for the line still to be a heading (see `Vocab.article_heading`)
+_RUBRIC_WORD = r"[^\Wa-zà-ÿ\d_]"
+# a run of parenthesized numbers after the designation: CONSLEG's own amendment
+# footnote markers, which sit between the number and the rubric ("Artikel 1 (10)
+# (15) Definitioner")
+_ART_MARKERS = r"(?:\s*\(\s*\d+[a-z]*\s*\))+"
 
 
 def article_num(text):
@@ -249,9 +256,20 @@ class Vocab:
         # prose, never a rubric. The keyword and the bis/ter letter are matched
         # case-insensitively; the rubric test must not be, so the flag is scoped
         # rather than global.
+        #
+        # A parenthesized number right after the designation is the other
+        # pinpoint spelling -- "Article 85 (3)", "Article 1 (2) is hereby
+        # replaced by following:" -- and `(` opens a rubric, so those read as
+        # headings and minted 365 phantom articles across 83 legacy-HTML acts,
+        # each stealing the text that followed it. CONSLEG writes its amendment
+        # footnote markers the same way ("Artikel 1 (10) (15) Definitioner"), so
+        # the discriminator is not the parenthesis but what comes after it: a
+        # real rubric word keeps the heading, nothing (or prose, or a table
+        # separator) makes it a reference.
         self.article_heading = re.compile(
-            r"^(?i:%s)\.?\s+\d+(?i:[a-z])*(?:\s+%s.*)?$"
-            % (spec["article"], _RUBRIC_OPEN))
+            r"^(?i:%s)\.?\s+\d+(?i:[a-z])*"
+            r"(?:%s\s+%s.*|(?:\s+(?!\(\s*\d)%s.*)?)$"
+            % (spec["article"], _ART_MARKERS, _RUBRIC_WORD, _RUBRIC_OPEN))
         self.heading = re.compile(r"^(?:%s)\b" % "|".join(spec["headings"]), re.I)
         self.annex = re.compile(r"^(?:%s)\b" % "|".join(spec["annex"]), re.I)
         # the bare words, for `annex_strip`'s segment pick (a prefix test, not a

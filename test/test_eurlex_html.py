@@ -445,6 +445,26 @@ def test_article_heading_shape_across_languages():
         assert voc.article.match(line), line
 
 
+def test_a_parenthesized_pinpoint_is_a_reference_not_a_heading():
+    """"Article 85 (3)" is the other spelling of a pinpoint, and `(` opens a
+    rubric -- so those lines read as headings and minted 365 phantom articles
+    across 83 legacy-HTML acts, each stealing the text that followed it. CONSLEG
+    writes its own amendment footnote markers the same way, so what decides is
+    whether a rubric word follows the parenthesis."""
+    for voc, line in ((L.vocab("eng"), "Article 85 (3)"),
+                      (L.vocab("eng"), "Article 6 (2):"),
+                      (L.vocab("eng"), "Article 1 (2) is hereby replaced by "
+                                       "following:"),
+                      (L.vocab("eng"), "Article 85 (1) of the Treaty applies"),
+                      (L.vocab("swe"), "Artikel 26 (6)")):
+        assert not voc.article_heading.match(line), line
+        assert voc.article.match(line), line     # the loose marker test still does
+    for voc, line in ((L.vocab("swe"), "Artikel 1 (10) (15) Definitioner"),
+                      (L.vocab("swe"), "Artikel 4 (10) Sakområden"),
+                      (L.vocab("eng"), "Article 1 (Text with EEA relevance)")):
+        assert voc.article_heading.match(line), line
+
+
 def test_latin_ordinal_article_keeps_its_whole_suffix():
     # inserted articles carry Latin ordinals, not just single letters. A
     # one-letter suffix truncated "Artikel 6ter" to num "6t" -- an anchor

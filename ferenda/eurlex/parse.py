@@ -168,6 +168,73 @@ def base_preamble(doc):
     return out
 
 
+# a repeal marker's enacting terms reach no further than this share of the base
+# act's -- one article of 34 for 31995L0046, two of 814 for 32001R0993. Measured
+# over the 5,019 acts with downloaded consolidations on dev, 2026-09-07: 227
+# post-repeal wordings sit at or under half, and the four that clear the cut
+# carry 3 of 4, 6 of 7, 14 of 16 and 21 of 22 -- so the gap between a marker and
+# a wording that genuinely lost a late article is wide, and nothing sits in it.
+MARKER_REACH = 0.5
+
+RE_ARTICLE_NUM = re.compile(r"(\d+)")
+
+
+def enacting_reach(doc):
+    """The last article number of an act's own enacting terms, as an int, or 0.
+
+    The articles in document order, up to the first one that numbers *lower*
+    than the article before it -- that reset is an annex starting its own
+    "Artikel 1" run, and an annex's articles are not the act's. Sub-numbered
+    articles count as their base number ("28l" -> 28), which is what the run
+    needs: the act's reach, not its article count."""
+    last = 0
+    for b in doc.body:
+        if b.kind != "article":
+            continue
+        m = RE_ARTICLE_NUM.match(b.num or "")
+        if m is None:
+            continue
+        if int(m.group(1)) < last:
+            break
+        last = int(m.group(1))
+    return last
+
+
+def repeal_date(doc_dir, celex):
+    """The day the act stopped applying, or None -- CELLAR's own flag on the
+    act (`notice_repeal_date`), or, for a corrigendum, the date it inherits
+    from the act it corrects (`revision_repeal_date`). The artifact's
+    `expired`, and the date a wording is a repeal marker from."""
+    return notice_repeal_date(doc_dir) or revision_repeal_date(celex)
+
+
+def repeal_marker(version, cons, reach, repealed):
+    """Whether consolidation `cons` (dated `version`) is the Publications
+    Office's repeal marker for an act repealed on `repealed`, rather than a
+    wording of it. `reach` is the base act's own `enacting_reach`.
+
+    CELLAR publishes a wording per moment of an act's life, and for many
+    repealed acts one more, starting the day the repeal took effect. That last
+    one is not a text: 31995L0046's carries Article 1 of the directive's 34 and
+    stops, so the data protection directive served its purpose clause and
+    nothing else. Twenty-two of them carry a literal ``XXXX`` where the article
+    text belongs (31992R0436), which is the Publications Office saying the same
+    thing in another way.
+
+    A post-repeal wording is not *always* a marker -- 1,546 of them carry the
+    act's full text, and those are the right thing to serve -- so the date alone
+    decides nothing. It is the pair that does: dated at or after the repeal, and
+    reaching no further than `MARKER_REACH` of the act's own last article.
+
+    `reach` is the yardstick, so a base act with none (its content file is
+    missing, or the parser found no numbered article in it) measures nothing and
+    every wording of it stays. Without that the comparison reads 0 <= 0 and drops
+    the act's whole text under a reason -- "CELLAR dates this from the repeal" --
+    that says nothing about why the base act came out empty."""
+    return (reach > 0 and repealed is not None and version >= repealed
+            and enacting_reach(cons) <= reach * MARKER_REACH)
+
+
 def parse_consolidation(vdir, celex, version, preamble=()):
     """One downloaded consolidation dir -> EurlexDoc: the consolidated text
     with `preamble` (the base act's own, see base_preamble) spliced in front,
@@ -465,14 +532,16 @@ def content_file(doc_dir, languages=LANG_PREFERENCE):
     return None, None, None
 
 
-def base_preamble_for(doc_dir, celex):
-    """The base act's own preamble blocks, parsed once for a whole history
-    -- every version artifact splices the same recitals in front, exactly as
-    the main artifact does."""
+def base_context_for(doc_dir, celex):
+    """`(preamble, enacting_reach)` of an act's base text, parsed once for a
+    whole history -- every version artifact splices the same recitals in front,
+    exactly as the main artifact does, and each version is measured against the
+    same reach to tell a wording from a repeal marker (`repeal_marker`)."""
     path, lang, route = content_file(doc_dir)
     if path is None:
-        return ()
-    return base_preamble(parse_content(path, route, celex, lang))
+        return (), 0
+    base = parse_content(path, route, celex, lang)
+    return base_preamble(base), enacting_reach(base)
 
 
 def parse_content(path, route, celex, lang):
@@ -597,7 +666,11 @@ def parse_dir(doc_dir, celex):
     # "Konsoliderad t.o.m." row are that fine print). The pre-2005 PDF-only
     # tail never swaps in; the base act's own preamble rides in front
     # (base_preamble); the superseded wordings become /konsolidering/ pages
-    # via the versions stage.
+    # via the versions stage. A wording the Publications Office dates from the
+    # act's repeal is skipped rather than served: it is the repeal marker, not
+    # a text (`repeal_marker`).
+    repealed = repeal_date(doc_dir, celex)
+    reach = enacting_reach(doc)
     for version, vdir in reversed(version_dirs(doc_dir)):
         try:
             cons = parse_consolidation(vdir, celex, version,
@@ -612,7 +685,7 @@ def parse_dir(doc_dir, celex):
             # be a parser bug and must surface, not silently serve the
             # 20-year-old base text corpus-wide.
             continue
-        if cons:
+        if cons and not repeal_marker(version, cons, reach, repealed):
             cons.version = None       # the latest is the document, not a lydelse
             doc = cons
             break
@@ -620,7 +693,6 @@ def parse_dir(doc_dir, celex):
             or RE_CORRIGENDUM.search(celex)):
         doc.date = notice_work_date(doc_dir) or doc.date
     art = to_artifact(doc)
-    repealed = notice_repeal_date(doc_dir) or revision_repeal_date(celex)
     if repealed:
         art["expired"] = repealed
     # what the act amends or carries out, off its notice. `andrar` is the key

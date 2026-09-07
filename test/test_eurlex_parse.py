@@ -9,10 +9,12 @@ from lxml import etree
 from ferenda.eurlex import parse as P
 from ferenda.eurlex.correspond import correspondence
 from ferenda.lib.cellar import notice_ttl
+from ferenda.eurlex.model import Block, EurlexDoc
 from ferenda.eurlex.parse import (
     UNCARRIED,
     content_file,
     doctype,
+    enacting_reach,
     notice_repeal_date,
     notice_work_date,
     parse_dir,
@@ -2002,3 +2004,131 @@ def test_a_quoted_bare_article_designation_is_read_as_a_heading():
         ("citat", "heading", "Artikel 9"),
         ("citat", "heading", "Befogenhet"),
     ]
+
+
+# --------------------------------------------------------------------------
+# the Publications Office's repeal marker, which is not a wording
+# --------------------------------------------------------------------------
+
+# a four-article act, and the one-article "wording" CELLAR dates from its repeal
+FOUR_ARTICLE_ACT = """<ACT>
+  <BIB.INSTANCE><DATE ISO="19951024">19951024</DATE>
+    <DOCUMENT.REF><COLL>L</COLL><NO.OJ>281</NO.OJ></DOCUMENT.REF></BIB.INSTANCE>
+  <TITLE><TI><P>Direktiv 95/46/EG av den
+    <DATE ISO="19951024">24 oktober 1995</DATE> om skydd f&#246;r enskilda
+    personer</P></TI></TITLE>
+  <PREAMBLE>
+    <GR.CONSID><CONSID><NP><NO.P>(1)</NO.P><TXT>Det f&#246;rsta
+      sk&#228;let.</TXT></NP></CONSID></GR.CONSID>
+  </PREAMBLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="001"><TI.ART>Artikel 1</TI.ART>
+      <ALINEA>Direktivets syfte.</ALINEA></ARTICLE>
+    <ARTICLE IDENTIFIER="002"><TI.ART>Artikel 2</TI.ART>
+      <ALINEA>Definitioner.</ALINEA></ARTICLE>
+    <ARTICLE IDENTIFIER="003"><TI.ART>Artikel 3</TI.ART>
+      <ALINEA>Till&#228;mpningsomr&#229;de.</ALINEA></ARTICLE>
+    <ARTICLE IDENTIFIER="004"><TI.ART>Artikel 4</TI.ART>
+      <ALINEA>Slutbest&#228;mmelse.</ALINEA></ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+MARKER_CONS_XML = """<CONS.ACT>
+  <INFO.CONSLEG CONSLEG.REF="1995L0046" START.DATE="20180525"
+     END.DATE="99999999" END="REPEALED" SOURCE.END="32016R0679" LEG.VAL="DIR"/>
+  <CONS.DOC>
+    <BIB.INSTANCE><DATE ISO="20180525">20180525</DATE></BIB.INSTANCE>
+    <FAM.COMP><BIB.DATA><NO.CELEX>31995L0046</NO.CELEX>
+      <DATE ISO="19951024">19951024</DATE>
+      <BIB.INSTANCE.CONS><DOCUMENT.REF.CONS><COLL>L</COLL>
+        <NO.OJ>281</NO.OJ></DOCUMENT.REF.CONS></BIB.INSTANCE.CONS>
+      <TITLE><TI><P>Direktiv 95/46/EG</P></TI></TITLE></BIB.DATA>
+      <GR.MOD.ACT><MOD.ACT TYPE="REP"><BIB.DATA>
+        <NO.CELEX>32016R0679</NO.CELEX></BIB.DATA></MOD.ACT></GR.MOD.ACT>
+    </FAM.COMP>
+    <TITLE><TI><P>Direktiv 95/46/EG</P></TI></TITLE>
+    <PREAMBLE><PREAMBLE.INIT/><PREAMBLE.FINAL/></PREAMBLE>
+    <ENACTING.TERMS>
+      <ARTICLE IDENTIFIER="001"><TI.ART>Artikel 1</TI.ART>
+        <ALINEA>Direktivets syfte.</ALINEA></ARTICLE>
+    </ENACTING.TERMS>
+  </CONS.DOC>
+</CONS.ACT>"""
+
+# CELLAR's own repeal metadata: out of force, with the day it stopped
+REPEALED_NOTICE = (
+    b'<x> <http://publications.europa.eu/ontology/cdm#'
+    b'resource_legal_in-force> "false" .\n'
+    b'<x> <http://publications.europa.eu/ontology/cdm#'
+    b'resource_legal_date_end-of-validity> "2018-05-24" .\n')
+
+
+def _repeal_marker_dir(tmp_path, cons_xml=MARKER_CONS_XML):
+    (tmp_path / "swe.fmx4").write_bytes(FOUR_ARTICLE_ACT.encode())
+    (tmp_path / "notice.ttl").write_bytes(REPEALED_NOTICE)
+    vdir = tmp_path / ".versions" / "2018-05-25"
+    vdir.mkdir(parents=True)
+    (vdir / "swe.fmx4").write_bytes(cons_xml.encode())
+    (vdir / "notice.ttl").write_bytes(CONS_NOTICE)
+    return tmp_path
+
+
+def test_a_repeal_marker_never_replaces_the_acts_text(tmp_path):
+    """CELLAR publishes one more "wording" for many repealed acts, starting the
+    day the repeal took effect and carrying a fragment of the text -- Article 1
+    of the data protection directive's 34, and nothing after it. Serving it cut
+    31995L0046 off after Article 1. The act keeps its own text instead."""
+    art = parse_dir(_repeal_marker_dir(tmp_path), "31995L0046")
+    assert "consolidation" not in art
+    assert art["expired"] == "2018-05-24"
+    labels = [b["label"] for b in flatten_structure(art["structure"])
+              if b["type"] == "article"]
+    assert labels == ["Artikel 1", "Artikel 2", "Artikel 3", "Artikel 4"]
+
+
+def test_a_post_repeal_wording_that_carries_the_act_still_serves(tmp_path):
+    """The date alone decides nothing: 1,546 post-repeal wordings on dev carry
+    the act's full text, and those are the right thing to serve. Only a wording
+    that also stops short of the act's own articles is a marker."""
+    art = parse_dir(_repeal_marker_dir(
+        tmp_path, MARKER_CONS_XML.replace(
+            "</ENACTING.TERMS>",
+            '<ARTICLE IDENTIFIER="002"><TI.ART>Artikel 2</TI.ART>'
+            "<ALINEA>Definitioner.</ALINEA></ARTICLE>"
+            '<ARTICLE IDENTIFIER="003"><TI.ART>Artikel 3</TI.ART>'
+            "<ALINEA>Konsoliderad text.</ALINEA></ARTICLE>"
+            "</ENACTING.TERMS>")), "31995L0046")
+    assert art["consolidation"]["date"] == "2018-05-25"
+    labels = [b["label"] for b in flatten_structure(art["structure"])
+              if b["type"] == "article"]
+    assert labels == ["Artikel 1", "Artikel 2", "Artikel 3"]
+
+
+def _doc_with_articles(*nums):
+    doc = EurlexDoc(celex="31995L0046", uri="", doctype="directive", lang="swe")
+    doc.body = [Block("article", "", num=n) for n in nums]
+    return doc
+
+
+def test_enacting_reach_stops_at_an_annexs_own_article_run():
+    """An annex restarts the numbering at Artikel 1; its articles are not the
+    act's, so the reach is the last article before that reset. A sub-numbered
+    article counts as its base number, and an act with no article at all
+    measures nothing."""
+    assert enacting_reach(_doc_with_articles("1", "2", "3", "1", "2")) == 3
+    assert enacting_reach(_doc_with_articles("1", "2", "28l")) == 28
+    assert enacting_reach(_doc_with_articles()) == 0
+
+
+def test_a_base_act_with_no_articles_marks_no_wording(tmp_path):
+    """`reach` is the yardstick. A base act the parser reads no article out of
+    measures nothing, so its consolidation still serves -- dropping it would
+    blame the repeal for a parse gap."""
+    art = parse_dir(_repeal_marker_dir(
+        tmp_path, cons_xml=MARKER_CONS_XML), "31995L0046")
+    assert "consolidation" not in art          # the four-article base act
+    (tmp_path / "swe.fmx4").write_bytes(
+        (FOUR_ARTICLE_ACT[:FOUR_ARTICLE_ACT.index("<ENACTING.TERMS>")]
+         + "<ENACTING.TERMS/></ACT>").encode())
+    art = parse_dir(tmp_path, "31995L0046")
+    assert art["consolidation"]["date"] == "2018-05-25"
