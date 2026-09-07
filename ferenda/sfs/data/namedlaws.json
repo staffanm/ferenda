@@ -301,8 +301,13 @@
   "1998:1276": {"spans": {
     "vinterdäckslagen": {"first": "K4P18a", "last": "K4P18a",
       "reason": "Vinterdäckslagen är inte ens en lag, utan trafikförordningens bestämmelse om vinterdäck (4 kap. 18 a §)."},
+    "bälteslagen": {"first": "K4P10a", "last": "K4P10d",
+      "reason": "Bälteslagen är inte ens en lag, utan trafikförordningens bestämmelse om när och hur bilbälte ska användas (4 kap. 10 - 10 d §§)."},
+    "bilbälteslagen": {"first": "K4P10a", "last": "K4P10d",
+      "reason": "Bilbälteslagen är inte ens en lag, utan trafikförordningens bestämmelse om när och hur bilbälte ska användas (4 kap. 10 - 10 d §§)."},
     "mobiltelefonlagen": {"first": "K4P10e", "last": "K4P10e",
-      "reason": "Mobiltelefonlagen syftar oftast på trafikförordningens förbud mot att hålla en mobiltelefon i handen vid bilkörning (4 kap. 10 e §). Namnet används även om skolans mobilförbud, se [5 kap. 4 § skollagen](sfs:2010:800#K5P4)."}}},
+      "reason": "Mobiltelefonlagen syftar oftast på trafikförordningens förbud mot att hålla en mobiltelefon i handen vid bilkörning (4 kap. 10 e §). Namnet används även om skolans mobilförbud, se [5 kap. 4 § skollagen](sfs:2010:800#K5P4)."}
+    }},
   "1999:175": {"label": "rättsinformationsförordningen"},
   "1999:355": {"label": "kasinolagen"},
   "1999:381": {"label": "sevesolagen"},
