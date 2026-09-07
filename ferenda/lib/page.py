@@ -39,7 +39,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from html import escape
-from urllib.parse import quote, urlsplit
+from urllib.parse import urlsplit
 
 from markupsafe import Markup
 
@@ -321,12 +321,18 @@ def _remiss_indexes():
 def _graphics_index():
     """{(document_uri, gap_key): entry} of publishable graphic crops.
 
-    The host URI is explicit layer metadata, so this horizontal reader neither
-    imports nor branches on an SFS vertical. `annstore.publishable` owns which
-    entries qualify, so this reader and the crop endpoint cannot disagree: a
-    model's guess stays out of the public render until the entry or the whole
-    layer is verified, while a mechanically derived layer needs no such review.
-    """
+    The host URI is explicit layer metadata, so this horizontal reader imports
+    no source module to find out whose page an entry belongs on. The layer
+    format itself is a statute one -- an entry names its provenance act in an
+    `sfs` key, and the crop is cut from that act's mirrored PDF -- so the
+    readers downstream (`_grafik_crop`, `render.write_graphics`) do address the
+    stored files under `sfs`. Widening that is a layer-format change, not a
+    branch to remove here.
+
+    `annstore.publishable` owns which entries qualify, so this reader and the
+    crop endpoint cannot disagree: a model's guess stays out of the public
+    render until the entry or the whole layer is verified, while a mechanically
+    derived layer needs no such review."""
     index = {}
     for path, meta, gap_key, entry in annstore.layer_entries(".graphics"):
         if not annstore.publishable(meta, entry):
@@ -1415,25 +1421,49 @@ def register_anchor(nr):
     return "L" + nr.replace(" ", "_")
 
 
-def _grafik_crop(entry, doc_uri, gap_key, alt):
-    """The `<img>` for one located graphic: the /api/v1/sfs-graphic crop of the
-    provenance-correct published PDF (geometry lives server-side in the layer,
-    so the src is just uri+node), lazily loaded. `v` hashes source, page and
-    bbox so every content-changing re-verification gets a fresh immutable URL --
-    and *both* render resolutions with them, because the response is cached
-    `immutable` for a year: raising either constant behind an unchanged URL
-    would reach nobody who had already loaded the page, and no CDN edge at all.
-    The large one belongs here too even though this URL is the thumbnail's: the
-    lightbox mints its own by appending `stor=1` to this very string, so one
-    identity selects both renders (`assets/grafik.js`)."""
+def grafik_version(entry):
+    """The geometry hash that names one crop's stored files: source act, page,
+    bbox and every render resolution the crop can be stored at. Re-verifying a
+    crop moves the rectangle, which must move the file name too -- a reader
+    holding the old picture in cache would otherwise keep it -- and raising a
+    DPI constant must do the same, for the same reason.
+
+    All three constants, not the two crop ones: a bbox-less entry *is* a whole
+    page, which `render.write_graphics` renders at the page resolution. Leaving
+    `DPI` out of the hash meant raising it left that file's name unchanged, so
+    the writer skipped it as current and the reader kept the old resolution for
+    good."""
     versioned = {"sfs": entry["sfs"], "page": entry["page"],
                  "bbox": entry.get("bbox"),
-                 "dpi": [facsimile.CROP_DPI, facsimile.CROP_DPI_LARGE]}
-    ver = hashlib.sha256(json.dumps(versioned, sort_keys=True).encode()).hexdigest()[:12]
-    src = "/api/v1/sfs-graphic?uri=%s&node=%s&v=%s" % (
-        quote(doc_uri, safe=""), quote(gap_key, safe=""),
-        quote(ver, safe=""))
-    return NODES.grafik_img(src, alt)
+                 "dpi": [facsimile.DPI, facsimile.CROP_DPI,
+                         facsimile.CROP_DPI_LARGE]}
+    return hashlib.sha256(
+        json.dumps(versioned, sort_keys=True).encode()).hexdigest()[:12]
+
+
+def _grafik_crop(entry, doc_uri, gap_key, alt):
+    """The `<img>` for one located graphic: the crop `generate` cut from the
+    provenance-correct published PDF and stored in the generated tree
+    (`render.write_graphics`), lazily loaded.
+
+    A plain site file, not an API call. The crops used to be served by
+    /api/v1/sfs-graphic, which renders on demand and so sits behind nginx's
+    host-wide 4 r/s crop budget -- and 2007:90 prints 325 signs on one page, so
+    a single reader's page view was answered 429 after the first burst. There
+    are 331 publishable crops in the whole corpus, so storing them costs a few
+    megabytes and turns every one of those requests into a plain file.
+
+    The large render is a second file rather than a query parameter: the
+    lightbox reads it off `data-full` (`assets/grafik.js`). An entry naming a
+    whole page has only one resolution -- there is no larger render of it to
+    ask for -- so it stores one file and the lightbox opens that same one."""
+    version = grafik_version(entry)
+    local = catalog.uri_local(doc_uri)
+
+    def src(large):
+        return "/" + layout.grafik_relpath("sfs", local, gap_key, version,
+                                           large=large)
+    return NODES.grafik_img(src(False), alt, src(bool(entry.get("bbox"))))
 
 
 def render_grafik(node, site, doc_uri):

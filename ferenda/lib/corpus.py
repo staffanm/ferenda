@@ -1134,6 +1134,11 @@ GENERATE_CODE = (PKG / "lib" / "page.py", PKG / "lib" / "margins.py",
                  # (render._write_inbound), so a change to what goes in one or
                  # how it is ordered has to re-stale the pages that carry it
                  PKG / "lib" / "inbound.py",
+                 # generate stores the located SFS graphics as site files
+                 # (render.write_graphics) and the pages link them by name --
+                 # a name that carries this module's two crop-DPI constants, so
+                 # raising one has to re-render every page that names a crop
+                 PKG / "lib" / "facsimile.py",
                  PKG / "api" / "app.py", PKG / "stats" / "charts.py",
                  # every page renderer: each source's own (`Source.render`),
                  # lib's site-assembly one, plus the editorial and statistics

@@ -20,9 +20,15 @@
   var box = null;         // the open overlay, or null
   var opener = null;      // the button that opened it, to return focus to
 
-  // the thumbnail's crop URL, asking for the full-size render of the same gap
-  function large(src) {
-    var url = new URL(src, location.href);
+  // Where the full-size render lives. `data-full` is the stored file the
+  // renderer names (lib/page._grafik_crop); a page generated before the crops
+  // became stored files carries no such attribute, and its thumbnail is still
+  // an /api/v1/sfs-graphic URL whose full-size render is the same URL with
+  // `stor=1`. Both shapes reach a picture, so the lightbox never opens on
+  // `undefined` between an assets deploy and the next full generate.
+  function fullSrc(button, thumb) {
+    if (button.dataset.full) return button.dataset.full;
+    var url = new URL(thumb, location.href);
     url.searchParams.set('stor', '1');
     return url.href;
   }
@@ -55,12 +61,11 @@
 
     var full = document.createElement('img');
     full.className = 'grafik-full';
-    // the same crop, re-rendered for this size: `stor=1` asks the endpoint for
-    // the full-size resolution rather than the thumbnail's. Stretching the
+    // the same crop at the full-size resolution (`fullSrc`). Stretching the
     // thumbnail instead would only blur it -- the graphic is vector art in the
     // PDF, so there is always more detail to render. `alt` is the vision pass's
     // or the road-sign scanner's own description, the only caption these have.
-    full.src = large(img.currentSrc || img.src);
+    full.src = fullSrc(button, img.currentSrc || img.src);
     full.alt = img.alt;
     box.appendChild(full);
 

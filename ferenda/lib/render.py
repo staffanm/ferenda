@@ -34,15 +34,18 @@ from . import (
     compress,
     datasets,
     facets,
+    facsimile,
     feeds,
     inbound,
     labels,
+    layout,
     util,
 )
 from .page import (
     BRAND,
     Site,
     doc_relpath,
+    grafik_version,
     href,
     page,
     page_context,
@@ -887,6 +890,14 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     util.checking(label)
     deps = (catalog.page_dependency_digests_for(con, [r[0] for r in rows])
             if only is not None else catalog.page_dependency_digests(con))
+    # the graphic crops the pages link. Written before any page is rendered, so
+    # a page and the files it names appear together; corpus-wide even under a
+    # scope, since there are 331 of them in all and the check is one stat each
+    # (write_graphics)
+    stored, dropped = write_graphics(out_root, site.graphics)
+    if stored or dropped:
+        print("generate: stored %d graphic crop(s), dropped %d superseded -> %s"
+              % (stored, dropped, out_root / layout.GRAFIK))
     # cross-document content (kommentar prose/.ann, remiss .ann, .corr rows)
     # renders onto OTHER documents' pages -- fold a per-host content digest into
     # the dependency digest so editing it re-renders the host page
@@ -1088,6 +1099,76 @@ def _bundled_script():
     return "\n".join("/* === %s === */\n%s" % (name,
                      (ASSETS / name).read_text(encoding="utf-8"))
                      for name in SCRIPT_FILES)
+
+
+def write_graphics(out_root, graphics):
+    """Store every publishable graphic crop as a file in the generated tree, at
+    each render resolution it has, and drop the files no current entry names.
+    Returns `(written, removed)`.
+
+    The crops used to be served only by ``/api/v1/sfs-graphic``, which cuts them
+    out of the published PDF on demand. That put them behind nginx's crop rate
+    limit -- 4 r/s across the whole host, because an on-demand render is the one
+    expensive thing the server does -- and 2007:90 prints 325 road signs on one
+    page, so one reader loading that page was answered 429 after the first
+    burst. The corpus holds 331 publishable crops in all -- 325 on that one page
+    and 6 in SFS 2004:629, the two statutes whose layers are signed off; the
+    other 24 layers hold only unreviewed entries, which render as a placeholder
+    and store nothing. So cutting them once at generate and letting the reader
+    fetch plain files costs a few megabytes of disk and takes the rate limit out
+    of the reading path entirely.
+
+    Written once and then only when they change: the file name carries the
+    geometry hash (`layout.grafik_relpath`), so a crop already on disk under
+    its current name is left alone and a re-verified one lands on a fresh name.
+    That is also why the sweep at the end is not optional -- a re-verified crop
+    would otherwise leave its old picture on disk, served at its own URL for
+    ever, and so would an entry an editor withdrew (`compress.remove`: a derived
+    tree is only as trustworthy as its deletions). The index is corpus-wide
+    whatever scope the caller renders (`page._graphics_index` reads every
+    layer), so the sweep sees every entry that should survive it.
+
+    The provenance PDF must be mirrored -- a human verified this crop against
+    it, so its absence is a broken corpus, not a page to render without the
+    picture (rule:fail-fast)."""
+    out_root = Path(out_root)
+    written, keep = 0, set()
+    for (doc_uri, gap_key), entry in sorted(graphics.items()):
+        local = catalog.uri_local(doc_uri)
+        where = "%s/%s" % (local, gap_key)
+        version = grafik_version(entry)
+        src_sfs, page_no, bbox = facsimile.graphics_region(entry, where)
+        pdf = layout.sfs_pdf(src_sfs)
+        assert pdf.exists(), \
+            "%s: SFS %s is not in the PDF mirror, so its verified crop " \
+            "cannot be cut" % (where, src_sfs)
+        # an entry naming a whole page has ONE resolution -- there is no larger
+        # render of it to ask for, exactly as the crop endpoint has always had
+        # it -- so it stores one file and the lightbox opens that same file
+        for large in ((False, True) if bbox else (False,)):
+            rel = layout.grafik_relpath("sfs", local, gap_key, version,
+                                        large=large)
+            keep.add(rel)
+            out = out_root / rel
+            if out.exists():
+                continue
+            # a whole page has exactly one resolution, the reading view's;
+            # only a crop carries the two the file name distinguishes
+            cut = facsimile.cached(
+                "sfs", src_sfs, pdf, page_no, bbox, may_render=True,
+                dpi=((facsimile.CROP_DPI_LARGE if large else facsimile.CROP_DPI)
+                     if bbox else facsimile.DPI))
+            out.parent.mkdir(parents=True, exist_ok=True)
+            # PNG is already compressed, so it is stored plain -- the same rule
+            # write_assets applies to the icons
+            compress.write_bytes(out, cut.read_bytes(), encodings=())
+            written += 1
+    removed = 0
+    for stored in sorted((out_root / layout.GRAFIK).rglob("*.png")):
+        if str(stored.relative_to(out_root)) not in keep:
+            compress.remove(stored)
+            removed += 1
+    return written, removed
 
 
 def write_assets(out_root):

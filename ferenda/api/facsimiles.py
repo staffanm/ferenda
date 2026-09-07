@@ -39,7 +39,7 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from ..lib import annstore, catalog, compress, facsimile, layout, regeringen
-from ..lib.util import basefile_slug
+from ..lib.util import basefile_slug, confine
 from . import db
 
 # immutable: the PDF a facsimile renders from never changes in place (a
@@ -212,12 +212,11 @@ def _rs_pdf(local):
 
 # an SFS: a bare "<year>:<löpnr>" ("2002:780"), no source prefix -- the
 # officially published PDF the mirror fetched (pdfmirror), facsimile source for
-# both a full published page and a sfs-graphic crop
-_RE_SFS_BASEFILE = re.compile(r"^\d{4}:\d+[a-z]?$")
-
-
+# both a full published page and a sfs-graphic crop. The grammar itself lives in
+# `lib/facsimile`, which validates a .graphics entry's provenance act with it
+# (rule:second-use-goes-to-lib): one shape, one home, no drift.
 def _sfs_pdf(local):
-    if not _RE_SFS_BASEFILE.match(local):
+    if not facsimile.RE_SFS_BASEFILE.match(local):
         return None
     pdf = layout.sfs_pdf(local)
     return ("sfs", local, pdf) if pdf.exists() else None
@@ -291,7 +290,7 @@ def sfs_source_pdf(src: str) -> Path:
 def sfs_graphic_path(local, node, dpi, *, may_render):
     """The cropped PNG for gap `node` of the SFS at uri-local `local`, its page,
     bbox and source PDF read from the statute's .graphics layer."""
-    if ".." in local or not _RE_SFS_BASEFILE.match(local):
+    if ".." in local or not facsimile.RE_SFS_BASEFILE.match(local):
         raise HTTPException(404, "not an SFS document: %r" % local)
     layer = annstore.path("sfs", local, ".graphics")
     if not layer.exists():
@@ -303,14 +302,7 @@ def sfs_graphic_path(local, node, dpi, *, may_render):
     if not annstore.publishable(content.get("meta", {}), entry):
         raise HTTPException(404, "graphic %r in %r is not verified" % (node, local))
     # the amending SFS whose published PDF carries the region (provenance)
-    src, page, bbox = entry["sfs"], entry["page"], entry.get("bbox")
-    assert isinstance(src, str) and _RE_SFS_BASEFILE.fullmatch(src), \
-        "%s/%s: invalid graphics source %r" % (local, node, src)
-    assert isinstance(page, int) and not isinstance(page, bool) and page > 0, \
-        "%s/%s: invalid graphics page %r" % (local, node, page)
-    if bbox is not None:
-        assert facsimile.valid_bbox(bbox), \
-            "%s/%s: invalid graphics bbox %r" % (local, node, bbox)
+    src, page, bbox = facsimile.graphics_region(entry, "%s/%s" % (local, node))
     pdf = sfs_source_pdf(src)
     # an entry with no bbox *is* the whole page, which has one resolution: there
     # is no larger render to ask for, so `stor` cannot apply to it
@@ -341,7 +333,12 @@ def sfs_graphic_response(local, node, dpi, *, may_render):
 # records every failure and `pdf.render_document` then refuses the degraded
 # PDF, so a renderer that starts emitting a new subresource fails loudly here
 # instead of silently printing a page with a hole in it.
+#
+# A statute's graphics are now stored files under `/grafik/`, which the page
+# links directly (render.write_graphics); the crop endpoint stays here because
+# a page rendered before that change still names it.
 _SUBRESOURCE_PATHS = ("/api/v1/facsimile", "/api/v1/sfs-graphic")
+_GRAFIK_PREFIX = "/%s/" % layout.GRAFIK
 
 
 def subresource(path_qs):
@@ -365,6 +362,15 @@ def subresource(path_qs):
     with a Retry-After. That is a far tighter ceiling than the 40-thread pool
     the gate exists to protect."""
     url = urlsplit(path_qs)
+    if url.path.startswith(_GRAFIK_PREFIX):
+        # a stored crop: a plain file in the generated tree, read where it lies.
+        # The path is joined onto a tree root, so it is confined exactly as the
+        # facsimile resolvers confine a basefile -- this dispatcher answers
+        # whatever the rendered HTML asked for, and "our own renderer wrote it"
+        # is not a check (rule:fail-fast).
+        rel = url.path.lstrip("/")
+        return compress.read_bytes(
+            layout.GENERATED / confine(Path(rel), rel, "grafik")), "image/png"
     if url.path not in _SUBRESOURCE_PATHS:
         raise ValueError("no subresource at %s" % url.path)
     query = parse_qs(url.query)

@@ -90,10 +90,14 @@ its own keys and its own provenance-correct source PDF. Generated candidates
 are not publicly rendered until
 their entry (or whole layer) is verified — by hand, or by a logged-in editor at
 `GET /internal-api/v1/graphics/review` (see "Reviewing `.graphics` crops" below).
-`GET /api/v1/sfs-graphic?uri=&node=` serves the
-crop (`lib/facsimile.py`'s `cached` with a `bbox`) lazily from the
-provenance-correct PDF; the renderer shows the crop where the layer has placed
-one — captioned "Karta ur SFS X", linked to the amendment's `#L{nr}` register
+`generate` cuts every publishable crop out of the
+provenance-correct PDF (`lib/render.py`'s `write_graphics`, over
+`lib/facsimile.py`'s `cached` with a `bbox`) and stores it as a site file under
+`/grafik/<source>/<relpath>/<gap>-<hash>.png`, at both render resolutions, so a
+page of 325 road signs costs the reader plain files instead of 325 calls to a
+rate-limited endpoint. `GET /api/v1/sfs-graphic?uri=&node=` still renders one on
+demand for a page built before that change. The renderer shows the crop where
+the layer has placed one — captioned "Karta ur SFS X", linked to the amendment's `#L{nr}` register
 entry on the same page — an honest placeholder otherwise, and prints each
 temporal variant's entry-into-force state as a subdued slash-delimited
 marker (`/Träder i kraft: den dag som regeringen bestämmer/`).

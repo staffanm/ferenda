@@ -41,13 +41,15 @@
 {#- the image column on a row that has no sign of its own (the header row) -#}
 <td class="grafik"></td>
 {%- endmacro -%}
-{%- macro grafik_img(src, alt) -%}
+{%- macro grafik_img(src, alt, full) -%}
 {#- every extracted graphic opens full size in the lightbox (grafik.js), so the
     crop is a real button: an <img> with a click handler is unreachable by
     keyboard, and these are printed at a size that hides their detail. The
     button carries no chrome of its own -- it looks exactly like the image -- and
-    prints as one, which is why it is not in style.css's print-hidden list. -#}
-<button type="button" class="grafik-open" aria-label="Visa i full storlek: {{ alt }}"><img class="grafik-img" src="{{ src }}" alt="{{ alt }}" loading="lazy"></button>
+    prints as one, which is why it is not in style.css's print-hidden list.
+    `data-full` is the lightbox's own file: both renders are stored as site
+    files, so the large one has a name rather than a query parameter. -#}
+<button type="button" class="grafik-open" aria-label="Visa i full storlek: {{ alt }}" data-full="{{ full }}"><img class="grafik-img" src="{{ src }}" alt="{{ alt }}" loading="lazy"></button>
 {%- endmacro -%}
 {%- macro grafik_figure(nid, img, label, anchor, sfs) -%}
 {#- the attribution links to the amending act's entry in this document's own

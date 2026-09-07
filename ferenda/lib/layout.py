@@ -732,6 +732,31 @@ def pdf_conversion(pdf_path, kind):
     return PDFCONV / rel.with_suffix(".%s.br" % kind)
 
 
+# the generated tree's own copies of the located SFS graphics. A statute of road
+# signs prints 325 of them, and asking an API route for each cost the reader 325
+# requests through nginx's crop rate limit -- 4 r/s host-wide, so a single page
+# view 429'd after the first burst. `generate` renders them once and stores them
+# here, and the page links them as plain site files.
+GRAFIK = "grafik"
+
+
+def grafik_relpath(source: str, basefile: str, gap: str, version: str,
+                   large: bool = False) -> str:
+    """One stored graphic crop's path inside the generated tree:
+    ``grafik/<source>/<relpath>/<gap>-<version>[-stor].png``. The version is the
+    geometry hash the renderer mints (`page.grafik_version`), so a re-verified
+    crop lands on a fresh name and no reader is served the old one from cache;
+    `large` names the lightbox's higher-resolution render of the same crop.
+
+    `gap` is a key out of a hand-edited `.graphics` layer and goes into the path
+    verbatim, so it is confined like a basefile (`util.confine`): every one of
+    the 372 live entries is a `g-<hex>` key, and a slash or a `..` in one would
+    otherwise write the crop outside the tree it is served from."""
+    name = "%s-%s%s.png" % (gap, version, "-stor" if large else "")
+    confine(Path(name), gap, "grafik")
+    return "%s/%s/%s/%s" % (GRAFIK, source, relpath(source, basefile), name)
+
+
 def facsimile(source: str, basefile: str, page: int) -> Path:
     """The cached facsimile PNG of one source-PDF page:
     ``cache/facsimile/<source>/<relpath>/sid<N>.png``."""

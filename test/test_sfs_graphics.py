@@ -688,9 +688,14 @@ def test_render_grafik_figure_when_localized():
     html = page.render_grafik(
         node, _site({(DOC_URI, "g-formula"): entry}), DOC_URI)
     assert '<figure class="grafik" data-grafik="g-formula">' in html
-    # crop url = uri + node + a cache-buster derived from the bbox; & escaped
-    assert "/api/v1/sfs-graphic?uri=https%3A%2F%2Flagen.nu%2F2002%3A780" in html
-    assert "node=g-formula" in html and "&amp;v=" in html
+    # the crop is a stored site file named by the statute, the gap and the
+    # geometry hash -- not an API call, which nginx rate-limits (write_graphics)
+    version = page.grafik_version(entry)
+    assert 'src="/grafik/sfs/2002/780/g-formula-%s.png"' % version in html
+    # the lightbox's own file, at the higher render resolution
+    assert 'data-full="/grafik/sfs/2002/780/g-formula-%s-stor.png"' % version \
+        in html
+    assert "/api/v1/sfs-graphic" not in html
     assert 'alt="Formel för balanstalet"' in html
     # attribution names the *source* (provenance) SFS, linked to its entry in
     # the viewed statute's own amendment register, not its standalone page

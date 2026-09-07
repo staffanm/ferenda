@@ -100,6 +100,8 @@ a graphics decision and a markdown edit share the same machinery). Checkout
 regenerates only the host statute's page — a reviewed entry needs no reparse or
 relate, since the layer is read at generate time
 (`page._graphics_index`) — via `build.rebuild_after_commit`'s `graphics`
-branch. The page/crop routes deliberately bypass `annstore.publishable` for a
-logged-in editor, since an editor has to see an unreviewed crop to judge it;
-the public `GET /api/v1/sfs-graphic` still 404s it.
+branch. That regenerate is also what stores the approved crop as a site file
+under `/grafik/` (`render.write_graphics`); until then no public page links it.
+The page/crop routes deliberately bypass `annstore.publishable` for a logged-in
+editor, since an editor has to see an unreviewed crop to judge it; the public
+`GET /api/v1/sfs-graphic` still 404s it.

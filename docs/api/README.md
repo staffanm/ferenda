@@ -389,10 +389,15 @@ PDF carries. `node` is the gap's stable key (the `data-grafik` value on the
 rendered page). The crop is cut from the PDF of the amendment that last set that
 wording, not from the viewed statute's own PDF, per the reviewed `.graphics`
 layer; a gap nobody has signed off on is a `404`. Two resolutions: the default
-is the inline thumbnail, `stor=1` the full-size render — a page of 325 road
-signs asks for hundreds of the first and one of the second. Same render gate
-as `/api/v1/facsimile`: a cached crop is served to any caller, an uncached one
-only to a request from a lagen.nu page.
+is the inline thumbnail, `stor=1` the full-size render. Same render gate as
+`/api/v1/facsimile`: a cached crop is served to any caller, an uncached one only
+to a request from a lagen.nu page.
+
+The generated pages no longer call this route. `generate` stores every
+publishable crop as a site file (`/grafik/…`) at both resolutions, because a
+statute of 325 road signs asked for 325 crops in one page view and nginx's
+host-wide crop budget answered the excess `429`. The route remains for a page
+built before that change.
 
 **Original verdict PDF — `GET /api/v1/dv-verdict?court=…&id=…&file=…`** — the
 PDF a decision was first served as, before its NJA referat was published. The

@@ -3,6 +3,7 @@ the API endpoint in both its documented and legacy-path forms."""
 
 import json
 import os
+import re
 import threading
 import time
 import types
@@ -15,7 +16,8 @@ from fastapi.testclient import TestClient
 from ferenda import config
 from ferenda.api import app as api
 from ferenda.api import facsimiles
-from ferenda.lib import annstore, compress, facsimile, layout
+from ferenda.lib import annstore, compress, facsimile, layout, page, render
+from ferenda.lib.page import grafik_version
 
 # a minimal one-page A4 PDF poppler accepts (blank page)
 MINI_PDF = (b"%PDF-1.4\n"
@@ -555,3 +557,93 @@ def test_the_cache_sweep_never_runs_on_the_caller_s_thread(tmp_path,
     facsimile._evict_if_low()
     assert swept.wait(5), "the sweep never ran"
     assert seen and seen[0] is not caller
+
+
+# ---- the crops generate stores as site files -------------------------------
+
+def test_write_graphics_stores_both_renders_and_skips_the_second_run(corpus,
+                                                                     tmp_path):
+    """`generate` cuts every publishable crop once and stores it in the
+    generated tree, so a page of road signs costs the reader plain files rather
+    than hundreds of calls to the rate-limited crop endpoint."""
+    entry = {"sfs": "2021:734", "page": 1, "bbox": [72, 72, 300, 200]}
+    index = {("https://lagen.nu/2002:780", "G1"): entry}
+    out = tmp_path / "generated"
+    assert render.write_graphics(out, index) == (2, 0)
+    version = grafik_version(entry)
+    small = out / ("grafik/sfs/2002/780/G1-%s.png" % version)
+    large = out / ("grafik/sfs/2002/780/G1-%s-stor.png" % version)
+    assert small.read_bytes()[:4] == PNG_MAGIC
+    assert large.read_bytes()[:4] == PNG_MAGIC
+    assert facsimile.png_size(large.read_bytes())[0] \
+        > facsimile.png_size(small.read_bytes())[0]
+    # a second run writes nothing: the name carries the geometry, so a crop
+    # already on disk under its current name is the current crop
+    assert render.write_graphics(out, index) == (0, 0)
+
+
+def test_write_graphics_stores_one_file_for_a_whole_page_entry(corpus,
+                                                               tmp_path):
+    """An entry naming a whole page has one resolution -- there is no larger
+    render of it to ask for -- so it stores one file and the page's lightbox
+    opens that same one."""
+    entry = {"sfs": "2021:734", "page": 1}
+    out = tmp_path / "generated"
+    assert render.write_graphics(
+        out, {("https://lagen.nu/2002:780", "G2"): entry}) == (1, 0)
+    version = grafik_version(entry)
+    assert (out / ("grafik/sfs/2002/780/G2-%s.png" % version)).exists()
+    assert not (out / ("grafik/sfs/2002/780/G2-%s-stor.png" % version)).exists()
+    html = page.render_grafik(
+        {"type": "grafik", "id": "G2", "key": "G2", "sort": "karta"},
+        page.Site(None, set(), graphics={("https://lagen.nu/2002:780", "G2"):
+                                         entry}),
+        "https://lagen.nu/2002:780")
+    assert 'data-full="/grafik/sfs/2002/780/G2-%s.png"' % version in html
+
+
+def test_write_graphics_drops_a_crop_no_entry_names_any_more(corpus, tmp_path):
+    """A re-verified crop lands on a fresh name and a withdrawn one names no
+    file at all -- so the sweep is what keeps a reader from fetching the
+    picture the editor replaced."""
+    out = tmp_path / "generated"
+    entry = {"sfs": "2021:734", "page": 1, "bbox": [72, 72, 300, 200]}
+    render.write_graphics(out, {("https://lagen.nu/2002:780", "G1"): entry})
+    moved = dict(entry, bbox=[73, 72, 300, 200])
+    assert render.write_graphics(
+        out, {("https://lagen.nu/2002:780", "G1"): moved}) == (2, 2)
+    assert {p.name for p in (out / "grafik/sfs/2002/780").glob("*.png")} == {
+        "G1-%s.png" % grafik_version(moved),
+        "G1-%s-stor.png" % grafik_version(moved)}
+    assert render.write_graphics(out, {}) == (0, 2)
+
+
+def test_the_pdf_export_reads_a_stored_crop_off_the_generated_tree(corpus,
+                                                                   tmp_path,
+                                                                   monkeypatch):
+    """WeasyPrint asks `facsimiles.subresource` for every image the page names,
+    and `pdf.render_document` refuses the whole export when one fails -- so the
+    href the renderer emits and the file the writer stores have to be the same
+    string."""
+    monkeypatch.setattr(layout, "GENERATED", tmp_path / "generated")
+    entry = {"sfs": "2021:734", "page": 1, "bbox": [72, 72, 300, 200]}
+    render.write_graphics(layout.GENERATED,
+                          {("https://lagen.nu/2002:780", "G1"): entry})
+    html = page.render_grafik(
+        {"type": "grafik", "id": "G1", "key": "G1", "sort": "formel"},
+        page.Site(None, set(), graphics={("https://lagen.nu/2002:780", "G1"):
+                                         entry}),
+        "https://lagen.nu/2002:780")
+    href = re.search(r'src="([^"]+)"', html).group(1)
+    data, content_type = facsimiles.subresource(href)
+    assert content_type == "image/png" and data[:4] == PNG_MAGIC
+
+
+def test_write_graphics_refuses_a_crop_whose_source_is_not_mirrored(corpus,
+                                                                    tmp_path):
+    """A human verified this crop against the published PDF, so the PDF missing
+    is a broken corpus, not a page to render without the picture."""
+    index = {("https://lagen.nu/2002:780", "G9"):
+             {"sfs": "2099:1", "page": 1, "bbox": [0, 0, 10, 10]}}
+    with pytest.raises(AssertionError, match="not in the PDF mirror"):
+        render.write_graphics(tmp_path / "generated", index)

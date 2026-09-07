@@ -50,7 +50,10 @@ DPI = 150
 # a reader pays for what they scroll past. Anything sharper belongs behind a
 # click, not on the page.
 CROP_DPI = 2 * DPI
-# What the lightbox asks for (the sfs-graphic endpoint's `stor=1`). The page
+# What the lightbox shows: the `-stor.png` file `render.write_graphics` stores
+# beside the thumbnail (and, for a page generated before the crops became stored
+# files, the sfs-graphic endpoint's `stor=1`, which the crop-review UI also
+# uses). The page
 # weight above is why this is a second render and not the inline one: it is one
 # request for the graphic the reader actually opened, where CROP_DPI is paid
 # hundreds of times over. Rendering rather than upscaling is what keeps it
@@ -79,6 +82,33 @@ class OffPage(ValueError):
     of the query string this is client input and the route answers 400; for one
     read off a stored .graphics layer or artifact it is a corpus fault and must
     fail loudly."""
+
+
+# a bare SFS number ("2007:90", "1949:105 s.1"'s löpnr letter included) -- the
+# form a .graphics entry names its provenance act by, and the form the API's
+# facsimile resolvers read an SFS document id in. One grammar, one home.
+RE_SFS_BASEFILE = re.compile(r"^\d{4}:\d+[a-z]?$")
+
+
+def graphics_region(entry, where):
+    """The `(sfs, page, bbox)` of one `.graphics` layer entry, checked.
+
+    The layer is hand-edited data, and two readers cut a crop from it -- the
+    `sfs-graphic` endpoint and `generate`'s own stored-crop writer -- so the
+    shape check lives here rather than in either of them: a mistyped bbox that
+    the route refuses must not reach poppler from the build instead
+    (rule:second-use-goes-to-lib). `where` names the entry in the message.
+
+    An `assert`: both callers read an entry a human verified, so a bad one is a
+    corpus fault, not input to answer 4xx for (rule:fail-fast)."""
+    src, page, bbox = entry["sfs"], entry["page"], entry.get("bbox")
+    assert isinstance(src, str) and RE_SFS_BASEFILE.fullmatch(src), \
+        "%s: invalid graphics source %r" % (where, src)
+    assert isinstance(page, int) and not isinstance(page, bool) and page > 0, \
+        "%s: invalid graphics page %r" % (where, page)
+    assert bbox is None or valid_bbox(bbox), \
+        "%s: invalid graphics bbox %r" % (where, bbox)
+    return src, page, bbox
 
 
 def _pdfinfo(pdf_path, *args):
