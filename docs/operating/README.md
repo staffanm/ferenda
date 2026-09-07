@@ -455,6 +455,31 @@ that do something meaningful only for that source. For example, `lagen sfs
 versions` builds a statute's historical consolidations.
 Run `lagen <source> --help` to see what a given source offers.
 
+### A forarbete listing item that names no number
+
+regeringen.se lists the odd document under its title alone — prop. 2025/26:223
+is "En ny konsumentkreditlag" and nothing else. `forarbete download` carries
+such an item on with no basefile and reads its number off the landing page
+instead (the vignette, then the text of the links to the document files), so
+that document is harvested rather than silently skipped.
+
+One consequence reaches `--only`. The walk cannot match an unnamed item
+against the basefile you asked for without resolving it first, so
+`lagen forarbete download prop --only 2025/26:223` also **stores** every unnamed
+item it passes on the way down the listing. Those are documents the corpus
+wants, but they are not the one you named.
+
+An item that names no number **anywhere** is rejected. That is the ordinary
+case for the kommittédirektiv index, which also holds regeringsuppdrag: 34 of
+the newest 400 items (8.5%) carry no `Dir.` number at all. Nothing on disk
+records a rejection, so each of those costs one landing-page GET on every run,
+and each one resets the watermark's consecutive-hit stop — the walk then runs
+to its date boundary instead of stopping after 20 known documents. Measured
+2026-09-07 over the newest 400 items per type: prop 4 (1.0%), sou 1 (0.2%),
+skr 14 (3.5%), fm 0, dir 34 (8.5%). If that cost ever matters, the fix is a
+rejected-items index like the one `remisser` keeps (`layout.REMISSER_SEEN`),
+not a tighter identity guess.
+
 One recurring family is the **`ai-*` actions**. Any action whose name starts
 with `ai-` works on a *single specified document* within a source (`sfs
 ai-hierarki` is the exception: it takes a lag basefile but works over that

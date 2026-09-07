@@ -95,21 +95,92 @@ def landing_vignette(html):
     return span.get_text(strip=True) if span else None
 
 
+# regeringen.se prints a document's own number however the editor typed it. The
+# house style is "Prop. 2025/26:294", but the same listings carry "prop.
+# 2025/26:50", "Prop 2025/26:169", "Skr.2025/26:115", "Prop.  2025/26:7" and
+# "Fm. 2016:1". Measured over the newest 400 items of each numbered type on
+# 2026-09-07, the strict "Prop. <number>" shape missed 17 propositioner, 38
+# skrivelser, 39 kommittedirektiv and 1 forordningsmotiv -- and forarbete held
+# none of them. So the series word is matched without regard to case, its period
+# is optional, and the space between word and number is any run of whitespace or
+# none.
+def _numbered(word, number):
+    return r"(?i:\b%s)\s*\.?\s*(%s)" % (word, number)
+
+
+# a riksmote number ("2025/26:223") and a year number ("2026:34"). The second
+# half of a riksmote takes 2 to 4 digits because regeringen.se writes the long
+# form too -- prop. 2025/26:223 is published as "Prop. 2025/2026:223", which
+# `riksmote` folds back to the printed short form.
+RIKSMOTE = r"\d{4}/\d{2,4}:\d+"
+ARSNUMMER = r"\d{4}:\d+"
+
+
 # type -> (url segment, taxonomy category id, identifier regex over the listing
 # link text). A None regex marks a type regeringen.se publishes without a
 # number; its basefile is derived from the landing page instead (see
 # forarbete.download).
 TYPES = {
-    "prop": ("proposition", 1329, r"Prop\. (\d{4}/\d{2,4}:\d+)"),
-    "sou": ("statens-offentliga-utredningar", 1331, r"SOU (\d{4}:\d+)"),
-    "ds": ("departementsserien-och-promemorior", 1325, r"Ds (\d{4}:\d+)"),
+    "prop": ("proposition", 1329, _numbered("prop", RIKSMOTE)),
+    "sou": ("statens-offentliga-utredningar", 1331, _numbered("sou", ARSNUMMER)),
+    "ds": ("departementsserien-och-promemorior", 1325, _numbered("ds", ARSNUMMER)),
     "pm": ("departementsserien-och-promemorior", 1325, None),
-    "dir": ("kommittedirektiv", 1327, r"Dir\. (\d{4}:\d+)"),
-    "fm": ("forordningsmotiv", 1326, r"Fm (\d{4}:\d+)"),
-    "skr": ("skrivelse", 1330, r"Skr\. (\d{4}/\d{2,4}:\d+)"),
+    "dir": ("kommittedirektiv", 1327, _numbered("dir", ARSNUMMER)),
+    "fm": ("forordningsmotiv", 1326, _numbered("fm", ARSNUMMER)),
+    "skr": ("skrivelse", 1330, _numbered("skr", RIKSMOTE)),
     "so": ("sveriges-internationella-overenskommelser", 1332, None),
     "lr": ("lagradsremiss", 2085, None),
 }
+
+# the types that share their taxonomy category with a sibling, and so partition
+# it between them: ds takes the items numbered "Ds YYYY:N", pm takes the rest.
+# An item of such a type that carries no number is the sibling's document, not
+# a document whose number has to be recovered from somewhere else.
+SHARED_CATEGORY = frozenset(
+    t for t, (_s, category, _i) in TYPES.items()
+    if sum(1 for _s2, c2, _i2 in TYPES.values() if c2 == category) > 1)
+
+# how the corpus prints each numbered series, whatever the page did. The
+# identifier is a document's display form ("Prop. 2025/26:223"), so it is minted
+# from the series and the normalized number rather than kept as regeringen.se
+# typed it -- prop. 2025/26:223's own page calls it "Prop. 2025/2026:223".
+SERIES_LABEL = {"prop": "Prop.", "sou": "SOU", "ds": "Ds", "dir": "Dir.",
+                "fm": "Fm", "skr": "Skr."}
+assert SERIES_LABEL.keys() == {t for t, (_s, _c, i) in TYPES.items() if i}, \
+    "every numbered type needs a printed series label"
+
+_RE_RIKSMOTE = re.compile(r"^(\d{4})/(\d{2,4}):(\d+)$")
+
+
+def riksmote(number):
+    """A riksmote number in the form the corpus keys on: "2025/2026:223" ->
+    "2025/26:223", the printed short form. Any other shape passes through."""
+    m = _RE_RIKSMOTE.match(number)
+    return ("%s/%s:%s" % (m.group(1), m.group(2)[-2:], m.group(3))
+            if m else number)
+
+
+def find_number(typ, text, anchored=False):
+    """The document's own printed number in `text`, as
+    ``(basefile, identifier, match)``, or None when `typ` is numberless or the
+    text carries no number of its series.
+
+    `basefile` is normalized (`riksmote`); `identifier` is the document's
+    display form, minted from `SERIES_LABEL` and that basefile rather than kept
+    as the page typed it; `match` locates the number in `text`, so a caller can
+    cut it out of a link text and keep the title.
+
+    `anchored` requires the number to open the text -- what remisser reads a
+    link's own label with, where a series named later is a reference rather than
+    the document's identity."""
+    pattern = TYPES[typ][2]
+    if pattern is None:
+        return None
+    hit = (re.match(pattern, text) if anchored else re.search(pattern, text))
+    if hit is None:
+        return None
+    basefile = riksmote(hit.group(1))
+    return basefile, "%s %s" % (SERIES_LABEL[typ], basefile), hit
 
 
 # the trailing ", Lagrådsremiss" a lagrådsremiss title carries is stripped

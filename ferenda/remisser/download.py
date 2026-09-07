@@ -60,6 +60,7 @@ from ..lib.net import BROWSER_UA, make_session, request
 from ..lib.regeringen import (
     BASE,
     TYPES,
+    find_number,
     listing_items,
     lr_identity,
     pm_identity,
@@ -285,9 +286,9 @@ def _match_forarbete(href, text, dnr):
             continue
         numbered = bool(idre)
         if idre:
-            hit = re.search(idre, text)
+            hit = find_number(typ, text)
             if hit:
-                return {"typ": typ, "basefile": hit.group(1)}
+                return {"typ": typ, "basefile": hit[0]}
             number = slug_number(typ, _landing_slug(href))
             if number:
                 return {"typ": typ, "basefile": number}
@@ -331,9 +332,9 @@ def _title_forarbete(title, anchored=False):
     "Tilläggsdirektiv … (SOU 2015:51)" outrank the direktiv it actually names."""
     for typ, (_segment, _category, idre) in TYPES.items():
         if idre:
-            hit = (re.match(idre, title) if anchored else re.search(idre, title))
+            hit = find_number(typ, title, anchored=anchored)
             if hit:
-                return {"typ": typ, "basefile": hit.group(1)}
+                return {"typ": typ, "basefile": hit[0]}
     return None
 
 

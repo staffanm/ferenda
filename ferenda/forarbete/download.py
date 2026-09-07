@@ -62,7 +62,9 @@ from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
 from ..lib.regeringen import (
     BASE,
+    SHARED_CATEGORY,
     TYPES,
+    find_number,
     is_misleading,
     landing_vignette,
     listing_items,
@@ -116,24 +118,40 @@ SO_OWN = re.compile(r"SÖ\s*(\d{4}:\d+)\s*$")
 SO_VIGNETTE = re.compile(r"(\d{4}:\d+)")
 def resolve_identity(typ, item, landing_html):
     """The authoritative (basefile, identifier) for a document, resolved once its
-    landing page is in hand. Only `so` needs the landing (its number lives in the
-    page vignette, not reliably in the listing text); every other type was
-    settled from the listing. Returns None to REJECT the document -- a listing
-    item under the SÖ index whose vignette (and title) carry no real
-    ``SÖ YYYY:NN`` (the index also holds pressmeddelanden and the like).
+    landing page is in hand. Two types need the landing: `so`, whose number lives
+    in the page vignette rather than reliably in the listing text, and any
+    numbered type whose listing text carried no number at all. Returns None to
+    REJECT the document -- a listing item under the SÖ index whose vignette (and
+    title) carry no real ``SÖ YYYY:NN`` (the index also holds pressmeddelanden
+    and the like), or a numbered type's item whose landing prints no number
+    either (an uppdrag filed under the kommittedirektiv index).
 
     The vignette is *searched*, not full-matched: regeringen.se prints the number
     in several shapes -- ``SÖ 1980:72``, ``Diarienummer: SÖ 1921:36`` (older
     överenskommelser), ``SÖ 1968:15 m.fl.`` (a multi-treaty publication) -- all of
     which yield the document's own number. When the page has no vignette at all,
     the title's trailing own-number is the fallback."""
-    if typ != "so":
+    if typ == "so":
+        vignette = landing_vignette(landing_html) or ""
+        match = SO_VIGNETTE.search(vignette) \
+            or SO_OWN.search(item.get("title") or "")
+        if not match:
+            return None
+        return match.group(1), "SÖ " + match.group(1)
+    if item["basefile"] is not None:
         return item["basefile"], item["identifier"]
-    vignette = landing_vignette(landing_html) or ""
-    match = SO_VIGNETTE.search(vignette) or SO_OWN.search(item.get("title") or "")
-    if not match:
-        return None
-    return match.group(1), "SÖ " + match.group(1)
+    # a numbered type whose listing text named no number: the landing page's own
+    # vignette first, then the text of the links to the document files. The
+    # vignette leads because a file link can carry a typo the vignette does not
+    # -- prop. 2025/26:50's file link says "Prop. 2025/26:0" while its vignette
+    # says "prop. 2025/26:50" -- and prop. 2025/26:223 needs the file link,
+    # since its page carries no vignette at all.
+    for text in [landing_vignette(landing_html) or ""] + content_link_texts(
+            landing_html):
+        found = find_number(typ, text)
+        if found:
+            return found[0], found[1]
+    return None
 
 
 def fetch(session, url, timeout=60):
@@ -166,15 +184,12 @@ def parse_listing(html, typ):
     *before* type filtering. The raw count is what tells "listing exhausted"
     apart from "page full of the sibling type's documents" (see iter_listing)."""
     segment, _, idre = TYPES[typ]
-    idpat = re.compile(idre) if idre else None
     # a type sharing a category with a sibling (pm/ds) takes the complementary
     # slice: items carrying the sibling's identifier belong to the sibling.
     sibling = EXCLUDE.get(typ)
-    excludepat = None
     if sibling:
-        sibre = TYPES[sibling][2]
-        assert sibre, "EXCLUDE sibling %s must be identifier-numbered" % sibling
-        excludepat = re.compile(sibre)
+        assert TYPES[sibling][2], \
+            "EXCLUDE sibling %s must be identifier-numbered" % sibling
     hrefpat = re.compile(r"/rattsliga-dokument/%s/\d{4}/\d{2}/" % segment)
     out = []
     raw = 0
@@ -185,14 +200,33 @@ def parse_listing(html, typ):
         slug = href.rstrip("/").rsplit("/", 1)[-1]
         time_el = li.find("time")
         date = time_el.get("datetime") if time_el else None
-        if excludepat and excludepat.search(text):
+        if sibling and find_number(sibling, text):
             continue  # carries the sibling type's number -> not ours
-        if idpat:
-            m = idpat.search(text)
-            if not m:
-                continue  # title without this type's identifier -> not a doc
-            basefile, identifier = m.group(1), m.group(0)
-            title = text[:m.start()].rstrip(", ").strip() or text
+        if idre:
+            found = find_number(typ, text)
+            if found is None and typ in SHARED_CATEGORY:
+                continue  # no number of this series -> the sibling type's doc
+            if found is None:
+                # regeringen.se publishes the odd item with no number in its
+                # link text at all -- prop. 2025/26:223 is listed as "En ny
+                # konsumentkreditlag". The landing page prints it, so the item
+                # rides on with no basefile and `resolve_identity` settles it
+                # there, exactly as a SÖ does.
+                #
+                # What that costs, measured over the newest 400 listing items of
+                # each type on 2026-09-07: prop 4 unnamed (1.0%), sou 1 (0.2%),
+                # skr 14 (3.5%), fm 0, dir 34 (8.5% -- the kommittedirektiv
+                # index also holds regeringsuppdrag, which carry no Dir.
+                # number). Such an item matches no record on disk, so its
+                # landing page is fetched on every run and it resets the
+                # watermark's consecutive-hit counter; the date-conclusive stop
+                # still bounds the walk. Nothing on disk records a rejection --
+                # see docs/operating/README.md.
+                basefile = identifier = None
+                title = text
+            else:
+                basefile, identifier, m = found
+                title = text[:m.start()].rstrip(", ").strip() or text
         elif sibling:
             # pm: a diarienummer keys the record; a promemoria with only a
             # title falls back to the landing-page slug (identifier = title).
@@ -298,6 +332,16 @@ def find_content_links(html):
     return out
 
 
+def content_link_texts(html):
+    """The link texts of a landing page's content files, in page order --
+    "En ny konsumentkreditlag, Prop. 2025/2026:223 (pdf 3 MB)". regeringen.se
+    prints the document's own number there even on the pages whose vignette is
+    missing, which is what `resolve_identity` reads it for."""
+    return [a.get_text(" ", strip=True)
+            for a in BeautifulSoup(html, "html.parser").find_all(
+                "a", href=CONTENT_HREF)]
+
+
 DOC_SUFFIXES = (".pdf", ".doc", ".docx", ".rtf", ".wpd")   # document_extension's
 
 
@@ -362,14 +406,41 @@ def download_document(session, root, item, delay, log=print):
     typ = item["type"]
     identity = resolve_identity(typ, item, landing.text)
     if identity is None:
+        time.sleep(delay)      # a rejected landing was still a fetch
         return None
     basefile, identifier = identity
+    stored = layout.fa_record_file(root, typ, basefile)
+    if item["basefile"] is None and compress.exists(stored):
+        owner = compress.read_json(stored).get("url")
+        if owner and owner != item["url"]:
+            # This item's number was READ OFF ITS OWN PAGE, because the listing
+            # named none (resolve_identity). That reading is a judgement about
+            # a page, not a fact the listing stated -- a regeringsuppdrag filed
+            # under the kommittedirektiv index whose PDF link happens to say
+            # "Dir. 2019:20" reads as that directive -- and the write below is
+            # unconditional: it would replace the stored document's title, url
+            # and files, and `store_documents` would have dropped this page's
+            # PDFs into its directory first. A basefile another landing page
+            # already holds is therefore refused outright, before anything is
+            # written (rule:fail-fast).
+            #
+            # This settles the collision by *write order*, not by evidence: the
+            # page that reached the number first keeps it. It also cannot tell
+            # the two cases apart -- a second page wrongly claiming the number,
+            # and the real document's landing page moving to a new slug. The
+            # first is the one worth protecting against, and the second is
+            # visible: the same line prints on every run and the document keeps
+            # its old files. Nothing on disk records either, so the log line is
+            # the whole report.
+            log("  %s/%s: %s carries that number but %s already owns it -- "
+                "not harvested" % (typ, basefile, item["url"], owner))
+            time.sleep(delay)
+            return None
     slug = basefile_slug(basefile)
     files = store_documents(session, layout.fa_dir(root, typ, basefile), slug,
                             find_content_links(landing.text), delay)
     compress.write_download(layout.fa_dir(root, typ, basefile) / (slug + ".html"),
                             landing.text)
-    stored = layout.fa_record_file(root, typ, basefile)
     if not files and compress.exists(stored):
         previous = compress.read_json(stored)
         if previous.get("files"):
@@ -689,9 +760,14 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                       only=only, limit=limit, scope=typ, log=log, reporter=rep)
 
         if result.errors:
-            log("  %s: %d download error(s) -- the store stays dirty, so the "
-                "next run re-walks down to the watermark boundary and retries "
-                "them (--only <basefile> forces one now)" % (typ, result.errors))
+            # an --only run never marks the store dirty (it does not call
+            # watermark.begin), so it must not claim the dirty-store retry
+            log("  %s: %d download error(s) -- %s (--only <basefile> forces "
+                "one now)"
+                % (typ, result.errors,
+                   "the next ordinary run reaches them again" if only
+                   else "the store stays dirty, so the next run re-walks down "
+                        "to the watermark boundary and retries them"))
         # summary right after this type's own start line + progress, so each
         # subtype reads as one self-contained block (not all summaries at the end)
         log("forarbete %s: %d seen, %d new" % (typ, result.seen, result.new))

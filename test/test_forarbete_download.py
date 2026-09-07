@@ -152,6 +152,36 @@ def test_resolve_identity_so_rejects_non_so_landing():
     assert download.resolve_identity("so", item, landing) is None
 
 
+def test_resolve_identity_reads_a_numbered_type_off_its_landing_page():
+    """prop. 2025/26:223's landing page has no vignette; the link to its PDF is
+    the only place the number is printed."""
+    item = {"basefile": None, "identifier": None,
+            "title": "En ny konsumentkreditlag"}
+    landing = ('<h1>En ny konsumentkreditlag</h1>'
+               '<a href="/contentassets/abc/en-ny-konsumentkreditlag">'
+               'En ny konsumentkreditlag, Prop. 2025/2026:223 (pdf 3 MB)</a>')
+    assert download.resolve_identity("prop", item, landing) \
+        == ("2025/26:223", "Prop. 2025/26:223")
+
+
+def test_resolve_identity_prefers_the_vignette_over_a_mistyped_file_link():
+    """prop. 2025/26:50's file link says "Prop. 2025/26:0"; its vignette is
+    right."""
+    item = {"basefile": None, "identifier": None, "title": "x"}
+    landing = ('<span class="h1-vignette">prop. 2025/26:50</span>'
+               '<a href="/contentassets/abc/x">x, Prop. 2025/26:0 (pdf)</a>')
+    assert download.resolve_identity("prop", item, landing) \
+        == ("2025/26:50", "Prop. 2025/26:50")
+
+
+def test_resolve_identity_rejects_an_item_no_page_of_which_names_a_number():
+    """An uppdrag filed under the kommittedirektiv index carries no Dir. number
+    anywhere, and is not a document of this series."""
+    item = {"basefile": None, "identifier": None, "title": "Uppdrag att ..."}
+    landing = '<h1>Uppdrag att föreslå obligatorisk förskola</h1>'
+    assert download.resolve_identity("dir", item, landing) is None
+
+
 def test_parse_listing_unhandled_type_raises(monkeypatch):
     # the final else is a hard error, never a silent slug fallback
     monkeypatch.setitem(download.TYPES, "zz", ("zztype", 9999, None))
@@ -161,12 +191,30 @@ def test_parse_listing_unhandled_type_raises(monkeypatch):
         parse_listing(html, "zz")
 
 
-def test_parse_listing_skips_items_without_the_types_identifier():
-    # a stray link whose text lacks "Prop. N" must not be taken as a document
+def test_a_listing_item_without_a_number_rides_on_for_the_landing_to_settle():
+    """regeringen.se lists the odd proposition under its title alone -- prop.
+    2025/26:223 is "En ny konsumentkreditlag" and nothing else. Skipping it left
+    the document unheld while every neighbour was harvested, so it rides on with
+    no basefile and `resolve_identity` reads the number off the landing page."""
     html = LISTING.replace(", Prop. 2025/26:279", "")
     items, raw = parse_listing(html, "prop")
-    assert len(items) == 1        # only the second item survives the filter...
-    assert raw == 2               # ...but the page was NOT raw-empty
+    assert raw == 2
+    assert [i["basefile"] for i in items] == [None, "2025/26:276"]
+    assert items[0]["title"] == "Personalförsörjning av det militära försvaret"
+
+
+def test_parse_listing_reads_the_number_however_regeringen_spelled_it():
+    """The house style is "Prop. 2025/26:279", but the same listing carries
+    "prop. …", "Prop 2025/26:169", "Prop.  2025/26:7" and the long riksmote
+    "2025/2026:223". All of them name the same series."""
+    for spelling, basefile in (("prop. 2025/26:279", "2025/26:279"),
+                               ("Prop 2025/26:279", "2025/26:279"),
+                               ("Prop.  2025/26:279", "2025/26:279"),
+                               ("Prop.2025/26:279", "2025/26:279"),
+                               ("Prop. 2025/2026:279", "2025/26:279")):
+        html = LISTING.replace("Prop. 2025/26:279", spelling)
+        items, _raw = parse_listing(html, "prop")
+        assert items[0]["basefile"] == basefile, spelling
 
 
 def test_parse_listing_ds_takes_only_ds_numbered_items():
@@ -688,3 +736,85 @@ def test_download_writes_normally_when_the_landing_links_a_document(monkeypatch,
     _stored(tmp_path, "2001/02:82", [])
     record = download.download_document(None, tmp_path, _item(), delay=0)
     assert record["files"] == ["2001-02-82.pdf"]
+
+
+# ---- an item the listing did not name: --only, and the ownership guard ------
+
+def _unnamed_listing(monkeypatch, items):
+    monkeypatch.setattr(download, "iter_listing",
+                        lambda session, typ, delay, log=None: [(items, len(items), 1)])
+
+
+def test_only_reaches_a_document_the_listing_never_named(tmp_path, monkeypatch):
+    """prop. 2025/26:223 is listed under its title alone, so the walk cannot
+    match `--only` against the listing. It resolves such an item and matches the
+    stored record's own basefile instead."""
+    _unnamed_listing(monkeypatch, [
+        {"type": "prop", "basefile": None, "identifier": None,
+         "title": "Ett annat ärende", "date": "2026-04-01",
+         "url": "http://example.com/annat"},
+        {"type": "prop", "basefile": None, "identifier": None,
+         "title": "En ny konsumentkreditlag", "date": "2026-03-30",
+         "url": "http://example.com/223"},
+    ])
+    resolved = []
+
+    def mock(session, root, item, delay, log=print):
+        resolved.append(item["url"])
+        if not item["url"].endswith("223"):
+            return None                       # the landing named no number
+        return {"basefile": "2025/26:223"}
+    monkeypatch.setattr(download, "download_document", mock)
+    assert download.sync(tmp_path, types=["prop"], delay=0,
+                         only="2025/26:223") == {"prop": (2, 1)}
+    assert resolved == ["http://example.com/annat", "http://example.com/223"]
+
+
+def test_only_walks_past_an_unnamed_item_that_fails(tmp_path, monkeypatch):
+    """One unrelated document failing must not end the run before it reaches
+    the one asked for."""
+    _unnamed_listing(monkeypatch, [
+        {"type": "prop", "basefile": None, "identifier": None, "title": "x",
+         "date": "2026-04-01", "url": "http://example.com/broken"},
+        {"type": "prop", "basefile": None, "identifier": None, "title": "y",
+         "date": "2026-03-30", "url": "http://example.com/223"},
+    ])
+
+    def mock(session, root, item, delay, log=print):
+        if item["url"].endswith("broken"):
+            raise requests.HTTPError("500 on the landing page")
+        return {"basefile": "2025/26:223"}
+    monkeypatch.setattr(download, "download_document", mock)
+    assert download.sync(tmp_path, types=["prop"], delay=0,
+                         only="2025/26:223") == {"prop": (2, 1)}
+
+
+def test_an_unnamed_item_never_takes_over_another_pages_basefile(tmp_path,
+                                                                 monkeypatch):
+    """A number read off a page is a judgement, not a fact the listing stated --
+    a regeringsuppdrag whose PDF link says "Dir. 2019:20" must not replace the
+    real directive's record, nor drop its files into that directory."""
+    real = layout.fa_record_file(tmp_path, "dir", "2019:20")
+    real.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(real, json.dumps(
+        {"type": "dir", "basefile": "2019:20", "identifier": "Dir. 2019:20",
+         "title": "Det riktiga direktivet", "url": "http://example.com/dir",
+         "files": ["2019-20.pdf"]}))
+    landing = ('<h1>Uppdrag att utreda något</h1>'
+               '<a href="/contentassets/x/y">Uppdraget, Dir. 2019:20 (pdf)</a>')
+    monkeypatch.setattr(download, "fetch",
+                        lambda session, url, timeout=60:
+                        SimpleNamespace(text=landing))
+    stored_files = []
+    monkeypatch.setattr(download, "store_documents",
+                        lambda *a, **kw: stored_files.append(a) or [])
+    lines = []
+    assert download.download_document(
+        None, tmp_path,
+        {"type": "dir", "basefile": None, "identifier": None,
+         "title": "Uppdrag att utreda något", "date": "2026-01-01",
+         "url": "http://example.com/uppdrag"},
+        0, lines.append) is None
+    assert stored_files == []                 # nothing written into its dir
+    assert compress.read_json(real)["title"] == "Det riktiga direktivet"
+    assert "already owns it" in "".join(lines)

@@ -231,8 +231,14 @@ class ItemKey:
     *planned* one and can post-date documents published since the last harvest
     (riksdagen lists a betänkande's planned debate before the printed report
     exists). ``is_downloaded`` therefore stays "on disk AND conclusive": it
-    alone feeds the watermark gate, while either bit means "do not fetch"."""
-    basefile: str
+    alone feeds the watermark gate, while either bit means "do not fetch".
+
+    ``basefile`` is None for an item the *listing* did not name: a SÖ whose
+    number is printed only on its landing page, a proposition regeringen.se
+    listed under its title alone. Such an item matches no record on disk, so it
+    is never skipped as current, and an ``--only`` run has to resolve it before
+    it can tell whether this is the document asked for (see :func:`walk`)."""
+    basefile: str | None
     is_downloaded: bool
     date: str | None = None
     provisional: bool = False
@@ -286,8 +292,16 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     non-document item, e.g. a listing hit with no parsable identifier);
     ``resolve`` fetches + stores one item and returns a truthy value when it
     wrote something new/changed (counted into ``new``). ``full`` re-resolves
-    items already on disk; ``only`` fetches just the one matching basefile;
-    ``limit`` caps the number of new fetches.
+    items already on disk; ``limit`` caps the number of new fetches.
+
+    ``only`` fetches just the one document of that basefile. An item whose
+    ``ItemKey`` carries no basefile is one the listing did not name (a SÖ whose
+    number is only on its landing page, a proposition regeringen.se listed
+    under its title alone), and the listing cannot rule it out: those are
+    resolved and matched on the **stored record's** own basefile, so an
+    ``--only`` run of such a source also stores whatever unnamed documents it
+    passes on the way. A source with unnamed items therefore needs a ``resolve``
+    that returns that record (a Mapping) rather than a bare truthy value.
 
     ``deep`` walks the whole listing without re-resolving anything -- what a
     source means by ``--full`` when its documents never change once published
@@ -367,9 +381,35 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
         seen += 1
 
         if only is not None:
-            if key.basefile != only:
+            if key.basefile is not None:
+                if key.basefile != only:
+                    continue
+                resolve(item)
+                new = 1
+                break
+            # an item the listing did not name (a SÖ whose number is only on its
+            # landing page, a proposition regeringen.se listed under its title
+            # alone). The listing cannot rule it out, so it is resolved and the
+            # stored record's own basefile decides -- without this, `--only` can
+            # never reach exactly the documents whose identity the listing hides.
+            # One such item failing is not the run failing: the requested
+            # document may be further down, so this is counted and walked past.
+            # Its retry is not the ordinary path's, though -- an `--only` run
+            # never calls `watermark.begin()`, so nothing is left dirty. It is
+            # retried because an unnamed item is never "on disk": the next
+            # ordinary walk reaches it and resolves it again.
+            try:
+                record = resolve(item)
+            except Exception as exc:  # noqa: BLE001 — an unnamed item is never "on disk", so the next ordinary walk resolves it again; ending this --only run instead would strand the document actually asked for (rule:no-catch-log-continue)
+                errors += 1
+                log("  %s (unnamed listing item): %s" % (scope, exc))
                 continue
-            resolve(item)
+            assert record is None or isinstance(record, Mapping), (
+                "%s: an unnamed listing item needs a resolve that returns the "
+                "stored record, not %r -- there is nothing else to match "
+                "--only against" % (scope, type(record).__name__))
+            if record is None or record.get("basefile") != only:
+                continue
             new = 1
             break
 
