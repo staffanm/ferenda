@@ -486,7 +486,20 @@ def omfattning_size(props):
               | set(props.get("rpubl:inforsI", [])))
 
 
-def resolve_omfattning(con):
+def _omfattning_job(root, docs):
+    """Read a batch of statutes; return only each proposition's magnitude."""
+    rows = []
+    for uri, path in docs:
+        for amendment in compress.read_json(root / path).get("amendments", []):
+            n = omfattning_size(amendment.get("properties", {}))
+            if n is not None:
+                rows.extend((ident, n, uri)
+                            for ident in amendment.get("forarbeten", [])
+                            if ident.startswith("Prop"))
+    return rows
+
+
+def resolve_omfattning(con, jobs=1):
     """Re-derive `prop_omfattning`: for every proposition cited as an SFS
     amendment's förarbete, the largest `omfattning_size` it reached in any one
     law and how many distinct laws it amended. A law whose only citing row is
@@ -495,20 +508,18 @@ def resolve_omfattning(con):
     counting it would understate how concentrated the prop's real amendments
     were. Runs at relate time over every related SFS document -- the
     Omfattning breakdown lives only in each SFS document's own `amendments`,
-    not in the catalog. Returns the row count."""
+    not in the catalog. Read artifacts across `jobs` processes and merge the
+    magnitudes here. Returns the row count."""
     by_prop = {}
-    for uri, path in con.execute(
-            "SELECT uri, path FROM documents WHERE source = 'sfs'"):
-        art = compress.read_json(catalog.data_root(con) / path)
-        for amendment in art.get("amendments", []):
-            n = omfattning_size(amendment.get("properties", {}))
-            if n is None:
-                continue
-            for ident in amendment.get("forarbeten", []):
-                if not ident.startswith("Prop"):
-                    continue
-                max_n, laws = by_prop.setdefault(ident, (0, set()))
-                by_prop[ident] = (max(max_n, n), laws | {uri})
+    docs = con.execute(
+        "SELECT uri, path FROM documents WHERE source = 'sfs'").fetchall()
+    for rows in util.pooled(
+            functools.partial(_omfattning_job, catalog.data_root(con)),
+            docs, jobs, chunk=100):
+        for ident, n, uri in rows:
+            max_n, laws = by_prop.setdefault(ident, (0, set()))
+            laws.add(uri)
+            by_prop[ident] = (max(max_n, n), laws)
     rows = [(ident, max_n, len(laws))
             for ident, (max_n, laws) in by_prop.items()]
     catalog.set_prop_omfattning(con, rows)

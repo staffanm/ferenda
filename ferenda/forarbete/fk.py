@@ -411,6 +411,7 @@ def resolve(con, jobs=1):
     across `jobs` processes (`util.pooled`); the resolution and the catalog
     write stay here. Returns the number of rows."""
     title_idx, path_idx = genomforande.law_index(con)
+    dates = {}
     props = con.execute("SELECT uri, path, label, date FROM documents "
                         "WHERE source = 'forarbete' AND kind = 'prop'").fetchall()
     rows = []
@@ -419,7 +420,7 @@ def resolve(con, jobs=1):
     for prop_uri, label, date, entries in itertools.chain.from_iterable(read):
         for e in entries:
             sfs_uri = genomforande.resolve_law(e.get("law"), date,
-                                               title_idx, path_idx)
+                                               title_idx, path_idx, dates)
             if not sfs_uri:
                 continue                # a law we do not hold (or a förordning)
             for num in e.get("paragrafer") or [None]:

@@ -202,7 +202,10 @@ def _id_nodes(node):
             yield from _id_nodes(item)
 
 
-def _body_id_nodes(art):
+def body_id_nodes(art):
+    """Every id-bearing node of the presented body, in document order -- the
+    one walk behind `fragment_ids`, `fragment_texts`, `fragment_node` and the
+    hierarchy's amendment dating (one walk, many ids)."""
     for nodes in body_sections(art):
         yield from _id_nodes(nodes)
 
@@ -214,7 +217,7 @@ def fragment_ids(art):
 
     Shares `body_sections` and the `_id_nodes` walk with `fragment_texts` and
     `fragment_text`; that walk's docstring states the invariant."""
-    return {node["id"] for node in _body_id_nodes(art)}
+    return {node["id"] for node in body_id_nodes(art)}
 
 
 # Node types whose own ``text`` runs are a HEADING rather than body text, so a
@@ -243,7 +246,7 @@ def fragment_texts_and_headings(art):
     return [(art["uri"] + "#" + node["id"], node_text(node),
              runs_text(node.get("text") or []).strip()
              if node.get("type") in HEADING_TYPES else "")
-            for node in _body_id_nodes(art)]
+            for node in body_id_nodes(art)]
 
 
 def fragment_texts(art):
@@ -260,7 +263,7 @@ def fragment_node(art, frag):
     (which renders the node via mdtext.node_markdown): both answer for a
     single provision, and each wants a different rendering of the same
     subtree (rule:second-use-goes-to-lib)."""
-    return next((node for node in _body_id_nodes(art)
+    return next((node for node in body_id_nodes(art)
                  if node["id"] == frag), None)
 
 

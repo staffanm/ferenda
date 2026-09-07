@@ -56,7 +56,9 @@ this corpus's compounds and `X av/för Y` phrases); casing and whitespace are
 folded so `på Internet` / `på internet` are one concept.
 """
 
+import functools
 import json
+import os
 import re
 from pathlib import Path
 
@@ -582,6 +584,7 @@ def _word_variants(word: str) -> set[str]:
     return variants
 
 
+@functools.cache
 def term_pattern(term):
     """A compiled regex matching `term` or an inflected surface form of it in
     `util.normalize_fold`ed running text, every word inflection-wide and
@@ -599,6 +602,17 @@ def term_pattern(term):
     return re.compile(r"\b" + r"\s+".join(parts) + r"\b")
 
 
+@functools.cache
+def term_needles(term):
+    """One literal substring per word of `term` that every text `term_pattern`
+    matches must contain: the longest common prefix of the word's inflected
+    variants ("incident" for "incidenter", "bedomningsst" for
+    "bedömningsstöd"). A `str in text` test on these rejects nearly every
+    (fragment, term) pair before the pattern runs -- the hierarchy scan runs
+    23 million such pairs, at 21 µs per regex search. Exact by construction:
+    the pattern consumes one escaped variant per word, verbatim."""
+    return tuple(needle for word in _norm(term).split(" ")
+                 if (needle := os.path.commonprefix(list(_word_variants(word)))))
 
 
 def _ucfirst(name):

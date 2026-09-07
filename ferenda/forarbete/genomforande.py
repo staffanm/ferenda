@@ -45,9 +45,11 @@ def _ikraft(path):
     return props.get("rpubl:ikrafttradandedatum")
 
 
-def resolve_law(law, prop_date, title_idx, path_idx):
+def resolve_law(law, prop_date, title_idx, path_idx, dates):
     """The SFS uri a författningskommentar section's `law` rubrik refers to, or
-    None when it cannot be resolved to a statute we hold."""
+    None when it cannot be resolved to a statute we hold. `dates` belongs to
+    one resolve pass: repeated title ties must not re-read a whole statute
+    for every commentary paragraph, nor retain dates across later builds."""
     sfsnr = kommentar.sfs_number(law)
     if sfsnr:                                       # "lag om ändring i X (YYYY:NN)"
         uri = catalog.BASE + sfsnr
@@ -56,8 +58,11 @@ def resolve_law(law, prop_date, title_idx, path_idx):
     if len(cand) == 1:
         return cand[0]
     if len(cand) > 1 and prop_date:                 # new law vs an older namesake
+        for uri in cand:
+            if uri not in dates:
+                dates[uri] = _ikraft(path_idx[uri])
         after = sorted((d, u) for u in cand
-                       for d in [_ikraft(path_idx[u])] if d and d > prop_date)
+                       for d in [dates[u]] if d and d > prop_date)
         return after[0][1] if after else None       # closest ikraft after the prop
     return None
 
@@ -138,6 +143,7 @@ def resolve(con, layers=None, jobs=1):
     relations pinned."""
     layers = layers or {}
     title_idx, path_idx = law_index(con)
+    dates = {}
     props = [(uri, path, layers.get(uri)) for uri, path in con.execute(
         "SELECT DISTINCT d.uri, d.path FROM links l "
         "JOIN documents d ON d.uri = l.from_uri "
@@ -150,7 +156,8 @@ def resolve(con, layers=None, jobs=1):
     edges = []
     for prop_uri, prop_date, prop_label, recs in itertools.chain.from_iterable(read):
         for rec in recs:
-            sfs_uri = resolve_law(rec.get("law"), prop_date, title_idx, path_idx)
+            sfs_uri = resolve_law(rec.get("law"), prop_date, title_idx, path_idx,
+                                  dates)
             anchor = kommentar.paragraf_fragment(rec.get("chapter"),
                                                  rec.get("paragraf"))
             if sfs_uri and anchor:

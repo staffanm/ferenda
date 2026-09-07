@@ -312,6 +312,24 @@ _CREATE_TO_URI = ("CREATE INDEX IF NOT EXISTS idx_links_to_uri ON links(%s)"
                   % ", ".join(INDEX_TO_URI_COLUMNS))
 
 
+def warm_cache(path):
+    """Read a batch catalog in file order before its scattered B-tree walks.
+
+    Even a covering index has scattered pages after incremental updates.
+    On production, reading the 7.2 GiB file sequentially takes about two
+    minutes; cold index walks take much longer while reading fewer bytes.
+    The reusable buffer is 8 MiB; the OS owns the reclaimable page cache.
+    Include committed pages that still live in the WAL.
+    """
+    path = Path(path)
+    wal = Path(str(path) + "-wal")
+    buf = bytearray(8 * 1024 * 1024)
+    for part in [path] + ([wal] if wal.exists() else []):
+        with part.open("rb", buffering=0) as stream:
+            while stream.readinto(buf):
+                pass
+
+
 def connect(path: Path | str, data_root: Path | None = None,
             exclusive: bool = False) -> sqlite3.Connection:
     """A read-write connection to the catalog at `path`, schema ensured.
@@ -734,6 +752,27 @@ NORM_LEVEL = {("eurlex", None): 0, ("sfs", "lag"): 1,
 # citation graph it exists to be distinguishable from.
 CHAIN_PREDICATES = ("rpubl:bemyndigande", "rpubl:genomforDirektiv",
                     "rinfoex:kompletterar")
+# The hierarchy also dates repeals. A covering partial index keeps both passes
+# off the multi-GB citation table. Its predicate is shared verbatim with the
+# reader so SQLite can prove that the partial index answers the whole query.
+_NORM_WHERE = "predicate IN (%s)" % ",".join(
+    "'%s'" % p for p in (*CHAIN_PREDICATES, "rpubl:upphaver"))
+_NORM_DOCUMENTS_WHERE = "source IN (%s)" % ",".join(
+    "'%s'" % source for source in dict.fromkeys(s for s, _ in NORM_LEVEL))
+
+
+def norm_documents(con):
+    """Metadata for documents that can occupy a rung of the norm hierarchy."""
+    return con.execute(
+        "SELECT uri, source, kind, date, expired, path FROM documents WHERE "
+        + _NORM_DOCUMENTS_WHERE)
+
+
+def norm_links(con):
+    """The stated authority and repeal references read by the norm hierarchy."""
+    return con.execute(
+        "SELECT from_uri, from_anchor, to_root, to_uri, predicate FROM links "
+        "WHERE " + _NORM_WHERE + " ORDER BY rowid")
 
 
 def norm_level(source, kind):
@@ -771,20 +810,33 @@ def rebuild_norm_chain(con):
     the corpus) is dropped: the chain answers "what authorises this", and only a
     rule can. An edge that does not descend a rung is dropped too -- a föreskrift
     amending a sibling föreskrift is a relation between equals, not authority."""
+    # Build only at relate, never on the serving connection's migration path.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_links_norm ON links "
+                "(predicate, from_uri, from_anchor, to_root, to_uri) WHERE "
+                + _NORM_WHERE)
+    con.execute("CREATE INDEX IF NOT EXISTS idx_docs_norm ON documents "
+                "(source, uri, kind, date, expired, path) WHERE "
+                + _NORM_DOCUMENTS_WHERE)
+    # The SQL join used idx_links_from
+    # to fetch every rule's references just to test rare predicates, followed
+    # by scattered document lookups. The small level map keeps that join in
+    # memory, while norm_links reads only the small covering index above.
+    levels, sources = {}, {}
+    for uri, source, kind, _date, _expired, _path in norm_documents(con):
+        if (level := norm_level(source, kind)) is not None:
+            levels[uri], sources[uri] = level, source
+    rows = {}
+    for lower, pin, upper, target, predicate in norm_links(con):
+        lo, up = levels.get(lower), levels.get(upper)
+        if predicate in CHAIN_PREDICATES and lo is not None and up is not None and lo > up:
+            rows.setdefault((lower, pin, upper, fragment(target), predicate, lo, up), None)
     con.execute("DELETE FROM norm_chain")
-    con.execute(
-        "INSERT INTO norm_chain (lower_uri, lower_pin, upper_uri, upper_pin, "
-        "                        predicate, lower_level, upper_level) "
-        "SELECT DISTINCT l.from_uri, l.from_anchor, l.to_root, "
-        "       CASE WHEN instr(l.to_uri, '#') > 0 "
-        "            THEN substr(l.to_uri, instr(l.to_uri, '#') + 1) END, "
-        "       l.predicate, lo.lvl, up.lvl "
-        "  FROM links l "
-        "  JOIN (%s) lo ON lo.uri = l.from_uri "
-        "  JOIN (%s) up ON up.uri = l.to_root "
-        " WHERE l.predicate IN (%s) AND lo.lvl > up.lvl"
-        % (_LEVEL_SELECT, _LEVEL_SELECT,
-           ",".join("'%s'" % p for p in CHAIN_PREDICATES)))
+    # Written in (source, lower_uri, links.rowid) order so the table is
+    # deterministic and diffable across rebuilds (the old INSERT ... SELECT
+    # had no ORDER BY). No reader depends on it: hierarki._ancestors sorts its
+    # edges, the others build sets or SELECT DISTINCT.
+    con.executemany("INSERT INTO norm_chain VALUES (?,?,?,?,?,?,?)",
+                    sorted(rows, key=lambda row: (sources[row[0]], row[0])))
     # commit like every other relate post-pass (set_correspondence,
     # synthesize_concepts): the caller closes the connection without one, so an
     # uncommitted rebuild is silently discarded and the table keeps whatever it
@@ -1365,7 +1417,7 @@ def canonicalize_concepts(con):
     form *Risk*, and *Risk*'s 31 legaldefinitioner then have no page while the
     page has no definitions. 1 077 rows over 494 concepts were in that state."""
     targets = [r[0] for r in con.execute(
-        "SELECT DISTINCT to_root FROM links WHERE to_root LIKE ?", (BEGREPP + "%",))]
+        "SELECT DISTINCT to_root FROM links WHERE to_root GLOB ?", (BEGREPP + "*",))]
     wiki = {_concept_form(r[0]) for r in con.execute(
         "SELECT uri FROM documents WHERE source = 'begrepp' AND path <> ''")}
     forms = {_concept_form(u) for u in targets
@@ -1420,7 +1472,7 @@ def synthesize_concepts(con):
     stubs = {r[0] for r in con.execute(
         "SELECT uri FROM documents WHERE source = 'begrepp' AND path = ''")}
     target = {uri for (uri,) in con.execute(
-        "SELECT DISTINCT to_root FROM links WHERE to_root LIKE ?", (prefix + "%",))
+        "SELECT DISTINCT to_root FROM links WHERE to_root GLOB ?", (prefix + "*",))
         if uri not in authored
         and RE_CONCEPT.match(uri[len(prefix):].replace("_", " "))}
     # drop stubs the corpus no longer references (incremental relate no longer
@@ -1499,8 +1551,20 @@ def set_fk_kommentar(con, rows):
     a law-level comment), resolved cross-document at relate time (forarbete.fk).
     Display-only: the statute rail shows the text with the prop as provenance;
     no links edge is stored -- a prop's own FK is not a citation."""
-    con.execute("DELETE FROM fk_kommentar")
-    con.executemany("INSERT INTO fk_kommentar VALUES (?,?,?,?,?,?,?)", rows)
+    # Preserve matching rows (including duplicates). Replacing all FK prose
+    # makes the WAL checkpoint rewrite the whole table even for a one-document
+    # relate. A sequential read plus changed rows keeps that off the slow disk.
+    remaining = collections.Counter(map(tuple, rows))
+    removed = []
+    for rowid, *row in con.execute("SELECT rowid, * FROM fk_kommentar ORDER BY rowid"):
+        key = tuple(row)
+        if remaining[key]:
+            remaining[key] -= 1
+        else:
+            removed.append((rowid,))
+    con.executemany("DELETE FROM fk_kommentar WHERE rowid = ?", removed)
+    con.executemany("INSERT INTO fk_kommentar VALUES (?,?,?,?,?,?,?)",
+                    remaining.elements())
     con.commit()
 
 
@@ -1759,14 +1823,15 @@ def dangling_anchors(con, sources):
     targets' artifacts are read, each once.
     """
     root = data_root(con)
-    # streamed, not fetched: the join covers every anchored link in the corpus
-    # (6.9 million of them here), and materialising them costs gigabytes for a
-    # loop that reads each row once and keeps only the misses
+    # The to_uri range reads only this target's anchored references, entirely
+    # from idx_links_to_uri. Joining on to_root fetched scattered table rows
+    # for to_uri, including every unanchored reference we then discarded.
     nodes, out = {}, collections.Counter()
     for from_uri, to_uri, path in con.execute(
-            "SELECT l.from_uri, l.to_uri, d.path FROM links l "
-            "JOIN documents d ON d.uri = l.to_root "
-            "WHERE instr(l.to_uri, '#') > 0 AND d.path <> '' "
+            "SELECT l.from_uri, l.to_uri, d.path FROM documents d "
+            "JOIN links l ON l.to_uri >= d.uri || '#' "
+            "AND l.to_uri < d.uri || '$' "
+            "WHERE d.path <> '' "
             "AND d.source IN (%s)" % ",".join("?" * len(sources)),
             tuple(sources)):
         if path not in nodes:
@@ -2047,9 +2112,20 @@ def stamp_inbound_counts(con: sqlite3.Connection) -> int:
     other documents' counts too: the re-related document's own citations).
     One whole-corpus pass (~9 s) instead of a per-request index-range count."""
     counts = document_inbound_counts(con)
-    con.execute("UPDATE documents SET inbound_count = 0")
-    con.executemany("UPDATE documents SET inbound_count = ? WHERE uri = ?",
-                    [(n, uri) for uri, n in counts.items()])
+    # Build here, not during serving migrations. The compact index avoids
+    # reading the documents' titles, descriptions and snippets just for counts.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_docs_inbound "
+                "ON documents(uri, inbound_count)")
+    # Update in table order, and write only changed counts. Resetting
+    # every row to zero then seeking cited uris rewrote the whole documents
+    # table and visited the same disk pages repeatedly on every cross-pass.
+    changed = [(rowid, counts.get(uri, 0))
+               for rowid, uri, previous in con.execute(
+                   "SELECT rowid, uri, inbound_count FROM documents "
+                   "INDEXED BY idx_docs_inbound")
+               if previous != counts.get(uri, 0)]
+    con.executemany("UPDATE documents SET inbound_count = ? WHERE rowid = ?",
+                    [(n, rowid) for rowid, n in sorted(changed)])
     return len(counts)
 
 

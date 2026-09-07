@@ -6,10 +6,12 @@ known-good documents (using the same comparator the corpus run uses).
 """
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
 
+from ferenda.lib import catalog
 from ferenda.lib.datasets import NAMEDLAWS
 from ferenda.lib.lagrum import FORARBETEN, LagrumParser, load_namedlaws
 from ferenda.sfs import load_inputs
@@ -25,6 +27,7 @@ from ferenda.sfs.register import (
     omfattning_size,
     parse_forarbeten,
     register_from_source,
+    resolve_omfattning,
     resource_map,
     sanitize_departement,
     sfs_slug,
@@ -199,6 +202,31 @@ def test_omfattning_size_zero_for_a_pure_renumbering():
     # empty -- distinct from the grundförfattning's missing field above
     props = {"rpubl:andrar": "nuvarande 2 § betecknas 3 §"}
     assert omfattning_size(props) == 0
+
+
+@pytest.mark.parametrize("jobs", [1, 2])
+def test_omfattning_merges_batches_by_proposition_and_distinct_law(tmp_path, jobs):
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    # Put two amendments of one law in the first batch, and another law in
+    # the second: max magnitude and distinct-law count must merge separately.
+    for i in range(101):
+        amendments = []
+        if i in (0, 100):
+            amendments = [{"forarbeten": ["Prop. 2025/26:1", "SOU 2025:1"],
+                           "properties": {"rpubl:andrar": "ändr.",
+                                          "rpubl:ersatter": ["P1"]}}]
+        if i == 0:
+            amendments.append({"forarbeten": ["Prop. 2025/26:1"],
+                               "properties": {"rpubl:andrar": "ändr.",
+                                              "rpubl:ersatter": ["P1", "P2"]}})
+        path = "%d.json" % i
+        (tmp_path / path).write_text(json.dumps({"amendments": amendments}))
+        con.execute("INSERT INTO documents (uri, source, path) VALUES (?, 'sfs', ?)",
+                    ("https://lagen.nu/2025:%d" % i, path))
+    assert resolve_omfattning(con, jobs=jobs) == 1
+    assert con.execute("SELECT * FROM prop_omfattning").fetchall() == [
+        ("Prop. 2025/26:1", 2, 2)]
+    con.close()
 
 
 # --- register parsing ---------------------------------------------------

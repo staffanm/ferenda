@@ -207,6 +207,16 @@ def _plan_artifact_verb(verb, sources, names, destination):
               % (verb, name, len(sources[name].artifacts()), destination(name)))
 
 
+def _relate_pass(label, fn, *args, **kwargs):
+    """Name and time each cross-pass without adding outer invocation steps."""
+    util.status(0, None, "relate cross-passes: %s" % label)
+    start = time.perf_counter()
+    result = fn(*args, **kwargs)
+    sys.stderr.write("\n")
+    print("relate: %s finished in %.1f s" % (label, time.perf_counter() - start))
+    return result
+
+
 def cmd_relate(sources, names, force=None, jobs=1):
     """(Re)build each named source's rows in the shared catalog from its
     artifacts on disk -- documents + the citation edges they carry inline.
@@ -315,6 +325,12 @@ def cmd_relate(sources, names, force=None, jobs=1):
                                                    corr_wm):
             t0 = time.perf_counter()
             con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
+            # This single batch writer repeatedly joins the same metadata.
+            # Keep its working pages and temporary sorts off the slow disk;
+            # serving connections retain their small per-request cache.
+            con.execute("PRAGMA cache_size=-65536")
+            con.execute("PRAGMA temp_store=MEMORY")
+            _relate_pass("catalog read-ahead", catalog.warm_cache, target)
             # each source's own contribution first (pinning a genomför-direktiv
             # statement to the paragraf it transposes, loading the .corr layers,
             # auditing a commentary's anchors): they read and write their own rows
@@ -322,22 +338,28 @@ def cmd_relate(sources, names, force=None, jobs=1):
             counts, warnings = {}, []
             for s in sources.values():
                 if s.relate_cross:
-                    more, lines = s.relate_cross(con, jobs)
+                    more, lines = _relate_pass(s.name, s.relate_cross, con, jobs)
                     counts.update(more)
                     warnings += lines
-            folded = catalog.canonicalize_concepts(con)
-            concepts = catalog.synthesize_concepts(con)
+            folded = _relate_pass("concept canonicalization", catalog.canonicalize_concepts, con)
+            concepts = _relate_pass("concept stubs", catalog.synthesize_concepts, con)
+            # No later pass changes links. Count now, while their index is
+            # warm: the hierarchy's artifact reads can evict it from the OS
+            # cache. Any ladder-only stubs minted later have zero citations.
+            stamped = _relate_pass("inbound counts", catalog.stamp_inbound_counts, con)
             # the norm hierarchy: which rule derives its authority from which. Needs
             # every source related (a chain crosses EU -> lag -> förordning ->
             # föreskrift), so it runs here rather than per source.
-            chain = catalog.rebuild_norm_chain(con)
+            chain = _relate_pass("norm chain", catalog.rebuild_norm_chain, con)
             # ordering invariant: rebuild_norm_chain DELETEs its table, so the
             # derived delegation edges always re-insert after it; the ladder rows
             # store canonical concept uris, so they build after
             # canonicalize_concepts (above) -- never join its UPDATE loop
-            delegated, deleg_dup = hierarki.derive_delegation_edges(con)
-            ladder_stats = hierarki.rebuild_regleringshierarki(
-                con, curated=hierarki.hierarki_layers())
+            delegated, deleg_dup = _relate_pass(
+                "delegation", hierarki.derive_delegation_edges, con)
+            ladder_stats = _relate_pass(
+                "regleringshierarki", hierarki.rebuild_regleringshierarki,
+                con, curated=hierarki.hierarki_layers(), jobs=jobs)
             # The same question the kommentar anchor audit asks of one commentary
             # and its host act, asked of the whole citation graph: a link whose
             # fragment names no node in the document it points at. Its home is here
@@ -351,11 +373,8 @@ def cmd_relate(sources, names, force=None, jobs=1):
             # one pass, not two: the scan reads every anchored link and parses each
             # distinct target artifact, so calling it again only to count them cost
             # the whole walk twice inside the nightly build
-            dangling = catalog.dangling_anchors(con, ANCHOR_EXACT)
-            # materialize each document's inbound count: the serving layer reads a
-            # column instead of counting an index range per request (the ECHR's is
-            # 1.4M entries -- tens of seconds cold on prod's disk)
-            stamped = catalog.stamp_inbound_counts(con)
+            dangling = _relate_pass("anchor audit", catalog.dangling_anchors,
+                                   con, ANCHOR_EXACT)
             con.commit()
             con.close()
             freshness._emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")

@@ -6,8 +6,49 @@ recovery rules for parse defects the corpus exhibits. See fk.py's module
 docstring for which prop motivates which rule.
 """
 
+import json
+
+from ferenda.forarbete import fk, genomforande
 from ferenda.forarbete.fk import extract, fk_span, parse_marks
 from ferenda.forarbete.structure import flatten
+from ferenda.lib import catalog, compress
+
+
+def test_title_ties_read_each_statute_once_per_pass(tmp_path, monkeypatch):
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    for nr, date in ((1, "2000-01-01"), (2, "2025-01-01"), (3, None)):
+        path = "%d.json" % nr
+        (tmp_path / path).write_text(json.dumps({"metadata": {"properties": {
+            "rpubl:ikrafttradandedatum": date}}}))
+        con.execute("INSERT INTO documents (uri, source, title, path) "
+                    "VALUES (?, 'sfs', 'Testlag', ?)",
+                    ("https://lagen.nu/2000:%d" % nr, path))
+    (tmp_path / "prop.json").write_text(json.dumps({"kommentarer": [
+        {"law": "testlag", "paragrafer": [str(i)],
+         "kommentar": "Kommentar %d" % i} for i in range(1, 4)]}))
+    con.execute("INSERT INTO documents (uri, source, kind, path, date) "
+                "VALUES ('prop', 'forarbete', 'prop', 'prop.json', '2024-01-01')")
+    read = compress.read_json
+    seen = []
+
+    def counted(path):
+        seen.append(str(path))
+        return read(path)
+
+    monkeypatch.setattr(compress, "read_json", counted)
+    assert fk.resolve(con) == 3
+    assert len(seen) == 4          # one prop + three statutes, including NULL date
+    assert con.execute("SELECT DISTINCT sfs_uri FROM fk_kommentar").fetchall() == [
+        ("https://lagen.nu/2000:2",)]
+    # A later build must see a changed effective date, not a process-global cache.
+    (tmp_path / "2.json").write_text(json.dumps({"metadata": {"properties": {
+        "rpubl:ikrafttradandedatum": "2023-01-01"}}}))
+    assert fk.resolve(con) == 0
+    assert len(seen) == 8
+    title, paths = genomforande.law_index(con)
+    assert genomforande.resolve_law("Testlag", "1999-01-01", title, paths, {}) == (
+        "https://lagen.nu/2000:1")
+    con.close()
 
 
 def prop(*blocks):

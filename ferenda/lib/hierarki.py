@@ -31,10 +31,13 @@ and after ``rebuild_norm_chain`` (which DELETEs its table, so the derived
 edges must always be re-inserted after it).
 """
 
+import bisect
+import functools
+import itertools
 import json
 import re
 
-from . import annstore, begrepp, catalog, catalog_rows, history, text
+from . import annstore, begrepp, catalog, catalog_rows, history, text, util
 from .util import normalize_fold, split_numalpha
 
 # a förordning issued under the government's own residual power (8 kap. RF)
@@ -134,11 +137,12 @@ def derive_delegation_edges(con):
         "      WHERE predicate = 'rpubl:bemyndigande' "
         "        AND upper_pin IS NOT NULL "
         "        AND lower_level = 3 AND upper_level = 2) nc "
-        "JOIN links l ON l.from_uri = nc.upper_uri "
+        # Start at the delegation clauses, not every citation into every law.
+        "CROSS JOIN links l ON l.from_uri = nc.upper_uri "
         "  AND (l.from_anchor = nc.upper_pin "
         "       OR l.from_anchor LIKE nc.upper_pin || 'S%') "
         "  AND l.predicate LIKE '%references' "
-        "JOIN (" + catalog._LEVEL_SELECT + ") lvl "
+        "CROSS JOIN (" + catalog._LEVEL_SELECT + ") lvl "
         "  ON lvl.uri = l.to_root AND lvl.lvl = 1 "
         "WHERE l.to_root != ?", (REGERINGSFORMEN,)).fetchall()
     # group the citations per delegation clause, then pinned-beats-bare
@@ -209,12 +213,23 @@ def _anchor_within(anchor, pin):
             and not anchor[len(pin)].isdigit() and anchor[len(pin)] != "-")
 
 
+def _under(anchor, ordered, strict=False):
+    """Whether any of the sorted anchors `ordered` sits at or under `anchor`
+    (only under, when `strict`): one bisect and a walk over the run of
+    anchors that start with it, instead of a pairwise test over a row's
+    thousands of anchors."""
+    i = bisect.bisect_left(ordered, anchor)
+    if strict and i < len(ordered) and ordered[i] == anchor:
+        i += 1
+    return any(_anchor_within(o, anchor) for o in itertools.takewhile(
+        lambda o: o.startswith(anchor), itertools.islice(ordered, i, None)))
+
+
 def _doc_info(con):
     """uri -> (level, kind, date, expired, path) for every ranked document --
     the documents that can be a rung at all."""
     out = {}
-    for uri, source, kind, date, expired, path in con.execute(
-            "SELECT uri, source, kind, date, expired, path FROM documents"):
+    for uri, source, kind, date, expired, path in catalog.norm_documents(con):
         level = catalog.norm_level(source, kind)
         if level is not None:
             out[uri] = (level, kind, date, expired, path)
@@ -273,8 +288,8 @@ def _term_starts(phrase, terms):
     matches "säkerhetsskyddsanalys..." (word-bounded, whole words)."""
     folded = normalize_fold(phrase)
     best = None
-    for concept, term, pattern in terms:
-        m = pattern.match(folded)
+    for concept, term in terms:
+        m = begrepp.term_pattern(term).match(folded)
         if m and (best is None or len(term) > len(best[1])):
             best = (concept, term)
     return best
@@ -295,7 +310,45 @@ def hierarki_layers():
     return out
 
 
-def rebuild_regleringshierarki(con, curated=None):
+def _scan_chain_job(root, docs):
+    """Match inherited terms in a batch of artifacts, returning only matches.
+
+    Terms travel as (concept, term) pairs and compile here, once per worker
+    process: a pickled pattern recompiles on every unpickle, and 600 of them
+    per chunk cost more than the scan itself."""
+    out = []
+    for doc, path, cands, descend, pins, own_defs in docs:
+        matches, verbatim, aligned = [], 0, 0
+        for frag_uri, frag_text in text.fragment_texts(catalog.load_artifact(root, path)):
+            anchor = catalog.fragment(frag_uri)
+            folded = normalize_fold(frag_text)
+            for concept, term in descend:
+                if (all(needle in folded for needle in begrepp.term_needles(term))
+                        and begrepp.term_pattern(term).search(folded)):
+                    role = ("delegerar"
+                            if any(_anchor_within(anchor, p) for p in pins)
+                            else "namner")
+                    matches.append((concept, anchor, role, None))
+                    verbatim += 1
+            # a löptext definition too long for a minted term: align the
+            # phrase against the chain's terms, keep the phrase as the label
+            for m in RE_LOPTEXT_PHRASE.finditer(folded):
+                hit = _term_starts(m.group(1), cands)
+                if hit and normalize_fold(hit[1]) != m.group(1):
+                    matches.append((hit[0], anchor, "definierar", m.group(1)))
+                    aligned += 1
+        # a defined term whose own phrase opens with an ancestor's term files
+        # under the ancestor's concept as well, the phrase as its label
+        for concept, term, anchor in own_defs:
+            hit = _term_starts(term, [(c, t) for c, t in cands if c != concept])
+            if hit:
+                matches.append((hit[0], anchor, "definierar", term))
+                aligned += 1
+        out.append((doc, matches, verbatim, aligned))
+    return out
+
+
+def rebuild_regleringshierarki(con, curated=None, jobs=1):
     """Rebuild the `regleringshierarki` table whole: the mechanical passes of
     PRD-regleringshierarki.md over `definitions` and the chain, plus the
     curated `.ann` rows (`curated`, from `hierarki_layers` -- the ai-hierarki
@@ -327,19 +380,12 @@ def rebuild_regleringshierarki(con, curated=None):
     # ancestor walk + candidate terms per chain-connected document
     chain_docs = sorted(set(up) | {e[2] for es in up.values() for e in es})
     ancestors = {doc: _ancestors(doc, up) for doc in chain_docs}
-    patterns = {}      # (concept, term) -> compiled pattern, built once
 
     def candidate_terms(doc):
-        """(concept, term, pattern) defined by `doc`'s proper ancestors --
-        "the chain above a document offers a median of 3 defined terms"."""
-        out = []
-        for anc in ancestors.get(doc, ()):
-            for concept, term, _anchor in defs.get(anc, ()):
-                key = (concept, term)
-                if key not in patterns:
-                    patterns[key] = begrepp.term_pattern(term)
-                out.append((concept, term, patterns[key]))
-        return out
+        """(concept, term) defined by `doc`'s proper ancestors -- "the chain
+        above a document offers a median of 3 defined terms"."""
+        return [(concept, term) for anc in ancestors.get(doc, ())
+                for concept, term, _anchor in defs.get(anc, ())]
 
     # upper_pin index: which (doc, anchor) is a delegation/bemyndigande target
     delegation_pins = {}
@@ -363,12 +409,13 @@ def rebuild_regleringshierarki(con, curated=None):
     # pass 0: every definition on a chain-connected document is a row; a
     # definition off the chain has no ladder to join and is only counted
     stats["defs_off_chain"] = sum(len(v) for d, v in defs.items()
-                                  if d not in set(chain_docs))
+                                  if d not in ancestors)
     for doc in chain_docs:
         for concept, _term, anchor in defs.get(doc, ()):
             add(concept, doc, anchor, "definierar")
 
     # passes P2 (verbatim descent) + the label alignments, per chain document
+    scans = []
     for doc in chain_docs:
         cands = candidate_terms(doc)
         if not cands:
@@ -376,35 +423,16 @@ def rebuild_regleringshierarki(con, curated=None):
                 stats["chain_docs_no_concept"] += 1
             continue
         own = {concept for concept, _t, _a in defs.get(doc, ())}
-        descend = [(c, t, p) for c, t, p in cands if c not in own]
+        descend = [(c, t) for c, t in cands if c not in own]
         stats["docs_scanned"] += 1
-        pins = delegation_pins.get(doc, set())
-        for frag_uri, frag_text in text.fragment_texts(art(doc)):
-            anchor = catalog.fragment(frag_uri)
-            folded = normalize_fold(frag_text)
-            for concept, _term, pattern in descend:
-                if pattern.search(folded):
-                    role = ("delegerar"
-                            if any(_anchor_within(anchor, p) for p in pins)
-                            else "namner")
-                    add(concept, doc, anchor, role)
-                    stats["verbatim"] += 1
-            # a löptext definition too long for a minted term: align the
-            # phrase against the chain's terms, keep the phrase as the label
-            for m in RE_LOPTEXT_PHRASE.finditer(folded):
-                hit = _term_starts(m.group(1), cands)
-                if hit and normalize_fold(hit[1]) != m.group(1):
-                    add(hit[0], doc, anchor, "definierar",
-                        label=m.group(1), source="verbatim")
-                    stats["aligned_labels"] += 1
-        # a defined term whose own phrase opens with an ancestor's term files
-        # under the ancestor's concept as well, the phrase as its label
-        for concept, term, anchor in defs.get(doc, ()):
-            hit = _term_starts(term, [(c, t, p) for c, t, p in cands
-                                      if c != concept])
-            if hit:
-                add(hit[0], doc, anchor, "definierar", label=term)
-                stats["aligned_labels"] += 1
+        scans.append((doc, paths[doc], cands, descend,
+                      delegation_pins.get(doc, set()), defs.get(doc, ())))
+    read = util.pooled(functools.partial(_scan_chain_job, root), scans, jobs, chunk=8)
+    for doc, matches, verbatim, aligned in itertools.chain.from_iterable(read):
+        for concept, anchor, role, label in matches:
+            add(concept, doc, anchor, role, label=label)
+        stats["verbatim"] += verbatim
+        stats["aligned_labels"] += aligned
 
     # pass P3: a lag definition and a directive definition joined by the same
     # genomforande row are the same concept -- the directive provision joins
@@ -432,29 +460,34 @@ def rebuild_regleringshierarki(con, curated=None):
     # on the kapitel and its paragraf both -- keep only the deepest anchors
     for row in rows.values():
         anchors = row["anchors"]
+        # sorted, every anchor under `a` follows it directly, so one forward
+        # look per anchor replaces the pairwise test (a row can hold thousands)
+        ordered = sorted(a for a in anchors if a)
         row["anchors"] = [a for a in anchors
-                          if a is None or not any(
-                              o and o != a and _anchor_within(o, a)
-                              for o in anchors)]
+                          if not (a and _under(a, ordered, strict=True))]
     # a provision that files under a stronger role for the concept needs no
     # weaker row on (or containing) the same anchor
     strength = {"definierar": 0, "delegerar": 1, "namner": 2}
     for key in sorted(rows, key=lambda k: strength.get(k[2], 9)):
         if key not in rows:
             continue
-        stronger = [a for r, s in strength.items() if s < strength[key[2]]
-                    for a in rows.get((key[0], key[1], r),
-                                      {"anchors": []})["anchors"] if a]
+        stronger = sorted(a for r, s in strength.items() if s < strength[key[2]]
+                          for a in rows.get((key[0], key[1], r),
+                                            {"anchors": []})["anchors"] if a)
         if stronger:
             row = rows[key]
             row["anchors"] = [a for a in row["anchors"]
-                              if a and not any(a == b or _anchor_within(b, a)
-                                               for b in stronger)]
+                              if a and not _under(a, stronger)]
             if not row["anchors"]:
                 del rows[key]
 
     # the curated rows: alias-folded, override-on-same-anchor, source llm
     aliases = catalog.concept_aliases(con)
+    # the roles present per (concept, doc): 15,000 curated rows each scanning
+    # every mechanical row for its own (concept, doc) took half the pass
+    roles = {}
+    for concept, doc, role in rows:
+        roles.setdefault((concept, doc), set()).add(role)
     for doc, layer_rows in (curated or {}).items():
         if doc not in info:
             continue
@@ -462,7 +495,8 @@ def rebuild_regleringshierarki(con, curated=None):
             concept = aliases.get(lr["concept"], lr["concept"])
             anchor = lr.get("anchor")
             role = lr.get("role") or "namner"
-            for key in [k for k in rows if k[0] == concept and k[1] == doc]:
+            present = roles.setdefault((concept, doc), set())
+            for key in [(concept, doc, r) for r in sorted(present)]:
                 row = rows[key]
                 row["anchors"] = [a for a in row["anchors"]
                                   if a != anchor
@@ -470,9 +504,11 @@ def rebuild_regleringshierarki(con, curated=None):
                                            and _anchor_within(anchor, a))]
                 if not row["anchors"]:
                     del rows[key]
+                    present.discard(key[2])
             row = rows.setdefault((concept, doc, role),
                                   {"anchors": [], "label": lr.get("label"),
                                    "source": "llm"})
+            present.add(role)
             row["source"] = "llm"
             if anchor not in row["anchors"]:
                 row["anchors"].append(anchor)
@@ -504,6 +540,9 @@ def rebuild_regleringshierarki(con, curated=None):
         assembled.setdefault((concept, chain_root), []).append(
             (doc, role, row, via))
     inserts = []
+    @functools.cache
+    def amended(uri):
+        return _amendment_dates(art(uri), delegation_pins[uri])
     for (concept, chain_root), group in sorted(assembled.items()):
         docs_in = {doc for doc, _r, _row, _v in group}
         if len(docs_in) < 2 and not any(via for _d, _r, _row, via in group):
@@ -517,7 +556,7 @@ def rebuild_regleringshierarki(con, curated=None):
             # provision is the row's primary anchor
             anchors = sorted((a for a in row["anchors"] if a),
                              key=split_numalpha) or row["anchors"]
-            stated, shaken = _edge_dates(via, info, art)
+            stated, shaken = _edge_dates(via, info, amended)
             inserts.append((
                 concept, doc, anchors[0],
                 json.dumps(anchors[1:]) if len(anchors) > 1 else None,
@@ -554,10 +593,10 @@ def _synthesize_ladder_stubs(con):
     con.executemany(
         "INSERT OR IGNORE INTO documents "
         "(uri, source, kind, label, title, path, source_url, content_hash, "
-        " expired, display) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        " expired, display, inbound_count) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         [(uri, "begrepp", "begrepp", name, name, "", None,
           catalog.content_hash(("begrepp-stub\x1f" + name).encode()),
-          None, name)
+          None, name, 0)
          for uri in new_stubs
          for name in [uri[len(prefix):].replace("_", " ")]])
     return len(new_stubs)
@@ -573,17 +612,34 @@ def _repeal_dates(con, info, art):
     is the sentinel, never a wrong date (PRD §9.5)."""
     out = {uri: expired
            for uri, (_l, _k, _d, expired, _p) in info.items() if expired}
-    for repealed, repealer in con.execute(
-            "SELECT to_root, from_uri FROM links "
-            "WHERE predicate = 'rpubl:upphaver'"):
-        if repealed in info and repealed not in out and repealer in info:
+    for repealer, _pin, repealed, _target, predicate in catalog.norm_links(con):
+        if (predicate == "rpubl:upphaver"
+                and repealed in info and repealed not in out and repealer in info):
             ikraft = (art(repealer).get("metadata") or {}).get(
                 "ikrafttradandedatum")
             out[repealed] = ikraft or catalog_rows.EXPIRED_UNDATED
     return out
 
 
-def _edge_dates(via, info, art):
+def _amendment_dates(art, pins):
+    """Date every requested provision in one tree walk, keeping the first id."""
+    if not art.get("amendments"):
+        return {}
+    amendments = history.amendment_info(art)
+    pending, dates = set(pins), {}
+    for node in text.body_id_nodes(art):
+        pin = node["id"]
+        if pin not in pending:
+            continue
+        pending.remove(pin)
+        m = RE_LYDELSE_TRAILER.search(text.node_text(node).strip())
+        dates[pin] = amendments.get(m.group(1), (None, None))[0] if m else None
+        if not pending:
+            break
+    return dates
+
+
+def _edge_dates(via, info, amended):
     """(stated, via_amended) for one row's upward path: `stated` is the date
     of the document at the lower end of the top edge (the one that read the
     delegation); `via_amended` the latest ikraftträdande of an SFS amendment
@@ -600,15 +656,7 @@ def _edge_dates(via, info, art):
         lower_date = info[lower][2]
         if not (upin and lower_date):
             continue
-        upper_art = art(upper)
-        if not upper_art.get("amendments"):
-            continue
-        m = RE_LYDELSE_TRAILER.search(
-            text.fragment_text(upper_art, upin).strip())
-        if not m:
-            continue
-        ikraft, _fa = history.amendment_info(upper_art).get(m.group(1),
-                                                            (None, None))
+        ikraft = amended(upper).get(upin)
         if ikraft and ikraft > lower_date and (not shaken or ikraft > shaken):
             shaken = ikraft
     return stated, shaken

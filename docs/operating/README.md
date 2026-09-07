@@ -305,8 +305,39 @@ carry a genomför-direktiv link — had no index to use and fetched every
 forarbete document's link rows to test the predicate, 20 minutes and more on
 the same copy; relate now builds a partial index over those links
 (`idx_links_genomfor`, one scan of `links` the first time) and the query is
-a covering index scan. The other passes are sqlite work on the catalog and
-were not changed.
+a covering index scan.
+
+The cross-passes also avoid repeated SQLite reads and writes:
+
+- SFS reads its amendment artifacts across the run's jobs. Title matching
+  caches each statute's effective date for one pass, including absent dates.
+- Commentary and inbound-count updates write only changed rows. Concept
+  lookups and the anchor audit read ranges of existing covering indexes.
+- The norm hierarchy uses compact covering indexes for authority and repeal
+  references (`idx_links_norm`) and rule metadata (`idx_docs_norm`). The
+  delegation query starts at the clauses that confer authority. Inbound
+  stamping reads `idx_docs_inbound` instead of full document rows, and runs
+  before the hierarchy pass, while the links index is still warm.
+- The regleringshierarki scan matches inherited terms across the run's jobs.
+  Terms travel as strings and compile once per worker. A substring test per
+  word (`begrepp.term_needles`) rejects nearly every (fragment, term) pair
+  before the regex runs: 23 million pairs at 21 µs each was the whole pass.
+  The curated-row merge and the anchor containment tests index their rows
+  instead of scanning them pairwise.
+- Each cross-pass prints its name and elapsed time. The batch connection
+  uses a 64 MiB SQLite page cache and keeps temporary sorts in memory.
+  It first reads the catalog and WAL sequentially to warm the OS page cache
+  (`catalog.warm_cache`). Cold, scattered index reads otherwise dominate the
+  run: the inbound count alone took 468 s cold against 16 s warm. The
+  sequential read of the 7.2 GB catalog takes about 150 s cold and seconds
+  when the pages are already cached.
+
+On a copy of the production catalog on 2026-09-07, with the page cache
+evicted first, the whole block took 271 s: 154 s of read-ahead, 44 s for
+the regleringshierarki, 23 s for fk, 17 s for genomförande, 16 s for
+inbound counts, and under 6 s for each other pass. The same run took
+5581 s in the nightly before these changes. The first run also builds the
+three new indexes; that one-time cost was 348 s on the same copy.
 
 Download has no such scan — nothing on disk decides what it fetches — so its
 line names the harvest watermark instead: `(from 2026-01-10)`, or

@@ -3,6 +3,7 @@ rung, and the per-concept ladder rows. Same fixture idiom as test_norm_chain --
 an in-memory catalog with hand-inserted documents/links rows; what is stored,
 not how it is shown."""
 
+import functools
 import json
 import re
 import sqlite3
@@ -11,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from ferenda.lib import aihierarki, annstore, catalog, hierarki, margins, page
-from ferenda.lib.begrepp import term_pattern
+from ferenda.lib.begrepp import _word_variants, term_needles, term_pattern
 from ferenda.lib.util import normalize_fold
 from ferenda.wiki import render as wiki_render
 
@@ -274,6 +275,56 @@ def _hrows(con):
         "FROM regleringshierarki")}
 
 
+def test_parallel_scans_preserve_rows_labels_and_dates(tmp_path):
+    results = []
+    for jobs in (1, 2):
+        root = tmp_path / str(jobs)
+        root.mkdir()
+        con = _ladder_con(root)
+        # More than one worker batch, with both inherited mentions and the
+        # fixture's long definition and dated delegation chain.
+        for i in range(9):
+            uri = "https://lagen.nu/extra/%d" % i
+            path = _write(root, "extra/%d.json" % i, {
+                "uri": uri, "structure": [{"id": "P1", "type": "paragraf",
+                    "text": ["En betydande incident ska rapporteras."]}]})
+            con.execute("INSERT INTO documents (uri, source, kind, date, path) "
+                        "VALUES (?, 'foreskrift', 'test', '2026-01-01', ?)",
+                        (uri, path))
+            chain_row(con, uri, None, CSF, "P37", "rpubl:bemyndigande", 3, 2)
+        stats = hierarki.rebuild_regleringshierarki(con, jobs=jobs)
+        results.append((stats, _hrows(con)))
+        con.close()
+    assert results[0] == results[1]
+    assert results[0][0]["docs_scanned"] >= 9
+
+
+def test_edge_date_cache_keeps_the_lower_documents_date_comparison(tmp_path, monkeypatch):
+    con = _ladder_con(tmp_path)
+    info = hierarki._doc_info(con)
+    reads = []
+    node_text = hierarki.text.node_text
+
+    def counted(node):
+        reads.append(node["id"])
+        return node_text(node)
+
+    monkeypatch.setattr(hierarki.text, "node_text", counted)
+    via = [(MCFFS, None, CSF, "P37", "rpubl:bemyndigande")]
+
+    @functools.cache
+    def amended(uri):
+        return hierarki._amendment_dates(
+            catalog.load_artifact(tmp_path, info[uri][-1]), {"P37"})
+
+    assert hierarki._edge_dates(via, info, amended)[1] == "2026-07-01"
+    level, kind, _date, expired, path = info[MCFFS]
+    info[MCFFS] = (level, kind, "2026-08-01", expired, path)
+    assert hierarki._edge_dates(via, info, amended)[1] is None
+    assert reads == ["P37"]
+    con.close()
+
+
 def test_the_ladder_spans_all_four_rungs(tmp_path):
     con = _ladder_con(tmp_path)
     stats = hierarki.rebuild_regleringshierarki(con)
@@ -506,6 +557,25 @@ def test_worked_example_mechanical_expectations(example):
     # and its output is asserted in the artifact-backed tests above -- a
     # table assertion at this point would be vacuous (nothing built it)
     assert all(r.get("phase") == 3 for r in example.get("expected_rows", []))
+
+
+def test_term_needles_are_in_every_text_the_pattern_matches():
+    # the scan tests `needle in folded` before the pattern: a needle must be
+    # a prefix of every inflected variant of its word, or a match is lost
+    for term in ("nationellt bedömningsstöd", "betydande incident",
+                 "allmän handling", "sakkunnig", "arbetsgivare"):
+        needles = term_needles(term)
+        for word, needle in zip(normalize_fold(term).split(" "), needles, strict=True):
+            assert all(v.startswith(needle) for v in _word_variants(word)), term
+        assert all(len(n) >= 3 for n in needles), needles
+    for text_ in ("nationella bedömningsstöden", "den sakkunniga",
+                  "arbetsgivarna"):
+        folded = normalize_fold(text_)
+        term = {"nationella bedömningsstöden": "nationellt bedömningsstöd",
+                "den sakkunniga": "sakkunnig",
+                "arbetsgivarna": "arbetsgivare"}[text_]
+        assert term_pattern(term).search(folded)
+        assert all(n in folded for n in term_needles(term))
 
 
 def test_term_pattern_inflects_every_word():

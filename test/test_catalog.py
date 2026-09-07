@@ -15,7 +15,7 @@ import sqlite3
 
 import pytest
 
-from ferenda.lib import catalog, catalog_rows
+from ferenda.lib import catalog, catalog_rows, hierarki
 
 
 def _plan_of_last_query(con, call):
@@ -470,6 +470,99 @@ def test_a_source_outside_the_audit_is_not_read_at_all(tmp_path):
     con = _corpus(tmp_path, ["Annex42"], "A42")
     assert catalog.dangling_anchors(con, ("sfs", "eurlex")) == []
     assert catalog.dangling_anchors(con, ("icrc",))
+    con.close()
+
+
+def test_anchor_audit_reads_only_the_targets_covering_index_range(tmp_path):
+    con = _corpus(tmp_path, ["Annex42"], "A42")
+    # data_root's metadata lookup precedes the audit SELECT.
+    seen = []
+    con.set_trace_callback(seen.append)
+    catalog.dangling_anchors(con, ("icrc",))
+    con.set_trace_callback(None)
+    sql = next(s for s in seen if "SELECT l.from_uri, l.to_uri, d.path" in s)
+    plan = " ".join(r[3] for r in con.execute("EXPLAIN QUERY PLAN " + sql))
+    assert "SEARCH l USING COVERING INDEX idx_links_to_uri" in plan, plan
+    assert "to_uri>? AND to_uri<?" in plan, plan
+    con.close()
+
+
+@pytest.mark.parametrize("call", [catalog.canonicalize_concepts,
+                                 catalog.synthesize_concepts])
+def test_concept_pass_seeks_the_concept_namespace(tmp_path, call):
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    _link(con)
+    seen = []
+    con.set_trace_callback(seen.append)
+    call(con)
+    con.set_trace_callback(None)
+    sql = next(s for s in seen if "SELECT DISTINCT to_root FROM links" in s)
+    plan = " ".join(r[3] for r in con.execute("EXPLAIN QUERY PLAN " + sql))
+    assert "SEARCH links USING COVERING INDEX idx_links_to_root" in plan, plan
+    con.close()
+
+
+def test_stamp_counts_updates_only_changed_documents(tmp_path):
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    con.executemany("INSERT INTO documents (uri, source, path, inbound_count) "
+                    "VALUES (?, 'sfs', '', ?)",
+                    [("https://lagen.nu/a", None),
+                     ("https://lagen.nu/b", 9),
+                     ("https://lagen.nu/c", 4)])
+    _link(con)
+    _link(con)                 # duplicate citing document + anchor counts once
+    _link(con, anchor=None)    # the unanchored mention counts separately
+    _link(con, from_uri="https://lagen.nu/b")  # self-citation is excluded
+    assert catalog.stamp_inbound_counts(con) == 1
+    assert dict(con.execute("SELECT uri, inbound_count FROM documents")) == {
+        "https://lagen.nu/a": 0, "https://lagen.nu/b": 2, "https://lagen.nu/c": 0}
+    changed = con.total_changes
+    catalog.stamp_inbound_counts(con)
+    assert con.total_changes == changed
+    con.execute("DELETE FROM links")
+    assert catalog.stamp_inbound_counts(con) == 0
+    assert catalog.document_inbound_count(con, "https://lagen.nu/b") == 0
+    con.close()
+
+
+def test_commentary_sync_preserves_duplicates_and_writes_only_changes(tmp_path):
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    row = ("law", "P1", "prop", "Prop. 2025/26:1", "2025-01-01", 10, "Text")
+    other = (*row[:-1], "Changed text")
+    catalog.set_fk_kommentar(con, [row, row])
+    changes = con.total_changes
+    catalog.set_fk_kommentar(con, [row, row])
+    assert con.total_changes == changes
+    catalog.set_fk_kommentar(con, [other, row])
+    assert con.total_changes == changes + 2    # one removed, one inserted
+    assert con.execute("SELECT * FROM fk_kommentar ORDER BY text").fetchall() == [
+        other, row]
+    catalog.set_fk_kommentar(con, [])
+    assert con.execute("SELECT count(*) FROM fk_kommentar").fetchone()[0] == 0
+    con.close()
+
+
+def test_norm_passes_use_small_covering_indexes(tmp_path):
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    _link(con)
+    catalog.rebuild_norm_chain(con)
+    for call, index in ((catalog.norm_links, "idx_links_norm"),
+                        (catalog.norm_documents, "idx_docs_norm")):
+        plan = _plan_of_last_query(con, lambda call=call: list(call(con)))
+        assert "COVERING INDEX " + index in plan, plan
+    con.close()
+
+
+def test_delegation_starts_from_clauses_not_all_citations_into_laws(tmp_path):
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    seen = []
+    con.set_trace_callback(seen.append)
+    hierarki.derive_delegation_edges(con)
+    con.set_trace_callback(None)
+    sql = next(s for s in seen if s.startswith("SELECT DISTINCT nc."))
+    plan = " ".join(r[3] for r in con.execute("EXPLAIN QUERY PLAN " + sql))
+    assert "SEARCH l USING INDEX idx_links_from (from_uri=?)" in plan, plan
+    assert "idx_links_to_root" not in plan, plan
     con.close()
 
 
