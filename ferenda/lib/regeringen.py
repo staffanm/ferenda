@@ -52,7 +52,8 @@ def is_misleading(url):
     return regeringen_path(url) in MISLEADING_URLS
 
 
-# Landing pages regeringen.se lists but cannot serve: path -> the evidence.
+# Landing pages regeringen.se lists but cannot serve. One curated line per
+# document, with the evidence.
 # Not an inference from a status code -- a 500 is an outage until proven
 # otherwise, and reading one as "this document does not exist" is how a bad
 # afternoon becomes a permanent hole in the corpus. An entry here says the
@@ -67,7 +68,7 @@ def is_misleading(url):
 # that will fail again.
 #
 # Drop an entry to re-test: the item comes straight back into the walk.
-BROKEN_LANDINGS = {
+BROKEN_LANDINGS = frozenset({
     # Skr. 2015/16:115 "Verksamheten i Europeiska unionen under 2015". The
     # listing carries exactly one row for it and that row's page answers HTTP
     # 500 with EPiServer's own "Något gick fel" error body -- 6 attempts in a
@@ -76,7 +77,7 @@ BROKEN_LANDINGS = {
     # hold this skrivelse; riksdagen publishes the same document if it is ever
     # wanted.
     "/rattsliga-dokument/skrivelse/2016/03/skr.-201516115",
-}
+})
 
 
 def broken_landing(url):

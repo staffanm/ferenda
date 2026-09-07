@@ -139,17 +139,19 @@ def test_parse_listing_skips_a_misleading_url():
     assert raw == 1 and items == []
 
 
-def test_parse_listing_skips_a_landing_the_site_cannot_serve():
+def test_parse_listing_skips_a_landing_the_site_cannot_serve(monkeypatch):
     """A page regeringen.se lists but answers 500 for is dropped before any
     fetch: otherwise net.request climbs its full retry ladder (~62 s) and the
     per-document error leaves the watermark store dirty for every later run."""
-    broken = "/rattsliga-dokument/skrivelse/2016/03/skr.-201516115"
-    assert broken in regeringen.BROKEN_LANDINGS
+    # the table's own contents are curated data, not behaviour: pinning today's
+    # single entry here would make the documented "drop an entry to re-test it"
+    # turn this test red
+    broken = "/rattsliga-dokument/skrivelse/2016/03/nagon-skrivelse"
+    monkeypatch.setattr(regeringen, "BROKEN_LANDINGS", frozenset({broken}))
     html = """
     <ul class="list--block">
       <li><div class="sortcompact">
-        <a href="%s/">Verksamheten i Europeiska unionen under 2015,
-          Skr. 2015/16:115</a>
+        <a href="%s/">Någon skrivelse, Skr. 2015/16:115</a>
         <time datetime="2016-03-10">10 mars 2016</time>
       </div></li>
       <li><div class="sortcompact">
