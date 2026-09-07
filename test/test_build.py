@@ -5,6 +5,7 @@ temp files -- no real corpus, no JVM, fast."""
 
 import contextlib
 import dataclasses
+import gzip
 import hashlib
 import json
 import os
@@ -2516,3 +2517,33 @@ def test_run_dirty_pages_is_the_parsed_documents_and_their_neighbours(tmp_path, 
     monkeypatch.setattr(freshness, "generate_caught_up", lambda: True)
     monkeypatch.setattr(freshness, "RUN_REBUILT", {})
     assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") is None
+
+
+def test_cmd_dump_appends_new_documents_and_rewrites_on_change(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "fingerprints.json")
+    monkeypatch.setattr(freshness, "_FINGERPRINTS_CACHE", None)
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(corpus, "DUMPS", tmp_path / "dumps")
+    monkeypatch.setattr(freshness, "RUN_ID", None)     # files change outside a stage here
+    arts = [tmp_path / "a.json", tmp_path / "b.json"]
+    for p in arts:
+        p.write_text(json.dumps({"uri": p.stem}))
+    sources = {"syn": Source("syn", lambda: [], {}, artifacts=lambda: list(arts))}
+    out = tmp_path / "dumps" / "syn.ndjson.gz"
+
+    def uris():
+        with gzip.open(out, "rt", encoding="utf-8") as fh:
+            return [json.loads(line)["uri"] for line in fh.read().splitlines()]
+
+    corpus.cmd_dump(sources, ["syn"])
+    assert uris() == ["a", "b"] and "2 documents" in capsys.readouterr().out
+    c = tmp_path / "c.json"
+    c.write_text(json.dumps({"uri": "c"}))
+    arts.append(c)
+    corpus.cmd_dump(sources, ["syn"])                     # new document: appended
+    assert uris() == ["a", "b", "c"] and "1 new document(s) appended" in capsys.readouterr().out
+    arts[1].write_text(json.dumps({"uri": "b", "v": 2}))  # changed in place: rewritten
+    corpus.cmd_dump(sources, ["syn"])
+    assert uris() == ["a", "b", "c"] and "3 documents" in capsys.readouterr().out
+    corpus.cmd_dump(sources, ["syn"])                     # unchanged: skipped
+    assert "skipped" in capsys.readouterr().out

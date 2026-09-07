@@ -219,6 +219,12 @@ download → parse → relate → index → dump → generate
   Corpus-level, rebuildable.
 - **index** — push the corpus into OpenSearch for full-text search.
 - **dump** — write the NDJSON bulk export (`dumps/<source>.ndjson.gz`).
+  Documents new to the dump are appended as one more gzip member (a reader
+  sees one stream); a document that changed in place or vanished, a code
+  change or `--force` rewrite the file, so no uri appears twice. The
+  artifacts a dump holds are recorded beside it (`.records`), and the
+  rewrite reads artifacts across the run's jobs: forarbete's 97,274 took
+  2151 s serially on 2026-09-07, 22 ms of NFS round trip each.
 - **generate** — render static, interlinked HTML into `generated/`.
 
 Convenience verbs:

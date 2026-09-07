@@ -626,7 +626,8 @@ def cmd_dump(sources, names, jobs=1):
         with util.step("%s dump" % name):
             util.checking("%s dump" % name)
             paths = source.artifacts()
-            wm = freshness.file_fingerprint(paths, label="%s dump" % name, jobs=jobs)
+            records = freshness.stat_records(paths, label="%s dump" % name, jobs=jobs)
+            wm = freshness.fingerprint_of(records)
             if out.exists() and freshness.up_to_date(store, "dump", name, wm, DUMP_CODE):
                 print("dump %s: up to date (%d artifacts unchanged) -- skipped"
                       % (name, len(paths)))
@@ -637,13 +638,25 @@ def cmd_dump(sources, names, jobs=1):
             def progress(seen, total, name=name):
                 util.status(seen, total, "dump %s" % name)
             t0 = time.perf_counter()
-            lines = dump.dump_source(paths, out, progress=progress)
-            freshness._emit_segment("dump", name, time.perf_counter() - t0, total=lines,
+            # documents new to the dump are appended as one more gzip member;
+            # a document that changed in place or vanished, a code change or
+            # --force rewrite the file, so no uri ever appears twice
+            new = (None if protocol.RUN.force or not out.exists()
+                   or freshness.code_changed(store, "dump", name, DUMP_CODE)
+                   else dump.appendable(dump.read_records(out), records))
+            if new:
+                lines = dump.append_to_dump(new, out, progress=progress, jobs=jobs)
+                what = "%d new document(s) appended" % lines
+            else:
+                lines = dump.dump_source(paths, out, progress=progress, jobs=jobs)
+                what = "%d documents" % lines
+            dump.write_records(out, records)
+            freshness._emit_segment("dump", name, time.perf_counter() - t0, total=len(paths),
                           ran=lines, status="ok")
             freshness.record_step(store, "dump", name, wm, DUMP_CODE)
             dirty = True
             sys.stderr.write("\n")
-            print("dump %s: %d documents -> %s" % (name, lines, out))
+            print("dump %s: %s -> %s" % (name, what, out))
     if dirty:
         freshness.save_fingerprints(store)
 
