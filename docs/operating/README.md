@@ -596,7 +596,13 @@ bind-mounted in, and its image is a pre-built tag on the host. Beside them run
 shared `nginx` and `certbot`.
 
 Which hostname reaches which application is nginx's business, and it changes at
-the September cutover — see [`cutover.md`](cutover.md).
+the September cutover — see [`cutover.md`](cutover.md). `matomo` is the one
+container both applications share. Its **UI is at `https://lagen.nu/matomo/`**
+(`docker/nginx/ferenda.lagen.nu.conf`); the legacy vhost's own `/matomo/` block
+still answers at `old.lagen.nu/matomo/` and goes when that vhost does. The
+reader-facing pages ping the tracker at the same `/matomo/` prefix, same-origin,
+under the site id `lib/assets/matomo.js` maps their hostname to; the API and MCP
+report server-side to their own site (`matomo_site_api`, `api/analytics.py`).
 
 The `ferenda` image
 is built on the box from the checkout and carries the full pipeline toolchain

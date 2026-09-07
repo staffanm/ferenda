@@ -8,13 +8,18 @@
    * The site id is looked up by hostname, so only a host we have actually
      registered in Matomo reports anything: a dev serve on localhost, a staging
      copy or a mirror stays silent instead of writing into prod's numbers.
-     Each deployed hostname must have an explicit site id here.
+     Each deployed hostname must have an explicit site id here -- and that cuts
+     both ways: after the 2026-09-05 cutover the pages answer on lagen.nu while
+     the table still named ferenda.lagen.nu, so the lookup missed, the snippet
+     returned before loading anything, and no reader page was counted at all.
+     ferenda.lagen.nu is gone from the table because it no longer serves a page
+     to run this in: its vhost is a 308 to lagen.nu.
 
    Kept first in the script.js bundle deliberately: the bundle is one
    concatenated script, so an uncaught error anywhere in it stops everything
    after -- the ping should not be downstream of the reading chrome. */
 (function () {
-  var SITES = {"ferenda.lagen.nu": 2};        // hostname -> Matomo site id
+  var SITES = {"lagen.nu": 2};                 // hostname -> Matomo site id
   var site = SITES[location.hostname];
   if (!site) return;
   var u = "/matomo/";
