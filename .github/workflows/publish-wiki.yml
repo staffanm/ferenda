@@ -1,0 +1,48 @@
+# Rebuild what a push to the content repo re-staled.
+#
+# lagen-wiki holds the editorial half of the site -- news and about pages,
+# commentary, concepts, text patches and annotation layers -- and a push to it
+# changes published pages without changing a line of ferenda. Nothing noticed
+# before this: the checkout on the box was pulled by hand.
+#
+# It runs here rather than in lagen-wiki because the self-hosted runner is
+# registered to this repository only (a personal-account runner serves one
+# repo), and the work has to happen on the box that holds the corpus. So
+# lagen-wiki's own workflow does nothing but send the changed paths over as a
+# repository_dispatch.
+#
+# Same concurrency group as the deploy, deliberately: both write the corpus,
+# and `lagen` refuses a second writer outright (build.py:682). The group keeps
+# them from queueing into each other's failure; the writer lease inside
+# publish_wiki.sh is what handles the nightly, which GitHub cannot see.
+name: publish-wiki
+
+on:
+  repository_dispatch:
+    types: [wiki-push]
+
+concurrency:
+  group: lagen-nu-deploy
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: self-hosted
+    env:
+      CODE: /home/staffan/wds/ferenda
+      # The paths arrive as a JSON array and stay in the environment. They are
+      # never interpolated into a `run:` block: a file named `$(...)` in a push
+      # would otherwise execute here, which is the documented injection vector
+      # for workflow expressions.
+      CHANGED: ${{ toJSON(github.event.client_payload.paths) }}
+    steps:
+      - name: Rebuild the affected documents
+        run: |
+          set -euo pipefail
+          # one path per line out of the JSON, then one argv element per line
+          # via xargs -d -- no shell ever parses a filename
+          python3 -c 'import json, os
+          for p in json.loads(os.environ["CHANGED"]):
+              print(p)' \
+            | xargs -d '\n' --no-run-if-empty \
+                sh "$CODE/tools/operations/publish_wiki.sh" 1
