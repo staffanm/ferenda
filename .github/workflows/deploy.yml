@@ -149,7 +149,17 @@ jobs:
         id: lease
         run: |
           set -uo pipefail
-          held="$(sh "$CODE/tools/operations/writer_lease.sh" 2>&1)"; rc=$?
+          # `set +e` around the check, and it is load-bearing: GitHub runs a
+          # `run:` block as `bash -e {0}`, so an assignment whose command
+          # substitution exits non-zero kills the step *there*. The lease check
+          # answering 3 ("held") is not an error, but on 2026-09-07 it ended
+          # this step before the line below could write `deferred=` -- so no
+          # retry was scheduled and the deploy went red instead of deferring.
+          # `set -uo pipefail` does not turn -e off; only this does.
+          set +e
+          held="$(sh "$CODE/tools/operations/writer_lease.sh" 2>&1)"
+          rc=$?
+          set -e
           case "$rc" in
             0) deferred=no ;;
             3) deferred=yes ;;
