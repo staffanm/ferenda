@@ -50,6 +50,14 @@ from ferenda.wiki import parse as wiki_parse
 # changed screencast needs the copy, which is the site source's own generate
 MEDIA = "site/media"
 
+# The one exception to "an unrecognised path means the whole corpus". This repo
+# runs CI of its own, and its workflow files are read by GitHub, never by
+# ferenda -- no page is built from them, provably, so widening to a corpus-wide
+# rebuild for a CI edit buys nothing. Kept to exactly this: a README or a stray
+# report is *probably* not an input either, but "probably" is the wrong word to
+# hang a published page on (see `targets`'s else branch).
+NOT_CONTENT = (".github/",)
+
 
 def _rel(path, root):
     """`path` as a `root`-relative posix string, or None if it is outside."""
@@ -97,6 +105,8 @@ def targets(changed, wiki_root=None):
                       if full in begrepp else ("begrepp", None))
         elif head in ("patches", "ann"):
             found.add(_document_of(head, rel, cache))
+        elif rel.startswith(NOT_CONTENT):
+            continue                 # CI config -- nothing is built from it
         else:
             # README, a report, something new -- no page is built from it that
             # this knows of, so make no claim either way
@@ -190,6 +200,16 @@ def commands(changed, wiki_root=None):
     found = targets(changed, wiki_root)
     if any(source is None for source, _ in found):
         return [WHOLE]
+    # A document-scoped generate selects by catalog row, so it can only name a
+    # document the catalog holds. `site`, `stats` and `remisser` are parsed and
+    # deliberately never catalogued (layout.CATALOGUED_SOURCES), and asking for
+    # one by name answers "no catalogued document matched 1 requested id(s)"
+    # and renders nothing -- which is what a live push did on 2026-09-07. Their
+    # whole-source generate is the narrowest form that exists; site is 33 pages,
+    # so that costs little.
+    for i, (source, basefile) in enumerate(found):
+        if basefile is not None and source not in layout.CATALOGUED_SOURCES:
+            found[i] = (source, None)
     # sources whose whole rebuild is already in the plan; their per-document
     # lines are redundant
     wide = {source for source, basefile in found if basefile is None}

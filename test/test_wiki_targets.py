@@ -49,17 +49,20 @@ def _commands(wiki, *paths):
     return wiki_targets.commands(list(paths), wiki_root=wiki)
 
 
-def test_a_news_edit_costs_one_page(wiki):
+def test_a_news_edit_costs_the_site_source_not_the_corpus(wiki):
     """The case this was written for: editing sitenews.md must not walk the
-    corpus. `lagen site generate sitenews` re-parses that one file and renders
-    that one page."""
-    assert _commands(wiki, "site/sitenews.md") == ["lagen site generate sitenews"]
+    corpus. It cannot narrow further than the source, because `site` is not
+    catalogued and a document-scoped generate selects by catalog row -- see
+    `test_a_source_the_catalog_does_not_hold_gets_its_whole_generate`. Site is
+    33 pages against half a million documents, so the win is the same."""
+    assert _commands(wiki, "site/sitenews.md") == ["lagen site rebuild"]
 
 
-def test_two_edits_give_two_targets_and_no_duplicates(wiki):
+def test_repeated_paths_do_not_repeat_commands(wiki):
     assert _commands(wiki, "site/sitenews.md", "site/om/nytt.md",
-                     "site/sitenews.md") == [
-        "lagen site generate om/nytt", "lagen site generate sitenews"]
+                     "site/sitenews.md") == ["lagen site rebuild"]
+    assert _commands(wiki, "concept/fullmakt.md", "concept/fullmakt.md") == [
+        "lagen begrepp generate Fullmakt"]
 
 
 def test_a_concept_names_its_own_document(wiki):
@@ -161,3 +164,41 @@ def test_a_source_rebuild_subsumes_that_source_s_document_commands(wiki):
     assert _commands(wiki, "site/media/oversikt.webm",
                      "concept/fullmakt.md") == [
         "lagen begrepp generate Fullmakt", "lagen site rebuild"]
+
+
+def test_the_content_repo_s_own_ci_is_not_content(wiki):
+    """lagen-wiki runs a workflow of its own, and GitHub is the only thing that
+    reads it. On 2026-09-07 the push that installed that workflow cost a
+    corpus-wide rebuild for two markdown edits, because `.github/` fell through
+    to the "could be anything" branch. It could not be anything: no page is
+    built from it."""
+    (wiki / ".github" / "workflows").mkdir(parents=True)
+    (wiki / ".github" / "workflows" / "publish.yml").write_text("name: publish\n")
+    assert _commands(wiki, ".github/workflows/publish.yml") == []
+    # and it does not mask the edits it was pushed alongside
+    assert _commands(wiki, ".github/workflows/publish.yml",
+                     "site/sitenews.md") == ["lagen site rebuild"]
+
+
+def test_a_stray_file_still_widens_even_though_ci_does_not(wiki):
+    """The exception is exactly one prefix. A README or a report is *probably*
+    not an input either, and probably is the wrong word to hang a published
+    page on."""
+    assert _commands(wiki, "RAPPORT-inaktuellt.md") == [WHOLE]
+
+
+def test_a_source_the_catalog_does_not_hold_gets_its_whole_generate(wiki):
+    """A document-scoped generate selects by catalog row, and `site`, `stats`
+    and `remisser` are parsed but deliberately never catalogued. Asking for one
+    by name answers "no catalogued document matched 1 requested id(s)" and
+    renders nothing -- which is what a live push did on 2026-09-07, reporting
+    success while the page stayed stale. The whole-source generate is the
+    narrowest form that exists for them; site is 33 pages."""
+    assert "site" not in layout.CATALOGUED_SOURCES
+    assert _commands(wiki, "site/sitenews.md") == ["lagen site rebuild"]
+    assert _commands(wiki, "site/sitenews.md", "site/om/nytt.md") == [
+        "lagen site rebuild"]
+    # a catalogued source keeps its per-document command
+    assert "begrepp" in layout.CATALOGUED_SOURCES
+    assert _commands(wiki, "concept/fullmakt.md") == [
+        "lagen begrepp generate Fullmakt"]
