@@ -3916,9 +3916,10 @@ def test_every_page_serving_vhost_has_a_matomo_site_id():
     since no page is served under it to run the snippet in.
 
     The subdomain projections (`docker/nginx/subdomains.conf`) serve pages from
-    a root rather than the app and are deliberately outside this check -- they
-    carry the same bundle and report nothing, which is a decision still to be
-    made, not an oversight this test would settle."""
+    a root rather than the app, so `location /` says nothing about them. They
+    report as site 2 since 2026-09-08, matched by a zone regex rather than by
+    name -- the second half of this test checks that regex against the zones
+    that vhost's own `server_name` names."""
     sites = re.search(r"var SITES = (\{[^}]*\})",
                       Path("ferenda/lib/assets/matomo.js").read_text())
     assert sites, "matomo.js no longer declares a SITES table"
@@ -3957,3 +3958,24 @@ def test_every_page_serving_vhost_has_a_matomo_site_id():
     assert not (tracked & redirecting), (
         "these hostnames only redirect, so no page is served under them to run "
         "the snippet: %s" % ", ".join(sorted(tracked & redirecting)))
+
+    # the subdomain vhost matches its hosts by regex, and so does the snippet:
+    # compare the zone alternation the two write, not the regexes themselves
+    zones = re.search(r"server_name\s+~\^\[a-z0-9-\]\+\\\.\(([^)]+)\)",
+                      Path("docker/nginx/subdomains.conf").read_text())
+    assert zones, "subdomains.conf no longer matches its hosts by zone regex"
+    snippet = re.search(r"var ZONES = /\^\[a-z0-9-\]\+\\\.\(([^)]+)\)",
+                        Path("ferenda/lib/assets/matomo.js").read_text())
+    assert snippet, "matomo.js no longer declares a ZONES regex"
+    assert set(zones.group(1).split("|")) == set(snippet.group(1).split("|")), (
+        "matomo.js tracks the zones %s, subdomains.conf serves %s"
+        % (snippet.group(1), zones.group(1)))
+    # nginx prefers an exact server_name over that regex, so the hosts other
+    # vhosts claim must be excluded by name even though they match the shape
+    excluded = set(re.findall(
+        r'"([^"]+)": 1', re.search(
+            r"var NOT_A_PAGE = \{([^}]*)\}",
+            Path("ferenda/lib/assets/matomo.js").read_text()).group(1)))
+    assert redirecting <= excluded, (
+        "these hostnames only redirect but the zone regex would track them: "
+        "%s" % ", ".join(sorted(redirecting - excluded)))

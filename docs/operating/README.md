@@ -613,6 +613,16 @@ reader-facing pages ping the tracker at the same `/matomo/` prefix, same-origin,
 under the site id `lib/assets/matomo.js` maps their hostname to; the API and MCP
 report server-side to their own site (`matomo_site_api`, `api/analytics.py`).
 
+The three sites are **1** legacy (`old.lagen.nu`), **2** the rebuilt pages, and
+**3** the API and MCP. Site 2 covers the definite-form subdomains too
+(`<slug>.lagen.nu` and the three other zones): they serve their page at `/`, so
+the snippet sends the whole origin as the tracked URL, and
+`docker/nginx/subdomains.conf` proxies `/matomo/matomo.php` on each of them so
+the hit stays same-origin. A screencast on an `/om/` page reports one custom
+event when the reader starts it — Behaviour > Events, category `Video`, action
+`Start`, name the film's file name. Matomo counts media by itself only with the
+paid MediaAnalytics plugin, which this install does not have.
+
 The `ferenda` image
 is built on the box from the checkout and carries the full pipeline toolchain
 (poppler, tesseract+swe, ocrmypdf, raptor2, a JRE + POI jars), so download and
