@@ -57,7 +57,12 @@ from there), and anything before `1998:306` exists only on paper — naming one
 is an error. Beside the PDFs, `.mirror.json` records the acts an upstream
 answered it has no PDF for: a missing file alone cannot say whether an act was
 never fetched or has nothing to fetch, so without that record every such act
-cost a request on every run. Each act is therefore asked about at most once —
+cost a request on every run. The same file keeps the sweep watermark
+(`swept`): the harvest's PDF sweep reads only the downloaded act records
+fetched since its last clean sweep and asks about the SFS numbers they list,
+the way the harvest itself keeps a watermark, so a nightly with a few new acts
+costs a few reads instead of all 11,247 records and a stat per number. `lagen sfs mirror-pdf` with no arguments
+still walks the corpus. Each act is therefore asked about at most once —
 the price being that a negative is permanent, so if the publisher posts a PDF it
 previously lacked, only `--full` will find it. `ai-includegraphics` mirrors any
 source PDF it still needs, so `mirror-pdf` need not have been run first.

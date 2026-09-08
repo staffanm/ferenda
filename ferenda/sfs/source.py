@@ -117,12 +117,15 @@ def sfs_harvest(scopes):
 
     Mirrors the official PDFs of whatever it found, too: the facsimiles are the
     same acts from the same publisher, and leaving them to a separate command
-    let the two drift. Always incrementally, `--force` or not -- an act already
-    mirrored, or known to have no PDF, costs nothing, so only the first harvest
-    pays for the corpus-wide backfill. `--force` here scopes *discovery* (walk
-    the whole corpus rather than stop at the first known page); re-fetching
-    every facsimile is `mirror-pdf --force`, and asking for one is no way to ask
-    for the other."""
+    let the two drift. Watermarked like the harvest itself: the sweep reads
+    only the act records fetched since its last clean sweep
+    (`pdfmirror.acts_to_sweep`) and asks about the SFS numbers they list, so
+    a nightly costs a handful of reads; the first sweep, or one after a
+    crash, walks the corpus. `--force` here scopes *discovery* (walk the whole corpus rather
+    than stop at the first known page); re-fetching every facsimile is
+    `mirror-pdf --force`, and asking for one is no way to ask for the other.
+    A PDF removed from the mirror directory by hand is found again by
+    `lagen sfs mirror-pdf`, which always walks the corpus."""
     if protocol.RUN.dry_run:
         print("sfs download: would download the corpus into %s"
               % layout.SFS_DOWNLOADED)
@@ -133,8 +136,14 @@ def sfs_harvest(scopes):
                                                     resume_after=resume_after)
     print("sfs download: %d seen, %d new, %d updated, %d skipped"
           % (seen, new, updated, skipped))
-    pdfmirror.mirror(protocol.session(download), pdfmirror.corpus_beteckningar(sfs_list()),
-                     force=False, dry_run=protocol.RUN.dry_run)
+    fetched = download.read_fetched(layout.SFS_DOWNLOADED)
+    bases = pdfmirror.acts_to_sweep(pdfmirror.MirrorState(layout.sfs_pdf_dir()),
+                                         fetched, sfs_list())
+    state = pdfmirror.mirror(protocol.session(download),
+                             pdfmirror.corpus_beteckningar(bases),
+                             force=False, dry_run=protocol.RUN.dry_run)
+    if state is not None and fetched:       # a clean sweep (mirror raises otherwise)
+        state.record_swept(max(fetched.values()))
     # sfs splits "changed" in two -- an act we did not hold, and a new lydelse of
     # one we did. Both wrote a record, so both count as work done
     return seen, new + updated

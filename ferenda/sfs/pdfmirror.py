@@ -148,12 +148,27 @@ class MirrorState:
     def __init__(self, root):
         self.path = Path(root) / ".mirror.json"
         self.absent: set[str] = set()
+        # the harvest's sweep watermark: every act record the harvest had
+        # fetched by this date has had its numbers asked about (on disk, or
+        # in `absent`).
+        # None until a corpus-wide sweep has completed cleanly.
+        self.swept: str | None = None
         if self.path.exists():
-            self.absent = set(json.loads(self.path.read_text())["absent"])
+            stored = json.loads(self.path.read_text())
+            self.absent = set(stored["absent"])
+            self.swept = stored.get("swept")
 
     def save(self):
         write_atomic(self.path, json.dumps(
-            {"absent": sorted(self.absent, key=_sort_key)}, indent=1))
+            {"absent": sorted(self.absent, key=_sort_key), "swept": self.swept},
+            indent=1))
+
+    def record_swept(self, date):
+        """Advance the sweep watermark to `date` (an ISO day, the newest
+        act-record fetch the sweep covered). Only after a clean sweep: a crashed
+        one leaves the old mark, and the next run re-walks from there."""
+        self.swept = date
+        self.save()
 
     def record_absent(self, beteckning):
         """Remember that the upstream definitively has no PDF for `beteckning`,
@@ -224,6 +239,21 @@ def _fetch_upstream(session, state, beteckning, out):
     return out
 
 
+def acts_to_sweep(state, fetched, bases):
+    """The base acts whose downloaded JSON the harvest's PDF sweep must read
+    for SFS numbers: those the harvest fetched on or after the sweep
+    watermark (`state.swept`, against the `.fetched.json` dates), so a
+    nightly reads a handful of act records and asks about their numbers
+    instead of reading all 11,247 and stat-ing every act's PDF (103 s on
+    2026-09-07). Every base act until a clean sweep has recorded a watermark,
+    or when the harvest kept no fetch dates. SFS numbers are chronological
+    and an amendment to an old act refetches that act's record, so a record
+    fetched since the mark lists every number the mark has not covered."""
+    if state.swept is None or not fetched:
+        return list(bases)
+    return [bf for bf in bases if fetched.get(bf, "") >= state.swept]
+
+
 def corpus_beteckningar(bases):
     """Every SFS number to mirror: each base act plus every andringsforfattning
     in its downloaded register, deduped and sorted oldest-first."""
@@ -274,6 +304,7 @@ def mirror(session, targets, *, force, dry_run):
     print("sfs mirror-pdf: %d fetched, %d without a published PDF, %d older than "
           "any facsimile source, %d target(s)"
           % (fetched, no_pdf, print_only, len(targets)))
+    return state
 
 
 def mirror_on_demand(session, beteckningar):

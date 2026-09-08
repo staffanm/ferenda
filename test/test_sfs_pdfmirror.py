@@ -252,3 +252,36 @@ def test_mirror_state_round_trips(tmp_path):
     state = m.MirrorState(tmp_path)
     state.record_absent("2007:9999")
     assert m.MirrorState(tmp_path).absent == {"2007:9999"}
+
+
+def test_mirror_state_keeps_the_sweep_watermark(tmp_path):
+    state = m.MirrorState(tmp_path)
+    assert state.swept is None
+    state.record_absent("2007:9999")
+    state.record_swept("2026-09-07")
+    again = m.MirrorState(tmp_path)
+    assert again.absent == {"2007:9999"} and again.swept == "2026-09-07"
+    # a store from before the watermark existed loads with none
+    (tmp_path / ".mirror.json").write_text(json.dumps({"absent": []}))
+    assert m.MirrorState(tmp_path).swept is None
+
+
+def test_the_sweep_reads_only_acts_fetched_since_the_watermark(tmp_path):
+    state = m.MirrorState(tmp_path)
+    bases = ["1962:700", "2018:585", "2026:100"]
+    fetched = {"1962:700": "2026-09-01", "2018:585": "2026-09-07", "2026:100": "2026-09-08"}
+    # no watermark yet, or no fetch dates kept: the whole corpus
+    assert m.acts_to_sweep(state, fetched, bases) == bases
+    state.record_swept("2026-09-07")
+    assert m.acts_to_sweep(state, {}, bases) == bases
+    # fetched on or after the mark: swept again (same-day fetches included);
+    # older, or never recorded: covered by an earlier sweep
+    assert m.acts_to_sweep(state, fetched, bases) == ["2018:585", "2026:100"]
+    assert m.acts_to_sweep(state, {"2026:100": "2026-09-08"}, bases) == ["2026:100"]
+
+
+def test_a_clean_sweep_returns_its_state(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(layout, "SFS_DOWNLOADED", tmp_path)
+    state = m.mirror(None, [], force=False, dry_run=False)
+    assert isinstance(state, m.MirrorState)
+    assert m.mirror(None, [], force=False, dry_run=True) is None
