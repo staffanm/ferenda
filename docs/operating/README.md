@@ -382,8 +382,11 @@ rules now cut that:
   just the documents this run parsed and the pages that show them, both ends
   of every link, instead of checking all 458,674 pages. The run must prove
   that is the whole set: every published source's parse ran in this run, the
-  layers, the repeal dates and the render code are unchanged, and the ledger
-  shows the last run that parsed anything also completed a full generate.
+  cross-document layers (`.ann`, `.corr`), the repeal dates and the render
+  code are unchanged, and the ledger shows the last run that parsed anything
+  also completed a full generate. A changed `.versions.json` sidecar adds
+  its own statute's page (the records of those sidecars live in
+  `.build/generate-own-layers.records`).
   Otherwise the per-page scan runs as before. The aggregate pages and the
   gate record are written either way, so the next unchanged run skips.
 

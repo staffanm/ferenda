@@ -15,7 +15,7 @@ import os
 import shutil
 from pathlib import Path
 
-from . import compress, util
+from . import compress, freshness, util
 
 # artifacts one read job takes: at 13-44 ms an artifact on the production NFS
 # mount a job is a few seconds, and the progress line moves (relate's HASH_CHUNK)
@@ -117,20 +117,13 @@ def records_path(out_path):
 
 
 def write_records(out_path, records):
-    with gzip.open(records_path(out_path), "wt", encoding="utf-8") as fh:
-        for path, size, mtime_ns in records:
-            fh.write("%s\t%d\t%d\n" % (path, size, mtime_ns))
+    freshness.write_stat_records(records_path(out_path), records)
 
 
 def read_records(out_path):
     """The recorded stat records, or None when the dump has none (a dump
     written before records were kept, or none at all)."""
-    p = records_path(out_path)
-    if not p.exists():
-        return None
-    with gzip.open(p, "rt", encoding="utf-8") as fh:
-        return [(path, int(size), int(mtime))
-                for path, size, mtime in (line.rstrip("\n").split("\t") for line in fh)]
+    return freshness.read_stat_records(records_path(out_path))
 
 
 def appendable(previous, current):
@@ -138,10 +131,8 @@ def appendable(previous, current):
     from `previous` (the dump's) only by additions: their paths, in `current`'s
     order. None when a recorded artifact changed or vanished, or when there is
     no record -- the dump must then be rewritten."""
-    if previous is None:
+    diff = freshness.changed_stat_records(previous, current)
+    if diff is None:
         return None
-    before = {path: (size, mtime) for path, size, mtime in previous}
-    now = {path: (size, mtime) for path, size, mtime in current}
-    if any(path not in now or now[path] != mark for path, mark in before.items()):
-        return None
-    return [path for path, _size, _mtime in current if path not in before]
+    new, changed, gone = diff
+    return None if changed or gone else new

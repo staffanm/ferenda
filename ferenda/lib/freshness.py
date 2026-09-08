@@ -15,6 +15,7 @@ Stage instance carries throughout the engine.
 import collections
 import faulthandler
 import functools
+import gzip
 import hashlib
 import heapq
 import itertools
@@ -217,6 +218,40 @@ def generate_caught_up():
                 and any(ev["step"] == "generate" and ev["source"] == "__site__"
                         and ev["status"] in ("ok", "skipped") for ev in segments))
     return True
+
+
+def write_stat_records(path, records):
+    """Persist `stat_records` output at `path`: one ``path\tsize\tmtime_ns``
+    line per file, gzipped. What lets a later run tell which files of a set
+    are new, changed or gone (`changed_stat_records`) without the previous
+    run's memory: the dumps keep one per source, generate one for the
+    own-page sidecars."""
+    with gzip.open(path, "wt", encoding="utf-8") as fh:
+        for p, size, mtime_ns in records:
+            fh.write("%s\t%d\t%d\n" % (p, size, mtime_ns))
+
+
+def read_stat_records(path):
+    """The records `write_stat_records` wrote, or None when there are none."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        return [(p, int(size), int(mtime))
+                for p, size, mtime in (line.rstrip("\n").split("\t") for line in fh)]
+
+
+def changed_stat_records(previous, current):
+    """``(new, changed, gone)`` paths between two record lists: in `current`
+    only, in both with another size or mtime, in `previous` only. None when
+    there is no `previous`."""
+    if previous is None:
+        return None
+    before = {p: (size, mtime) for p, size, mtime in previous}
+    now = {p: (size, mtime) for p, size, mtime in current}
+    return ([p for p in now if p not in before],
+            [p for p, mark in now.items() if p in before and before[p] != mark],
+            [p for p in before if p not in now])
 
 
 def forget_stats():

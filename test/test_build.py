@@ -2505,12 +2505,25 @@ def test_run_dirty_pages_is_the_parsed_documents_and_their_neighbours(tmp_path, 
     monkeypatch.setattr(freshness, "RUN_REBUILT", {("syn", "parse"): {"a"}})
     monkeypatch.setattr(freshness, "generate_caught_up", lambda: True)
     monkeypatch.setattr(freshness, "code_changed", lambda *a: False)
+    monkeypatch.setattr(freshness, "RUN_ID", None)
+    monkeypatch.setattr(corpus, "OWN_LAYER_RECORDS", tmp_path / "own.records")
+    # no sidecar records from a full generate yet: the corpus scan runs
+    assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") is None
+    freshness.write_stat_records(corpus.OWN_LAYER_RECORDS, [])
     # a: parsed; b: cited by a, its page shows a in its inbound rail; c: untouched
     assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") == {
         "https://lagen.nu/a", str(root / "syn" / "a.json"),
         "https://lagen.nu/b", str(root / "syn" / "b.json")}
-    # a changed layer set, an unparsed source, or an uncaught-up ledger: the
-    # corpus scan runs instead
+    # c's version panel sidecar appeared since the records: c's own page, no neighbours
+    sidecar = root / "syn" / "c.versions.json"
+    sidecar.write_text("[]")
+    src.layers = lambda: [sidecar]
+    monkeypatch.setattr(freshness, "RUN_REBUILT", {("syn", "parse"): set()})
+    assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") == {
+        "https://lagen.nu/c", str(root / "syn" / "c.json")}
+    monkeypatch.setattr(freshness, "RUN_REBUILT", {("syn", "parse"): {"a"}})
+    # a changed cross-document layer set, an unparsed source, or an uncaught-up
+    # ledger: the corpus scan runs instead
     assert corpus._run_dirty_pages({"syn": src}, store, "S2", "E") is None
     monkeypatch.setattr(freshness, "generate_caught_up", lambda: False)
     assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") is None

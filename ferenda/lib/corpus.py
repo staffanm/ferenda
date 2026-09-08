@@ -1175,9 +1175,9 @@ def generate_fingerprint(sources, jobs=1):
     return _join_fingerprint(*generate_fingerprint_parts(sources, jobs))
 
 
-def _join_fingerprint(sig, sides, expired):
+def _join_fingerprint(sig, sides, own, expired):
     return hashlib.sha256(
-        (sig + "\x1f" + sides + "\x1f" + expired).encode()).hexdigest()
+        (sig + "\x1f" + sides + "\x1f" + own + "\x1f" + expired).encode()).hexdigest()
 
 
 def generate_fingerprint_parts(sources, jobs=1):
@@ -1201,8 +1201,26 @@ def generate_fingerprint_parts(sources, jobs=1):
     # versions-stage sidecars, the remiss answers and the site artifacts. A
     # layer that rides another document's rail enters that page's dependency
     # digest per page (page.site_cross_digests); here it reopens the coarse gate
-    sides = freshness.file_fingerprint(_layers(sources), label="generate", jobs=jobs)
-    return sig, sides, hashlib.sha256(expired.encode()).hexdigest()
+    # the layers split in two: a curated .ann/.corr layer renders onto other
+    # documents' pages (cross), a .versions.json sidecar only onto its own
+    # statute's (own), so a changed sidecar names the one page to re-render
+    cross = freshness.file_fingerprint(
+        [p for p in _layers(sources) if not _own_layer(p)], label="generate", jobs=jobs)
+    own = freshness.stat_records(_own_layers(sources), jobs=jobs)
+    return sig, cross, freshness.fingerprint_of(own), hashlib.sha256(expired.encode()).hexdigest()
+
+
+def _own_layer(path):
+    return str(path).endswith(".versions.json")
+
+
+def _own_layers(sources):
+    return [p for p in _layers(sources) if _own_layer(p)]
+
+
+# the stat records of the own-page sidecars the last full generate saw: what
+# tells a later run which statutes' version panels moved
+OWN_LAYER_RECORDS = config.DATA / ".build" / "generate-own-layers.records"
 
 
 GENERATE_PARTS_KEY = freshness.manifest_key("generate", "__parts__", "__site__")
@@ -1210,20 +1228,28 @@ GENERATE_PARTS_KEY = freshness.manifest_key("generate", "__parts__", "__site__")
 
 def _run_dirty_pages(sources, store, sides, expired):
     """The pages a full generate must render when only the catalog signature
-    moved since the last full generate: the documents this run parsed
-    (`freshness.RUN_REBUILT`) and every document whose page shows one of them
-    -- the citing and the cited, both ends of every link -- as the uris and
-    artifact paths `generate_site`'s `only` takes. None when the run cannot
-    prove that is the whole set, and the per-page scan over the corpus runs
-    instead: a layer, a repeal date or the render code changed too; a
-    published source's parse did not run in this run; an earlier run parsed
-    documents no full generate has seen (`freshness.generate_caught_up`); or
-    no full generate has recorded its parts yet.
+    and the own-page sidecars moved since the last full generate: the
+    documents this run parsed (`freshness.RUN_REBUILT`) and every document
+    whose page shows one of them -- the citing and the cited, both ends of
+    every link -- plus the statutes whose `.versions.json` sidecar changed
+    (their version panel; the sidecar records are kept at
+    `OWN_LAYER_RECORDS`), as the uris and artifact paths `generate_site`'s
+    `only` takes. None when the run cannot prove that is the whole set, and
+    the per-page scan over the corpus runs instead: a cross-document layer, a
+    repeal date or the render code changed too; a published source's parse
+    did not run in this run; an earlier run parsed documents no full generate
+    has seen (`freshness.generate_caught_up`); or no full generate has
+    recorded its parts and sidecar records yet.
 
     The neighbourhood is exactly what `catalog.page_dependency_digests_for`
     reads: a page's digest is its inbound rows and its outbound targets, so
     a document outside it cannot have a changed digest."""
     if store.get(GENERATE_PARTS_KEY) != {"sides": sides, "expired": expired}:
+        return None
+    moved = freshness.changed_stat_records(
+        freshness.read_stat_records(OWN_LAYER_RECORDS),
+        freshness.stat_records(_own_layers(sources)))
+    if moved is None:
         return None
     published = [name for name, s in sources.items() if s.artifacts and "parse" in s.stages]
     if any((name, "parse") not in freshness.RUN_REBUILT for name in published):
@@ -1236,10 +1262,13 @@ def _run_dirty_pages(sources, store, sides, expired):
     root = catalog.data_root(con)
     rebuilt = {str(Path(sources[name].stages["parse"].output(bf)).relative_to(root))
                for name in published for bf in freshness.RUN_REBUILT[(name, "parse")]}
+    # a sidecar's owner is the artifact beside it: <stem>.versions.json -> <stem>.json
+    owners = {str(Path(p[:-len(".versions.json")] + ".json").relative_to(root))
+              for group in moved for p in group}
     uris = {uri for (uri,) in con.execute(
         "SELECT uri FROM documents WHERE path IN (%s)" % ",".join("?" * len(rebuilt)),
         sorted(rebuilt))} if rebuilt else set()
-    if not uris:                 # the signature moved, but not through this run's parse
+    if not uris and not owners:  # the signature moved, but not through this run's parse
         con.close()
         return None
     around = set()
@@ -1249,6 +1278,10 @@ def _run_dirty_pages(sources, store, sides, expired):
         around.update(u for (u,) in con.execute(
             "SELECT to_root FROM links WHERE from_uri = ?", (uri,)))
     around -= uris
+    if owners:
+        around.update(uri for (uri,) in con.execute(
+            "SELECT uri FROM documents WHERE path IN (%s)" % ",".join("?" * len(owners)),
+            sorted(owners)))
     only = set()
     for uri, path in con.execute(
             "SELECT uri, path FROM documents WHERE uri IN (%s)"
@@ -1257,8 +1290,9 @@ def _run_dirty_pages(sources, store, sides, expired):
         if path:
             only.add(str(root / path))
     con.close()
-    print("generate: %d document(s) parsed this run and %d page(s) that show "
-          "them -- rendering those, not scanning the corpus" % (len(uris), len(around)))
+    print("generate: %d document(s) parsed this run, %d page(s) that show them "
+          "and %d statute(s) with a changed version panel -- rendering those, "
+          "not scanning the corpus" % (len(uris), len(around) - len(owners), len(owners)))
     return only
 
 
@@ -1384,8 +1418,8 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     if not scoped:
         store = freshness.load_fingerprints()
         util.checking("generate")
-        sig, sides, expired = generate_fingerprint_parts(sources, jobs)
-        site_wm = _join_fingerprint(sig, sides, expired)
+        sig, sides, own, expired = generate_fingerprint_parts(sources, jobs)
+        site_wm = _join_fingerprint(sig, sides, own, expired)
         if freshness.up_to_date(store, "generate", "__site__", site_wm, GENERATE_CODE):
             print("generate: up to date -- skipped (%s)" % layout.GENERATED)
             freshness._emit_segment("generate", "__site__", 0.0, ran=0, status="skipped")
@@ -1487,6 +1521,9 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     if not scoped:                       # record the site fingerprint for next time
         freshness.record_step(store, "generate", "__site__", site_wm, GENERATE_CODE)
         store[GENERATE_PARTS_KEY] = {"sides": sides, "expired": expired}
+        OWN_LAYER_RECORDS.parent.mkdir(parents=True, exist_ok=True)
+        freshness.write_stat_records(OWN_LAYER_RECORDS,
+                                     freshness.stat_records(_own_layers(sources)))
         freshness.save_fingerprints(store)
     freshness._emit_segment("generate", seg_source, time.perf_counter() - t0, total=total,
                   ran=rendered, status="ok")
