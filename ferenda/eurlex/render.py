@@ -7,6 +7,7 @@ Registered as this source's page renderer (the `render=` field of its
 """
 import json
 import re
+import sys
 from datetime import date
 from html import escape
 
@@ -18,6 +19,7 @@ from ..lib.eu_structure import flatten as eurlex_flatten
 from ..lib.margins import chain_meta
 from ..lib.markdown import begrepp_uri
 from ..lib.page import (
+    ARTIKEL_SPAN,
     BANNERS,
     NODES,
     Rail,
@@ -30,6 +32,8 @@ from ..lib.page import (
     render_runs,
     render_tabell,
     render_toc,
+    span_key,
+    span_scopes,
     swedish_join,
     versions_panel,
 )
@@ -105,8 +109,11 @@ class Editorial:
 
 
 def _art_sort_key(art):
-    """Sort article numbers numerically where possible ('2' before '10')."""
-    return (0, int(art)) if art.isdigit() else (1, art)
+    """Sort article numbers the way the act numbers them: "2" before "10", and
+    "8a" between "8" and "9" -- the same order `span_key` gives a TOC span, so
+    one act's articles do not sort two ways on one page. A designation this
+    module cannot read ("Enda artikel") sorts last, by name."""
+    return span_key(art) or (sys.maxsize, art)
 
 
 def _load_editorial(celex):
@@ -465,6 +472,21 @@ def _division_label(b, casemap):
     return label, _cased_runs(runs, casemap) if _shouts(runs_text(runs)) else runs
 
 
+def _article_scopes(blocks):
+    """Every division heading -> the articles under it ("art. 24-43"), keyed by
+    block identity. A Kapitel and each Avsnitt inside it print their own span:
+    an EU act's divisions are how a reader finds an article, and GDPR's chapter
+    IV holds 20 articles under five Avsnitt.
+
+    The map is keyed on the *flattened* blocks (`eu_structure.flatten` copies
+    each container node), so it must be built from the same list the render
+    walks."""
+    scopes = {}
+    span_scopes(blocks, scopes, heading="heading", unit="article",
+                number="num", forms=ARTIKEL_SPAN)
+    return scopes
+
+
 def _article_parts(b):
     """An article heading's `(word, number, title_runs)`, or `(None, None, None)`
     where it carries no designation of its own ("Enda artikel").
@@ -520,7 +542,8 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
         # entry is 1 + (level - 1) = its own level, unchanged; only what
         # follows moves
         toc.depth = level - 1
-        anchor = toc.add(bid, " ".join(x for x in (label, plain(title)) if x), 1)
+        anchor = toc.add(bid, " ".join(x for x in (label, plain(title)) if x),
+                         1, b)
         return NODES.eu_heading(min(level + 1, 5), anchor, label,
                                 Markup(render_runs(title, site)))
     if t == "keyword":
@@ -690,7 +713,6 @@ def render(art, site):
                 if site.has(catalog.BASE + "celex/" + m["celex"])]
         if held:
             preamble_note = NODES.eu_preamble_note(held)
-    toc = Toc()
     rail = Rail(site, art["uri"])
     parts = []
     anchors = Anchors()                  # running context for sub-article keys
@@ -702,6 +724,7 @@ def render(art, site):
     # points); render reads it in document order -- the heading levels and the
     # TOC already convey the hierarchy, so no nested <section> markup is needed
     blocks = list(eurlex_flatten(art.get("structure", [])))
+    toc = Toc(_article_scopes(blocks))
     casemap = _case_map(blocks)
     # the page's own article anchors, for the recital back-links (an amending
     # act's `.ann` names articles this page does not carry)

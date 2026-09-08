@@ -19,8 +19,10 @@
 {%- macro toc(entries, top) -%}
 <nav class="toc"><div class="toc-h">Innehåll</div><div class="toc-list">
 {%- if top %}<a href="#top" class="lvl1 toc-top">{{ top }}</a>{% endif -%}
-{%- for anchor, text, level in entries -%}
-<a href="#{{ anchor }}" class="lvl{{ [level, 3] | min }}">{{ text }}</a>
+{%- for anchor, text, level, scope in entries -%}
+<a href="#{{ anchor }}" class="lvl{{ [level, 3] | min }}">{{ text }}
+{%- if scope %} <span class="toc-scope">({{ scope }})</span>{% endif -%}
+</a>
 {%- endfor -%}
 </div></nav>
 {%- endmacro -%}

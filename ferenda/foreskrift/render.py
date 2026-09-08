@@ -18,6 +18,7 @@ from ..lib.page import (
     Toc,
     doc_meta,
     footnote_items,
+    heading_scopes,
     page_context,
     ref_link,
     ref_list,
@@ -200,7 +201,7 @@ def render(art, site):
             + ref_list(site, "Bemyndigande", md.get("bemyndigande"))
             + ref_list(site, "Genomför EU-direktiv", md.get("genomfor"))
             + _upphavd_av(upphavd_rows))
-    toc = Toc()
+    toc = Toc(heading_scopes(structure))
     rail = Rail(site, art["uri"])
     banner = _foreskrift_repealed_banner(upphavd_rows) \
         + (_grund_banner(base_uri) if grund

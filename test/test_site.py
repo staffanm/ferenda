@@ -1399,7 +1399,8 @@ def test_toc_collects_and_generates_anchors():
     assert toc.add("K1", "1 kap.", 1) == "K1"      # existing id reused
     assert toc.add(None, "Bakgrund", 1) == "sec1"  # id-less -> generated, stable
     assert toc.add(None, "  ", 1) == "sec2"        # blank text -> no entry, still counts
-    assert toc.entries == [("K1", "1 kap.", 1), ("sec1", "Bakgrund", 1)]
+    assert toc.entries == [("K1", "1 kap.", 1, ""),
+                           ("sec1", "Bakgrund", 1, "")]
 
 
 def test_render_toc_skips_short_documents():
@@ -3230,8 +3231,10 @@ def test_act_toc_nests_articles_under_their_section(tmp_path):
     html = eurlex_render.render(DIVIDED_ACT,
                                 page.Site.from_catalog(catalog.connect(db)))
     nav = re.search(r'<nav class="toc">.*?</nav>', html, re.S).group(0)
-    entries = [(m.group(2), m.group(3)) for m in
-               re.finditer(r'<a href="([^"]+)" class="(lvl\d)[^"]*">([^<]*)</a>',
+    # the entry text without the article span a division entry also prints
+    # (test_toc_scope.py pins the span itself)
+    entries = [(m.group(2), re.sub(r"\s*<span.*", "", m.group(3))) for m in
+               re.finditer(r'<a href="([^"]+)" class="(lvl\d)[^"]*">(.*?)</a>',
                            nav)]
     assert entries == [
         ("lvl1", "32099R0002"),                      # the document's own short id

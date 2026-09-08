@@ -811,10 +811,20 @@ def _citer_line(row):
 class Toc:
     """Collects a document's headings as it is rendered, so the body's anchor
     ids and the TOC's links agree by construction. A heading without a node id
-    (DV/förarbete) is given a generated, stable-per-page anchor."""
+    (DV/förarbete) is given a generated, stable-per-page anchor.
 
-    def __init__(self):
-        self.entries = []                # (anchor, text, level)
+    `scopes` maps a node's identity to the span of provisions it covers ("3–6 b
+    §§", "kap. 3–24", "art. 24–43"). A heading alone cannot say where its own
+    span ends, so a whole document is read to build the map first --
+    `heading_scopes` for a statute, `eurlex.render._article_scopes` for an EU
+    act. It must be built from the *same* node objects the render then walks:
+    an identity the map does not hold reads as no span, which is the normal
+    case for a source that passes no map at all (dv, förarbete, the treaty
+    sources) and for a chapter, whose entry deliberately prints none."""
+
+    def __init__(self, scopes=None):
+        self.entries = []                # (anchor, text, level, scope)
+        self.scopes = scopes or {}
         self._n = 0
         # how much deeper the headings collected right now sit than their own
         # `level` says. A DV case is a stack of court instances that each
@@ -824,13 +834,142 @@ class Toc:
         # three times, with no way to tell HD's from tingsrättens (D6).
         self.depth = 0
 
-    def add(self, node_id, text, level):
+    def add(self, node_id, text, level, node=None):
         if not node_id:
             self._n += 1
             node_id = "sec%d" % self._n
         if text.strip():
-            self.entries.append((node_id, text, level + self.depth))
+            self.entries.append((node_id, text, level + self.depth,
+                                 self.scopes.get(id(node), "")))
         return node_id
+
+
+# the spans a TOC entry prints, as (one, several) format pairs. A statute's
+# heading names the paragrafer under it, a division the kapitel, an EU division
+# the articles -- the reader sees how much of the act an entry covers before
+# opening it.
+PARAGRAF_SPAN = ("%s §", "%s–%s §§")
+KAPITEL_SPAN = ("kap. %s", "kap. %s–%s")
+ARTIKEL_SPAN = ("art. %s", "art. %s–%s")
+
+
+# a provision number as this module reads it: a numeral, optionally with the
+# letter an inserted provision carries ("6 b", "6b", "21 a")
+RE_SPAN_NUMBER = re.compile(r"(\d+)\s*([a-zåäö]*)", re.I)
+
+
+def span_key(number):
+    """A provision number as a sort key: "6 b" after "6", "10" after "9". None
+    when the number is not written that way, which is what tells `span_label`
+    it cannot order the provisions it was given."""
+    m = RE_SPAN_NUMBER.fullmatch(number.strip())
+    return (int(m.group(1)), m.group(2).lower()) if m else None
+
+
+def span_label(numbers, forms):
+    """The span `numbers` covers, printed in `forms`: "3 §", "3–6 b §§",
+    "kap. 3–24". '' for no numbers at all.
+
+    A run that does not climb prints nothing. Document order is not always
+    ascending order, and a span over a run that restarts is a false claim about
+    the act:
+
+    * 31978R1562 quotes the amended regulation's articles 4-20d, then closes
+      with its own articles 2 and 3 -- printed "art. 4–3";
+    * 1987:1182 carries a tax treaty whose every article numbers its punkter
+      from 1, so "Bilaga 1" ran 1,2,3,4,5,1,2,1,… and printed "1–3 §§";
+    * 1971:235 runs several numbering sequences under one heading -- printed
+      "45–29 §§".
+
+    The two ends alone cannot see the middle one, so the whole run is read
+    (rule:fail-fast)."""
+    if not numbers:
+        return ""
+    keys = [span_key(n) for n in numbers]
+    if any(k is None for k in keys) \
+            or any(b < a for a, b in zip(keys, keys[1:], strict=False)):
+        return ""
+    return forms[0] % numbers[0] if numbers[0] == numbers[-1] \
+        else forms[1] % (numbers[0], numbers[-1])
+
+
+# the containers a statute nests. An avdelning names the kapitel under it the
+# way a rubrik names the paragrafer under it; a kapitel names none of its own.
+AVDELNINGAR = ("avdelning", "underavdelning")
+DIVISIONS = ("kapitel",) + AVDELNINGAR
+
+
+def span_scopes(nodes, scopes, *, heading, unit, number, forms):
+    """Fill `scopes` (node identity -> span label) for every `heading` node in
+    the flat list `nodes`: it covers the `unit` nodes from itself up to the next
+    heading at its own level or above, so a heading's span includes what its
+    sub-headings cover."""
+    numbers, open_headings = [], []
+    for node in nodes:
+        if node.get("type") == heading:
+            level = node.get("level") or 1
+            while open_headings and open_headings[-1][1] >= level:
+                _close_span(open_headings.pop(), numbers, scopes, forms)
+            open_headings.append((node, level, len(numbers)))
+        elif node.get("type") == unit and node.get(number):
+            numbers.append(node[number])
+    while open_headings:
+        _close_span(open_headings.pop(), numbers, scopes, forms)
+
+
+def _close_span(open_heading, numbers, scopes, forms):
+    node, _level, opened = open_heading
+    scopes[id(node)] = span_label(numbers[opened:], forms)
+
+
+def adopted_title(node):
+    """The rubrik a division prints AS its own heading: a level-1 rubrik first
+    among its children, reading "1 kap. Lagens tillämpningsområde". None when
+    the division opens with anything else.
+
+    One rule, two readers: `render_node` renders it as the chapter heading
+    under the container's id, and the TOC scan skips the same node -- the
+    division's entry prints the division's span, so its title must not collect
+    one of its own."""
+    kids = node.get("children") or []
+    if node.get("type") in DIVISIONS and kids \
+            and kids[0].get("type") == "rubrik" \
+            and (kids[0].get("level") or 1) == 1:
+        return kids[0]
+    return None
+
+
+def heading_scopes(nodes):
+    """A statute's TOC spans, keyed by node identity: every rubrik -> the
+    paragrafer under it, every avdelning/underavdelning -> the kapitel under it.
+
+    A chapter gets none: its paragrafer always open at 1, so the span would say
+    nothing its own heading does not. The reader navigates a long statute by
+    these. 2010:900 3 kap. lists eight headings, and each names the paragrafer
+    it covers -- "Antagande (19–22 §§)"."""
+    scopes = {}
+    _statute_scopes(nodes, scopes)
+    return scopes
+
+
+def _statute_scopes(nodes, scopes):
+    """Fill `scopes` for `nodes` and everything under them. Returns the kapitel
+    ordinals under `nodes`, in document order."""
+    span_scopes(nodes, scopes, heading="rubrik", unit="paragraf",
+                number="ordinal", forms=PARAGRAF_SPAN)
+    kapitel = []
+    for node in nodes:
+        if node.get("type") == "paragraf" or not node.get("children"):
+            continue
+        kids = node["children"]
+        under = _statute_scopes(kids[1:] if adopted_title(node) else kids,
+                                scopes)
+        if node.get("type") == "kapitel":
+            kapitel.append(node["ordinal"])
+        elif node.get("type") in AVDELNINGAR:
+            scopes[id(node)] = span_label(under, KAPITEL_SPAN)
+        kapitel.extend(under)
+    return kapitel
 
 
 def plain(runs):
@@ -1754,7 +1893,7 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         return "<%s class=\"punkter\">%s</%s>" % (tag, items, tag)
     if t == "rubrik":
         text = node.get("text", [])
-        anchor = toc.add(nid, plain(text), node.get("level") or 1)
+        anchor = toc.add(nid, plain(text), node.get("level") or 1, node)
         lvl = min(node.get("level") or 2, 5) + 1
         return NODES.rubrik(lvl, anchor, Markup(render_runs(text, site)))
 
@@ -1801,7 +1940,7 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
                             Markup(inner))
 
     # container: paragraf, kapitel, avdelning, bilaga, overgangsbestammelse, ...
-    if t in ("kapitel", "avdelning", "underavdelning"):
+    if t in DIVISIONS:
         label = {"kapitel": "kap.", "avdelning": "Avd.",
                  "underavdelning": "Avd."}[t]
         # the container's own title is its first child: a level-1 rubrik reading
@@ -1811,8 +1950,7 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         # TOC entry), self-link flattened -- rather than emitting a bare-number
         # "1 kap." kaprubrik plus the redundant rubrik that repeats it.
         kids = node.get("children", [])
-        title = (kids[0] if kids and kids[0].get("type") == "rubrik"
-                 and (kids[0].get("level") or 1) == 1 else None)
+        title = adopted_title(node)
         rail_id = nid if nid and nid in rail.data else None
         if title is not None and plain(title.get("text", [])):
             # anchor the heading at the container's id (or a minted secN when the
@@ -1820,7 +1958,7 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
             # return keeps the heading id and the TOC anchor in lockstep, as the
             # rubrik branch does -- an id-less container would otherwise emit no
             # heading id while the TOC still linked its minted secN anchor
-            anchor = toc.add(nid, plain(title.get("text", [])), 1)
+            anchor = toc.add(nid, plain(title.get("text", [])), 1, node)
             head = NODES.kaprubrik(anchor, Markup(render_runs(
                 _strip_self_ref(title.get("text", []), nid), site)))
             body = kids[1:]
@@ -1876,7 +2014,13 @@ def document_body(art, site, key="structure"):
     and a rail whose `add_document` was forgotten silently loses every
     document-level citation panel. `key` names the artifact's body array, which
     is ``structure`` for a document with a formal structure and ``body`` for a
-    wiki page's prose."""
+    wiki page's prose.
+
+    The TOC gets no span map: the seven sources that walk their body this way
+    (avg, guidance, hudoc, icc, icj, rs, wiki) carry prose under headings, not
+    paragrafer, so `heading_scopes` would walk every tree twice to return an
+    empty map. sfs and foreskrift, which do number their provisions, build one
+    themselves."""
     toc = Toc()
     rail = Rail(site, art["uri"])
     structure = Markup("".join(render_node(node, site, art["uri"], toc, rail)

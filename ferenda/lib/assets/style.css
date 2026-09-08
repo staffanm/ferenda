@@ -234,6 +234,13 @@ nav.toc a.toc-top { color: var(--ink); font-weight: 600; letter-spacing: -.01em;
                     border-bottom: 1px solid var(--rule); }
 nav.toc a.lvl2 { padding-left: 2.5rem; color: var(--ink-3); }
 nav.toc a.lvl3 { padding-left: 3.4rem; color: var(--ink-4); font-size: .78rem; }
+/* the span of provisions an entry covers ("3-6 b §§", "art. 24-43"): the
+   heading is what the reader scans, so the span reads one step back from it.
+   Opacity, not a colour: a lvl3 entry is already --ink-4, so a fixed colour
+   would leave the span reading exactly like the heading beside it. It never
+   breaks across lines -- "(3-6 b §§)" split after the dash reads as two
+   numbers. */
+nav.toc .toc-scope { opacity: .72; white-space: nowrap; }
 nav.toc a.active { color: var(--accent); border-left-color: var(--accent);
                    background: var(--surf-2); font-weight: 500; }
 /* scrollspy collapses every branch but the active section's ancestor path, so

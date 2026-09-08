@@ -25,6 +25,7 @@ from ..lib.page import (
     citer_name,
     doc_meta,
     forarb_sort_key,
+    heading_scopes,
     href,
     page_context,
     prop_link,
@@ -407,7 +408,7 @@ def render(art, site):
         ("Lydelser", lydelser if lydelser and not amended else None),
         ("Senast hämtad", _sfs_fetched().get(base_id)),
     ]
-    toc = Toc()
+    toc = Toc(heading_scopes(art.get("structure", [])))
     rail = Rail(site, art["uri"])
     # each provision's own change history, shown beside it (S1); the anchors
     # link into the register section _andringar renders further down
@@ -531,7 +532,7 @@ def render_chapter(art, site, first_id, last_id, name, reason):
         title = kids[0] if kids and kids[0].get("type") == "rubrik" else None
         nodes = [{**ancestor, "children": ([title] if title else []) + nodes}]
     lb = labels.document_labels("sfs", art)
-    toc = Toc()
+    toc = Toc(heading_scopes(nodes))
     rail = Rail(site, art["uri"])
     site.caselaw_memo.clear()
     site.caselaw_memo[art["uri"]] = catalog.caselaw_anchored(

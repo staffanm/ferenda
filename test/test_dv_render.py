@@ -38,7 +38,7 @@ def test_each_instances_sections_nest_under_its_court():
     _, entries = _walk([
         _instans("Hovrätten", _rubrik("DOMSKÄL"), _rubrik("DOMSLUT")),
         _instans("Högsta domstolen", _rubrik("DOMSKÄL"), _rubrik("DOMSLUT"))])
-    assert [(t, lvl) for _a, t, lvl in entries] == [
+    assert [(t, lvl) for _a, t, lvl, _s in entries] == [
         ("Hovrätten", 1), ("DOMSKÄL", 2), ("DOMSLUT", 2),
         ("Högsta domstolen", 1), ("DOMSKÄL", 2), ("DOMSLUT", 2)]
 
@@ -49,7 +49,7 @@ def test_a_first_instance_adopts_the_heading_above_it():
     # heading and then a section called "Instans"
     html, entries = _walk([_rubrik("Malmö tingsrätt"),
                            _instans(None, _rubrik("DOMSKÄL"))])
-    assert [t for _a, t, _l in entries] == ["Malmö tingsrätt", "DOMSKÄL"]
+    assert [t for _a, t, _l, _s in entries] == ["Malmö tingsrätt", "DOMSKÄL"]
     assert "Instans" not in html
     assert html.count("Malmö tingsrätt") == 1        # not both heading and rubrik
 
@@ -60,7 +60,7 @@ def test_a_rubrik_naming_the_next_instance_is_not_repeated():
     html, entries = _walk([
         _instans("Hovrätten", _rubrik("DOMSLUT"), _rubrik("Högsta domstolen")),
         _instans("Högsta domstolen", _rubrik("DOMSKÄL"))])
-    assert [t for _a, t, _l in entries] == [
+    assert [t for _a, t, _l, _s in entries] == [
         "Hovrätten", "DOMSLUT", "Högsta domstolen", "DOMSKÄL"]
     assert html.count(">Högsta domstolen<") == 1
 
