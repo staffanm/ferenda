@@ -3,12 +3,14 @@ classification and number-extraction logic that decides what each landing-page
 file is and which regulation it belongs to. The live enumerate/resolve paths are
 exercised against the real sites during a harvest, not here."""
 
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from bs4 import BeautifulSoup
 
 from ferenda.foreskrift import harvest
-from ferenda.foreskrift.agencies import REGISTRY
+from ferenda.foreskrift.agencies import REGISTRY, SJVFS
 from ferenda.foreskrift.harvest import (
     DocRef,
     Skip,
@@ -22,7 +24,8 @@ from ferenda.foreskrift.harvest import (
 # otherwise shadow the imported function
 from ferenda.foreskrift.harvest import ref as _ref
 from ferenda.foreskrift.parse import extract_publisher
-from ferenda.lib.harvest import guarded_enumerate
+from ferenda.lib.harvest import guarded_enumerate, write_record
+from ferenda.lib.util import record_path
 
 
 def anchor(html):
@@ -217,6 +220,59 @@ def test_guarded_enumerate_passes_skips_and_docs_through():
     assert [type(o).__name__ for o in out] == ["DocRef", "Skip", "DocRef"]
 
 
+def test_sjvfs_enumerate_reads_all_pages_status_and_predecessors(monkeypatch):
+    pages = json.loads(
+        (Path(__file__).parent / "files/foreskrift/sjvfs-register.json").read_text())
+
+    class Response:
+        def __init__(self, data=None):
+            self.data = data
+
+        def json(self):
+            return self.data
+
+    calls = []
+
+    def request(_session, method, _url, **kwargs):
+        calls.append((method, kwargs))
+        return Response() if method == "GET" else Response(pages.pop(0))
+
+    monkeypatch.setattr("ferenda.foreskrift.agencies.request", request)
+    monkeypatch.setattr("ferenda.foreskrift.agencies.time.sleep", lambda _seconds: None)
+
+    items = list(SJVFS.enumerate(None, SJVFS))
+    refs = [item for item in items if isinstance(item, DocRef)]
+
+    assert [ref.basefile for ref in refs] == [
+        "sjvfs/2026:9", "sjvfs/1995:122", "lsfs/1980:8"]
+    assert [ref.extra["status"] for ref in refs] == [
+        "gällande", "upphävt", "gällande"]
+    assert refs[0].title == "Föreskrifter om statistisk undersökning"
+    assert refs[2].identifier == "LSFS 1980:8" and refs[2].fs == "lsfs"
+    assert refs[2].title == "Lantbruksstyrelsens aktuella föreskrifter"
+    assert not [item for item in items if isinstance(item, Skip)]
+    assert [call[1].get("json", {}).get("searchData", {}).get("page")
+            for call in calls] == [None, 1, 2]
+
+
+def test_harvest_refreshes_a_stored_record_when_listing_status_changes(tmp_path):
+    ref = DocRef("sjvfs/2026:9", "SJVFS 2026:9", "https://example.se/2026-9.pdf",
+                 extra={"status": "gällande"})
+    resolved = []
+    agency = harvest.Agency(
+        fs="sjvfs", name="SJV", publisher="Jordbruksverket",
+        base_url="https://example.se", index_url="https://example.se/list",
+        enumerate=lambda *_args: iter([ref]),
+        resolve=lambda *_args, **_kwargs: resolved.append(ref))
+    write_record(record_path(tmp_path, "sjvfs", ref.basefile),
+                 {"basefile": ref.basefile, "status": "upphävt"})
+
+    harvest._harvest_session(agency, tmp_path, None, full=False, only=None,
+                             limit=None, delay=0, log=lambda _message: None)
+
+    assert resolved == [ref]
+
+
 def test_browser_agency_selects_the_camoufox_transport_only(tmp_path, monkeypatch):
     selected = {}
 
@@ -281,11 +337,13 @@ def test_resolve_direct_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
         content = b"<html>error page</html>"
     monkeypatch.setattr(harvest, "request", lambda *a, **kw: Resp())
     ref = DocRef(basefile="bfs/2026:1", identifier="BFS 2026:1", url="https://e/x",
-                 extra={"regulation_url": "https://e/x.pdf", "title": "t"})
+                 extra={"regulation_url": "https://e/x.pdf", "title": "t",
+                        "status": "upphävt"})
     logs, rejects = [], []
     record = harvest.resolve_direct(None, _agency_fffs(), ref, str(tmp_path),
                                     delay=0, log=logs.append, rejects=rejects)
     assert record["files"]["regulation"] is None
+    assert record["status"] == "upphävt"
     assert len(rejects) == 1 and any("non-PDF" in m for m in logs)
 
 

@@ -1,0 +1,54 @@
+[
+  {
+    "result": {
+      "searchResult": {
+        "hits": [
+          {
+            "simpleTags": ["2026", "Aktuell"],
+            "complexTags": [{"name": "Grundföreskriftnr", "value": "2026:9"}],
+            "link": "https://jvdoc.sharepoint.com/current.pdf",
+            "title": "Föreskrifter om statistisk undersökning"
+          },
+          {
+            "simpleTags": ["1980", "Historik"],
+            "complexTags": [{"name": "Grundföreskriftnr", "value": "LSFS 1980:8"}],
+            "link": "https://jvdoc.sharepoint.com/lsfs.pdf",
+            "title": "Lantbruksstyrelsens föreskrifter"
+          },
+          {
+            "simpleTags": ["Historik"],
+            "complexTags": [],
+            "link": "https://jvdoc.sharepoint.com/unnumbered.pdf",
+            "title": "",
+            "summary": "Statens jordbruksverks författningssamling SJVFS 2026:9"
+          }
+        ],
+        "pagination": {"next": {"value": 2}}
+      }
+    }
+  },
+  {
+    "result": {
+      "searchResult": {
+        "hits": [
+          {
+            "simpleTags": ["1980", "Aktuell"],
+            "complexTags": [{"name": "Grundföreskriftnr", "value": "LSFS 1980:8"}],
+            "link": "https://jvdoc.sharepoint.com/lsfs-current.pdf",
+            "title": "Lantbruksstyrelsens aktuella föreskrifter"
+          },
+          {
+            "simpleTags": ["1995", "Upphävd"],
+            "complexTags": [
+              {"name": "Grundföreskriftnr", "value": "1995:115"},
+              {"name": "Ändringsföreskriftnr", "value": "1995:122"}
+            ],
+            "link": "https://jvdoc.sharepoint.com/repealed.pdf",
+            "title": "Föreskrifter om ändring"
+          }
+        ],
+        "pagination": {"next": null}
+      }
+    }
+  }
+]

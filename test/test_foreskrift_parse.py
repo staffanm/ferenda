@@ -520,6 +520,17 @@ def test_parse_record_prefers_pdf_rubric_over_chrome_title(tmp_path, monkeypatch
     assert reg.title == "Konkurrensverkets föreskrifter om kartellbekämpning"
 
 
+def test_parse_record_preserves_register_status(tmp_path):
+    record = {"fs": "sjvfs", "basefile": "sjvfs/2001:33",
+              "identifier": "SJVFS 2001:33", "status": "upphävt",
+              "files": {"regulation": None}}
+
+    art = parse_record(record, tmp_path).to_artifact()
+
+    assert art["metadata"]["status"] == "upphävt"
+    assert catalog.catalog_rows._expired_date(art) == catalog.catalog_rows.EXPIRED_UNDATED
+
+
 # --- amendments: minted uris + preserved source urls (review C3) -------------
 
 def test_amendment_uri_minted_from_the_identifiers_own_fs_code():

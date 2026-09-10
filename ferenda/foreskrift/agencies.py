@@ -5,8 +5,8 @@ shared harvest engine (:mod:`harvest`). Each entry is an
 URL, and the architecture (an ``enumerate`` + a ``resolve``) that fits its site,
 plus ``params``. 76 harvest *scopes* are registered over 71
 författningssamlingar: 70 samlingar one agency owns outright (``Agency.scope``
-is None, so the fs code is the scope name) -- 66 live-harvested and 4 closed
-series with no live harvester (RSFS, SOSFS, SJVFS, SVKFS), whose documents live
+is None, so the fs code is the scope name) -- 67 live-harvested and 3 closed
+series with no live harvester (RSFS, SOSFS, SVKFS), whose documents live
 in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
 samling with seven issuing agencies (:mod:`hslffs`). SKVFS and MTFS select a
 Camoufox transport in config; ordinary agencies stay on HTTP.
@@ -64,6 +64,7 @@ from .harvest import (
     classify_section,
     classify_single,
     direct_docref,
+    fs_code,
     indexed_enumerate,
     json_enumerate,
     newest_first,
@@ -2282,13 +2283,74 @@ def frozen_agency(fs, name, publisher, designation, site):
 # reason: SvK has effectively delegated its regulatory output to Energimarknads-
 # inspektionen (EIFS); its current SvKFS page lists a single upphävd föreskrift
 # (SvKFS 2005:2, replaced by EIFS 2025:2) with no PDF and no register to scrape.
-# SJVFS (Statens jordbruksverk): the register itself is public (a Sitevision
-# search portlet, predecessor LSFS included) but every document link redirects
-# to an authenticated Microsoft 365 / SharePoint tenant (login.microsoftonline
-# .com) -- no anonymous PDF access. Frozen until Jordbruksverket restores
-# public documents or a SharePoint-authenticated harvest posture exists (§7g).
-SJVFS = frozen_agency("sjvfs", "Statens jordbruksverk", "Statens jordbruksverk",
-                      "SJVFS", "https://jordbruksverket.se")
+RE_SJVFS_NUMBER = re.compile(r"(?:(SJVFS|LSFS|LBS|DFS)\s+)?(\d{4}):(\d+)$")
+SJVFS_STATUSES = {"Aktuell": "gällande", "Historik": "upphävt", "Upphävd": "upphävt"}
+
+
+def sjvfs_enumerate(session, agency):
+    """Jordbruksverket's Sitevision proxy over its public SharePoint register."""
+    request(session, "GET", agency.index_url)  # establish the Sitevision session
+    seen = set()
+    refs = {}
+    page = 1
+    while True:
+        result = request(
+            session, "POST", agency.params["search_url"],
+            json={"searchData": {"newSearch": False, "page": page,
+                                 "refinementfilters": []},
+                  "filters": "[]"}).json()["result"]["searchResult"]
+        for hit in result["hits"]:
+            tags = {tag["name"]: tag["value"] for tag in hit["complexTags"]}
+            number = tags.get("Ändringsföreskriftnr") or tags.get("Grundföreskriftnr")
+            if not number and (summary_number := harvest.RE_FS_NUMBER.search(
+                    html.unescape(hit.get("summary", "")))):
+                number = "%s %s:%s" % summary_number.groups()
+            match = RE_SJVFS_NUMBER.fullmatch(number or "")
+            if not match:
+                # The search also indexes unnumbered forms and image attachments.
+                # They cannot mint a regulation identity of their own.
+                continue
+            remote_status = next((status for status in SJVFS_STATUSES
+                                  if status in hit["simpleTags"]), None)
+            if remote_status is None:
+                raise harvest.UpstreamChanged("SJVFS %s has unknown status tags %r"
+                                              % (number, hit["simpleTags"]))
+            designation = match.group(1) or "SJVFS"
+            fs = fs_code(designation)
+            basefile = "%s/%s:%s" % (fs, match.group(2), str(int(match.group(3))))
+            docref = direct_docref(
+                agency, fs, match.group(2), str(int(match.group(3))),
+                hit["link"], seen,
+                identifier="%s %s:%s" % (designation, match.group(2),
+                                          str(int(match.group(3)))),
+                title=hit.get("title"))
+            if docref:
+                docref.extra["status"] = SJVFS_STATUSES[remote_status]
+                refs[basefile] = docref
+            elif (SJVFS_STATUSES[remote_status] == "gällande"
+                  and refs[basefile].extra["status"] != "gällande"):
+                refs[basefile].url = hit["link"]
+                if hit.get("title"):
+                    refs[basefile].title = hit["title"]
+                refs[basefile].extra.update(
+                    regulation_url=hit["link"], title=refs[basefile].title,
+                    status="gällande")
+        if not result["pagination"].get("next"):
+            yield from newest_first(refs.values())
+            return
+        page += 1
+        time.sleep(0.3)
+
+
+SJVFS = Agency(
+    fs="sjvfs", name="Statens jordbruksverk", publisher="Statens jordbruksverk",
+    base_url="https://jordbruksverket.se",
+    index_url="https://jordbruksverket.se/om-jordbruksverket/forfattningar",
+    enumerate=sjvfs_enumerate, resolve=resolve_direct, designation="SJVFS",
+    params={"search_url": "https://jordbruksverket.se/appresource/"
+                          "4.3b03b79b16ee86d57cada45c/"
+                          "12.44ec123117d9b92687e63acd/search"},
+)
 
 SVKFS = frozen_agency("svkfs", "Affärsverket svenska kraftnät",
                       "Affärsverket svenska kraftnät", "SvKFS",
@@ -2499,7 +2561,8 @@ REGISTRY = {a.scope or a.fs: a for a in (
     SCBFS, STAFS, TVFS,
     AFS, TSFS, TRVFS,
     AFFS, AGVFS, FKFS, PFS,
-    SJVFS, SVKFS,                                      # closed: no public documents/register
+    SJVFS,                                             # live: Sitevision/SharePoint register
+    SVKFS,                                             # closed: no public documents/register
     MTFS, SKVFS,                                       # live: Camoufox for the F5 wall
     RSFS, SOSFS,                                       # closed series; RSFS also emitted by SKVFS
     HSLFFS_SOS, HSLFFS_FOHM, HSLFFS_IVO,               # one samling, six publishing

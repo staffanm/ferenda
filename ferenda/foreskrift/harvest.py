@@ -417,6 +417,8 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
         "title": ref.title or extra.get("title"), "publisher": agency.publisher,
         "url": extra.get("source_url") or ref.url, "files": files,
     }
+    if extra.get("status"):
+        record["status"] = extra["status"]
     write_record(record_path(root, fs, ref.basefile), record)
     return record
 
@@ -678,11 +680,15 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
         if not (len(year) == 4 and year.isdigit()):
             raise UpstreamChanged("%s: basefile year %r is not a 4-digit year"
                                   % (ref.basefile, year))
+        stored = record_path(root, ref.fs or agency.fs, ref.basefile)
+        downloaded = compress.exists(stored)
+        if downloaded and ref.extra.get("status"):
+            downloaded = compress.read_json(stored).get("status") == ref.extra["status"]
         return ItemKey(
             basefile=ref.basefile,
             # the record lives under the document's own fs, which is agency.fs
             # unless the row named a different samling (see DocRef.fs)
-            is_downloaded=compress.exists(record_path(root, ref.fs or agency.fs, ref.basefile)),
+            is_downloaded=downloaded,
             date=f"{year}-12-31")
 
     def resolve(ref):
