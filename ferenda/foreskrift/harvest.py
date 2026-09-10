@@ -678,11 +678,16 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
         if not (len(year) == 4 and year.isdigit()):
             raise UpstreamChanged("%s: basefile year %r is not a 4-digit year"
                                   % (ref.basefile, year))
+        stored = record_path(root, ref.fs or agency.fs, ref.basefile)
+        downloaded = compress.exists(stored)
+        if downloaded and ref.extra.get("updated_at"):
+            downloaded = (compress.read_json(stored).get("updated_at")
+                          == ref.extra["updated_at"])
         return ItemKey(
             basefile=ref.basefile,
             # the record lives under the document's own fs, which is agency.fs
             # unless the row named a different samling (see DocRef.fs)
-            is_downloaded=compress.exists(record_path(root, ref.fs or agency.fs, ref.basefile)),
+            is_downloaded=downloaded,
             date=f"{year}-12-31")
 
     def resolve(ref):

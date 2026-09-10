@@ -440,6 +440,7 @@ after the publisher, not the samling.
 
 ```sh
 lagen foreskrift download fffs         # one agency, one författningssamling
+lagen foreskrift download stkfa        # STKFA plus current predecessor ESVFA
 lagen foreskrift download hslffs-ivo   # one of HSLF-FS's six publishing sites
 lagen foreskrift download hslffs-sos --only hslffs/2025:25    # one document
 ```

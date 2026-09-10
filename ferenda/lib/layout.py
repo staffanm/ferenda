@@ -1032,7 +1032,7 @@ def url_to_relpath(path: str) -> str | None:
 # test_layout_grammar_covers_every_registered_fs keeps this in lock-step with
 # foreskrift.agencies.SAMLINGAR -- the registry keyed by *samling*, not by the
 # publisher scope a CLI harvest names (layout cannot import the vertical itself)
-_FS_SLUG = r"(?:[a-zåäö]+fs|bfnar|rams)"
+_FS_SLUG = r"(?:[a-zåäö]+(?:fs|fa)|bfnar|rams)"
 _FORESKRIFT_LOC = re.compile(r"^%s/\d{4}:\d+$" % _FS_SLUG)
 # a HUDOC item id ("001-159324"): the identity the Strasbourg case law is filed
 # under, and so also the `annotates:` of a commentary on one

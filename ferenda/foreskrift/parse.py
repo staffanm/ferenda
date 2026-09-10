@@ -29,7 +29,7 @@ Two layers over the shared font-aware extraction (``lib.pdftext``):
 import re
 from pathlib import Path
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 from ..lib import begrepp, compress, tabell
 from ..lib.artifact import footnote_nodes
@@ -167,7 +167,7 @@ def stodav_clause(text):
 # passive ("Genom föreskrifterna upphävs … (PMFS 2019:2)")
 RE_ERSATTER = re.compile(r"\b(?:ersätter|upphäv(?:er|s))\b(.*?)(?:\.|$)",
                          re.DOTALL | re.I)
-RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+-?FS)\s*(\d{4}):(\d+)")   # NFS/TFS … ELSÄK-FS
+RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+-?(?:FS|FA))\s*(\d{4}):(\d+)")
 # an ändringsförfattning's own title names its target: "… föreskrifter om
 # ändring i <agency>s föreskrifter (ÅFS 2005:5) om …". Some agencies drop
 # their own series designation in the parenthesis ("föreskrifter (2007:12)");
@@ -1043,7 +1043,93 @@ RE_HTML_PREAMBLE = re.compile(
 RE_HTML_END = re.compile(r"Tryckta versioner")
 
 
-def parse_consolidation_html(path, parser):
+def _html_blocks(container):
+    """Convert one semantic HTML section to the föreskrift block model."""
+    blocks, paras, loose = [], [], []
+
+    def flush_loose():
+        if loose:
+            paras.append(Para(" ".join(loose)))
+            loose.clear()
+
+    def flush():
+        flush_loose()
+        if paras:
+            blocks.extend(classify(paras, None))
+            paras.clear()
+
+    for el in container.children:
+        if isinstance(el, NavigableString):
+            text = " ".join(str(el).split())
+            if text:
+                loose.append(text)
+            continue
+        if el.name in ("strong", "span", "em", "a"):
+            text = " ".join(el.get_text(" ", strip=True).split())
+            if text:
+                loose.append(text)
+            continue
+        if el.name == "br":
+            continue
+        if el.name not in ("h2", "h3", "h4", "p", "ol", "ul", "table"):
+            continue
+        flush_loose()
+        text = " ".join(el.get_text(" ", strip=True).split())
+        if not text:
+            continue
+        if el.name in ("h2", "h3", "h4", "p"):
+            paras.append(Para(text, bold=el.name != "p",
+                              size={"h2": 3, "h3": 2, "h4": 1}.get(el.name, 0)))
+            continue
+        flush()
+        if el.name in ("ol", "ul"):
+            items = [" ".join(li.get_text(" ", strip=True).split())
+                     for li in el.find_all("li") if not li.find("li")]
+            blocks.append(Block("lista", children=[Block("punkt", item)
+                                                    for item in items if item]))
+        else:
+            rows = [tuple(" ".join(cell.get_text(" ", strip=True).split())
+                          for cell in row.find_all(["th", "td"], recursive=False))
+                    for row in el.find_all("tr")]
+            rows = [row for row in rows if row]
+            blocks.append(Block("tabell", rows=rows,
+                                th=bool(el.find("tr") and el.find("tr").find("th"))))
+    flush()
+    return blocks
+
+
+def _typed_html_amendments(body, fs, base_ars, base_lop):
+    """Read amendment identities from the explicit transition sections."""
+    headings = []
+    for section in body.select("div.foreskrifter"):
+        heading = section.find("h2")
+        if heading is None or not heading.get_text(" ", strip=True).startswith(
+                "Övergångsbestämmelser"):
+            continue
+        headings.extend(h.get_text(" ", strip=True)
+                        for h in section.find_all(["h3", "h4"]))
+    return masthead_amendments(" ".join(headings), fs, base_ars, base_lop)
+
+
+def _typed_html_blocks(body):
+    """Read explicit binding/advisory sections from EA-regelverket HTML."""
+    blocks = []
+    for section in body.select("div.foreskrifter, div.allmanna-rad"):
+        section_blocks = _html_blocks(section)
+        if "allmanna-rad" not in section.get("class", []):
+            blocks.extend(section_blocks)
+            continue
+        if section_blocks and section_blocks[0].kind == "rubrik":
+            heading = section_blocks.pop(0).text
+        else:
+            heading = "Allmänna råd"
+        assert section_blocks, "allmänna råd section has no body"
+        blocks.append(Block("allmanna_rad", heading, children=section_blocks))
+    _rank_rubriker(blocks, 0)
+    return blocks
+
+
+def parse_consolidation_html(path, parser, fs=None, base_ars=None, base_lop=None):
     """A consolidated HTML page -> the same (structure, footnotes,
     konsolideradTom, masthead refs) contract as :func:`parse_consolidation`.
 
@@ -1061,6 +1147,12 @@ def parse_consolidation_html(path, parser):
     body = soup.select_one("div.pubr-reader-body") or soup.select_one("main")
     if body is None:
         raise ValueError("no consolidated text in konsoliderad page %s" % path)
+    if body.select_one("div.foreskrifter, div.allmanna-rad"):
+        assert fs and base_ars and base_lop, \
+            "typed regulation HTML needs its own designation"
+        refs = _typed_html_amendments(body, fs, base_ars, base_lop)
+        tom = (regulation_uri(fs, refs[-1][1], refs[-1][2]) if refs else None)
+        return _structure(_typed_html_blocks(body), parser), [], tom, refs
     paras, refs = [], []
     for el in body.find_all(["h2", "h3", "h4", "p", "li"]):
         if el.find_parent(["p", "li"]):
@@ -1197,7 +1289,8 @@ def parse_record(record, root):
             path = Path(root) / fs / cons["name"]
             cstruct, cnotes, tom, refs = (
                 parse_consolidation_html(
-                    path, sfs_parser("foreskrift", PARSE_TYPES, written=cons_written))
+                    path, sfs_parser("foreskrift", PARSE_TYPES, written=cons_written),
+                    fs, arsutgava, lopnummer)
                 if path.suffix == ".html"
                 else parse_consolidation(path, record["identifier"],
                                          fs, arsutgava, lopnummer,
