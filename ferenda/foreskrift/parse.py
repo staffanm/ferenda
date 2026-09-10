@@ -1164,6 +1164,7 @@ def parse_record(record, root):
         identifier=record["identifier"], fs=fs,
         arsutgava=arsutgava, lopnummer=lopnummer,
         title=title, publisher=publisher,
+        status=record.get("status"), dokumenttyp=record.get("dokumenttyp"),
         source_url=record.get("url"),
         structure=structure, footnotes=notes, **meta)
     # the resolved title, not the raw harvest one: for a chrome-titled record

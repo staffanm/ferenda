@@ -416,6 +416,7 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
         "fs": fs, "basefile": ref.basefile, "identifier": ref.identifier,
         "title": ref.title or extra.get("title"), "publisher": agency.publisher,
         "url": extra.get("source_url") or ref.url, "files": files,
+        **{key: extra[key] for key in ("status", "dokumenttyp") if key in extra},
     }
     write_record(record_path(root, fs, ref.basefile), record)
     return record

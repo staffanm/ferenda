@@ -25,6 +25,8 @@ representative spread:
   * **KIFS** (Kemikalieinspektionen) -- ``indexed_enumerate`` (one static page),
     landing pages whose files are grouped under ``<h2>`` section headings
     (``classify_section``), Sitevision ``/download/`` PDFs.
+  * **KKVFS** (Konkurrensverket) -- one page whose current sections classify
+    status and document type, followed by a complete historical register.
 
 The rest of the file is the long tail of sites that need a bespoke ``enumerate``
 (a POST search API, an inline family listing, a filename-slug number the generic
@@ -1300,18 +1302,79 @@ KAMFS = Agency(
 )
 
 # indexed + DIRECT: one static page of direct PDF links under
-# /forfattningssamling/kkvfs_YYYY-N.pdf. Base rows name "KKVFS YYYY:N" in the
-# text; upphävande-rows carry only a description, so ref falls back to the
-# filename slug for the number. konkurrensverket.se sits behind a Cloudflare
+# /forfattningssamling/kkvfs_YYYY-N.pdf. The two current tables distinguish
+# föreskrifter from allmänna råd; the complete register carries historical rows,
+# only some of which retain a PDF. The filename always names a PDF's own number:
+# an upphävande row's text instead names the regulation it repeals.
+# konkurrensverket.se sits behind a Cloudflare
 # front that 403s HTTP/1.1 and only serves HTTP/2, which requests/urllib3 cannot
 # speak, so this agency sets ``http2=True``: harvest() builds the session with
 # lib.net.make_http2_session (the httpx2 HTTP/2 client) instead of a requests
 # Session, and the shared engine runs unchanged over it.
+RE_KKV_ROW = re.compile(r"^KKVFS\s+(\d{4}):(\d+)\.?\s*(.*)$", re.DOTALL)
+RE_KKV_HREF = re.compile(r"kkvfs_(\d{4})-(\d+)\.pdf$", re.IGNORECASE)
+KKV_CURRENT_SECTIONS = {
+    "Gällande föreskrifter": "föreskrift",
+    "Gällande allmänna råd": "allmänt råd",
+}
+
+
+def kkvfs_enumerate(session, agency):
+    """One KKVFS record per row, with the official current status and type."""
+    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
+    seen = set()
+    refs = []
+
+    def add(arsutgava, lopnummer, title, pdf_url, status, dokumenttyp=None):
+        docref = direct_docref(
+            agency, agency.fs, arsutgava, lopnummer,
+            harvest.absolute(agency.base_url, pdf_url) if pdf_url else agency.index_url,
+            seen, title=title)
+        if docref is None:
+            return
+        if not pdf_url:
+            del docref.extra["regulation_url"]
+        docref.extra["status"] = status
+        if dokumenttyp:
+            docref.extra["dokumenttyp"] = dokumenttyp
+        refs.append(docref)
+
+    for a in soup.select(agency.params["link_select"]):
+        heading = a.find_previous("h2")
+        section = heading.get_text(" ", strip=True) if heading else ""
+        if section not in KKV_CURRENT_SECTIONS:
+            continue
+        row = a.find_parent("tr")
+        assert row is not None, "%s: current link outside a table row" % agency.fs
+        cells = row.find_all("td")
+        assert cells, "%s: current row has no title cell" % agency.fs
+        href = a.get("href", "")
+        assert isinstance(href, str)
+        match = RE_KKV_HREF.search(href)
+        assert match, "%s: unreadable PDF link %s" % (agency.fs, href)
+        add(match.group(1), match.group(2), cells[0].get_text(" ", strip=True),
+            href, "gällande", KKV_CURRENT_SECTIONS[section])
+
+    for paragraph in soup.find_all("p"):
+        heading = paragraph.find_previous("h2")
+        if not heading or not heading.get_text(" ", strip=True).startswith(
+                "Register över samtliga"):
+            continue
+        match = RE_KKV_ROW.match(paragraph.get_text(" ", strip=True))
+        if not match:
+            continue
+        link = paragraph.select_one(agency.params["link_select"])
+        add(match.group(1), str(int(match.group(2))), match.group(3).strip(" ."),
+            link.get("href") if link else None, "historisk")
+
+    yield from newest_first(refs)
+
+
 KKVFS = Agency(
     fs="kkvfs", name="Konkurrensverket", publisher="Konkurrensverket",
     base_url="https://www.konkurrensverket.se",
     index_url="https://www.konkurrensverket.se/om-oss/forfattningssamling/",
-    enumerate=indexed_enumerate, resolve=resolve_direct, http2=True,
+    enumerate=kkvfs_enumerate, resolve=resolve_direct, http2=True,
     params={"link_select": 'a[href*="/forfattningssamling/kkvfs"][href$=".pdf"]',
             "direct": True},
 )

@@ -520,6 +520,15 @@ def test_parse_record_prefers_pdf_rubric_over_chrome_title(tmp_path, monkeypatch
     assert reg.title == "Konkurrensverkets föreskrifter om kartellbekämpning"
 
 
+def test_parse_record_preserves_register_status_and_document_type(tmp_path):
+    record = {"fs": "kkvfs", "basefile": "kkvfs/2021:1",
+              "identifier": "KKVFS 2021:1", "title": "Om eftergift",
+              "status": "gällande", "dokumenttyp": "allmänt råd", "files": {}}
+    artifact = parse_record(record, tmp_path).to_artifact()
+    assert artifact["metadata"]["status"] == "gällande"
+    assert artifact["metadata"]["dokumenttyp"] == "allmänt råd"
+
+
 # --- amendments: minted uris + preserved source urls (review C3) -------------
 
 def test_amendment_uri_minted_from_the_identifiers_own_fs_code():
