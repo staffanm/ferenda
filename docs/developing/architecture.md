@@ -48,7 +48,7 @@ preferences.
   plain functions wired into one small `Source` record (see §3). When two
   sources need the same behaviour, extract a **function** into `lib/` and
   configure it by *data*, not by adding a hook to a shared base class. (A single
-  harvest engine driven by a per-agency data registry beats 76 bespoke
+  harvest engine driven by a per-agency data registry beats 78 bespoke
   agency pipelines — see `foreskrift/agencies.py`.)
 - **Each source owns a typed model** — dataclasses using Swedish domain
   vocabulary (`Forfattning`, `Kapitel`, `Paragraf`, `Avgorande`, …) rather than
@@ -500,9 +500,9 @@ back silently, so check every row.
 | `lib/feeds.py` `DATASETS` | the bulk-data feed | no feed |
 
 The design principle: **configure by data, not by subclassing.** `foreskrift`
-drives one shared harvest engine for 76 agency scopes over 71
+drives one shared harvest engine for 78 agency scopes over 73
 författningssamlingar from a data registry (`foreskrift/agencies.py`) rather
-than 76 bespoke pipelines — that is the model to follow when sources are
+than 78 bespoke pipelines — that is the model to follow when sources are
 similar.
 
 ## Adding a source-specific action

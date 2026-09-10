@@ -81,6 +81,7 @@ dependencies = [
     "rdflib",
     "requests",
     "ruamel-yaml>=0.19.1",
+    "statskontoret-scraper @ git+https://github.com/Statskontoretdatalabb/StatskontoretScraper.git@v0.1.0",
     # the CLI's progress bars (lib/util.status): nested bars for a whole-invocation
     # `lagen all rebuild` next to the current stage, and write() to print a
     # persistent line (or a routed warnings.warn) without tearing an active bar

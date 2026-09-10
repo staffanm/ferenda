@@ -1,5 +1,5 @@
 """The föreskrift source's registration: the agency författningssamlingar
-(FFFS, …), one per-fs subtree with a PDF body.
+(FFFS, …), one per-fs subtree with a PDF or HTML body.
 
 One shared harvest engine drives every agency from the data registry in
 `agencies.py`, and one shared parser reads every fs (rule:sources-are-programs
@@ -158,7 +158,7 @@ def foreskrift_record(basefile):
 
 
 def foreskrift_inputs(basefile):
-    """The record JSON plus every body PDF it references (the regulation and any
+    """The record JSON plus every body file it references (the regulation and any
     konsoliderad versions); re-downloading any of them re-stales the parse."""
     rec = foreskrift_record(basefile)
     paths = [rec]

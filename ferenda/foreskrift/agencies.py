@@ -3,12 +3,13 @@ lagrummet.se list (the per-county samlingar excluded) as configuration over the
 shared harvest engine (:mod:`harvest`). Each entry is an
 :class:`~harvest.Agency`: a författningssamling code, the issuing org, its index
 URL, and the architecture (an ``enumerate`` + a ``resolve``) that fits its site,
-plus ``params``. 76 harvest *scopes* are registered over 71
-författningssamlingar: 70 samlingar one agency owns outright (``Agency.scope``
-is None, so the fs code is the scope name) -- 66 live-harvested and 4 closed
-series with no live harvester (RSFS, SOSFS, SJVFS, SVKFS), whose documents live
-in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
-samling with seven issuing agencies (:mod:`hslffs`). SKVFS and MTFS select a
+plus ``params``. 78 harvest *scopes* are registered over 73
+författningssamlingar: 72 samlingar one agency owns outright (``Agency.scope``
+is None, so the fs code is the scope name) -- 67 live-harvested and 5 closed
+series with no live harvester (ESVFA, RSFS, SOSFS, SJVFS, SVKFS), whose
+documents live in the corpus or arrive through a successor -- plus the six
+sites that all publish into HSLF-FS, which is one samling with seven issuing
+agencies (:mod:`hslffs`). SKVFS and MTFS select a
 Camoufox transport in config; ordinary agencies stay on HTTP.
 
 An agency is *config*, not a pipeline. Many sites are covered by the three
@@ -54,7 +55,7 @@ from ..lib.harvest import write_record
 from ..lib.net import BROWSER_UA, is_not_found, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
-from . import harvest, hslffs, mtfs, skvfs
+from . import harvest, hslffs, mtfs, skvfs, statskontoret
 from .harvest import (
     Agency,
     DocRef,
@@ -2477,9 +2478,37 @@ HSLFFS_LV = Agency(
 )
 
 
+# --------------------------------------------------------------------------
+# STKFA + ESVFA (Statskontoret) -- the released statskontoret-scraper package
+# owns the one EA-regelverket crawl and returns its binding föreskrifter and
+# allmänna råd as separate HTML sections. Statskontoret took over ESVFA when
+# ESV closed; DocRef.fs keeps those predecessor documents under esvfa while the
+# one stkfa scope walks the shared current register only once.
+# --------------------------------------------------------------------------
+
+STKFA = Agency(
+    fs="stkfa", name="Statskontoret", publisher="Statskontoret",
+    base_url="https://forum.statskontoret.se",
+    index_url="https://forum.statskontoret.se/ea-regelverket/",
+    enumerate=statskontoret.enumerate_regulations, resolve=statskontoret.resolve,
+    designation="STKFA",
+)
+
+# ESVFA closed when Statskontoret took over ESV's rulemaking. Its current
+# documents still arrive through the STKFA scope above. This registry row gives
+# citations and rendered identifiers the predecessor series' own identity.
+ESVFA = Agency(
+    fs="esvfa", name="Ekonomistyrningsverket",
+    publisher="Ekonomistyrningsverket",
+    base_url="https://www.statskontoret.se",
+    index_url="https://www.statskontoret.se/kunskapsstod-och-regler/regelverk/foreskrifter/",
+    designation="ESVFA",
+)
+
+
 # scope name -> Agency: the CLI's `lagen foreskrift download <scope>` names,
 # and the keys `download.sync` fans out over. The scope is the fs code for the
-# 65 samlingar one agency owns outright, and `hslffs-<publisher>` for the six
+# 72 samlingar one agency owns outright, and `hslffs-<publisher>` for the six
 # sites that all publish into HSLF-FS. New agencies append here; a new *site
 # shape* is a new enumerate/classify in harvest.py, not a new pipeline.
 REGISTRY = {a.scope or a.fs: a for a in (
@@ -2504,6 +2533,7 @@ REGISTRY = {a.scope or a.fs: a for a in (
     RSFS, SOSFS,                                       # closed series; RSFS also emitted by SKVFS
     HSLFFS_SOS, HSLFFS_FOHM, HSLFFS_IVO,               # one samling, six publishing
     HSLFFS_MFOF, HSLFFS_TLV, HSLFFS_LV,                #   sites (fs="hslffs")
+    STKFA, ESVFA,                                      # one live scope + predecessor
 )}
 
 # fs code -> the Agency that speaks for that samling: its printed designation
