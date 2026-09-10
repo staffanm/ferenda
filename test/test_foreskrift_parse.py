@@ -22,7 +22,7 @@ from ferenda.foreskrift.parse import (PARSE_TYPES, classify,
 from ferenda.foreskrift.model import Block, printed_designation
 from ferenda.foreskrift import render as fs_render
 from ferenda.foreskrift.render import _andrad_genom, _konsoliderad_banner
-from ferenda.lib import catalog
+from ferenda.lib import catalog, catalog_rows
 from ferenda.lib.page import Site
 from ferenda.lib.lagrum import sfs_parser
 
@@ -518,6 +518,17 @@ def test_parse_record_prefers_pdf_rubric_over_chrome_title(tmp_path, monkeypatch
               "files": {"regulation": {"name": "r.pdf"}}}
     reg = parse_record(record, tmp_path)
     assert reg.title == "Konkurrensverkets föreskrifter om kartellbekämpning"
+
+
+def test_parse_record_preserves_register_status(tmp_path):
+    record = {"fs": "livsfs", "basefile": "livsfs/2011:16",
+              "identifier": "LIVSFS 2011:16", "status": "upphävt",
+              "files": {"regulation": None}}
+
+    art = parse_record(record, tmp_path).to_artifact()
+
+    assert art["metadata"]["status"] == "upphävt"
+    assert catalog_rows._expired_date(art) == catalog_rows.EXPIRED_UNDATED
 
 
 # --- amendments: minted uris + preserved source urls (review C3) -------------

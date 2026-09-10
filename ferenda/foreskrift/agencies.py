@@ -66,6 +66,7 @@ from .harvest import (
     direct_docref,
     indexed_enumerate,
     json_enumerate,
+    livsfs_enumerate,
     newest_first,
     paginated_enumerate,
     ref,
@@ -286,12 +287,10 @@ LIVSFS = Agency(
     fs="livsfs", name="Livsmedelsverket", publisher="Livsmedelsverket",
     base_url="https://www.livsmedelsverket.se",
     index_url="https://www.livsmedelsverket.se/om-oss/lagstiftning1/foreskrifter-i-nummerordning/",
-    enumerate=indexed_enumerate, resolve=resolve_direct,
+    enumerate=livsfs_enumerate, resolve=resolve_direct,
     params={"index_urls": ["https://www.livsmedelsverket.se/om-oss/lagstiftning1/"
                            "foreskrifter-i-nummerordning/foreskrifter-i-nummerordning-%d/" % y
-                           for y in range(2026, 1995, -1)],
-            "link_select": "td p.related-info > a[href]", "direct": True,
-            "optional_pages": True},
+                           for y in range(2026, 1995, -1)]},
 )
 
 # indexed + landing; type axis lives on the index, landing hangs one PDF
