@@ -342,6 +342,21 @@ def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
     assert meta["upphaver"] == ["https://lagen.nu/aafs/2005:6"]
 
 
+def test_extract_metadata_upphaver_from_harvest_title():
+    # BOLFS 2022:3 and 2022:4 declare the repeal only with the noun form in
+    # their harvest titles. Their PDF text instead says "ska upphöra att gälla".
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    for title, target in [
+            ("Föreskrift om upphävande av Bolagsverkets föreskrifter "
+             "(BOLFS 2006:1) om avgifter för bevis",
+             "https://lagen.nu/bolfs/2006:1"),
+            ("Föreskrift om upphävande av Bolagsverkets föreskrifter "
+             "(BOLFS 2006:2) om avgifter för bevis och uppgifter",
+             "https://lagen.nu/bolfs/2006:2")]:
+        meta = extract_metadata("", fp.role_declaration("", title), parser)
+        assert meta["upphaver"] == [target]
+
+
 def test_printed_designation_names_a_regulation_the_corpus_does_not_hold():
     # a repealed predecessor series nobody harvests still has to be *named* in
     # the Upphäver row; without this the reader was shown the slug
