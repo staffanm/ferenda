@@ -31,7 +31,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import begrepp, compress, tabell
+from ..lib import begrepp, compress, datasets, tabell
 from ..lib.artifact import footnote_nodes
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -48,6 +48,7 @@ from ..lib.pdftext import (
     RE_KAP_MARK,
     RE_PARA_MARK,
     Para,
+    ocr_pdf,
     page_paragraphs,
     pdf_pages,
     ruled_footnotes,
@@ -165,14 +166,34 @@ def stodav_clause(text):
     return window[:end.start()] if end else window
 # active masthead form ("ersätter/upphäver …") and the transitional-provision
 # passive ("Genom föreskrifterna upphävs … (PMFS 2019:2)")
-RE_ERSATTER = re.compile(r"\b(?:ersätter|upphäv(?:er|s))\b(.*?)(?:\.|$)",
+RE_ERSATTER = re.compile(r"\b(?:ersätter|upphäv(?:er|s)|upphör)\b(.*?)(?:\.|$)",
                          re.DOTALL | re.I)
+# the target *before* the verb, in an ikraftträdande sentence: "träder i kraft
+# den 28 februari 2003, då Livsmedelsverkets föreskrifter (SLVFS 1993:18) om
+# material … upphör att gälla" (LIVSFS 2003:2). Bounded by the sentence, whose
+# colons are only the numbers' own.
+RE_UPPHOR_BEFORE = re.compile(r"(?:^|[.;])([^.;]{0,400}?)\b(?:upphör|skall?\s+upphöra)\s+att\s+gälla",
+                              re.DOTALL | re.I)
+# the list form: "följande föreskrifter ska upphöra att gälla den 1 januari
+# 2006: − Livsmedelsverkets föreskrifter (SLVFS 1978:21) om …, − …" (LIVSFS
+# 2005:24), "Nedanstående föreskrifter upphör att gälla enligt följande. 1. …"
+# (LIVSFS 2012:4). The items run to the next blank line, the entry-into-force
+# sentence or the signature rule; each item is cut at "om ändring i" like a
+# title, so repealing an amendment leaves its base regulation alone.
+RE_UPPHOR_LIST = re.compile(
+    r"(?:följande|nedanstående)\s+(?:föreskrifter|allmänna\s+råd|författningar|kungörelser)\b"
+    r"[^:]{0,160}?(?:upphävs|upphöra\s+att\s+gälla|upphör\s+att\s+gälla)[^:]{0,160}?"
+    r"(?::|nämligen|enligt\s+följande\.)\s*(.{0,4000}?)"
+    r"(?=\n\s*\n|Dessa\s+föreskrifter\s+träder|_{5,}|$)", re.DOTALL | re.I)
+RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-z]\)|[−•–-])\s)")
 # the decision form of a pure repeal, where the target precedes the verb:
 # "Konkurrensverket beslutar att Konkurrensverkets allmänna råd (KKVFS 2015:2)
 # om näringsförbud … ska upphöra att gälla den 1 mars 2021." (KKVFS 2021:2)
 RE_UPPHORA = re.compile(r"\b(?:beslutar|föreskriver)\s+att\b(.*?)\bska\s+upphöra\s+att\s+gälla",
                         re.DOTALL | re.I)
-RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+-?FS)\s*(\d{4}):(\d+)")   # NFS/TFS … ELSÄK-FS
+# NFS/TFS … ELSÄK-FS; the pre-2002 Livsmedelsverket masthead prints "SLV FS
+# 1996:1" with a space, which `_fs_key` folds away like the hyphen
+RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+(?:-| )?FS)\s*(\d{4}):(\d+)")
 # an ändringsförfattning's own title names its target: "… föreskrifter om
 # ändring i <agency>s föreskrifter (ÅFS 2005:5) om …". Some agencies drop
 # their own series designation in the parenthesis ("föreskrifter (2007:12)");
@@ -641,6 +662,14 @@ def extract_metadata(text, declaration, parser):
     # _fs_key, not lower(): 'ÅFS' must mint aafs/…, never a dangling åfs/…
     targets = [m.group(1) for m in RE_ERSATTER.finditer(text)]
     targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHORA.finditer(text)]
+    # only the subordinate clause when the sentence has one: an omtryck reprints
+    # the base's "Dessa föreskrifter (LIVSFS 2003:13) träder i kraft …, då …
+    # (SLVFS 1993:25) … upphör att gälla" (LIVSFS 2004:26), and the base is not
+    # what that sentence repeals
+    targets += [RE_ANDRING.split(m.group(1).rsplit(" då ", 1)[-1])[0]
+                for m in RE_UPPHOR_BEFORE.finditer(text)]
+    targets += [RE_ANDRING.split(item)[0] for m in RE_UPPHOR_LIST.finditer(text)
+                for item in RE_UPPHOR_ITEM.split(m.group(1))]
     meta["upphaver"] = sorted({regulation_uri(_fs_key(fs), y, str(int(n)))
                                for target in targets
                                for fs, y, n in RE_FS_REF.findall(target)})
@@ -798,7 +827,7 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # masthead's second column ("Box 7821, 103 97 Stockholm, Sverige, www.fi.se")
     r"|\bwww\.[\w.-]+|\bBox\s+\d+|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö]+,?"
     r"|\bTfn\b[\s\d-]*|\bSverige\b,?"
-    r"|Publicerings?datum|Publicerade?\s+den|\b[A-ZÅÄÖ]{2,}-?FS\b|\b\d{4}:\d+\b"
+    r"|Publicerings?datum|Publicerade?\s+den|\b[A-ZÅÄÖ]{2,}(?:-| )?FS\b|\b\d{4}:\d+\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?|\bnr\s+\d+"
     % "|".join(MONTHS), re.IGNORECASE)
 # a word the removal left doubled ("Kriminalvårdens
@@ -849,9 +878,20 @@ TITLE_MAX = 300      # a subject longer than this is extraction running on
 _NAME_JOINERS = {"för", "och", "av", "i", "med", "samt", "vid", "om"}
 
 
+# Livsmedelsverket prints its register code beside the title -- "(H 34)",
+# "(H 32:9)", "(J 77)" -- and two-column extraction drops it into the title
+# sentence or inside a reference's parenthesis ("(SLV FS (H 34) 1993:34)")
+RE_SLV_REGISTER_CODE = re.compile(r"\(\s*[HJ]\s?\d+(?:\s*:\s*\d+)?\s*\)")
+# the 1996-2001 Livsmedelsverket scans carry an OCR layer that splits the
+# designation at random: 240 "SLV FS", 96 "SL V FS", 73 "SL VFS", 16 "S LV FS"
+# across the 244 documents -- one spelling before any pattern reads it
+RE_OCR_SLVFS = re.compile(r"\bS\s?L\s?V\s?F\s?S\b")
+
+
 def _strip_boilerplate(masthead):
     """The masthead with its standing text deleted and the sentence rejoined,
     parenthesised references left intact."""
+    masthead = RE_SLV_REGISTER_CODE.sub(" ", masthead)
     # a held parenthesis keeps its FS number but not the column header the
     # second column dropped into it ("(LVFS Utkom från trycket 2006:16)")
     held = [" ".join(RE_MASTHEAD_COLUMN.sub(" ", p).split())
@@ -955,13 +995,37 @@ def title_from_masthead(blocks, start):
     return None
 
 
+def _pages(path, patch_key=None):
+    """The PDF's pages of text, from its visible text layer -- or, when that
+    layer is empty, from the hidden one: a scanned föreskrift (SLVFS 1996-2000,
+    188 documents) carries its text only as an invisible OCR layer behind the
+    page image, which pdftohtml drops unless asked for hidden text. A scan with
+    no text layer at all (LIVSFS 2002:49, six documents) is OCRed first."""
+    pages = list(pdf_pages(path, patch_key))
+    if any(lines for _pageno, lines in pages):
+        return pages
+    pages = list(pdf_pages(path, patch_key, hidden=True))
+    if any(lines for _pageno, lines in pages):
+        return pages
+    return list(pdf_pages(ocr_pdf(path, "swe"), patch_key, hidden=True))
+
+
+def _repair_ocr(blocks):
+    """The blocks with the OCR layer's split designations rejoined, so the
+    masthead, the title and every reference read the one printed form."""
+    for b in blocks:
+        b.text = RE_OCR_SLVFS.sub("SLVFS", b.text)
+    return blocks
+
+
 def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None):
     """One föreskrift PDF -> (structure tree, its metadata dict, its footnotes).
     Metadata is read
     from the whole text (the masthead up front, ikraftträdande at the end); the
     structure is built from the operative body only, the masthead dropped.
     `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
-    blocks, notes = parse_body(pdf_pages(path, patch_key), identifier)
+    blocks, notes = parse_body(_pages(path, patch_key), identifier)
+    _repair_ocr(blocks)
     start = _body_start(blocks)
     masthead = _full_text(blocks[:start])
     # the notes are read for metadata with the body: the "Jfr … direktiv" clause
@@ -1011,11 +1075,27 @@ def masthead_amendments(masthead, fs, base_ars, base_lop):
     pages list amendments incompletely, the consolidation masthead names
     exactly the ones folded in."""
     base = (base_ars, str(int(base_lop)))
+    family = _series_family(_fs_key(fs))
     seen = {}
     for f, y, n in RE_FS_REF.findall(masthead):
-        if _fs_key(f) == _fs_key(fs) and (y, str(int(n))) != base:
+        if _fs_key(f) in family and (y, str(int(n))) != base:
             seen.setdefault((int(y), int(n)), f)
     return [(f, str(y), str(n)) for (y, n), f in sorted(seen.items())]
+
+
+_FS_SERIES = datasets.load_fs_series()
+
+
+def _series_family(fs):
+    """A samling and the series that succeeded it (series.json `successor`):
+    an SLVFS base is amended and consolidated by LIVSFS ("ändringar t.o.m.
+    LIVSFS 2016:9" in SLVFS 1997:27's konsoliderad version), an RSFS base by
+    SKVFS. A reference to the successor is an amendment of the base, not
+    another series' document."""
+    family = [fs]
+    while _FS_SERIES.get(family[-1], {}).get("successor"):
+        family.append(_FS_SERIES[family[-1]]["successor"])
+    return set(family)
 
 
 def konsoliderad_tom(masthead, fs, base_ars, base_lop):
@@ -1026,8 +1106,8 @@ def konsoliderad_tom(masthead, fs, base_ars, base_lop):
     refs = masthead_amendments(masthead, fs, base_ars, base_lop)
     if not refs:
         return None
-    _, y, n = refs[-1]
-    return regulation_uri(fs, y, n)
+    f, y, n = refs[-1]
+    return regulation_uri(_fs_key(f), y, n)      # the amendment's own series
 
 
 def parse_consolidation(path, identifier, fs, base_ars, base_lop, parser):
@@ -1039,7 +1119,8 @@ def parse_consolidation(path, identifier, fs, base_ars, base_lop, parser):
     lines out of the body, so discarding them here would put that text in no
     artifact key at all. No konsoliderad PDF in the corpus prints one today
     (0 of 150 sampled), which is why the discard went unnoticed."""
-    blocks, notes = parse_body(pdf_pages(path), identifier)
+    blocks, notes = parse_body(_pages(path), identifier)
+    _repair_ocr(blocks)
     start = _body_start(blocks)
     masthead = _full_text(blocks[:start]) or _full_text(blocks)
     return (_structure(blocks[start:], parser), footnote_nodes(notes, parser),

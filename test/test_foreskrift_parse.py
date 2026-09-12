@@ -332,6 +332,73 @@ def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
     assert meta["upphaver"] == ["https://lagen.nu/pmfs/2019:2"]
 
 
+def test_extract_metadata_upphaver_target_before_upphor_att_galla():
+    # LIVSFS 2003:2 (verbatim): the repealed regulation precedes the verb in
+    # the ikraftträdande sentence; the document's own number in that sentence
+    # is dropped later by parse_record, not here
+    text = ("Dessa föreskrifter träder i kraft den 28 februari 2003 då "
+            "Livsmedelsverkets föreskrifter och allmänna råd (SLVFS 1993:18) om "
+            "material och produkter avsedda att komma i kontakt med livsmedel "
+            "upphör att gälla. Äldre föreskrifter om tillverkning får tillämpas.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1993:18"]
+
+
+def test_extract_metadata_upphaver_from_a_list_of_repealed_regulations():
+    # LIVSFS 2005:24's shape: "följande föreskrifter ska upphöra att gälla den
+    # 1 januari 2006:" and a dash list; an amendment item is cut at "om ändring
+    # i" so its base stays. LIVSFS 2012:4's "Nedanstående … enligt följande."
+    text = ("Med stöd av 55 § livsmedelsförordningen (1971:807) föreskriver "
+            "Livsmedelsverket att följande föreskrifter ska upphöra att gälla "
+            "den 1 januari 2006: − Livsmedelsverkets föreskrifter (SLVFS 1978:21) "
+            "om undersökning av bekämpningsmedelsrester (H 61), − Livsmedelsverkets "
+            "föreskrifter (LIVSFS 2002:5) om ändring i Livsmedelsverkets "
+            "föreskrifter (SLVFS 1993:36) om gränsvärden, − Livsmedelsverkets "
+            "föreskrifter och allmänna råd (SLVFS 1996:13) om köttbesiktning.\n\n"
+            "Dessa föreskrifter träder i kraft den 1 januari 2006.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/livsfs/2002:5",
+                                "https://lagen.nu/slvfs/1978:21",
+                                "https://lagen.nu/slvfs/1996:13"]
+    text = ("Nedanstående föreskrifter upphör att gälla enligt följande. "
+            "1. Livsmedelsverkets föreskrifter (LIVSFS 2007:15) om livsmedelstillsatser: "
+            "a) Den 8 mars 2012: 1. 5 och 37 §§, 2. bilaga 2. "
+            "2. Livsmedelsverkets föreskrifter (SLVFS 1996:1) om aromer.\n\n"
+            "BERTIL NORBELIE")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/livsfs/2007:15", "https://lagen.nu/slvfs/1996:1"]
+
+
+def test_extract_metadata_upphaver_verb_then_target_then_att_galla():
+    # SLVFS 1999:22: "upphör Livsmedelsverkets föreskrifter … (SLVFS 1995:31) …
+    # att gälla" -- the verb before the target, split from "att gälla"
+    text = ("I och med att föreskrifterna i denna författning träder i kraft "
+            "upphör Livsmedelsverkets föreskrifter och allmänna råd (SLVFS 1995:31) "
+            "om livsmedelstillsatser att gälla.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1995:31"]
+
+
+def test_old_livsmedelsverket_masthead_reads_its_spaced_designation_and_register_code():
+    """SLVFS 1996:1's masthead (OCR): "Statens livsmedelsverks kungörelse SLV FS
+    1996:1 om ändring i kungörelsen (SLV FS (H 34) 1993:34) …". The designation
+    prints with a space, and the register code "(H 34)" lands inside the
+    reference's parenthesis. The title reads clean and the amendment target
+    resolves to slvfs/1993:34."""
+    blocks = [Block("rubrik", "Statens livsmedelsverks författningssamling", 1),
+              Block("stycke", "ISSN 0346-119X", 1),
+              Block("rubrik", "Statens livsmedelsverks kungörelse SLV FS 1996:1", 1),
+              Block("stycke", "om ändring i kungörelsen (SLV FS (H 34) 1993:34) med "
+                              "föreskrifter och allmänna Utkom från trycket råd om aromer m.m.;", 1),
+              Block("stycke", "beslutad den 8 mars 1996.", 1),
+              Block("paragraf", "1 § Denna kungörelse innehåller regler om aromer.", 1)]
+    title = title_from_masthead(blocks, 5)
+    assert title == ("Statens livsmedelsverks kungörelse om ändring i kungörelsen "
+                     "(SLV FS 1993:34) med föreskrifter och allmänna råd om aromer m.m")
+    assert fp.andrar_target(title, "slvfs", "https://lagen.nu/slvfs/1996:1") == \
+        "https://lagen.nu/slvfs/1993:34"
+
+
 def test_extract_metadata_upphaver_from_a_ska_upphora_att_galla_decision():
     # KKVFS 2021:2 (verbatim): a pure repeal states its target *before* the
     # verb, in the decision sentence, not in an "upphäver …" clause
@@ -512,6 +579,35 @@ def test_the_utgivare_does_not_become_part_of_the_agency_name():
               Block("kapitel", "1 kap. Allmänna bestämmelser", 1)]
     assert title_from_masthead(blocks, 4) == \
         "Säkerhetspolisens föreskrifter om säkerhetsskydd"
+
+
+def test_masthead_amendments_accept_the_successor_series():
+    """SLVFS 1997:27's konsoliderad version (verbatim): "Denna version innehåller
+    ändringar t.o.m. LIVSFS 2016:9." LIVSFS succeeded SLVFS, so that reference
+    is the cutoff, not another series' document."""
+    masthead = ("Livsmedelsverkets föreskrifter om spannmålsbaserade livsmedel och "
+                "barnmat för spädbarn och småbarn; SLVFS 1997:27 (H 375) Detta "
+                "dokument har sammanställts i informationssyfte. Denna version "
+                "innehåller ändringar t.o.m. LIVSFS 2016:9.")
+    assert fp.masthead_amendments(masthead, "slvfs", "1997", "27") == [("LIVSFS", "2016", "9")]
+    assert fp.konsoliderad_tom(masthead, "slvfs", "1997", "27") == "https://lagen.nu/livsfs/2016:9"
+
+
+def test_pages_fall_back_to_the_hidden_ocr_layer(monkeypatch):
+    """A scanned SLVFS PDF has no visible text; its OCR layer is hidden text,
+    which pdftohtml only emits with -hidden."""
+    calls = []
+    def fake_pdf_pages(path, patch_key=None, hidden=False):
+        calls.append(hidden)
+        return [(1, [])] if not hidden else [(1, ["a line"])]
+    monkeypatch.setattr(fp, "pdf_pages", fake_pdf_pages)
+    assert fp._pages("scan.pdf") == [(1, ["a line"])]
+    assert calls == [False, True]
+    calls.clear()
+    monkeypatch.setattr(fp, "pdf_pages", lambda path, patch_key=None, hidden=False:
+                        (calls.append(hidden), [(1, ["visible"])])[1])
+    assert fp._pages("text.pdf") == [(1, ["visible"])]
+    assert calls == [False]
 
 
 def test_body_start_falls_back_to_the_decision_date_line():

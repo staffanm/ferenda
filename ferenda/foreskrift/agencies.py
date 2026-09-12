@@ -3,11 +3,11 @@ lagrummet.se list (the per-county samlingar excluded) as configuration over the
 shared harvest engine (:mod:`harvest`). Each entry is an
 :class:`~harvest.Agency`: a författningssamling code, the issuing org, its index
 URL, and the architecture (an ``enumerate`` + a ``resolve``) that fits its site,
-plus ``params``. 76 harvest *scopes* are registered over 71
-författningssamlingar: 70 samlingar one agency owns outright (``Agency.scope``
-is None, so the fs code is the scope name) -- 66 live-harvested and 4 closed
-series with no live harvester (RSFS, SOSFS, SJVFS, SVKFS), whose documents live
-in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
+plus ``params``. 77 harvest *scopes* are registered over 72
+författningssamlingar: 71 samlingar one agency owns outright (``Agency.scope``
+is None, so the fs code is the scope name) -- 66 live-harvested and 5 closed
+series with no live harvester (RSFS, SOSFS, SLVFS, SJVFS, SVKFS), whose documents
+live in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
 samling with seven issuing agencies (:mod:`hslffs`). SKVFS and MTFS select a
 Camoufox transport in config; ordinary agencies stay on HTTP.
 
@@ -42,6 +42,7 @@ import json
 import re
 import time
 from collections import defaultdict
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from urllib.parse import quote, unquote
@@ -281,21 +282,78 @@ MCFFS = Agency(
             "fs_from_designation": True},
 )
 
+# A base regulation in force also has a landing page at a URL built from its
+# number (gallande-lagstiftning/livsfs-20144/, /slvfs-199727/), which hangs the
+# konsoliderad version ("Författningen med ändringar införda"), the printed
+# grundförfattning and every later ändringsförfattning ("Senare ändringar").
+# The year index never links it, so the resolver asks for it by number: a 404
+# means an amendment or a repealed base, which keeps its index PDF.
+LIVSFS_LANDING = "https://www.livsmedelsverket.se/om-oss/lagstiftning1/gallande-lagstiftning/%s-%s%s/"
+
+
+def classify_livsfs(a, fs, base_ars, base_lop):
+    """Section-heading classifier for a Livsmedelsverket landing page; the
+    file's number from the link text, in whichever series it prints (an SLVFS
+    base's amendments are LIVSFS)."""
+    head = a.find_previous(["h2", "h3"])
+    head = head.get_text(" ", strip=True).lower() if head else ""
+    m = harvest.RE_FS_NUMBER.search(a.get_text(" ", strip=True))
+    ars, lop = (m.group(2), str(int(m.group(3)))) if m else (None, None)
+    if "ändringar införda" in head or harvest.RE_KONSOLIDERAD.search(head):
+        return ("consolidation", base_ars, base_lop)
+    if "grundför" in head:
+        return ("regulation", base_ars, base_lop)
+    if "senare ändringar" in head:
+        return ("amendment", ars, lop) if ars else None
+    return None
+
+
+def livsfs_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
+    """The landing page when the document has one, else the index PDF. An
+    amendment row sometimes links its *base's* landing page instead of a PDF
+    (SLVFS 1998:38 -> …/slvfs-199727/); the amendment's own PDF hangs there
+    under "Senare ändringar", named by its number."""
+    fs = ref.fs or agency.fs
+    arsutgava, lopnummer = ref.basefile.split("/", 1)[1].split(":")
+    landing = LIVSFS_LANDING % (fs, arsutgava, lopnummer)
+    try:
+        request(session, "HEAD", landing)
+    except requests.exceptions.HTTPError as exc:
+        if not is_not_found(exc):
+            raise
+        if not ref.url.lower().split("?")[0].endswith(".pdf"):
+            soup = BeautifulSoup(request(session, "GET", ref.url).text, "html.parser")
+            own = "%s:%s" % (arsutgava, str(int(lopnummer)))
+            pdf = next((a["href"] for a in soup.select('a[href$=".pdf"]')
+                        if own in a.get_text(" ", strip=True)), None)
+            assert pdf, "%s: %s hangs no PDF for %s" % (fs, ref.url, ref.identifier)
+            url = harvest.absolute(agency.base_url, pdf)
+            ref = replace(ref, url=url, extra={**ref.extra, "regulation_url": url})
+        return resolve_direct(session, agency, ref, root, delay, log=log, rejects=rejects)
+    return resolve_landing(session, agency, replace(ref, url=landing), root, delay,
+                           log=log, rejects=rejects)
+
+
 # indexed over per-year pages + DIRECT: each year table's row links the PDF
 # from its first cell; the second cell is the register's status text, whose own
 # link (an "Upphävd genom …" cross-reference) must not be read as a document.
 # Livsmedelsverket dropped the ``p.related-info`` wrapper in 2026, which left
-# the old selector matching nothing on the pages before 2024 (#32).
+# the old selector matching nothing on the pages before 2024 (#32). The pages
+# for 1996-2001 (and three 2002 rows) list the predecessor series -- rows read
+# "SLVFS 1998:12" and link slvfs-1998-12.pdf -- so `fs_from_designation` files
+# them under slvfs, the series later documents repeal them by ("upphävande av
+# Livsmedelsverkets föreskrifter (SLVFS 1998:8)", LIVSFS 2026:1).
 LIVSFS = Agency(
     fs="livsfs", name="Livsmedelsverket", publisher="Livsmedelsverket",
     base_url="https://www.livsmedelsverket.se",
     index_url="https://www.livsmedelsverket.se/om-oss/lagstiftning1/foreskrifter-i-nummerordning/",
-    enumerate=indexed_enumerate, resolve=resolve_direct,
+    enumerate=indexed_enumerate, resolve=livsfs_resolve,
     params={"index_urls": ["https://www.livsmedelsverket.se/om-oss/lagstiftning1/"
                            "foreskrifter-i-nummerordning/foreskrifter-i-nummerordning-%d/" % y
                            for y in range(2026, 1995, -1)],
             "link_select": "td:first-child a[href]", "direct": True,
-            "optional_pages": True},
+            "optional_pages": True, "fs_from_designation": True,
+            "classify": classify_livsfs},
 )
 
 # indexed + landing; type axis lives on the index, landing hangs one PDF
@@ -2334,6 +2392,11 @@ SKVFS = Agency(
 )
 RSFS = frozen_agency("rsfs", "Riksskatteverket", "Skatteverket", "RSFS",
                      "https://www.skatteverket.se")
+# Statens livsmedelsverks författningssamling, the series before LIVSFS (2002);
+# its documents come off Livsmedelsverket's own year pages through the LIVSFS
+# scope's `fs_from_designation`, so it needs no sweep of its own
+SLVFS = frozen_agency("slvfs", "Statens livsmedelsverk", "Livsmedelsverket", "SLVFS",
+                      "https://www.livsmedelsverket.se")
 SOSFS = frozen_agency("sosfs", "Socialstyrelsen", "Socialstyrelsen", "SOSFS",
                       "https://www.socialstyrelsen.se")
 
@@ -2510,7 +2573,7 @@ REGISTRY = {a.scope or a.fs: a for a in (
     AFFS, AGVFS, FKFS, PFS,
     SJVFS, SVKFS,                                      # closed: no public documents/register
     MTFS, SKVFS,                                       # live: Camoufox for the F5 wall
-    RSFS, SOSFS,                                       # closed series; RSFS also emitted by SKVFS
+    RSFS, SOSFS, SLVFS,                                # closed series; RSFS also emitted by SKVFS, SLVFS by LIVSFS
     HSLFFS_SOS, HSLFFS_FOHM, HSLFFS_IVO,               # one samling, six publishing
     HSLFFS_MFOF, HSLFFS_TLV, HSLFFS_LV,                #   sites (fs="hslffs")
 )}

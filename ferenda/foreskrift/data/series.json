@@ -77,6 +77,7 @@
   "sisuvfs": {"designation": "SiSUVFS", "title": "Statens institutionsstyrelses ungdomsvårdsförfattningssamling"},
   "sivfs": {"designation": "SIVFS", "title": "Statens invandrarverks författningssamling", "successor": "migrfs"},
   "sjofs": {"designation": "SJÖFS", "title": "Sjöfartsverkets författningssamling"},
+  "slvfs": {"designation": "SLVFS", "title": "Statens livsmedelsverks författningssamling", "successor": "livsfs"},
   "sjvfs": {"designation": "SJVFS", "title": "Statens jordbruksverks författningssamling"},
   "skolfs": {"designation": "SKOLFS", "title": "Statens skolverks författningssamling"},
   "sksfs": {"designation": "SKSFS", "title": "Skogsstyrelsens författningssamling"},
