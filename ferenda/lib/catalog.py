@@ -2080,9 +2080,18 @@ def upphaver_targets(con):
     """Every uri some other document's text repeals or replaces (the target
     side of all rpubl:upphaver edges) -- what the föreskrift browse listing
     subdues as no longer in force. The evidence is the replacing documents'
-    own repeal clauses; there is no authoritative status field."""
-    return {r[0] for r in con.execute(
+    own repeal clauses; there is no authoritative status field. An
+    ändringsförfattning of a repealed base goes with it: its text was folded
+    into the base and has nothing left to apply to (Livsmedelsverket's register
+    marks SLVFS 1996:3, which amended SLVFS 1993:18, "upphävd genom LIVSFS
+    2003:2", the document that repealed 1993:18), so the rpubl:andrar sources
+    of every target are included."""
+    targets = {r[0] for r in con.execute(
         "SELECT DISTINCT to_uri FROM links WHERE predicate = 'rpubl:upphaver'")}
+    amendments = {r[0] for r in con.execute(
+        "SELECT DISTINCT a.from_uri FROM links a JOIN links u ON a.to_uri = u.to_uri "
+        "WHERE a.predicate = 'rpubl:andrar' AND u.predicate = 'rpubl:upphaver'")}
+    return targets | amendments
 
 
 def andrar_edges(con):
