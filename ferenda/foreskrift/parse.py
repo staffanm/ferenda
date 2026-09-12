@@ -644,8 +644,10 @@ def extract_metadata(text, declaration, parser):
     # _fs_key, not lower(): 'ÅFS' must mint aafs/…, never a dangling åfs/…
     targets = [m.group(1) for m in RE_ERSATTER.finditer(text)]
     targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHORA.finditer(text)]
-    # the noun form in the declaration (masthead + harvest title)
-    targets += [m.group(1) for m in RE_UPPHAVANDE.finditer(declaration)]
+    # the noun form in the declaration (masthead + harvest title), cut the same
+    # way: "upphävande av X (HSLF-FS 2019:43) om ändring i Y (HSLF-FS 2019:32)"
+    # repeals the amendment X, and Y stays in force
+    targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHAVANDE.finditer(declaration)]
     meta["upphaver"] = sorted({regulation_uri(_fs_key(fs), y, str(int(n)))
                                for target in targets
                                for fs, y, n in RE_FS_REF.findall(target)})

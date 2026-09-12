@@ -375,8 +375,10 @@ def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
 
 
 def test_extract_metadata_upphaver_from_harvest_title():
-    # BOLFS 2022:3 and 2022:4 declare the repeal only with the noun form in
-    # their harvest titles. Their PDF text instead says "ska upphöra att gälla".
+    # BOLFS 2022:3 and 2022:4 declare the repeal with the noun form in their
+    # harvest titles (their PDF text says "ska upphöra att gälla", which the
+    # decision form reads too); the title alone must yield the relation, since
+    # for 949 föreskrifter on lagen.nu it is the only readable statement of it
     parser = sfs_parser("foreskrift", PARSE_TYPES)
     for title, target in [
             ("Föreskrift om upphävande av Bolagsverkets föreskrifter "
@@ -387,6 +389,18 @@ def test_extract_metadata_upphaver_from_harvest_title():
              "https://lagen.nu/bolfs/2006:2")]:
         meta = extract_metadata("", fp.role_declaration("", title), parser)
         assert meta["upphaver"] == [target]
+
+
+def test_title_upphavande_of_an_amendment_spares_its_base():
+    # HSLF-FS 2021:26 repeals the ändringsförfattning HSLF-FS 2019:43, whose
+    # own title names the base regulation HSLF-FS 2019:32; only the amendment
+    # is repealed, the base stays in force
+    title = ("Föreskrifter (HSLF-FS 2021:26) om upphävande av föreskrifterna "
+             "(HSLF-FS 2019:43) om ändring i Läkemedelsverkets föreskrifter "
+             "(HSLF-FS 2019:32) om förordnande och utlämnande av läkemedel")
+    meta = extract_metadata("", fp.role_declaration("", title),
+                            sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/hslffs/2019:43"]
 
 
 def test_printed_designation_names_a_regulation_the_corpus_does_not_hold():
