@@ -386,7 +386,7 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
             # ("finns i " + "bilaga 2") and one without ("bilaga 2" + ".")
             # both leave the runs touching. `join_runs` reads them; the Line's
             # own text is normalized after assembly, so no edge survives.
-            text = re.sub(r"\s+", " ", "".join(t.itertext()))
+            text = RE_SHY_INSIDE.sub("", re.sub(r"\s+", " ", "".join(t.itertext())))
             if text.strip():
                 top, height = int(t.get("top")), int(t.get("height") or 0)
                 left = int(t.get("left"))
@@ -1124,7 +1124,17 @@ def _number_run(candidates, pagenos, label, out):
         remaining = remaining[cut:]
 
 
+# A discretionary hyphen (U+00AD) inside a run is a break the typesetter did
+# not take: it carries no text and is dropped where it is read. One that ends
+# the run is the break it *did* take -- KKVFS 2025:1 prints "konkurrens\xad" /
+# "lagen" -- and is kept for `dehyphenate` to close up, whatever the next line
+# starts with.
+RE_SHY_INSIDE = re.compile("\u00ad(?=\\S)")
+
+
 def dehyphenate(acc, line):
+    if acc.endswith("\u00ad"):
+        return acc[:-1] + line          # the line broke at a discretionary hyphen
     if acc.endswith("-") and line[:1].islower():
         return acc[:-1] + line          # soft hyphen: "för-\nfogar" -> "förfogar"
     return (acc + " " + line) if acc else line

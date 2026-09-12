@@ -774,3 +774,28 @@ def test_an_eu_judgment_is_described_by_its_keywords_and_snippeted_by_its_ground
     act = {"uri": "https://lagen.nu/celex/32016R0679", "doctype": "regulation",
            "structure": [{"type": "keyword", "text": ["x"]}]}
     assert catalog_rows._document_description(act, "eurlex") is None
+
+
+def test_upphavande_instrument_is_a_repeal_title_with_no_operative_provision():
+    """KKVFS 2021:2's shape: an ingress and the decision sentence, nothing else.
+    KKVFS 2017:3 also repeals a predecessor and has no paragraf (numbered
+    points), but its title is its subject, so it keeps full weight; a base
+    regulation with paragrafer is never one, whatever its title says."""
+    repeal = {"metadata": {"title": "Upphävande av Konkurrensverkets allmänna råd "
+                                    "om näringsförbud (KKVFS 2015:2)",
+                           "upphaver": ["https://lagen.nu/kkvfs/2015:2"]},
+              "structure": [{"type": "ingress", "children": [{"type": "stycke"}]},
+                            {"type": "stycke"}]}
+    assert catalog_rows.upphavande_instrument(repeal) is True
+    advice = {"metadata": {"title": "Konkurrensverkets allmänna råd om avtal av "
+                                    "mindre betydelse (bagatellavtal)",
+                           "upphaver": ["https://lagen.nu/kkvfs/2009:1"]},
+              "structure": [{"type": "stycke"}] * 5}
+    assert catalog_rows.upphavande_instrument(advice) is False
+    kungorelse = {"metadata": {"title": "Kungörelse - Förordning om upphävande av "
+                                        "vissa av Konkurrensverkets föreskrifter"},
+                  "structure": [{"type": "rubrik"}, {"type": "stycke"}]}
+    assert catalog_rows.upphavande_instrument(kungorelse) is True
+    with_body = {"metadata": {"title": "Föreskrifter om upphävande av X"},
+                 "structure": [{"type": "kapitel", "children": [{"type": "paragraf"}]}]}
+    assert catalog_rows.upphavande_instrument(with_body) is False
