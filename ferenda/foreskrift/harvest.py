@@ -416,7 +416,6 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
         "fs": fs, "basefile": ref.basefile, "identifier": ref.identifier,
         "title": ref.title or extra.get("title"), "publisher": agency.publisher,
         "url": extra.get("source_url") or ref.url, "files": files,
-        **{key: extra[key] for key in ("status", "dokumenttyp") if key in extra},
     }
     write_record(record_path(root, fs, ref.basefile), record)
     return record
@@ -441,11 +440,16 @@ def ref(agency, ident_text, href, seen, title=None, direct=False):
     #  1. an FS-prefixed designation in the text ("RGKFS 2015:2") -- skips an SFS
     #     reference in a title ("med stöd av förordning (2006:1097)");
     #  2. for a direct (PDF-href) agency, the filename slug ("rgkfs_2015_2.pdf")
-    #     -- when the title carries no designation at all;
+    #     -- when the title carries no designation at all, or first of all when
+    #     the agency sets ``number_from_slug``: KKVFS's upphävande rows name the
+    #     *repealed* regulation in their text ("Upphävande av … (KKVFS 2015:2)")
+    #     while the filename (kkvfs_2021-2.pdf) is the document's own number;
     #  3. a bare "YYYY:N" in the text, as a last resort.
     fsm = RE_FS_NUMBER.search(ident_text)
     slugm = RE_SLUG_NUMBER.search(href.rsplit("/", 1)[-1].split("?")[0]) if direct else None
-    if fsm:
+    if slugm and agency.params.get("number_from_slug"):
+        arsutgava, lopnummer = slugm.group(1), str(int(slugm.group(2)))
+    elif fsm:
         arsutgava, lopnummer = fsm.group(2), str(int(fsm.group(3)))
     elif slugm:
         arsutgava, lopnummer = slugm.group(1), str(int(slugm.group(2)))

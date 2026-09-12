@@ -253,7 +253,7 @@ def _expired_date(art: dict) -> str | None:
     the only thing between it and a reader: an advanced "search expired" option
     is a query change, not a reindex.
 
-    Several kinds of document declare one, for the same reason. A statute names its
+    Three kinds of document declare one, for the same reason. A statute names its
     repeal date (`rpubl:upphavandedatum`). A rättsligt ställningstagande is in
     force until the agency withdraws it, and a withdrawn one no longer says how
     the agency reads the rule -- which is the only reason it was on that
@@ -262,8 +262,6 @@ def _expired_date(art: dict) -> str | None:
     carries the date CELLAR says it stopped being in force, stamped on the
     artifact as a plain `expired` key (`cellar.notice_repeal_date`) --
     32016R0679 article 94 repealed 31995L0046 with effect from 2018-05-24.
-    A föreskrift register can classify a document as historical without giving
-    a date; that status also takes the undated form.
 
     A date has to be an ISO one, because this column is compared against one.
     Where the issuer names a *successor* but no usable date, the document is
@@ -283,8 +281,6 @@ def _expired_date(art: dict) -> str | None:
     A withdrawal with neither a date nor a successor still stays listed: that is
     an issuer saying less than it knows, not a document we can place in time."""
     metadata = art.get("metadata", {})
-    if metadata.get("status") == "historisk":
-        return EXPIRED_UNDATED
     if metadata.get("status") == "upphävt":
         withdrawn = metadata.get("upphavd") or ""
         if RE_ISO_DATE.match(withdrawn):

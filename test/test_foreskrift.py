@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup
 
-from ferenda.foreskrift import agencies, harvest
+from ferenda.foreskrift import harvest
 from ferenda.foreskrift.agencies import REGISTRY
 from ferenda.foreskrift.harvest import (
     DocRef,
@@ -22,7 +22,6 @@ from ferenda.foreskrift.harvest import (
 # otherwise shadow the imported function
 from ferenda.foreskrift.harvest import ref as _ref
 from ferenda.foreskrift.parse import extract_publisher
-from ferenda.lib import catalog_rows
 from ferenda.lib.harvest import guarded_enumerate
 
 
@@ -116,6 +115,17 @@ def test_ref_falls_back_to_filename_when_title_has_no_designation():
     assert ref.basefile == "rgkfs/2006:1"
 
 
+def test_ref_number_from_slug_outranks_a_repeal_target_in_the_text():
+    # KKVFS's register row for a repeal document names the *repealed* regulation
+    # in its text; the filename is the document's own number
+    ref = _ref(_Agency(fs="kkvfs", params={"number_from_slug": True}),
+               "Upphävande av Konkurrensverkets allmänna råd (KKVFS 2015:2) om näringsförbud",
+               "/globalassets/dokument/om-oss/forfattningssamling/kkvfs_2021-2.pdf",
+               set(), direct=True)
+    assert ref.basefile == "kkvfs/2021:2"
+    assert ref.identifier == "KKVFS 2021:2"
+
+
 def test_ref_dedupes_by_basefile():
     seen = set()
     a = _ref(_Agency(fs="kifs"), "Gå till KIFS 2017:7", "/kifs-20177", seen)
@@ -126,42 +136,6 @@ def test_ref_dedupes_by_basefile():
 def test_ref_direct_puts_pdf_in_extra():
     ref = _ref(_Agency(fs="lmfs"), "LMFS 2026:3 (pdf)", "/gl/lmfs-2026-3.pdf", set(), direct=True)
     assert ref.extra["regulation_url"] == "https://example.se/gl/lmfs-2026-3.pdf"
-
-
-def test_kkvfs_enumerate_preserves_current_section_status_and_type(monkeypatch):
-    class Resp:
-        text = """
-        <h2>Gällande föreskrifter</h2>
-        <table><tr><td>Om registrering</td><td>
-          <a href="/globalassets/dokument/om-oss/forfattningssamling/kkvfs_2025-1.pdf">
-            KKVFS 2025:1
-          </a>
-        </td></tr></table>
-        <h2>Gällande allmänna råd</h2>
-        <table><tr><td>Om bagatellavtal</td><td>
-          <a href="/globalassets/dokument/om-oss/forfattningssamling/kkvfs_2017-3.pdf">
-            KKVFS 2017:3
-          </a>
-        </td></tr></table>
-        <h2>Register över samtliga föreskrifter och allmänna råd</h2>
-        <h3>2021</h3><p>KKVFS 2021:2.
-          <a href="/globalassets/dokument/om-oss/forfattningssamling/kkvfs_2021-2.pdf">
-            Upphävande av KKVFS 2015:2
-          </a>
-        </p>
-        """
-
-    monkeypatch.setattr(agencies, "request", lambda *_args, **_kw: Resp())
-    refs = list(agencies.kkvfs_enumerate(None, REGISTRY["kkvfs"]))
-    assert [r.basefile for r in refs] == [
-        "kkvfs/2025:1", "kkvfs/2021:2", "kkvfs/2017:3"]
-    by_basefile = {r.basefile: r for r in refs}
-    assert by_basefile["kkvfs/2025:1"].title == "Om registrering"
-    assert by_basefile["kkvfs/2025:1"].extra["status"] == "gällande"
-    assert by_basefile["kkvfs/2025:1"].extra["dokumenttyp"] == "föreskrift"
-    assert by_basefile["kkvfs/2017:3"].extra["dokumenttyp"] == "allmänt råd"
-    assert by_basefile["kkvfs/2021:2"].extra["status"] == "historisk"
-    assert "dokumenttyp" not in by_basefile["kkvfs/2021:2"].extra
 
 
 def test_ref_fs_from_designation_keeps_inherited_samling_identity():
@@ -324,25 +298,6 @@ def test_resolve_direct_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
                                     delay=0, log=logs.append, rejects=rejects)
     assert record["files"]["regulation"] is None
     assert len(rejects) == 1 and any("non-PDF" in m for m in logs)
-
-
-def test_resolve_direct_preserves_register_status_and_type(tmp_path, monkeypatch):
-    class Resp:
-        content = b"%PDF-1.4\n"
-
-    monkeypatch.setattr(harvest, "request", lambda *_args, **_kw: Resp())
-    ref = DocRef(
-        basefile="kkvfs/2025:1", identifier="KKVFS 2025:1", url="https://e/x.pdf",
-        extra={"regulation_url": "https://e/x.pdf", "title": "Om registrering",
-               "status": "gällande", "dokumenttyp": "föreskrift"})
-    record = harvest.resolve_direct(None, _agency_fffs(), ref, str(tmp_path), delay=0)
-    assert record["status"] == "gällande"
-    assert record["dokumenttyp"] == "föreskrift"
-
-
-def test_historical_register_status_is_an_undated_expiry():
-    art = {"metadata": {"status": "historisk"}}
-    assert catalog_rows._expired_date(art) == catalog_rows.EXPIRED_UNDATED
 
 
 # --- extract_publisher: the issuing agency from the PDF masthead --------------

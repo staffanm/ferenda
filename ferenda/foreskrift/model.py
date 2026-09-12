@@ -4,8 +4,8 @@ that embeds its **Consolidation**(s) and **Amendment**(s).
 Unlike the SFS source we built first, these are **as-published, immutable
 documents**: a grundförfattning and each ändringsförfattning is a fixed
 historical artifact (an amendment changes the base by being a separate later
-document, not by mutating it). An official register can still state whether it
-is current. Only a konsoliderad version -- an inofficial
+document, not by mutating it), so a base/amendment regulation carries no
+currency metadata at all. Only a konsoliderad version -- an inofficial
 compilation a minority of regulations have -- needs the one fact of *which*
 amendments it folds in. The structure layer is grounded in förarbete:
 
@@ -126,8 +126,6 @@ class Regulation:
     lopnummer: str               # "10"
     title: str | None = None
     publisher: str | None = None         # the issuing agency (org)
-    status: str | None = None            # gällande | historisk, from an official register
-    dokumenttyp: str | None = None       # föreskrift | allmänt råd, when classified there
 
     # metadata that only the PDF text carries (filled at parse, not harvest)
     beslutsdatum: str | None = None
@@ -165,8 +163,6 @@ class Regulation:
                 "lopnummer": self.lopnummer,
                 "title": self.title,
                 "publisher": self.publisher,
-                "status": self.status,
-                "dokumenttyp": self.dokumenttyp,
                 "beslutsdatum": self.beslutsdatum,
                 "ikrafttradandedatum": self.ikrafttradandedatum,
                 "utkomFranTryck": self.utkomFranTryck,
