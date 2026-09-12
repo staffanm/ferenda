@@ -167,6 +167,11 @@ def stodav_clause(text):
 # passive ("Genom föreskrifterna upphävs … (PMFS 2019:2)")
 RE_ERSATTER = re.compile(r"\b(?:ersätter|upphäv(?:er|s))\b(.*?)(?:\.|$)",
                          re.DOTALL | re.I)
+# the decision form of a pure repeal, where the target precedes the verb:
+# "Konkurrensverket beslutar att Konkurrensverkets allmänna råd (KKVFS 2015:2)
+# om näringsförbud … ska upphöra att gälla den 1 mars 2021." (KKVFS 2021:2)
+RE_UPPHORA = re.compile(r"\b(?:beslutar|föreskriver)\s+att\b(.*?)\bska\s+upphöra\s+att\s+gälla",
+                        re.DOTALL | re.I)
 # noun form in a title ("föreskrift om upphävande av … (BOLFS 2006:1)")
 RE_UPPHAVANDE = re.compile(r"\bupphävande\s+av\b(.*?)(?:\.|$)", re.DOTALL | re.I)
 RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+-?FS)\s*(\d{4}):(\d+)")   # NFS/TFS … ELSÄK-FS
@@ -233,6 +238,9 @@ RE_DIREKTIV_CELEX = re.compile(r"/celex/\d+L\d")    # a directive (…L…), not
 RE_JFR = re.compile(r"\bJfr\b(.*?)(?:\.\s|\n\n|\Z)", re.DOTALL)
 # the verb that closes a föreskrift preamble ("… föreskriver följande")
 RE_PREAMBLE_END = re.compile(r"föreskriver|kungör|beslutar|meddelar", re.I)
+# the masthead's closing clause when nothing else marks the body: "beslutat den
+# 31 augusti 2017." / "beslutade den 15 juni 2026."
+RE_BESLUTAD_LINE = re.compile(r"\s*besluta(?:de?|t)\s+den\s+\d", re.I)
 
 
 def _dedupe_bemyndigande(uris):
@@ -427,12 +435,17 @@ def _body_start(blocks):
     med-stöd-av lines). The first ``kapitel``/``paragraf`` marker is the reliable
     boundary; a föreskrift with no §§ at all (a short declarative, a förteckning)
     has none, so we fall back to the block just after the closing preamble verb
-    ('… föreskriver följande'), and failing even that keep everything."""
+    ('… föreskriver följande'); an allmänt råd with neither (KKVFS 2017:3, a
+    numbered list after "beslutat den 31 augusti 2017.") ends its masthead on
+    that decision date; failing even that keep everything."""
     for i, b in enumerate(blocks):
         if b.kind in ("kapitel", "paragraf"):
             return i
     for i, b in enumerate(blocks):
         if RE_PREAMBLE_END.search(b.text):
+            return i + 1
+    for i, b in enumerate(blocks):
+        if RE_BESLUTAD_LINE.match(b.text):
             return i + 1
     return 0
 
@@ -623,13 +636,19 @@ def extract_metadata(text, declaration, parser):
     # upphäver: regulations an "ersätter/upphäver(s) …" PDF clause or an
     # "upphävande av …" title replaces. The declaration includes the harvest title.
     # every clause, since the first "upphävs" in a document is often a bare
-    # provision repeal ("5 § upphävs") that names no regulation at all.
+    # provision repeal ("5 § upphävs") that names no regulation at all -- or a
+    # "beslutar att … ska upphöra att gälla" decision names. The decision's
+    # object stops at "om ändring i": repealing an ändringsförfattning
+    # ("(KVFS 2007:6) om ändring i … (KVFS 2006:26) ska upphöra att gälla",
+    # KVFS 2008:16) leaves the base regulation in force.
     # _fs_key, not lower(): 'ÅFS' must mint aafs/…, never a dangling åfs/…
+    targets = [m.group(1) for m in RE_ERSATTER.finditer(text)]
+    targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHORA.finditer(text)]
+    # the noun form in the declaration (masthead + harvest title)
+    targets += [m.group(1) for m in RE_UPPHAVANDE.finditer(declaration)]
     meta["upphaver"] = sorted({regulation_uri(_fs_key(fs), y, str(int(n)))
-                               for pattern, source in ((RE_ERSATTER, text),
-                                                       (RE_UPPHAVANDE, declaration))
-                               for m in pattern.finditer(source)
-                               for fs, y, n in RE_FS_REF.findall(m.group(1))})
+                               for target in targets
+                               for fs, y, n in RE_FS_REF.findall(target)})
     return meta
 
 
@@ -869,7 +888,7 @@ def _agency_possessive(before):
     start = len(tokens) - 1
     while start > 0:
         prev, cur = tokens[start - 1].group(), tokens[start].group()
-        if not prev[:1].isalpha() or prev.endswith((":", ".")):
+        if not prev[:1].isalpha() or prev.endswith((":", ".", ",")):
             break                       # standing masthead text, not a name
         if prev.lower() in _NAME_JOINERS or prev[:1].islower():
             start -= 1
@@ -881,6 +900,12 @@ def _agency_possessive(before):
             break
         start -= 1
         break
+    # a name begins with a capitalised word; a walk that ran back over lower-
+    # case words to a boundary without reaching one took the utgivare's role
+    # for the name ("Johan Sahl, tillförordnad chefsjurist Konkurrensverkets"
+    # in KKVFS 2025:1) -- only the possessive itself is the agency then
+    if not tokens[start].group()[:1].isupper():
+        return tokens[-1].start()
     return tokens[start].start()
 
 

@@ -7,25 +7,32 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from ferenda.lib.pdftext import Para
-from ferenda.lib.text import node_text, runs_text
-from ferenda.foreskrift import structure
 from ferenda.foreskrift import parse as fp
-from ferenda.foreskrift.parse import (PARSE_TYPES, classify,
-                                           extract_metadata, _iso,
-                                           _body_start, _ingress_start,
-                                           _dedupe_bemyndigande,
-                                           konsoliderad_tom, amendment_uri,
-                                           andrar_target,
-                                           masthead_amendments, parse_record,
-                                           clean_title, title_from_masthead)
-from ferenda.foreskrift.model import Block, printed_designation
 from ferenda.foreskrift import render as fs_render
+from ferenda.foreskrift import structure
+from ferenda.foreskrift.model import Block, printed_designation
+from ferenda.foreskrift.parse import (
+    PARSE_TYPES,
+    _body_start,
+    _dedupe_bemyndigande,
+    _ingress_start,
+    _iso,
+    amendment_uri,
+    andrar_target,
+    classify,
+    clean_title,
+    extract_metadata,
+    konsoliderad_tom,
+    masthead_amendments,
+    parse_record,
+    title_from_masthead,
+)
 from ferenda.foreskrift.render import _andrad_genom, _konsoliderad_banner
 from ferenda.lib import catalog
-from ferenda.lib.page import Site
 from ferenda.lib.lagrum import sfs_parser
-
+from ferenda.lib.page import Site
+from ferenda.lib.pdftext import Para
+from ferenda.lib.text import node_text, runs_text
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------
 
@@ -332,6 +339,31 @@ def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
     assert meta["upphaver"] == ["https://lagen.nu/pmfs/2019:2"]
 
 
+def test_extract_metadata_upphaver_from_a_ska_upphora_att_galla_decision():
+    # KKVFS 2021:2 (verbatim): a pure repeal states its target *before* the
+    # verb, in the decision sentence, not in an "upphäver …" clause
+    text = ("Upphävande av Konkurrensverkets allmänna råd om näringsförbud vid "
+            "överträdelser av konkurrensreglerna; KKVFS 2021:2 Utkom från "
+            "trycket den 25 februari 2021 beslutat den 23 februari 2021. "
+            "Konkurrensverket beslutar att Konkurrensverkets allmänna råd "
+            "(KKVFS 2015:2) om näringsförbud vid överträdelser av "
+            "konkurrensreglerna ska upphöra att gälla den 1 mars 2021.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/kkvfs/2015:2"]
+
+
+def test_extract_metadata_upphora_decision_on_an_amendment_spares_its_base():
+    # KVFS 2008:16's shape: the repealed document is itself an ändrings-
+    # författning, whose title names the base regulation; only the amendment
+    # is repealed
+    text = ("Kriminalvården beslutar att Kriminalvårdens föreskrifter "
+            "(KVFS 2007:6) om ändring i Kriminalvårdens föreskrifter och "
+            "allmänna råd för verkställighet i anstalt (KVFS 2006:26) ska "
+            "upphöra att gälla.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/kvfs/2007:6"]
+
+
 def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
     # 'ÅFS' must mint aafs/… (the registered slug), never a dangling åfs/… --
     # a naive lower() broke the repeal-subduing for every ÅFS/RÅFS document
@@ -502,6 +534,48 @@ def test_the_utgivare_does_not_become_part_of_the_agency_name():
               Block("kapitel", "1 kap. Allmänna bestämmelser", 1)]
     assert title_from_masthead(blocks, 4) == \
         "Säkerhetspolisens föreskrifter om säkerhetsskydd"
+
+
+def test_body_start_falls_back_to_the_decision_date_line():
+    """KKVFS 2017:3 is a numbered allmänt råd: no kapitel, no paragraf, no
+    "föreskriver följande". Its masthead ends on "beslutat den 31 augusti
+    2017.", so the title is read from the blocks before that line."""
+    blocks = [Block("rubrik", "Konkurrensverkets författningssamling", 1),
+              Block("stycke", "ISSN 1103-6303", 1),
+              Block("stycke", "Utkom från trycket", 1),
+              Block("rubrik", "Konkurrensverkets allmänna råd om avtal av mindre", 1),
+              Block("stycke", "den 15 september 2017", 1),
+              Block("rubrik", "betydelse (bagatellavtal) som inte omfattas av "
+                              "förbudet i 2 kap. 1 § konkurrenslagen (2008:579);", 1),
+              Block("stycke", "beslutat den 31 augusti 2017.", 1),
+              Block("stycke", "1. Enligt 1 kap. 6 § och 2 kap. 1 § konkurrenslagen "
+                              "är som utgångspunkt sådana avtal förbjudna.", 1),
+              Block("stycke", "2. I det här allmänna rådet informerar "
+                              "Konkurrensverket om hur verket tolkar begreppet.", 1)]
+    start = fp._body_start(blocks)
+    assert start == 7
+    assert title_from_masthead(blocks, start) == \
+        ("Konkurrensverkets allmänna råd om avtal av mindre betydelse "
+         "(bagatellavtal) som inte omfattas av förbudet i 2 kap. 1 § "
+         "konkurrenslagen (2008:579)")
+
+
+def test_the_utgivares_role_does_not_become_part_of_the_agency_name():
+    """KKVFS 2025:1: the utgivare line carries a role after a comma, so the
+    lower-case role words precede the agency possessive. The comma ends the
+    name; "Sahl, tillförordnad chefsjurist" is not part of "Konkurrensverkets"."""
+    blocks = [Block("rubrik", "Konkurrensverkets författningssamling", 1),
+              Block("stycke", "ISSN 1103-6303 Ansvarig utgivare: Johan Sahl, "
+                              "tillförordnad chefsjurist", 1),
+              Block("rubrik", "Konkurrensverkets föreskrifter och allmänna råd om "
+                              "anmälan om företagskoncentration enligt "
+                              "konkurrenslagen (2008:579);", 1),
+              Block("stycke", "KKVFS 2025:1 Utkom från trycket den 3 april 2025 "
+                              "beslutade den 27 mars 2025.", 1),
+              Block("kapitel", "1 kap. Inledning", 1)]
+    assert title_from_masthead(blocks, 4) == \
+        ("Konkurrensverkets föreskrifter och allmänna råd om anmälan om "
+         "företagskoncentration enligt konkurrenslagen (2008:579)")
 
 
 def test_parse_record_mints_andrar_from_the_pdf_rubric(tmp_path, monkeypatch):
