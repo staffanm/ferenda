@@ -191,6 +191,8 @@ RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-z]\)|[−•–-])\s)")
 # om näringsförbud … ska upphöra att gälla den 1 mars 2021." (KKVFS 2021:2)
 RE_UPPHORA = re.compile(r"\b(?:beslutar|föreskriver)\s+att\b(.*?)\bska\s+upphöra\s+att\s+gälla",
                         re.DOTALL | re.I)
+# noun form in a title ("föreskrift om upphävande av … (BOLFS 2006:1)")
+RE_UPPHAVANDE = re.compile(r"\bupphävande\s+av\b(.*?)(?:\.|$)", re.DOTALL | re.I)
 # NFS/TFS … ELSÄK-FS; the pre-2002 Livsmedelsverket masthead prints "SLV FS
 # 1996:1" with a space, which `_fs_key` folds away like the hyphen
 RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+(?:-| )?FS)\s*(\d{4}):(\d+)")
@@ -652,7 +654,8 @@ def extract_metadata(text, declaration, parser):
         if dirs:
             genomfor.add(min(dirs, key=lambda r: r.start).uri)
     meta["genomfor"] = sorted(genomfor)
-    # upphäver: regulations an "ersätter/upphäver(s) …" clause replaces --
+    # upphäver: regulations an "ersätter/upphäver(s) …" PDF clause or an
+    # "upphävande av …" title replaces. The declaration includes the harvest title.
     # every clause, since the first "upphävs" in a document is often a bare
     # provision repeal ("5 § upphävs") that names no regulation at all -- or a
     # "beslutar att … ska upphöra att gälla" decision names. The decision's
@@ -670,6 +673,10 @@ def extract_metadata(text, declaration, parser):
                 for m in RE_UPPHOR_BEFORE.finditer(text)]
     targets += [RE_ANDRING.split(item)[0] for m in RE_UPPHOR_LIST.finditer(text)
                 for item in RE_UPPHOR_ITEM.split(m.group(1))]
+    # the noun form in the declaration (masthead + harvest title), cut the same
+    # way: "upphävande av X (HSLF-FS 2019:43) om ändring i Y (HSLF-FS 2019:32)"
+    # repeals the amendment X, and Y stays in force
+    targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHAVANDE.finditer(declaration)]
     meta["upphaver"] = sorted({regulation_uri(_fs_key(fs), y, str(int(n)))
                                for target in targets
                                for fs, y, n in RE_FS_REF.findall(target)})

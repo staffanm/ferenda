@@ -7,25 +7,32 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from ferenda.lib.pdftext import Para
-from ferenda.lib.text import node_text, runs_text
-from ferenda.foreskrift import structure
 from ferenda.foreskrift import parse as fp
-from ferenda.foreskrift.parse import (PARSE_TYPES, classify,
-                                           extract_metadata, _iso,
-                                           _body_start, _ingress_start,
-                                           _dedupe_bemyndigande,
-                                           konsoliderad_tom, amendment_uri,
-                                           andrar_target,
-                                           masthead_amendments, parse_record,
-                                           clean_title, title_from_masthead)
-from ferenda.foreskrift.model import Block, printed_designation
 from ferenda.foreskrift import render as fs_render
+from ferenda.foreskrift import structure
+from ferenda.foreskrift.model import Block, printed_designation
+from ferenda.foreskrift.parse import (
+    PARSE_TYPES,
+    _body_start,
+    _dedupe_bemyndigande,
+    _ingress_start,
+    _iso,
+    amendment_uri,
+    andrar_target,
+    classify,
+    clean_title,
+    extract_metadata,
+    konsoliderad_tom,
+    masthead_amendments,
+    parse_record,
+    title_from_masthead,
+)
 from ferenda.foreskrift.render import _andrad_genom, _konsoliderad_banner
 from ferenda.lib import catalog
-from ferenda.lib.page import Site
 from ferenda.lib.lagrum import sfs_parser
-
+from ferenda.lib.page import Site
+from ferenda.lib.pdftext import Para
+from ferenda.lib.text import node_text, runs_text
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------
 
@@ -432,6 +439,35 @@ def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
             "(ÅFS 2005:6) om expediering.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
     assert meta["upphaver"] == ["https://lagen.nu/aafs/2005:6"]
+
+
+def test_extract_metadata_upphaver_from_harvest_title():
+    # BOLFS 2022:3 and 2022:4 declare the repeal with the noun form in their
+    # harvest titles (their PDF text says "ska upphöra att gälla", which the
+    # decision form reads too); the title alone must yield the relation, since
+    # for 949 föreskrifter on lagen.nu it is the only readable statement of it
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    for title, target in [
+            ("Föreskrift om upphävande av Bolagsverkets föreskrifter "
+             "(BOLFS 2006:1) om avgifter för bevis",
+             "https://lagen.nu/bolfs/2006:1"),
+            ("Föreskrift om upphävande av Bolagsverkets föreskrifter "
+             "(BOLFS 2006:2) om avgifter för bevis och uppgifter",
+             "https://lagen.nu/bolfs/2006:2")]:
+        meta = extract_metadata("", fp.role_declaration("", title), parser)
+        assert meta["upphaver"] == [target]
+
+
+def test_title_upphavande_of_an_amendment_spares_its_base():
+    # HSLF-FS 2021:26 repeals the ändringsförfattning HSLF-FS 2019:43, whose
+    # own title names the base regulation HSLF-FS 2019:32; only the amendment
+    # is repealed, the base stays in force
+    title = ("Föreskrifter (HSLF-FS 2021:26) om upphävande av föreskrifterna "
+             "(HSLF-FS 2019:43) om ändring i Läkemedelsverkets föreskrifter "
+             "(HSLF-FS 2019:32) om förordnande och utlämnande av läkemedel")
+    meta = extract_metadata("", fp.role_declaration("", title),
+                            sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/hslffs/2019:43"]
 
 
 def test_printed_designation_names_a_regulation_the_corpus_does_not_hold():
