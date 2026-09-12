@@ -2366,19 +2366,35 @@ def frozen_agency(fs, name, publisher, designation, site):
 # ("författningssamling", the ISSN); the rest are its bilagor or corrections.
 RE_SJVFS_NUMBER = re.compile(r"(?:(SJVFS|LSFS|LBS|DFS)\s+)?(\d{4}):(\d+)$")
 RE_SJVFS_MASTHEAD = re.compile(r"författningssamling|ISSN", re.I)
-SJVFS_FROM = 1991
+# the predecessor series the register keeps, their years (series.json) and
+# the possessive their documents' titles open with
+SJVFS_PREDECESSORS = {"LBS": (0, 1979, "Lantbruksstyrelsens"),
+                      "LSFS": (1980, 1990, "Lantbruksstyrelsens"),
+                      "DFS": (2004, 2007, "Djurskyddsmyndighetens")}
 
 
-def sjvfs_designation(tags):
-    """The printed series of a register row: its own field's designation, else
-    the base row's (a bare "1986:18" amending "LSFS 1980:8" is LSFS), else by
-    year."""
+def sjvfs_designation(tags, title=""):
+    """The printed series of a register row. Its own field's designation when
+    it prints one; else the base row's, if that series was still issued in the
+    row's year (a bare "1986:18" amending "LSFS 1980:8" is LSFS, a bare
+    "2009:19" amending "DFS 2004:22" is SJVFS); else the agency the title opens
+    with, since the register drops the DFS designation on some 2004-07 rows
+    ("Djurskyddsmyndighetens föreskrifter om …" under a bare "2004:19"); else
+    SJVFS from 1991 and LSFS before."""
     own = RE_SJVFS_NUMBER.fullmatch(tags.get("Ändringsföreskriftnr") or tags.get("Grundföreskriftnr") or "")
     if own is None:
         return None
+    year = int(own.group(2))
     base = RE_SJVFS_NUMBER.fullmatch(tags.get("Grundföreskriftnr") or "")
-    designation = own.group(1) or (base.group(1) if base else None) \
-        or ("SJVFS" if int(own.group(2)) >= SJVFS_FROM else "LSFS")
+    designation = own.group(1)
+    if not designation and base and base.group(1):
+        first, last, _ = SJVFS_PREDECESSORS[base.group(1)]
+        designation = base.group(1) if first <= year <= last else None
+    if not designation:
+        designation = next((d for d, (first, last, agency) in SJVFS_PREDECESSORS.items()
+                            if first <= year <= last and title.startswith(agency)), None)
+    if not designation:
+        designation = "SJVFS" if year >= 1991 else "LSFS"
     return designation, own.group(2), str(int(own.group(3)))
 
 
@@ -2395,7 +2411,7 @@ def sjvfs_enumerate(session, agency):
                   "filters": "[]"}).json()["result"]["searchResult"]
         for hit in result["hits"]:
             tags = {tag["name"]: tag["value"] for tag in hit["complexTags"]}
-            number = sjvfs_designation(tags)
+            number = sjvfs_designation(tags, hit.get("title") or "")
             if number is None:
                 continue        # the search also indexes unnumbered forms and images
             proper = bool(RE_SJVFS_MASTHEAD.search(html.unescape(hit.get("summary") or "")[:300]))

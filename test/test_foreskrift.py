@@ -274,6 +274,15 @@ def test_sjvfs_designation_by_field_base_row_or_year():
         == ("LSFS", "1986", "18")
     assert agencies.sjvfs_designation({"Grundföreskriftnr": "1988:3"}) == ("LSFS", "1988", "3")
     assert agencies.sjvfs_designation({"Grundföreskriftnr": "DFS 2004:5"}) == ("DFS", "2004", "5")
+    # a 2009 amendment of a DFS base is SJVFS: DFS ended in 2007
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "DFS 2004:22", "Ändringsföreskriftnr": "2009:19"}) \
+        == ("SJVFS", "2009", "19")
+    # the register drops the designation on some DFS rows; the title's agency says
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "2004:19"},
+                                      "Djurskyddsmyndighetens föreskrifter om djurhållning i djurparker") \
+        == ("DFS", "2004", "19")
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "2004:19"},
+                                      "Statens jordbruksverks föreskrifter om något") == ("SJVFS", "2004", "19")
     assert agencies.sjvfs_designation({}) is None
 
 
