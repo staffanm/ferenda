@@ -3,14 +3,14 @@ classification and number-extraction logic that decides what each landing-page
 file is and which regulation it belongs to. The live enumerate/resolve paths are
 exercised against the real sites during a harvest, not here."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import SimpleNamespace
 
 from bs4 import BeautifulSoup
 
 from ferenda.foreskrift import harvest
-from ferenda.foreskrift.agencies import LIVSFS, REGISTRY
+from ferenda.foreskrift.agencies import REGISTRY
 from ferenda.foreskrift.harvest import (
     DocRef,
     Skip,
@@ -230,23 +230,21 @@ def test_guarded_enumerate_passes_skips_and_docs_through():
     assert [type(o).__name__ for o in out] == ["DocRef", "Skip", "DocRef"]
 
 
-def test_livsfs_enumerate_reads_first_cell_and_row_status(monkeypatch):
-    assert LIVSFS.enumerate is harvest.livsfs_enumerate
+def test_livsfs_index_reads_the_pdf_from_each_rows_first_cell(monkeypatch):
+    """Livsmedelsverket's year tables link the PDF from the first cell and put
+    the register's status text, with its own cross-reference link, in the
+    second (#32). Three rows of the live 2011 page; LIVSFS 2011:13 is the one
+    the old ``p.related-info`` selector lost."""
     html = (Path(__file__).parent / "files/foreskrift/livsfs-2011.html").read_text()
     monkeypatch.setattr(harvest, "request", lambda *_args, **_kwargs:
                         SimpleNamespace(text=html))
     monkeypatch.setattr(harvest.time, "sleep", lambda _seconds: None)
-    agency = harvest.Agency(
-        fs="livsfs", name="Livsmedelsverket", publisher="Livsmedelsverket",
-        base_url="https://www.livsmedelsverket.se", index_url="https://example.se/2011",
-        params={"index_urls": ["https://example.se/2011"]})
-
-    refs = list(harvest.livsfs_enumerate(None, agency))
-
-    assert [ref.basefile for ref in refs] == [
+    agency = replace(REGISTRY["livsfs"],
+                     params={**REGISTRY["livsfs"].params,
+                             "index_urls": ["https://example.se/2011"]})
+    refs = list(harvest.indexed_enumerate(None, agency))
+    assert [r.basefile for r in refs] == [
         "livsfs/2011:13", "livsfs/2011:16", "livsfs/2011:19"]
-    assert [ref.extra["status"] for ref in refs] == [
-        "gällande", "upphävt", "upphävt"]
     assert refs[0].extra["regulation_url"].endswith("/livsfs-2011-13.pdf")
 
 
@@ -314,13 +312,11 @@ def test_resolve_direct_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
         content = b"<html>error page</html>"
     monkeypatch.setattr(harvest, "request", lambda *a, **kw: Resp())
     ref = DocRef(basefile="bfs/2026:1", identifier="BFS 2026:1", url="https://e/x",
-                 extra={"regulation_url": "https://e/x.pdf", "title": "t",
-                        "status": "upphävt"})
+                 extra={"regulation_url": "https://e/x.pdf", "title": "t"})
     logs, rejects = [], []
     record = harvest.resolve_direct(None, _agency_fffs(), ref, str(tmp_path),
                                     delay=0, log=logs.append, rejects=rejects)
     assert record["files"]["regulation"] is None
-    assert record["status"] == "upphävt"
     assert len(rejects) == 1 and any("non-PDF" in m for m in logs)
 
 

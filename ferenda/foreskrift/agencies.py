@@ -66,7 +66,6 @@ from .harvest import (
     direct_docref,
     indexed_enumerate,
     json_enumerate,
-    livsfs_enumerate,
     newest_first,
     paginated_enumerate,
     ref,
@@ -282,15 +281,21 @@ MCFFS = Agency(
             "fs_from_designation": True},
 )
 
-# indexed over per-year pages + DIRECT (col-1 PDF link per row)
+# indexed over per-year pages + DIRECT: each year table's row links the PDF
+# from its first cell; the second cell is the register's status text, whose own
+# link (an "Upphävd genom …" cross-reference) must not be read as a document.
+# Livsmedelsverket dropped the ``p.related-info`` wrapper in 2026, which left
+# the old selector matching nothing on the pages before 2024 (#32).
 LIVSFS = Agency(
     fs="livsfs", name="Livsmedelsverket", publisher="Livsmedelsverket",
     base_url="https://www.livsmedelsverket.se",
     index_url="https://www.livsmedelsverket.se/om-oss/lagstiftning1/foreskrifter-i-nummerordning/",
-    enumerate=livsfs_enumerate, resolve=resolve_direct,
+    enumerate=indexed_enumerate, resolve=resolve_direct,
     params={"index_urls": ["https://www.livsmedelsverket.se/om-oss/lagstiftning1/"
                            "foreskrifter-i-nummerordning/foreskrifter-i-nummerordning-%d/" % y
-                           for y in range(2026, 1995, -1)]},
+                           for y in range(2026, 1995, -1)],
+            "link_select": "td:first-child a[href]", "direct": True,
+            "optional_pages": True},
 )
 
 # indexed + landing; type axis lives on the index, landing hangs one PDF

@@ -417,8 +417,6 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
         "title": ref.title or extra.get("title"), "publisher": agency.publisher,
         "url": extra.get("source_url") or ref.url, "files": files,
     }
-    if extra.get("status"):
-        record["status"] = extra["status"]
     write_record(record_path(root, fs, ref.basefile), record)
     return record
 
@@ -560,35 +558,6 @@ def indexed_enumerate(session, agency):
             docref = ref(agency, text, a.get("href", ""), seen,
                           title=text if direct else None, direct=direct)
             if docref:
-                yield docref
-        time.sleep(0.3)
-
-
-def livsfs_enumerate(session, agency):
-    """LIVSFS year tables: document PDF in column one, status in column two."""
-    seen = set()
-    for url in agency.params["index_urls"]:
-        try:
-            response = request(session, "GET", url)
-        except requests.exceptions.HTTPError as exc:
-            if is_not_found(exc):
-                continue
-            yield Skip("%s: %r" % (url, exc))
-            continue
-        except requests.exceptions.RequestException as exc:
-            yield Skip("%s: %r" % (url, exc))
-            continue
-        for row in BeautifulSoup(response.text, "html.parser").select("table tr"):
-            cells = row.select("td")
-            if len(cells) < 2 or not (a := cells[0].select_one("a[href]")):
-                continue
-            text = a.get_text(" ", strip=True)
-            docref = ref(agency, text, a["href"], seen, title=text, direct=True)
-            if docref:
-                status = cells[1].get_text(" ", strip=True)
-                docref.extra["status"] = (
-                    "gällande" if status.endswith("Gällande")
-                    and not status.endswith("Inte gällande") else "upphävt")
                 yield docref
         time.sleep(0.3)
 

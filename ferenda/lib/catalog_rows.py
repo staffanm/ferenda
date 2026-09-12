@@ -285,8 +285,6 @@ def _expired_date(art: dict) -> str | None:
         withdrawn = metadata.get("upphavd") or ""
         if RE_ISO_DATE.match(withdrawn):
             return withdrawn
-        if art.get("type") == "foreskrift":
-            return EXPIRED_UNDATED
         # an issuer that states *that* a document is superseded but never
         # *when*: the EBA's version pages carry no repeal marker at all, and
         # their only date is an application date. Reading the absence of a day
