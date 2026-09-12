@@ -341,7 +341,7 @@ def _treaty_rows(con, source):
     return [{"uri": uri, "number": _ext_number(uri), "kind": kind,
              "title": title, "identifier": label, "date": doc_date, "path": path}
             for uri, _src, kind, label, title, _url, path, _display, doc_date,
-                _sid, _stitle, _desc
+                _sid, _stitle, _desc, _upphavande
             in catalog.facet_documents(con, source)]
 
 

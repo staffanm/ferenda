@@ -922,6 +922,25 @@ def test_join_across_pages_closes_a_hyphen_the_reflow_left_open():
         "FRA har i huvudsak följande synpunkter."]
 
 
+def test_dehyphenate_closes_a_discretionary_hyphen_at_the_line_end():
+    """KKVFS 2025:1 sets its title with U+00AD break hints and pdftohtml keeps
+    them: "konkurrens\xad" / "lagen (2008:579)" is one word, and the break
+    closes whatever the next line starts with (unlike a printed "-", which a
+    capital after it marks as part of the term)."""
+    assert pdftext.dehyphenate("enligt konkurrens\xad", "lagen (2008:579)") == \
+        "enligt konkurrenslagen (2008:579)"
+    assert pdftext.dehyphenate("med stöd av 13 § konkurrens\xad", "Förordningen") == \
+        "med stöd av 13 § konkurrensFörordningen"
+
+
+def test_a_discretionary_hyphen_inside_a_run_is_dropped():
+    """The same document prints "konkur\xadrens\xadförordningen" on one line;
+    the untaken hints are not text."""
+    assert pdftext.RE_SHY_INSIDE.sub("", "13 § konkur\xadrens\xadförordningen (2021:87)") == \
+        "13 § konkurrensförordningen (2021:87)"
+    assert pdftext.RE_SHY_INSIDE.sub("", "konkurrens\xad") == "konkurrens\xad"
+
+
 def test_join_across_pages_keeps_a_hanging_hyphen():
     """Correct Swedish, not an artifact: "studie- och yrkesvägledare",
     "fri- och rättigheter". Closing these up would produce "studieoch"."""

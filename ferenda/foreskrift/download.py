@@ -11,7 +11,7 @@ the six sites that all publish into HSLF-FS (see `Agency.scope`)."""
 import re
 from pathlib import Path
 
-from ..lib import compress
+from ..lib import compress, datasets
 from ..lib import harvest as harvest_lib
 from ..lib.compress import list_basefiles as _list_basefiles
 from ..lib.util import NullReporter, Reporter, fold_swedish, record_path
@@ -85,6 +85,17 @@ def stored_series(root):
     return sorted(p.name for p in Path(root).iterdir() if p.is_dir())
 
 
+_FS_SERIES = datasets.load_fs_series()
+
+
+def _lineage(fs):
+    """`fs` and the series that succeeded it (series.json `successor`)."""
+    chain = [fs]
+    while _FS_SERIES.get(chain[-1], {}).get("successor"):
+        chain.append(_FS_SERIES[chain[-1]]["successor"])
+    return set(chain)
+
+
 def superseded(root, series=None):
     """Harvested records that a *later* run has re-filed under another
     författningssamling, as ``{basefile: (winning basefile, landing url)}``.
@@ -105,13 +116,44 @@ def superseded(root, series=None):
     they are one document, and the one whose stored designation the landing slug
     does not corroborate is the leftover."""
     claims = {}
+    bodies = {}
+    empty = []
+    held = {}
     for fs in (series or stored_series(root)):
         for basefile in _list_basefiles(root, fs):
-            url = compress.read_json(
-                record_path(root, fs, basefile)).get("url")
-            if url:
-                claims.setdefault(url, []).append(basefile)
+            path = record_path(root, fs, basefile)
+            record = compress.read_json(path)
+            if record.get("url"):
+                claims.setdefault(record["url"], []).append(basefile)
+            # a direct-PDF series (LIVSFS) files every record under the one
+            # year index as its url, so there the regulation PDF's own url is
+            # what two records share. Its filename is no evidence of the
+            # samling (Livsmedelsverket names SLVFS 2000:3's file
+            # livsfs-2003-3-andr-1996-32.pdf); the record the later run wrote
+            # is the re-filing, so the newer one wins
+            regulation = record.get("files", {}).get("regulation") or {}
+            if regulation.get("url"):
+                bodies.setdefault(regulation["url"], []).append(
+                    (compress.stat(path).st_mtime_ns, basefile))
+            if not any(record.get("files", {}).values()):
+                empty.append(basefile)
+            held.setdefault(basefile.split("/", 1)[1], set()).add(basefile)
     stale = {}
+    for url, claimants in bodies.items():
+        if len(claimants) < 2:
+            continue
+        claimants.sort()
+        stale.update({bf: (claimants[-1][1], url) for _, bf in claimants[:-1]})
+    # a record that holds no document at all (its row linked another
+    # document's landing page, so nothing was fetched) is superseded by the
+    # same number filed under a series of the same lineage (series.json
+    # `successor`: livsfs/1997:27, emptied, next to slvfs/1997:27)
+    for basefile in empty:
+        fs, number = basefile.split("/", 1)
+        kin = [bf for bf in held[number] - {basefile} - set(empty)
+               if fs in _lineage(bf.split("/", 1)[0]) or bf.split("/", 1)[0] in _lineage(fs)]
+        if len(kin) == 1:
+            stale[basefile] = (kin[0], "")
     for url, basefiles in claims.items():
         if len(basefiles) < 2:
             continue

@@ -4,12 +4,15 @@ file is and which regulation it belongs to. The live enumerate/resolve paths are
 exercised against the real sites during a harvest, not here."""
 
 import json
-from dataclasses import dataclass, field
+import os
+from dataclasses import dataclass, field, replace
 from pathlib import Path
+from types import SimpleNamespace
 
+import requests
 from bs4 import BeautifulSoup
 
-from ferenda.foreskrift import harvest
+from ferenda.foreskrift import agencies, download, harvest
 from ferenda.foreskrift.agencies import REGISTRY, SJVFS
 from ferenda.foreskrift.harvest import (
     DocRef,
@@ -116,6 +119,17 @@ def test_ref_falls_back_to_filename_when_title_has_no_designation():
     ref = _ref(_Agency(fs="rgkfs"), "Riksgäldskontorets föreskrifter och allmänna råd",
                "/dok/rgkfs_2006_1.pdf", seen, direct=True)
     assert ref.basefile == "rgkfs/2006:1"
+
+
+def test_ref_number_from_slug_outranks_a_repeal_target_in_the_text():
+    # KKVFS's register row for a repeal document names the *repealed* regulation
+    # in its text; the filename is the document's own number
+    ref = _ref(_Agency(fs="kkvfs", params={"number_from_slug": True}),
+               "Upphävande av Konkurrensverkets allmänna råd (KKVFS 2015:2) om näringsförbud",
+               "/globalassets/dokument/om-oss/forfattningssamling/kkvfs_2021-2.pdf",
+               set(), direct=True)
+    assert ref.basefile == "kkvfs/2021:2"
+    assert ref.identifier == "KKVFS 2021:2"
 
 
 def test_ref_dedupes_by_basefile():
@@ -271,6 +285,112 @@ def test_harvest_refreshes_a_stored_record_when_listing_status_changes(tmp_path)
                              limit=None, delay=0, log=lambda _message: None)
 
     assert resolved == [ref]
+def test_livsfs_index_reads_the_pdf_from_each_rows_first_cell(monkeypatch):
+    """Livsmedelsverket's year tables link the PDF from the first cell and put
+    the register's status text, with its own cross-reference link, in the
+    second (#32). Three rows of the live 2011 page; LIVSFS 2011:13 is the one
+    the old ``p.related-info`` selector lost."""
+    html = (Path(__file__).parent / "files/foreskrift/livsfs-2011.html").read_text()
+    monkeypatch.setattr(harvest, "request", lambda *_args, **_kwargs:
+                        SimpleNamespace(text=html))
+    monkeypatch.setattr(harvest.time, "sleep", lambda _seconds: None)
+    agency = replace(REGISTRY["livsfs"],
+                     params={**REGISTRY["livsfs"].params,
+                             "index_urls": ["https://example.se/2011"]})
+    refs = list(harvest.indexed_enumerate(None, agency))
+    assert [r.basefile for r in refs] == [
+        "livsfs/2011:13", "livsfs/2011:16", "livsfs/2011:19"]
+    assert refs[0].extra["regulation_url"].endswith("/livsfs-2011-13.pdf")
+
+
+def test_livsfs_files_the_predecessor_series_under_slvfs():
+    """Livsmedelsverket's 1996-2001 year pages list the predecessor series:
+    rows read "SLVFS 1998:12" and link slvfs-1998-12.pdf. They file under slvfs,
+    the series later documents repeal them by; a bare "2002:12" row stays livsfs."""
+    agency = REGISTRY["livsfs"]
+    old = _ref(agency, "SLVFS 1998:12", "/globalassets/slvfs-1998-12.pdf", set(), direct=True)
+    assert (old.basefile, old.fs, old.identifier) == ("slvfs/1998:12", "slvfs", "SLVFS 1998:12")
+    new = _ref(agency, "2002:12", "/globalassets/livsfs-2002-12.pdf", set(), direct=True)
+    assert (new.basefile, new.fs, new.identifier) == ("livsfs/2002:12", None, "LIVSFS 2002:12")
+    assert REGISTRY["slvfs"].designation == "SLVFS"
+
+
+def test_livsfs_landing_classifies_by_section_and_keeps_each_files_series():
+    """The <main> block of LIVSFS 2008:13's landing page, as captured: the
+    konsoliderad version under "Författningen med ändringar införda", the
+    printed base under "Grundförfattningen", two amendments under "Senare
+    ändringar". The consolidation's own filename names the amendment first
+    (livsfs-2022-3-kons-2008-13.pdf), so the role comes from the heading."""
+    html = (Path(__file__).parent / "files/foreskrift/livsfs-landing-2008-13.html").read_text()
+    soup = BeautifulSoup(html, "html.parser")
+    roles = [agencies.classify_livsfs(a, "livsfs", "2008", "13")
+             for a in soup.select('a[href$=".pdf"]')]
+    assert roles == [("consolidation", "2008", "13"), ("regulation", "2008", "13"),
+                     ("amendment", "2013", "5"), ("amendment", "2022", "3")]
+
+
+def test_livsfs_resolve_falls_back_to_the_index_pdf_without_a_landing_page(monkeypatch):
+    """An amendment, or a repealed base, has no gallande-lagstiftning page (404):
+    the index PDF is the document. A base in force resolves its landing page."""
+    calls = []
+    def head(session, method, url, **_kw):
+        calls.append((method, url))
+        if "20186" in url:
+            resp = requests.Response(); resp.status_code = 404
+            raise requests.exceptions.HTTPError(response=resp)
+        return SimpleNamespace(text="")
+    monkeypatch.setattr(agencies, "request", head)
+    monkeypatch.setattr(agencies, "resolve_direct", lambda *a, **kw: "direct")
+    monkeypatch.setattr(agencies, "resolve_landing",
+                        lambda session, agency, ref, *a, **kw: ("landing", ref.url))
+    agency = REGISTRY["livsfs"]
+    amendment = DocRef(basefile="livsfs/2018:6", identifier="LIVSFS 2018:6", url="https://e/a.pdf")
+    base = DocRef(basefile="livsfs/2014:4", identifier="LIVSFS 2014:4", url="https://e/b.pdf")
+    assert agencies.livsfs_resolve(None, agency, amendment, "/r") == "direct"
+    assert agencies.livsfs_resolve(None, agency, base, "/r") == \
+        ("landing", "https://www.livsmedelsverket.se/om-oss/lagstiftning1/gallande-lagstiftning/livsfs-20144/")
+    assert calls[0][0] == "HEAD"
+
+
+def test_reap_finds_a_direct_series_leftover_by_its_regulation_pdf(tmp_path):
+    """LIVSFS files every record under the one year index as its url, so the
+    page url corroborates nothing; the regulation PDF's url is what the
+    pre-split livsfs/1998:8 and the re-filed slvfs/1998:8 share, and its
+    filename (slvfs-1998-8.pdf) names the samling that issued it."""
+    index = "https://www.livsmedelsverket.se/om-oss/lagstiftning1/foreskrifter-i-nummerordning/"
+    pdf = "https://www.livsmedelsverket.se/globalassets/lakemedelsrester/slvfs-1998-8.pdf"
+    for fs in ("livsfs", "slvfs"):
+        harvest.write_record(record_path(tmp_path, fs, "%s/1998:8" % fs), {
+            "fs": fs, "basefile": "%s/1998:8" % fs, "url": index,
+            "files": {"regulation": {"name": "%s-1998-8-regulation.pdf" % fs, "url": pdf}}})
+    assert download.superseded(tmp_path) == {"livsfs/1998:8": ("slvfs/1998:8", pdf)}
+
+
+def test_reap_prefers_the_newer_record_over_the_pdf_filename(tmp_path):
+    """Livsmedelsverket names SLVFS 2000:3's file livsfs-2003-3-andr-1996-32.pdf;
+    the filename is no evidence of the samling. The record the later run wrote
+    is the re-filing."""
+    index = "https://www.livsmedelsverket.se/om-oss/lagstiftning1/foreskrifter-i-nummerordning/"
+    pdf = "https://www.livsmedelsverket.se/globalassets/livsfs-2003-3-andr-1996-32.pdf"
+    for fs, age in (("livsfs", 200), ("slvfs", 100)):
+        path = record_path(tmp_path, fs, "%s/2000:3" % fs)
+        harvest.write_record(path, {"fs": fs, "basefile": "%s/2000:3" % fs, "url": index,
+                                    "files": {"regulation": {"name": "x.pdf", "url": pdf}}})
+        os.utime(path, ns=(10**9 * (10**6 - age), 10**9 * (10**6 - age)))
+    assert download.superseded(tmp_path) == {"livsfs/2000:3": ("slvfs/2000:3", pdf)}
+
+
+def test_reap_drops_an_empty_record_beside_its_lineage_twin(tmp_path):
+    """A row whose first cell links another document's landing page fetched
+    nothing under livsfs/1997:27; the re-filed slvfs/1997:27 holds the
+    document. LIVSFS succeeded SLVFS, so the empty one is the leftover."""
+    harvest.write_record(record_path(tmp_path, "livsfs", "livsfs/1997:27"), {
+        "fs": "livsfs", "basefile": "livsfs/1997:27", "url": "https://e/index/",
+        "files": {"regulation": None, "consolidation": [], "amendment": []}})
+    harvest.write_record(record_path(tmp_path, "slvfs", "slvfs/1997:27"), {
+        "fs": "slvfs", "basefile": "slvfs/1997:27", "url": "https://e/gallande/slvfs-199727/",
+        "files": {"regulation": {"name": "r.pdf", "url": "https://e/slvfs-1997-27.pdf"}}})
+    assert download.superseded(tmp_path) == {"livsfs/1997:27": ("slvfs/1997:27", "")}
 
 
 def test_browser_agency_selects_the_camoufox_transport_only(tmp_path, monkeypatch):

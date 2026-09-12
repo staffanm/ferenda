@@ -66,6 +66,10 @@ CREATE TABLE IF NOT EXISTS documents (
     source_url   TEXT,             -- authoritative publisher url ("Källa"), if any
     content_hash TEXT,             -- sha256 of the artifact bytes (incremental relate)
     expired      TEXT,             -- repeal-effective date (SFS upphavandedatum), if any
+    upphavande   INTEGER,          -- 1 when the document's only content is the
+                                   -- repeal of other documents (a föreskrift
+                                   -- titled "upphävande av …" with no operative
+                                   -- provision); listings subdue it
     date         TEXT,             -- the document's own date (förarbete/statute/decision), ISO
     publisher    TEXT,             -- issuing organization, for feed filtering
     inbound_count INTEGER,         -- document_inbound_count materialized at
@@ -372,6 +376,8 @@ def connect(path: Path | str, data_root: Path | None = None,
         con.execute("ALTER TABLE documents ADD COLUMN content_hash TEXT")
     if "expired" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN expired TEXT")
+    if "upphavande" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN upphavande INTEGER")
     if "display" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN display TEXT")
     if "descriptive" not in cols:
@@ -1164,13 +1170,17 @@ def _index_document(con, art, path, source):
     con.execute(
         "INSERT OR REPLACE INTO documents "
         "(uri, source, kind, label, title, path, source_url, content_hash, "
-        " expired, display, date, publisher, descriptive, "
+        " expired, upphavande, display, date, publisher, descriptive, "
         " short_id, short_title, description, snippet, "
         " beredning_ident, beredning_uri) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (*row, art.get("source_url"),
          None,                 # content_hash filled by the caller (holds bytes)
          catalog_rows._expired_date(art),
+         # a föreskrift that only repeals others: a fact of its own text, so
+         # the listing can subdue it without any register status
+         1 if source == "foreskrift" and catalog_rows.upphavande_instrument(art)
+         else None,
          display,                                 # the reader-facing heading
          catalog_rows.document_date(art), catalog_rows._document_publisher(art),
          # the reader-facing name forms the listings + inbound panels use (labels;
@@ -2070,9 +2080,24 @@ def upphaver_targets(con):
     """Every uri some other document's text repeals or replaces (the target
     side of all rpubl:upphaver edges) -- what the föreskrift browse listing
     subdues as no longer in force. The evidence is the replacing documents'
-    own repeal clauses; there is no authoritative status field."""
-    return {r[0] for r in con.execute(
+    own repeal clauses; there is no authoritative status field. An
+    ändringsförfattning of a repealed base goes with it: its text was folded
+    into the base and has nothing left to apply to (Livsmedelsverket's register
+    marks SLVFS 1996:3, which amended SLVFS 1993:18, "upphävd genom LIVSFS
+    2003:2", the document that repealed 1993:18), so the rpubl:andrar sources
+    of every target are included."""
+    spent = {r[0] for r in con.execute(
         "SELECT DISTINCT to_uri FROM links WHERE predicate = 'rpubl:upphaver'")}
+    amends = {}
+    for source, target in con.execute(
+            "SELECT from_uri, to_uri FROM links WHERE predicate = 'rpubl:andrar'"):
+        amends.setdefault(target, set()).add(source)
+    # transitively: an amendment of an amendment of a repealed base
+    frontier = set(spent)
+    while frontier:
+        frontier = {a for t in frontier for a in amends.get(t, ())} - spent
+        spent |= frontier
+    return spent
 
 
 def andrar_edges(con):
@@ -2365,7 +2390,7 @@ def facet_documents(con, source):
     """
     return con.execute(
         "SELECT uri, source, kind, label, title, source_url, path, display, date, "
-        "short_id, short_title, description "
+        "short_id, short_title, description, upphavande "
         "FROM documents WHERE source = ? ORDER BY uri", (source,)
     ).fetchall()
 

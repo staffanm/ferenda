@@ -348,7 +348,13 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
         if result is None:
             continue
         role, ars, lop = result
-        identifier = "%s %s:%s" % (fs.upper(), ars, lop) if ars else None
+        # the printed designation when the link names one: a landing page can
+        # hang another series' documents (an SLVFS base amended by LIVSFS, MSBFS
+        # hosting SÄIFS), and "SLVFS 2016:9" for LIVSFS 2016:9 would mint a
+        # document that does not exist
+        printed = RE_FS_NUMBER.search(a.get_text(" ", strip=True))
+        designation = printed.group(1) if printed else fs.upper()
+        identifier = "%s %s:%s" % (designation, ars, lop) if ars else None
         # resolve the PDF href against the landing page's own URL (its host may
         # differ from base_url, e.g. STEMFS's a-w2m document store); keep the
         # query string -- some document stores need it (a-w2m's ?id=&res=).
@@ -442,11 +448,16 @@ def ref(agency, ident_text, href, seen, title=None, direct=False):
     #  1. an FS-prefixed designation in the text ("RGKFS 2015:2") -- skips an SFS
     #     reference in a title ("med stöd av förordning (2006:1097)");
     #  2. for a direct (PDF-href) agency, the filename slug ("rgkfs_2015_2.pdf")
-    #     -- when the title carries no designation at all;
+    #     -- when the title carries no designation at all, or first of all when
+    #     the agency sets ``number_from_slug``: KKVFS's upphävande rows name the
+    #     *repealed* regulation in their text ("Upphävande av … (KKVFS 2015:2)")
+    #     while the filename (kkvfs_2021-2.pdf) is the document's own number;
     #  3. a bare "YYYY:N" in the text, as a last resort.
     fsm = RE_FS_NUMBER.search(ident_text)
     slugm = RE_SLUG_NUMBER.search(href.rsplit("/", 1)[-1].split("?")[0]) if direct else None
-    if fsm:
+    if slugm and agency.params.get("number_from_slug"):
+        arsutgava, lopnummer = slugm.group(1), str(int(slugm.group(2)))
+    elif fsm:
         arsutgava, lopnummer = fsm.group(2), str(int(fsm.group(3)))
     elif slugm:
         arsutgava, lopnummer = slugm.group(1), str(int(slugm.group(2)))
