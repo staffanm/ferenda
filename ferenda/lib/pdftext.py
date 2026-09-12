@@ -44,6 +44,7 @@ from .errors import SkipDocument
 from .util import normalize_space, write_atomic
 
 RE_DOTS = re.compile(r"\.{4,}")                       # TOC dotted leaders
+RE_TOC_HEADING = re.compile(r"\s*innehåll(?:sförteckning)?\s*$", re.I)
 # "2 kap. ...", a bare centered "2 kap." and a lettered "2 a kap."
 RE_KAP_MARK = re.compile(r"^(\d+(?:\s?[a-z])?)\s*kap\.(?:\s|$)")
 RE_PARA_MARK = re.compile(r"^(\d+\s*[a-z]?)\s*§(?:\s|$)")  # "3 §" / "3 a §"
@@ -240,8 +241,16 @@ def ocr_pdf(path, lang):
     # --force-ocr: rasterize and OCR every page, replacing the unrecoverable
     # (Identity-H, no ToUnicode) text layer these scans carry -- --skip-text
     # would see that broken layer as "already text" and skip the page.
-    subprocess.run(["ocrmypdf", "--quiet", "--force-ocr", "-l", lang,
-                    str(path), str(cached)], check=True, capture_output=True)
+    # --continue-on-soft-render-error: a 1990s Acrobat scan (SJVFS 1991:139)
+    # trips a ghostscript rendering warning; its page images and the text OCR
+    # reads off them are intact, and the text is all this sidecar is for.
+    # --tesseract-timeout: past its default 180 s a page is silently left
+    # without text, and a 200 dpi CCITT page takes longer than that on a
+    # machine busy with a parse (SJVFS 1991:136 came back with four empty
+    # pages); an empty sidecar is cached as done, so wait for the text
+    subprocess.run(["ocrmypdf", "--quiet", "--force-ocr", "--continue-on-soft-render-error",
+                    "--tesseract-timeout", "900", "-l", lang, str(path), str(cached)],
+                   check=True, capture_output=True)
     return cached
 
 
@@ -1601,7 +1610,14 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
     line of a quoted block, breaking a sentence). Neither is validated for them,
     so they keep the segmentation they had."""
     if sum(RE_DOTS.search(l.text) is not None for l in lines) >= 5:
-        return []
+        # the table of contents may open on the masthead page (SJVFS 2015:50
+        # prints title, preamble and "Innehållsförteckning" on page 1): keep
+        # what precedes its heading, or its first dotted line
+        first_dots = next(i for i, l in enumerate(lines) if RE_DOTS.search(l.text))
+        lines = lines[:next((i for i, l in enumerate(lines[:first_dots])
+                             if RE_TOC_HEADING.match(l.text)), first_dots)]
+        if not lines:
+            return []
     # first the header no single line holds the whole of (`_strip_split_header`),
     # then, per line, the one a line does
     lines = _strip_split_header(lines, identifier)

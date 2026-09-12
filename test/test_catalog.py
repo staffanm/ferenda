@@ -816,3 +816,10 @@ def test_upphaver_targets_include_amendments_of_a_repealed_base(tmp_path):
     con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
                 (U + "slvfs/1996:11", "rpubl:andrar", U + "slvfs/1996:3", U + "slvfs/1996:3"))
     assert catalog.upphaver_targets(con) == {U + "slvfs/1993:18", U + "slvfs/1996:3", U + "slvfs/1996:11"}
+    # an omtryck that repeals the base it reprints (SJVFS 1997:29 for 1991:88)
+    # is the successor, not spent with the base
+    for pred in ("rpubl:andrar", "rpubl:upphaver"):
+        con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
+                    (U + "sjvfs/1997:29", pred, U + "sjvfs/1991:88", U + "sjvfs/1991:88"))
+    assert U + "sjvfs/1991:88" in catalog.upphaver_targets(con)
+    assert U + "sjvfs/1997:29" not in catalog.upphaver_targets(con)

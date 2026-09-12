@@ -3,6 +3,7 @@ classification and number-extraction logic that decides what each landing-page
 file is and which regulation it belongs to. The live enumerate/resolve paths are
 exercised against the real sites during a harvest, not here."""
 
+import json
 import os
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -12,7 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ferenda.foreskrift import agencies, download, harvest
-from ferenda.foreskrift.agencies import REGISTRY
+from ferenda.foreskrift.agencies import REGISTRY, SJVFS
 from ferenda.foreskrift.harvest import (
     DocRef,
     Skip,
@@ -26,7 +27,7 @@ from ferenda.foreskrift.harvest import (
 # otherwise shadow the imported function
 from ferenda.foreskrift.harvest import ref as _ref
 from ferenda.foreskrift.parse import extract_publisher
-from ferenda.lib.harvest import guarded_enumerate
+from ferenda.lib.harvest import guarded_enumerate, write_record
 from ferenda.lib.util import record_path
 
 
@@ -231,6 +232,69 @@ def test_guarded_enumerate_passes_skips_and_docs_through():
         yield DocRef("x/2022:3", "X 2022:3", "u2")
     out = list(guarded_enumerate(mixed(), lambda *a: None))
     assert [type(o).__name__ for o in out] == ["DocRef", "Skip", "DocRef"]
+
+
+def test_sjvfs_enumerate_files_rows_by_printed_series_and_keeps_the_document_proper(monkeypatch):
+    """Six rows of the live register (two proxy pages, captured 2026-09-12):
+    a bare-numbered base (SJVFS 2023:21); SJVFS 2025:17 twice -- the "Aktuell"
+    row is a rättelseblad, the "Historik" row the document, whose summary opens
+    with the masthead; LSFS 1980:8 and its bare-numbered amendment 1986:18,
+    which inherits LSFS; DFS 2004:5. Nothing is read from the status tags."""
+    pages = json.loads(
+        (Path(__file__).parent / "files/foreskrift/sjvfs-register.json").read_text())
+
+    class Response:
+        def __init__(self, data=None):
+            self.data = data
+
+        def json(self):
+            return self.data
+
+    def request(_session, method, _url, **_kwargs):
+        return Response() if method == "GET" else Response(pages.pop(0))
+
+    monkeypatch.setattr("ferenda.foreskrift.agencies.request", request)
+    monkeypatch.setattr("ferenda.foreskrift.agencies.time.sleep", lambda _seconds: None)
+    refs = list(SJVFS.enumerate(None, SJVFS))
+    assert [(r.basefile, r.identifier, r.fs) for r in refs] == [
+        ("sjvfs/2025:17", "SJVFS 2025:17", None),
+        ("sjvfs/2023:21", "SJVFS 2023:21", None),
+        ("dfs/2004:5", "DFS 2004:5", "dfs"),
+        ("lsfs/1986:18", "LSFS 1986:18", "lsfs"),
+        ("lsfs/1980:8", "LSFS 1980:8", "lsfs")]
+    assert refs[0].url.endswith("dCa5YZ6Wg2Hnv9Hlqx0?download=1")     # the Historik original
+    assert refs[0].extra["regulation_url"] == refs[0].url
+    assert "status" not in refs[0].extra
+    assert refs[4].title.startswith("Lantbruksstyrelsens kungörelse")
+
+
+def test_sjvfs_designation_by_field_base_row_or_year():
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "2023:21"}) == ("SJVFS", "2023", "21")
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "LSFS 1980:8", "Ändringsföreskriftnr": "1986:18"}) \
+        == ("LSFS", "1986", "18")
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "1988:3"}) == ("LSFS", "1988", "3")
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "DFS 2004:5"}) == ("DFS", "2004", "5")
+    # a 2009 amendment of a DFS base is SJVFS: DFS ended in 2007
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "DFS 2004:22", "Ändringsföreskriftnr": "2009:19"}) \
+        == ("SJVFS", "2009", "19")
+    # the register drops the designation on some DFS rows; the title's agency says
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "2004:19"},
+                                      "Djurskyddsmyndighetens föreskrifter om djurhållning i djurparker") \
+        == ("DFS", "2004", "19")
+    assert agencies.sjvfs_designation({"Grundföreskriftnr": "2004:19"},
+                                      "Statens jordbruksverks föreskrifter om något") == ("SJVFS", "2004", "19")
+    assert agencies.sjvfs_designation({}) is None
+
+
+def test_reap_refiles_a_record_that_predates_its_series(tmp_path):
+    """A legacy import filed LSFS 1986:18 as sjvfs/1986:18; SJVFS began in 1991.
+    Once the register harvest files it under lsfs, the sjvfs record is the
+    leftover."""
+    for fs in ("sjvfs", "lsfs"):
+        harvest.write_record(record_path(tmp_path, fs, "%s/1986:18" % fs), {
+            "fs": fs, "basefile": "%s/1986:18" % fs, "url": "https://e/%s" % fs,
+            "files": {"regulation": {"name": "r.pdf", "url": "https://e/%s.pdf" % fs}}})
+    assert download.superseded(tmp_path) == {"sjvfs/1986:18": ("lsfs/1986:18", "")}
 
 
 def test_livsfs_index_reads_the_pdf_from_each_rows_first_cell(monkeypatch):

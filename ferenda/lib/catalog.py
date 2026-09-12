@@ -2090,7 +2090,12 @@ def upphaver_targets(con):
         "SELECT DISTINCT to_uri FROM links WHERE predicate = 'rpubl:upphaver'")}
     amends = {}
     for source, target in con.execute(
-            "SELECT from_uri, to_uri FROM links WHERE predicate = 'rpubl:andrar'"):
+            # not an amendment that itself repeals the base it amends: an
+            # omtryck replacing its base (SJVFS 1997:29 for 1991:88) is the
+            # successor, not spent with it
+            "SELECT a.from_uri, a.to_uri FROM links a WHERE a.predicate = 'rpubl:andrar' "
+            "AND NOT EXISTS (SELECT 1 FROM links u WHERE u.predicate = 'rpubl:upphaver' "
+            "AND u.from_uri = a.from_uri AND u.to_uri = a.to_uri)"):
         amends.setdefault(target, set()).add(source)
     # transitively: an amendment of an amendment of a repealed base
     frontier = set(spent)
