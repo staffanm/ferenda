@@ -39,7 +39,7 @@
   "lfnfs": {"designation": "LFNFS", "title": "Läkemedelsförmånsnämndens författningssamling", "successor": "tlvfs"},
   "lfs": {"designation": "LFS", "title": "Luftfartsverkets författningssamling", "successor": "tsfs"},
   "lifs": {"designation": "LIFS", "title": "Lotteriinspektionens författningssamling", "successor": "sifs"},
-  "livsfs": {"designation": "LIVSFS", "title": "Livsmedelsverkets författningssamling"},
+  "livsfs": {"designation": "LIVSFS", "title": "Livsmedelsverkets författningssamling", "from": 2002},
   "lmfs": {"designation": "LMFS", "title": "Lantmäteriets författningssamling"},
   "lmvfs": {"designation": "LMVFS", "title": "Lantmäteriverkets författningssamling", "successor": "lmfs"},
   "lsfs": {"designation": "LSFS", "title": "Lantbruksstyrelsens författningssamling", "successor": "sjvfs"},

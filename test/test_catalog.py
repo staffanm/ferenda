@@ -813,4 +813,6 @@ def test_upphaver_targets_include_amendments_of_a_repealed_base(tmp_path):
                 (U + "slvfs/1996:3", "rpubl:andrar", U + "slvfs/1993:18", U + "slvfs/1993:18"))
     con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
                 (U + "livsfs/2014:17", "rpubl:andrar", U + "livsfs/2003:45", U + "livsfs/2003:45"))
-    assert catalog.upphaver_targets(con) == {U + "slvfs/1993:18", U + "slvfs/1996:3"}
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
+                (U + "slvfs/1996:11", "rpubl:andrar", U + "slvfs/1996:3", U + "slvfs/1996:3"))
+    assert catalog.upphaver_targets(con) == {U + "slvfs/1993:18", U + "slvfs/1996:3", U + "slvfs/1996:11"}

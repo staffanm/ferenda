@@ -172,8 +172,31 @@ RE_ERSATTER = re.compile(r"\b(?:ersätter|upphäv(?:er|s)|upphör)\b(.*?)(?:\.|$
 # den 28 februari 2003, då Livsmedelsverkets föreskrifter (SLVFS 1993:18) om
 # material … upphör att gälla" (LIVSFS 2003:2). Bounded by the sentence, whose
 # colons are only the numbers' own.
-RE_UPPHOR_BEFORE = re.compile(r"(?:^|[.;])([^.;]{0,400}?)\b(?:upphör|skall?\s+upphöra)\s+att\s+gälla",
+RE_UPPHOR_BEFORE = re.compile(r"([^;]{0,2500}?)\b(?:upphör|ska(?:ll)?\s+upphöra)\s+att\s+gälla",
                               re.DOTALL | re.I)
+# where that sentence starts: the last full stop followed by a capital
+# ("m.m." and "t.o.m." are not sentence ends)
+RE_SENTENCE_START = re.compile(r"\.\s+(?=[A-ZÅÄÖ])")
+# a repeal of a *provision* names one before the regulation: "att 17 § verkets
+# föreskrifter (LIVSFS 2005:20) … ska upphöra att gälla" (LIVSFS 2011:8),
+# "bilaga 2 till …", "övergångsbestämmelserna till …" -- the regulation stays
+RE_PROVISION = re.compile(r"\d+\s*§|§§|\bbilag|\bpunkt(?:en|erna)?\b|övergångsbestämmelse", re.I)
+
+
+def _repeal_object(segment):
+    """The regulations a repeal sentence's object names, or nothing when the
+    object is a provision of one. `segment` is the text before the verb: cut to
+    its own sentence, to the subordinate clause after "då" (an omtryck reprints
+    its base's entry-into-force sentence), and at "om ändring i"."""
+    segment = RE_SENTENCE_START.split(segment)[-1].rsplit(" då ", 1)[-1]
+    segment = RE_ANDRING.split(segment)[0]
+    first = RE_FS_REF.search(segment) or RE_BARE_OWN_REF.search(segment)
+    if first and RE_PROVISION.search(segment[:first.start()]):
+        return ""
+    return segment
+# an enumerator inside a repeal sentence ("upphävs 1. Livsmedelsverkets
+# föreskrifter (1993:21) …, 2. …", LIVSFS 2014:4) is not the sentence's end
+RE_ENUMERATOR = re.compile(r"\b\d{1,2}\.\s+(?=[A-ZÅÄÖ(])")
 # the list form: "följande föreskrifter ska upphöra att gälla den 1 januari
 # 2006: − Livsmedelsverkets föreskrifter (SLVFS 1978:21) om …, − …" (LIVSFS
 # 2005:24), "Nedanstående föreskrifter upphör att gälla enligt följande. 1. …"
@@ -189,10 +212,11 @@ RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-z]\)|[−•–-])\s)")
 # the decision form of a pure repeal, where the target precedes the verb:
 # "Konkurrensverket beslutar att Konkurrensverkets allmänna råd (KKVFS 2015:2)
 # om näringsförbud … ska upphöra att gälla den 1 mars 2021." (KKVFS 2021:2)
-RE_UPPHORA = re.compile(r"\b(?:beslutar|föreskriver)\s+att\b(.*?)\bska\s+upphöra\s+att\s+gälla",
+RE_UPPHORA = re.compile(r"\b(?:beslutar|föreskriver)\s+(?:[A-ZÅÄÖ][\wåäö]+\s+(?:[\wåäö]+\s+){0,2})?att\b(.*?)\bska(?:ll)?\s+upphöra\s+att\s+gälla",
                         re.DOTALL | re.I)
 # noun form in a title ("föreskrift om upphävande av … (BOLFS 2006:1)")
-RE_UPPHAVANDE = re.compile(r"\bupphävande\s+av\b(.*?)(?:\.|$)", re.DOTALL | re.I)
+RE_UPPHAVANDE = re.compile(r"\bupphävande\s+av\b(?!\s+vissa\s+(?:regler|bestämmelser|delar)\b|\s+\d+\s*§)(.*?)(?:\.|$)",
+                           re.DOTALL | re.I)
 # NFS/TFS … ELSÄK-FS; the pre-2002 Livsmedelsverket masthead prints "SLV FS
 # 1996:1" with a space, which `_fs_key` folds away like the hyphen
 RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+(?:-| )?FS)\s*(\d{4}):(\d+)")
@@ -213,7 +237,7 @@ RE_ANDRING = re.compile(r"ändring(?:ar)?\s+(?:i|av)\b", re.IGNORECASE)
 RE_AMENDING_FORMULA = re.compile(
     r"föreskriver\b.{0,160}?\bi\s+fråga\s+om\b", re.IGNORECASE | re.DOTALL)
 RE_BARE_OWN_REF = re.compile(
-    r"(?:föreskrifter(?:na)?|allmänna\s+råd(?:en)?)[^()]*\((\d{4}):(\d+)\)")
+    r"(?:föreskrifter(?:na)?|allmänna\s+råd(?:en)?|kungörelsen?)[^()]*\((\d{4}):(\d+)\)")
 # the issuing agency, read from the masthead (searched over a whitespace-collapsed
 # copy, since two-column extraction breaks the lines apart). Three signals, tried
 # in order:
@@ -258,7 +282,7 @@ RE_DIREKTIV_CELEX = re.compile(r"/celex/\d+L\d")    # a directive (…L…), not
 # *it* amends, not ones this föreskrift implements).
 RE_JFR = re.compile(r"\bJfr\b(.*?)(?:\.\s|\n\n|\Z)", re.DOTALL)
 # the verb that closes a föreskrift preamble ("… föreskriver följande")
-RE_PREAMBLE_END = re.compile(r"föreskriver|kungör|beslutar|meddelar", re.I)
+RE_PREAMBLE_END = re.compile(r"föreskriver|\bkungör\b|beslutar|meddelar", re.I)   # kungör, not kungörelse
 # the masthead's closing clause when nothing else marks the body: "beslutat den
 # 31 augusti 2017." / "beslutade den 15 juni 2026."
 RE_BESLUTAD_LINE = re.compile(r"\s*besluta(?:de?|t)\s+den\s+\d", re.I)
@@ -627,7 +651,7 @@ def role_declaration(masthead, harvest_title):
     return f"{masthead} {harvest_title or ''}"
 
 
-def extract_metadata(text, declaration, parser):
+def extract_metadata(text, declaration, parser, fs=None):
     """Best-effort masthead facts from the regulation's plain text. ``text`` is
     the whole document (ikraftträdande sits at the end, the rest up front);
     ``declaration`` is what the document says it *is*, per
@@ -663,23 +687,24 @@ def extract_metadata(text, declaration, parser):
     # ("(KVFS 2007:6) om ändring i … (KVFS 2006:26) ska upphöra att gälla",
     # KVFS 2008:16) leaves the base regulation in force.
     # _fs_key, not lower(): 'ÅFS' must mint aafs/…, never a dangling åfs/…
-    targets = [m.group(1) for m in RE_ERSATTER.finditer(text)]
-    targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHORA.finditer(text)]
-    # only the subordinate clause when the sentence has one: an omtryck reprints
-    # the base's "Dessa föreskrifter (LIVSFS 2003:13) träder i kraft …, då …
-    # (SLVFS 1993:25) … upphör att gälla" (LIVSFS 2004:26), and the base is not
-    # what that sentence repeals
-    targets += [RE_ANDRING.split(m.group(1).rsplit(" då ", 1)[-1])[0]
-                for m in RE_UPPHOR_BEFORE.finditer(text)]
+    targets = [m.group(1) for m in RE_ERSATTER.finditer(RE_ENUMERATOR.sub("", text))]
+    targets += [_repeal_object(m.group(1)) for m in RE_UPPHORA.finditer(text)]
+    targets += [_repeal_object(m.group(1)) for m in RE_UPPHOR_BEFORE.finditer(text)]
     targets += [RE_ANDRING.split(item)[0] for m in RE_UPPHOR_LIST.finditer(text)
                 for item in RE_UPPHOR_ITEM.split(m.group(1))]
     # the noun form in the declaration (masthead + harvest title), cut the same
     # way: "upphävande av X (HSLF-FS 2019:43) om ändring i Y (HSLF-FS 2019:32)"
     # repeals the amendment X, and Y stays in force
     targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHAVANDE.finditer(declaration)]
-    meta["upphaver"] = sorted({regulation_uri(_fs_key(fs), y, str(int(n)))
-                               for target in targets
-                               for fs, y, n in RE_FS_REF.findall(target)})
+    upphaver = {_ref_uri(f, y, n) for target in targets for f, y, n in RE_FS_REF.findall(target)}
+    if fs:
+        # a bare "(1993:21)" right after "föreskrifter" names the document's own
+        # series (RE_BARE_OWN_REF), as it does in an ändring title -- or its
+        # predecessor when the year predates the series (LIVSFS 2014:4 repeals
+        # "föreskrifter (1993:21)": SLVFS, since LIVSFS began in 2002)
+        upphaver |= {regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
+                     for target in targets for y, n in RE_BARE_OWN_REF.findall(target)}
+    meta["upphaver"] = sorted(upphaver)
     return meta
 
 
@@ -885,14 +910,21 @@ TITLE_MAX = 300      # a subject longer than this is extraction running on
 _NAME_JOINERS = {"för", "och", "av", "i", "med", "samt", "vid", "om"}
 
 
-# Livsmedelsverket prints its register code beside the title -- "(H 34)",
-# "(H 32:9)", "(J 77)" -- and two-column extraction drops it into the title
-# sentence or inside a reference's parenthesis ("(SLV FS (H 34) 1993:34)")
-RE_SLV_REGISTER_CODE = re.compile(r"\(\s*[HJ]\s?\d+(?:\s*:\s*\d+)?\s*\)")
 # the 1996-2001 Livsmedelsverket scans carry an OCR layer that splits the
 # designation at random: 240 "SLV FS", 96 "SL V FS", 73 "SL VFS", 16 "S LV FS"
 # across the 244 documents -- one spelling before any pattern reads it
-RE_OCR_SLVFS = re.compile(r"\bS\s?L\s?V\s?F\s?S\b")
+# Livsmedelsverket prints its register code beside the title -- "(H 34)",
+# "(H 32:9)", "(J 77)" -- and two-column extraction drops it into the title
+# sentence or inside a reference's parenthesis ("(SLV FS (H 34) 1993:34)")
+RE_SLV_REGISTER_CODE = re.compile(r"\(\s*[HJ]\s?[0-9Il][0-9Il ]*(?:\s*:\s*[0-9Il ]+)?\s*\)")
+RE_OCR_SLVFS = re.compile(r"\bS\s?L\s?[VY]\s?F\s?S\b")
+# … and its numbers: "SLVFS I 995 :3 I" for SLVFS 1995:31 (60 of 1,187 on the
+# first two pages), and "ändring" as "Undring"/"lindring" before "i kungörelsen"
+RE_OCR_SLVFS_NUMBER = re.compile(r"SLVFS\s*([0-9Il](?: ?[0-9Il]){2,4})\s*:\s*([0-9Il](?: ?[0-9Il]){0,2})(?=\D|$)")
+RE_OCR_ANDRING = re.compile(r"(?<![\wåäö])(?:lindring|~indring|[UÄÅA]ndring)(?=\s+(?:i|av)\b)")
+# the two columns interleaved mid-phrase: "föreskrifter i om ändring verkets
+# föreskrifter (SLVFS 1999:6)" for "föreskrifter om ändring i verkets …"
+RE_OCR_I_OM_ANDRING = re.compile(r"\bi\s+om\s+(?:ändring|lindring|~indring|[UÄÅA]ndring)\b")
 
 
 def _strip_boilerplate(masthead):
@@ -988,7 +1020,11 @@ def title_from_masthead(blocks, start):
     repeat it. The blocks are joined, and the standing masthead text deleted,
     before matching: two-column extraction interleaves the columns, so neither
     block holds the whole sentence and the second column lands inside it."""
-    masthead = _strip_boilerplate(" ".join(_full_text(blocks[:start]).split()))
+    # repaired twice: once joined, and once more after the column headers are
+    # gone, since one can land between a designation and its number
+    # ("(SLVFS Utkom från trycket 1994: 13)", SLVFS 1998:41)
+    masthead = _repair_ocr_text(_strip_boilerplate(
+        _repair_ocr_text(" ".join(_full_text(blocks[:start]).split()))))
     for word in RE_TITLE_TYPE.finditer(masthead):
         head = _agency_possessive(masthead[:word.start()].rstrip())
         rest = masthead[word.end():word.end() + TITLE_MAX]
@@ -1017,15 +1053,30 @@ def _pages(path, patch_key=None):
     return list(pdf_pages(ocr_pdf(path, "swe"), patch_key, hidden=True))
 
 
+def _repair_ocr_text(text):
+    """`text` with the OCR layer's damage to designations undone: the register
+    code first, since it lands between the designation and the number ("(SLV
+    FS (H 33:1) 1993: 17)", SLVFS 1997:2), then the split designation, its
+    digits, "ändring" and the two-column reorder "i om ändring"."""
+    text = RE_SLV_REGISTER_CODE.sub(" ", text)
+    text = RE_OCR_SLVFS.sub("SLVFS", text)
+    text = RE_OCR_SLVFS_NUMBER.sub(
+        lambda m: "SLVFS %s:%s" % tuple(g.replace("I", "1").replace("l", "1").replace(" ", "")
+                                       for g in m.groups()), text)
+    text = RE_OCR_ANDRING.sub("ändring", text)
+    return RE_OCR_I_OM_ANDRING.sub("om ändring i", text)
+
+
 def _repair_ocr(blocks):
-    """The blocks with the OCR layer's split designations rejoined, so the
-    masthead, the title and every reference read the one printed form."""
+    """The blocks repaired one by one -- and again once joined, where the
+    masthead's second column split a reference over two blocks ("(SLVFS " |
+    "1994: 13) med föreskrifter", SLVFS 1997:11)."""
     for b in blocks:
-        b.text = RE_OCR_SLVFS.sub("SLVFS", b.text)
+        b.text = _repair_ocr_text(b.text)
     return blocks
 
 
-def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None):
+def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=None):
     """One föreskrift PDF -> (structure tree, its metadata dict, its footnotes).
     Metadata is read
     from the whole text (the masthead up front, ikraftträdande at the end); the
@@ -1034,13 +1085,13 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None):
     blocks, notes = parse_body(_pages(path, patch_key), identifier)
     _repair_ocr(blocks)
     start = _body_start(blocks)
-    masthead = _full_text(blocks[:start])
+    masthead = _repair_ocr_text(_full_text(blocks[:start]))
     # the notes are read for metadata with the body: the "Jfr … direktiv" clause
     # that names what a föreskrift genomför is *printed as* a page-foot note, so
     # a scan of the blocks alone would lose the very relation it exists to find
-    meta = extract_metadata("\n".join([_full_text(blocks)]
-                                      + [text for _mark, text in notes]),
-                            role_declaration(masthead, harvest_title), parser)
+    meta = extract_metadata(_repair_ocr_text("\n".join([_full_text(blocks)]
+                                                       + [text for _mark, text in notes])),
+                            role_declaration(masthead, harvest_title), parser, fs=fs)
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
     meta["publisher"] = extract_publisher(masthead or _full_text(blocks))
@@ -1091,6 +1142,23 @@ def masthead_amendments(masthead, fs, base_ars, base_lop):
 
 
 _FS_SERIES = datasets.load_fs_series()
+
+
+def _ref_uri(designation, year, lopnummer):
+    """A cited regulation's uri: the designation's slug, or its predecessor
+    when the year predates the series ("LIVSFS 2000:22" in LIVSFS 2014:9 is
+    SLVFS 2000:22, LIVSFS having begun in 2002)."""
+    return regulation_uri(_series_for_year(_fs_key(designation), int(year)),
+                          year, str(int(lopnummer)))
+
+
+def _series_for_year(fs, year):
+    """The series a bare reference from a document of `fs` names for `year`:
+    `fs` itself, or the predecessor that was current then (series.json
+    `from`, the successor's first year)."""
+    while year < _FS_SERIES.get(fs, {}).get("from", 0):
+        fs = next(p for p, row in _FS_SERIES.items() if row.get("successor") == fs)
+    return fs
 
 
 def _series_family(fs):
@@ -1209,11 +1277,11 @@ def andrar_target(title, fs, self_uri):
         return None
     rest = title[m.end():]
     for f, y, n in RE_FS_REF.findall(rest):
-        uri = regulation_uri(_fs_key(f), y, str(int(n)))
+        uri = _ref_uri(f, y, n)
         if uri != self_uri:
             return uri
     for y, n in RE_BARE_OWN_REF.findall(rest):
-        uri = regulation_uri(fs, y, str(int(n)))
+        uri = regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
         if uri != self_uri:
             return uri
     return None
@@ -1227,7 +1295,7 @@ def amendment_uri(identifier):
     m = RE_FS_REF.search(identifier or "")
     if not m:
         return None
-    return regulation_uri(_fs_key(m.group(1)), m.group(2), str(int(m.group(3))))
+    return _ref_uri(m.group(1), m.group(2), m.group(3))
 
 
 def body_path(root, fs, entry):
@@ -1263,7 +1331,7 @@ def parse_record(record, root):
     if reg_file:
         structure, meta, notes = parse_pdf(
             body_path(root, fs, reg_file), record["identifier"], parser,
-            ("foreskrift", basefile), record.get("title"))
+            ("foreskrift", basefile), record.get("title"), fs=fs)
 
     # the PDF masthead is the authoritative issuer; the harvest label (the current
     # custodian agency) is only the fallback when the PDF names none

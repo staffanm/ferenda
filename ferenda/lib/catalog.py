@@ -2086,12 +2086,18 @@ def upphaver_targets(con):
     marks SLVFS 1996:3, which amended SLVFS 1993:18, "upphävd genom LIVSFS
     2003:2", the document that repealed 1993:18), so the rpubl:andrar sources
     of every target are included."""
-    targets = {r[0] for r in con.execute(
+    spent = {r[0] for r in con.execute(
         "SELECT DISTINCT to_uri FROM links WHERE predicate = 'rpubl:upphaver'")}
-    amendments = {r[0] for r in con.execute(
-        "SELECT DISTINCT a.from_uri FROM links a JOIN links u ON a.to_uri = u.to_uri "
-        "WHERE a.predicate = 'rpubl:andrar' AND u.predicate = 'rpubl:upphaver'")}
-    return targets | amendments
+    amends = {}
+    for source, target in con.execute(
+            "SELECT from_uri, to_uri FROM links WHERE predicate = 'rpubl:andrar'"):
+        amends.setdefault(target, set()).add(source)
+    # transitively: an amendment of an amendment of a repealed base
+    frontier = set(spent)
+    while frontier:
+        frontier = {a for t in frontier for a in amends.get(t, ())} - spent
+        spent |= frontier
+    return spent
 
 
 def andrar_edges(con):
