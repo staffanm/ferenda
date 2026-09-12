@@ -77,6 +77,23 @@ def test_a_real_identifier_strips_headers_but_not_body_text():
     assert "Klagomålet rör Riksdagens ombudsmän i ett tidigare ärende" in joined
 
 
+def test_a_toc_that_opens_on_the_masthead_page_keeps_the_masthead():
+    # SJVFS 2015:50: title and preamble, then "Innehållsförteckning" and the
+    # dotted entries, all on page 1 -- the masthead is what the title comes from
+    lines = ([_line("Föreskrifter om ändring i Statens jordbruksverks", 100, bold=True),
+              _line("föreskrifter (SJVFS 2015:35) om företagsstöd;", 120, bold=True),
+              _line("beslutade den 11 december 2015.", 160),
+              _line("Innehållsförteckning", 200, bold=True)]
+             + [_line("%d § Rubrik %d ........................ s. %d" % (i, i, i), 220 + 20 * i)
+                for i in range(1, 8)])
+    paras = page_paragraphs(lines, "SJVFS 2015:50", 1)
+    joined = " ".join(p.text for p in paras)
+    assert "Föreskrifter om ändring" in joined and "beslutade den 11 december 2015" in joined
+    assert "Innehåll" not in joined and "Rubrik" not in joined
+    # a page that is nothing but the table of contents is still skipped whole
+    assert page_paragraphs(lines[3:], "SJVFS 2015:50", 2) == []
+
+
 PAGE_XML = (b"<pdf2xml>"
             b"<page number='1' width='744' height='1200'>"
             b"<text top='10' left='5' height='10'>first page</text></page>"
