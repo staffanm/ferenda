@@ -799,3 +799,20 @@ def test_upphavande_instrument_is_a_repeal_title_with_no_operative_provision():
     with_body = {"metadata": {"title": "Föreskrifter om upphävande av X"},
                  "structure": [{"type": "kapitel", "children": [{"type": "paragraf"}]}]}
     assert catalog_rows.upphavande_instrument(with_body) is False
+
+
+def test_upphaver_targets_include_amendments_of_a_repealed_base(tmp_path):
+    """SLVFS 1996:3 amended SLVFS 1993:18; LIVSFS 2003:2 repealed 1993:18. The
+    register marks 1996:3 "upphävd genom LIVSFS 2003:2": an amendment of a
+    repealed base is spent with it, so the listing subdues it too."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    U = "https://lagen.nu/"
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
+                (U + "livsfs/2003:2", "rpubl:upphaver", U + "slvfs/1993:18", U + "slvfs/1993:18"))
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
+                (U + "slvfs/1996:3", "rpubl:andrar", U + "slvfs/1993:18", U + "slvfs/1993:18"))
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
+                (U + "livsfs/2014:17", "rpubl:andrar", U + "livsfs/2003:45", U + "livsfs/2003:45"))
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) VALUES (?,?,?,?)",
+                (U + "slvfs/1996:11", "rpubl:andrar", U + "slvfs/1996:3", U + "slvfs/1996:3"))
+    assert catalog.upphaver_targets(con) == {U + "slvfs/1993:18", U + "slvfs/1996:3", U + "slvfs/1996:11"}

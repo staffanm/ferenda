@@ -348,7 +348,13 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
         if result is None:
             continue
         role, ars, lop = result
-        identifier = "%s %s:%s" % (fs.upper(), ars, lop) if ars else None
+        # the printed designation when the link names one: a landing page can
+        # hang another series' documents (an SLVFS base amended by LIVSFS, MSBFS
+        # hosting SÄIFS), and "SLVFS 2016:9" for LIVSFS 2016:9 would mint a
+        # document that does not exist
+        printed = RE_FS_NUMBER.search(a.get_text(" ", strip=True))
+        designation = printed.group(1) if printed else fs.upper()
+        identifier = "%s %s:%s" % (designation, ars, lop) if ars else None
         # resolve the PDF href against the landing page's own URL (its host may
         # differ from base_url, e.g. STEMFS's a-w2m document store); keep the
         # query string -- some document stores need it (a-w2m's ?id=&res=).
