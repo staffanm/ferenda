@@ -430,6 +430,11 @@ def test_decision_form_with_the_agency_between_the_verb_and_att():
 
 def test_bare_ref_before_the_series_began_names_the_predecessor():
     assert fp._series_for_year("livsfs", 1993) == "slvfs"
+    # SJVFS has two predecessors: LSFS (1980–1990) and DFS (2004–2007); a year
+    # before both goes on to LBS, and a DFS year before 2004 stays DFS
+    assert fp._series_for_year("sjvfs", 1988) == "lsfs"
+    assert fp._series_for_year("sjvfs", 1975) == "lbs"
+    assert fp._series_for_year("dfs", 2003) == "dfs"
     assert fp._series_for_year("livsfs", 2002) == "livsfs"
     assert fp._series_for_year("slvfs", 1993) == "slvfs"
     text = "Genom dessa föreskrifter upphävs Livsmedelsverkets föreskrifter (1993:21) om näringsvärdesdeklaration."
@@ -526,6 +531,263 @@ def test_ocr_repair_reorders_i_om_andring():
     assert fp._repair_ocr_text("Statens livsmedelsverks föreskrifter i om ändring verkets "
                                "föreskrifter (SLVFS 1999:6) om godkända") == \
         "Statens livsmedelsverks föreskrifter om ändring i verkets föreskrifter (SLVFS 1999:6) om godkända"
+
+
+def test_decision_form_across_a_bemyndigande_clause():
+    # SJVFS 2021:7 (verbatim): "föreskriver, med stöd av … om skydd mot smitta på
+    # djur m.m., att Lantbruksstyrelsens kungörelse (LSFS 1980:9) … ska upphöra"
+    text = ("Statens jordbruksverk föreskriver, med stöd av 6 § förordningen (1994:1830) "
+            "om skydd mot smitta på djur m.m., att Lantbruksstyrelsens kungörelse "
+            "(LSFS 1980:9) om smittreningsåtgärder m.m. för den som kommer från land "
+            "där mul- och klövsjuka förekommer ska upphöra att gälla. Denna författning "
+            "träder i kraft den 21 april 2021.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/lsfs/1980:9"]
+
+
+def test_skall_target_upphora_att_galla():
+    # SJVFS 2000:84: the target between "skall" and "upphöra"
+    text = ("Vid ikraftträdandet av författningen skall Statens jordbruksverks "
+            "föreskrifter (SJVFS 1994:123) om utförsel av vattenbruksdjur till länder "
+            "som ingår i Europeiska ekonomiska samarbetsområdet upphöra att gälla.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1994:123"]
+
+
+def test_enumerated_repeal_list_reads_items_and_spares_provision_items():
+    # SJVFS 2026:3 (shape): "upphävs respektive upphör att gälla 1. 2 kap. 1 §
+    # … (SJVFS 2002:98) …, 2. Statens … (SJVFS 2012:24) …" -- item 1 repeals a
+    # provision, item 2 a regulation; "kap." is not the sentence's end
+    text = ("2. Genom författningen upphävs respektive upphör att gälla 1. 2 kap. 1 § "
+            "Statens jordbruksverks föreskrifter (SJVFS 2002:98) om förebyggande och "
+            "bekämpning av epizootiska sjukdomar, 2. Statens jordbruksverks föreskrifter "
+            "(SJVFS 2012:24) om anmälningspliktiga djursjukdomar. Denna författning "
+            "träder i kraft den 1 mars 2026.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2012:24"]
+
+
+def test_enumerated_repeal_list_runs_past_the_sentence_window_and_page_furniture():
+    # SJVFS 2026:8 (shape): "upphävs a) … m) … (saknr. J 35),\n92 SJVFS 2021:13.\n
+    # Godkänd … SJVFS 2026:8\nn) … samt å) … (saknr. J 135).\n…\n1. Denna
+    # författning träder i kraft" -- a footnote ends with a full stop between
+    # items m) and n), the page head names the document itself, an "å)" item
+    # closes the list, and an omtryck's numbered entry-into-force points follow
+    items = ["%s) Statens jordbruksverks föreskrifter (SJVFS 2000:%d) om införsel av "
+             "vissa djur samt sperma, ägg och embryon från vissa djur (saknr. J %d)"
+             % (chr(97 + i), i + 1, i + 11) for i in range(12)]
+    text = ("Genom författningen upphävs " + ", ".join(items[:6])
+            + ",\n92 SJVFS 2021:13.\nGodkänd 2026-05-21 av Olof Johansson\nSJVFS 2026:8\n"
+            + ", ".join(items[6:]) + ", samt å) Statens jordbruksverks föreskrifter "
+            "(SJVFS 1995:71) om utförsel av vattenbruksdjur (saknr. J 135).\n"
+            "Godkänd 2026-05-21 av Olof Johansson\nSJVFS 2026:8\n"
+            "1. Denna författning träder i kraft den 5 juni 2026. 2. Bestämmelsen i "
+            "1 kap. 2 § tillämpas första gången den 1 juli 2026.")
+    assert len(text) > 1200
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == sorted(["https://lagen.nu/sjvfs/2000:%d" % i for i in range(1, 13)]
+                                      + ["https://lagen.nu/sjvfs/1995:71"])
+
+
+def test_a_forteckning_over_gallande_foreskrifter_repeals_nothing():
+    # LIVSFS 2007:1 (shape): the list 18 c § författningssamlingsförordningen
+    # has the agency publish restates each regulation's "Upphäver …" entry
+    text = ("Livsmedelsverkets förteckningar över gällande författningar och allmänna "
+            "råd inom verkets ansvarsområde\nI enlighet med 18 c § "
+            "författningssamlingsförordningen (1976:725) tillhandahåller Livsmedelsverket "
+            "följande förteckningar.\n- Upph. LIVSFS 2006:22 Upphäver LIVSFS 2004:14\n"
+            "Saknr: H 64 Ikraft: 9 december 2006\n2004 26 Se LIVSFS 2003:13\n")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="livsfs")
+    assert meta["upphaver"] == []
+
+
+def test_bare_allmanna_rad_number_is_not_an_own_series_ref():
+    # SJVFS 2013:40 repeals "Statens jordbruksverks allmänna råd (2005:1) om
+    # lagring och spridning av gödsel" -- a series of its own, not SJVFS 2005:1
+    text = ("Denna författning träder i kraft den 1 januari 2014. Genom denna "
+            "författning upphävs Statens jordbruksverks allmänna råd (2005:1) om "
+            "lagring och spridning av gödsel m.m. samt Statens jordbruksverks "
+            "föreskrifter och allmänna råd (2004:62) om miljöhänsyn i jordbruket.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2004:62"]
+
+
+def test_extract_metadata_andrar_from_the_amending_formula():
+    # SJVFS 2011:24, an omtryck: the title restates the base's, only the
+    # enacting formula names it
+    declaration = ("Statens jordbruksverks föreskrifter och allmänna råd om träning och "
+                   "tävling med djur; beslutade den 1 juni 2011. Statens jordbruksverk "
+                   "föreskriver med stöd av 38 § djurskyddsförordningen (1988:539) i fråga "
+                   "om verkets föreskrifter och allmänna råd (SJVFS 2010:45) om träning och "
+                   "tävling med djur, dels att nuvarande bilaga ska betecknas bilaga 1")
+    meta = extract_metadata(declaration, declaration, sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
+    assert meta["andrar"] == ["https://lagen.nu/sjvfs/2010:45"]
+    # a base regulation's "föreskriver följande" names nothing
+    meta = extract_metadata("Statens jordbruksverk föreskriver följande. 1 § …", "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
+    assert meta["andrar"] == []
+
+
+def test_the_registers_upphavs_genom_stamp_is_not_a_repeal():
+    # Jordbruksverket stamps a repealed document's PDF "UPPHÄVS GENOM SJVFS
+    # 2021:13" above the masthead (SJVFS 1994:223): the document's repealer,
+    # never its target
+    text = ("UPPHÄVS GENOM SJVFS 2021:13\nStatens jordbruksverks författningssamling\n"
+            "Statens jordbruksverks föreskrifter om införsel av fjäderfä och kläckägg; "
+            "beslutade den 1 december 1994. Denna författning träder i kraft den 1 januari "
+            "1995. Genom författningen upphävs Statens jordbruksverks föreskrifter "
+            "(SJVFS 1994:125) om införsel av fjäderfä.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1994:125"]
+
+
+def test_a_dels_att_provision_repeal_spares_the_base_named_in_the_formula():
+    # SJVFS 2024:4: "i fråga om verkets föreskrifter (SJVFS 2017:44) om
+    # instruktion …, dels att 3 § ska upphöra att gälla, dels att 5 § ska ha
+    # följande lydelse" repeals a provision of 2017:44, not 2017:44
+    text = ("Statens jordbruksverk föreskriver, med stöd av 28 a § förordningen "
+            "(2009:1464) med instruktion för Statens jordbruksverk, i fråga om verkets "
+            "föreskrifter (SJVFS 2017:44) om instruktion för Nationella kommittén för "
+            "skydd av djur som används för vetenskapliga ändamål, dels att 3 § ska "
+            "upphöra att gälla, dels att 5 § ska ha följande lydelse.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
+    assert meta["upphaver"] == []
+
+
+def test_a_footnote_inside_a_repeal_item_names_no_target():
+    # SJVFS 2025:10: the page foot's "12 SJVFS 2021:10." lands inside the item
+    # for SJVFS 2009:3; the base the document amends is not repealed by it
+    text = ("Genom författningen upphävs 1. Statens jordbruksverks föreskrifter "
+            "(SJVFS 2007:17) om förebyggande åtgärder, 2. Statens jordbruksverks "
+            "föreskrifter (SJVFS 2009:3) om obligatorisk\n12 SJVFS 2021:10.\n"
+            "hälsoövervakning. Denna författning träder i kraft den 1 april 2025.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2007:17", "https://lagen.nu/sjvfs/2009:3"]
+
+
+def test_upphor_att_galla_vid_ikrafttradandet_av_names_the_successor():
+    # SJVFS 1994:23: "… (SJVFS 1989:26) upphör att gälla vid ikraftträdandet av
+    # Statens jordbruksverks föreskrifter (SJVFS 1994:22) om certifiering"
+    text = ("Denna författning träder i kraft den 1 juli 1994. Lantbruksstyrelsens "
+            "föreskrifter (LSFS 1989:26) om certifiering upphör att gälla vid "
+            "ikraftträdandet av Statens jordbruksverks föreskrifter (SJVFS 1994:22) om "
+            "certifiering m.m. av utsäde av stråsäd. Ansökan görs hos verket.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/lsfs/1989:26"]
+
+
+def test_repeal_wordings_upphor_galla_letter_items_and_an_own_series_typo():
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    # SJVFS 2019:6 drops the "att": "då … (DFS 2006:8) om odling av fisk upphör gälla"
+    meta = extract_metadata("Denna författning träder i kraft den 1 april 2019, då "
+                            "Djurskyddsmyndighetens föreskrifter (DFS 2006:8) om odling av "
+                            "fisk upphör gälla. CHRISTINA NORDIN", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/dfs/2006:8"]
+    # SJVFS 2019:71 lists its targets as "a. …, samt b. …"; SJVFS 2022:21 as
+    # "följande föreskrifter upphör att gälla: a. … b. …"
+    meta = extract_metadata("2. Genom författningen upphävs a. Statens jordbruksverks "
+                            "föreskrifter (SJVFS 1995:94) om skyddsåtgärder, samt b. Statens "
+                            "jordbruksverks föreskrifter (SJVFS 1996:13) om införsel. "
+                            "3. Bestämmelserna i 4 § tillämpas första gången 2020.", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1995:94", "https://lagen.nu/sjvfs/1996:13"]
+    meta = extract_metadata("Denna författning träder i kraft den 1 juli 2022, då följande "
+                            "föreskrifter upphör att gälla: a. Statens jordbruksverk föreskrifter "
+                            "(SJVFS 2011:16) om rutiner, b. Statens jordbruksverk föreskrifter "
+                            "(SJVFS 2007:6) om rutiner vid länsstyrelsens handläggning.\n\n"
+                            "CHRISTINA NORDIN", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2007:6", "https://lagen.nu/sjvfs/2011:16"]
+    # SJVFS 2020:8: the sentence ends before a numbered point, which
+    # RE_ENUMERATOR has turned into an item dash
+    meta = extract_metadata("1. Denna författning träder i kraft den 15 juni 2020. Genom "
+                            "författningen upphävs Statens jordbruksverks föreskrifter och allmänna "
+                            "råd (SJVFS 2019:28) om hållande av hund och katt. 2. Bestämmelserna i "
+                            "3 kap. tillämpas från 2021.", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2019:28"]
+    # SJVFS 2025:7 misspells its own series: "(SVJFS 2008:33)"
+    meta = extract_metadata("2. Genom författningen upphävs Statens Jordbruksverks föreskrifter "
+                            "(SVJFS 2008:33) om avgifter i växtsortärenden.", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2008:33"]
+
+
+def test_footnote_lines_and_the_bare_stamp_name_no_target():
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    # SJVFS 2010:1: the page foot's footnotes follow the object with no rule
+    meta = extract_metadata("Genom författningen upphävs Statens jordbruksverks allmänna råd "
+                            "(2005:1) om lagring och spridning av gödsel m.m.\n6 SJVFS 2004:62 "
+                            "7 SJVFS 2005:74 8 SJVFS 2006:66\nSJVFS 2010:1", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == []
+    # SJVFS 2000:105: footnote 3 cites the base, footnote 4 says a provision
+    # "upphör att gälla"
+    meta = extract_metadata("utan certifiering eller kontroll\n3 SJVFS 1994:23. 4 Föreskrifterna "
+                            "upphör att gälla den 1 juli 2001.", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == []
+    # SJVFS 2021:33: "upphävs" ends a provision repeal, a footnote follows
+    meta = extract_metadata("dels att 2 kap. 4 § ska upphävs\n78 SJVFS 2021:13.\n", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == []
+    # SJVFS 2012:24: the stamp's "UPPHÄVS" line, split from its "GENOM", above a
+    # bilaga whose footnotes name other regulations
+    meta = extract_metadata("UPPHÄVS\n1 00 017 boskapspest rinderpestvirus\n1 Första siffran: 1 = "
+                            "Sjukdomar som omfattas av Statens jordbruksverks föreskrifter (SJVFS "
+                            "1999:102) om epizootiska sjukdomar m.m., 2 = Sjukdomar som omfattas av "
+                            "Statens jordbruksverks föreskrifter (SJVFS 1999:101) om zoonotiska "
+                            "sjukdomar. Ersätter inget.", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == []
+    # SJVFS 2025:10 opens its list with "upphävs respektive upphör att gälla"
+    meta = extract_metadata("2. Genom författningen upphävs respektive upphör att gälla 1. 2 kap. 1 § "
+                            "Statens jordbruksverks föreskrifter (SJVFS 2002:98) om epizootiska "
+                            "sjukdomar, 2. Statens jordbruksverks föreskrifter (SJVFS 2012:24) om "
+                            "anmälningspliktiga djursjukdomar, 3. Statens jordbruksverks föreskrifter "
+                            "(SJVFS 2009:3) om obligatorisk\n12 SJVFS 2021:10.\nGodkänd 2025-10-14 av "
+                            "Olof Johansson\nhälsoövervakning.\n\nCHRISTINA NORDIN", "", parser, fs="sjvfs")
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2009:3", "https://lagen.nu/sjvfs/2012:24"]
+
+
+def test_repeal_capture_survives_an_abbreviation_and_stays_in_its_sentence():
+    # SJVFS 2026:8: "upphävs a) … (saknr. J 11), b) … (SJVFS 2006:42)"; "saknr."
+    # is not the sentence's end. DFS 2009:19: "8 § har upphävts genom (SJVFS
+    # 2008:26)" names the repealer of a provision, never a target, and a later
+    # "ska upphöra att gälla" in another sentence does not reach back to it.
+    text = ("Genom författningen upphävs a) Statens jordbruksverks föreskrifter "
+            "(SJVFS 1996:24) om införsel av vissa djur (saknr. J 11), b) Statens "
+            "jordbruksverks föreskrifter (SJVFS 2006:42) om införsel av hästdjur. "
+            "Denna författning träder i kraft den 1 april 2026.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1996:24", "https://lagen.nu/sjvfs/2006:42"]
+    text = ("Djurskyddsmyndigheten föreskriver, med stöd av 4 § djurskyddsförordningen, "
+            "att bilaga 2 ska ha följande lydelse. Hingstar 8 § har upphävts genom "
+            "(SJVFS 2008:26). Övrigt 9 § Om det finns särskilda skäl kan undantag "
+            "medges. Denna författning träder i kraft den 1 mars 2009, då "
+            "Djurskyddsmyndighetens föreskrifter (DFS 2004:1) om hästhållning ska "
+            "upphöra att gälla.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == ["https://lagen.nu/dfs/2004:1"]
+
+
+def test_an_omtryck_amends_the_base_whose_designation_it_restates():
+    title = "Statens jordbruksverks föreskrifter (SJVFS 1995:71) om utförsel av vattenbruksdjur"
+    assert fp.andrar_target(title, "sjvfs", "https://lagen.nu/sjvfs/2000:84") == "https://lagen.nu/sjvfs/1995:71"
+    # a base's own designation is not an amendment of itself
+    assert fp.andrar_target(title, "sjvfs", "https://lagen.nu/sjvfs/1995:71") is None
+    # a repeal instrument names its target the same way, but is no omtryck
+    assert fp.andrar_target("Föreskrifter om upphävande av Statens jordbruksverks föreskrifter "
+                            "(SJVFS 1994:1) om avgifter", "sjvfs", "https://lagen.nu/sjvfs/1994:230") is None
+
+
+def test_title_drops_jordbruksverkets_saknr():
+    blocks = [Block("rubrik", "Statens jordbruksverks författningssamling", 1),
+              Block("rubrik", "Föreskrifter om upphävande av Lantbruksstyrelsens Saknr K 72:1", 1),
+              Block("stycke", "kungörelse (LSFS 1980:9) om smittreningsåtgärder m.m.;", 1),
+              Block("stycke", "beslutade den 9 april 2021.", 1),
+              Block("paragraf", "1 § Kungörelsen upphävs.", 1)]
+    assert title_from_masthead(blocks, 4) == \
+        "Föreskrifter om upphävande av Lantbruksstyrelsens kungörelse (LSFS 1980:9) om smittreningsåtgärder m.m"
+    # the "Omtryck" stamp lands mid-title the same way (SJVFS 2015:50)
+    blocks = [Block("rubrik", "Föreskrifter om ändring i Statens jordbruksverks", 1),
+              Block("stycke", "föreskrifter (SJVFS 2015:35) om företagsstöd, Omtryck", 1),
+              Block("stycke", "projektstöd och miljöinvesteringar;", 1),
+              Block("stycke", "beslutade den 11 december 2015.", 1),
+              Block("paragraf", "1 § Grundläggande bestämmelser.", 1)]
+    assert title_from_masthead(blocks, 4) == \
+        "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (SJVFS 2015:35) om företagsstöd, projektstöd och miljöinvesteringar"
 
 
 def test_ocr_repair_rejoins_the_designation_its_digits_and_andring():
@@ -880,6 +1142,24 @@ def test_parse_record_mints_andrar_from_the_pdf_rubric(tmp_path, monkeypatch):
     reg = parse_record(record, tmp_path)
     assert reg.title.startswith("Föreskrifter om ändring")
     assert reg.andrar == ["https://lagen.nu/kkvfs/2021:1"]
+
+
+def test_parse_record_mints_andrar_from_the_pdf_rubric_behind_a_base_title(tmp_path, monkeypatch):
+    # SJVFS 1994:26: Jordbruksverket's register titles the amendment with its
+    # base's title; the printed rubric declares the ändring and names the base
+    monkeypatch.setattr(fp, "parse_pdf", lambda *a, **kw: ([], {
+        "title": "Föreskrifter om ändring i Statens jordbruksverks föreskrifter "
+                 "(SJVFS 1993:46) om arealbidrag",
+        "upphaver": [], "bemyndigande": [], "genomfor": [], "andrar": [],
+        "beslutsdatum": None, "utkomFranTryck": None,
+        "ikrafttradandedatum": None, "publisher": None}, []))
+    record = {"fs": "sjvfs", "basefile": "sjvfs/1994:26",
+              "identifier": "SJVFS 1994:26",
+              "title": "Statens jordbruksverks föreskrifter om arealbidrag",
+              "files": {"regulation": {"name": "r.pdf"}}}
+    reg = parse_record(record, tmp_path)
+    assert reg.title == "Statens jordbruksverks föreskrifter om arealbidrag"
+    assert reg.andrar == ["https://lagen.nu/sjvfs/1993:46"]
 
 
 def test_parse_record_prefers_pdf_rubric_over_chrome_title(tmp_path, monkeypatch):
