@@ -860,6 +860,9 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     r"|\bwww\.[\w.-]+|\bBox\s+\d+|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö]+,?"
     r"|\bTfn\b[\s\d-]*|\bSverige\b,?"
     r"|Publicerings?datum|Publicerade?\s+den|\b[A-ZÅÄÖ]{2,}(?:-| )?FS\b|\b\d{4}:\d+\b"
+    # the second column's ISO date ("Utkom från trycket 1998-01-26", the old
+    # Livsmedelsverket masthead), which lands mid-title like the "den …" form
+    r"|\b\d{4}-\d{2}-\d{2}\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?|\bnr\s+\d+"
     % "|".join(MONTHS), re.IGNORECASE)
 # a word the removal left doubled ("Kriminalvårdens

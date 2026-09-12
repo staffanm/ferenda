@@ -496,6 +496,19 @@ def test_decision_form_with_skall_and_a_two_word_subject():
     assert meta["upphaver"] == ["https://lagen.nu/slvfs/1994:1"]
 
 
+def test_title_drops_the_second_columns_iso_date():
+    # SLVFS 1998:2: "… (VF 1969:16) avseende hygieniska 1998-01-26 anordningar …"
+    blocks = [Block("rubrik", "Statens livsmedelsverks författningssamling", 1),
+              Block("rubrik", "Statens livsmedelsverks kungörelse om upphävande av Veterinärstyrelsens "
+                              "föreskrifter (VF 1969:16) avseende hygieniska Utkom från trycket "
+                              "1998-01-26 anordningar vid servering;", 1),
+              Block("stycke", "beslutad den 19 januari 1998.", 1),
+              Block("paragraf", "1 § Kungörelsen upphävs.", 1)]
+    assert title_from_masthead(blocks, 3) == ("Statens livsmedelsverks kungörelse om upphävande av "
+                                               "Veterinärstyrelsens föreskrifter (VF 1969:16) avseende "
+                                               "hygieniska anordningar vid servering")
+
+
 def test_title_repairs_a_number_split_by_the_column_header():
     # SLVFS 1998:41: "(SLVFS Utkom från trycket 1994: 13)" -- the header is
     # removed with the boilerplate, and only then do designation and number meet
