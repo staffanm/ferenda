@@ -154,6 +154,19 @@ def superseded(root, series=None):
                if fs in _lineage(bf.split("/", 1)[0]) or bf.split("/", 1)[0] in _lineage(fs)]
         if len(kin) == 1:
             stale[basefile] = (kin[0], "")
+    # a record filed under a series that did not yet exist in its year (a
+    # legacy import's sjvfs/1986:18; SJVFS began 1991, series.json `from`) is
+    # superseded by the same number filed under a predecessor of that series
+    for number, basefiles in held.items():
+        for basefile in basefiles:
+            fs = basefile.split("/", 1)[0]
+            first = _FS_SERIES.get(fs, {}).get("from")
+            if not first or int(number.split(":")[0]) >= first:
+                continue
+            kin = [bf for bf in basefiles - {basefile}
+                   if fs in _lineage(bf.split("/", 1)[0]) and bf.split("/", 1)[0] != fs]
+            if len(kin) == 1:
+                stale.setdefault(basefile, (kin[0], ""))
     for url, basefiles in claims.items():
         if len(basefiles) < 2:
             continue

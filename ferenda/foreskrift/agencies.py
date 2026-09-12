@@ -3,11 +3,11 @@ lagrummet.se list (the per-county samlingar excluded) as configuration over the
 shared harvest engine (:mod:`harvest`). Each entry is an
 :class:`~harvest.Agency`: a författningssamling code, the issuing org, its index
 URL, and the architecture (an ``enumerate`` + a ``resolve``) that fits its site,
-plus ``params``. 77 harvest *scopes* are registered over 72
-författningssamlingar: 71 samlingar one agency owns outright (``Agency.scope``
-is None, so the fs code is the scope name) -- 66 live-harvested and 5 closed
-series with no live harvester (RSFS, SOSFS, SLVFS, SJVFS, SVKFS), whose documents
-live in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
+plus ``params``. 80 harvest *scopes* are registered over 75
+författningssamlingar: 74 samlingar one agency owns outright (``Agency.scope``
+is None, so the fs code is the scope name) -- 67 live-harvested and 7 closed
+series with no live harvester (RSFS, SOSFS, SLVFS, LSFS, LBS, DFS, SVKFS), whose
+documents live in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
 samling with seven issuing agencies (:mod:`hslffs`). SKVFS and MTFS select a
 Camoufox transport in config; ordinary agencies stay on HTTP.
 
@@ -2350,15 +2350,42 @@ def frozen_agency(fs, name, publisher, designation, site):
 # reason: SvK has effectively delegated its regulatory output to Energimarknads-
 # inspektionen (EIFS); its current SvKFS page lists a single upphävd föreskrift
 # (SvKFS 2005:2, replaced by EIFS 2025:2) with no PDF and no register to scrape.
+# SJVFS (Statens jordbruksverk): the register is a Sitevision search portlet
+# over Jordbruksverket's public SharePoint document library (1,506 rows on 31
+# pages, 2026-09). Each hit is one PDF: its own number in
+# ``Ändringsföreskriftnr`` for an amendment, ``Grundföreskriftnr`` for a base
+# (which an amendment carries too, as the base it amends). Numbers print bare
+# ("2023:21") except for the predecessor series the register keeps -- LSFS
+# (Lantbruksstyrelsen, to 1991), LBS (its kungörelser), DFS (Djurskydds-
+# myndigheten, 2004-07) -- and a bare number predating SJVFS (1991) is LSFS.
+# The tags Aktuell/Historik/Upphävd describe the *file* (SJVFS 2025:17's
+# rättelseblad is "Aktuell" beside the "Historik" original), not the document's
+# legal state, so nothing is read from them; whether a document is in force is
+# what the repealing documents say (#35). When several files share a number,
+# the document proper is the one whose text opens with the masthead
+# ("författningssamling", the ISSN); the rest are its bilagor or corrections.
 RE_SJVFS_NUMBER = re.compile(r"(?:(SJVFS|LSFS|LBS|DFS)\s+)?(\d{4}):(\d+)$")
-SJVFS_STATUSES = {"Aktuell": "gällande", "Historik": "upphävt", "Upphävd": "upphävt"}
+RE_SJVFS_MASTHEAD = re.compile(r"författningssamling|ISSN", re.I)
+SJVFS_FROM = 1991
+
+
+def sjvfs_designation(tags):
+    """The printed series of a register row: its own field's designation, else
+    the base row's (a bare "1986:18" amending "LSFS 1980:8" is LSFS), else by
+    year."""
+    own = RE_SJVFS_NUMBER.fullmatch(tags.get("Ändringsföreskriftnr") or tags.get("Grundföreskriftnr") or "")
+    if own is None:
+        return None
+    base = RE_SJVFS_NUMBER.fullmatch(tags.get("Grundföreskriftnr") or "")
+    designation = own.group(1) or (base.group(1) if base else None) \
+        or ("SJVFS" if int(own.group(2)) >= SJVFS_FROM else "LSFS")
+    return designation, own.group(2), str(int(own.group(3)))
 
 
 def sjvfs_enumerate(session, agency):
     """Jordbruksverket's Sitevision proxy over its public SharePoint register."""
-    request(session, "GET", agency.index_url)  # establish the Sitevision session
-    seen = set()
-    refs = {}
+    request(session, "GET", agency.index_url)      # the portlet's session cookie
+    rows = {}
     page = 1
     while True:
         result = request(
@@ -2368,45 +2395,26 @@ def sjvfs_enumerate(session, agency):
                   "filters": "[]"}).json()["result"]["searchResult"]
         for hit in result["hits"]:
             tags = {tag["name"]: tag["value"] for tag in hit["complexTags"]}
-            number = tags.get("Ändringsföreskriftnr") or tags.get("Grundföreskriftnr")
-            if not number and (summary_number := harvest.RE_FS_NUMBER.search(
-                    html.unescape(hit.get("summary", "")))):
-                number = "%s %s:%s" % summary_number.groups()
-            match = RE_SJVFS_NUMBER.fullmatch(number or "")
-            if not match:
-                # The search also indexes unnumbered forms and image attachments.
-                # They cannot mint a regulation identity of their own.
-                continue
-            remote_status = next((status for status in SJVFS_STATUSES
-                                  if status in hit["simpleTags"]), None)
-            if remote_status is None:
-                raise harvest.UpstreamChanged("SJVFS %s has unknown status tags %r"
-                                              % (number, hit["simpleTags"]))
-            designation = match.group(1) or "SJVFS"
-            fs = fs_code(designation)
-            basefile = "%s/%s:%s" % (fs, match.group(2), str(int(match.group(3))))
-            docref = direct_docref(
-                agency, fs, match.group(2), str(int(match.group(3))),
-                hit["link"], seen,
-                identifier="%s %s:%s" % (designation, match.group(2),
-                                          str(int(match.group(3)))),
-                title=hit.get("title"))
-            if docref:
-                docref.extra["status"] = SJVFS_STATUSES[remote_status]
-                refs[basefile] = docref
-            elif (SJVFS_STATUSES[remote_status] == "gällande"
-                  and refs[basefile].extra["status"] != "gällande"):
-                refs[basefile].url = hit["link"]
-                if hit.get("title"):
-                    refs[basefile].title = hit["title"]
-                refs[basefile].extra.update(
-                    regulation_url=hit["link"], title=refs[basefile].title,
-                    status="gällande")
+            number = sjvfs_designation(tags)
+            if number is None:
+                continue        # the search also indexes unnumbered forms and images
+            proper = bool(RE_SJVFS_MASTHEAD.search(html.unescape(hit.get("summary") or "")[:300]))
+            rows.setdefault(number, []).append((proper, hit))
         if not result["pagination"].get("next"):
-            yield from newest_first(refs.values())
-            return
+            break
         page += 1
         time.sleep(0.3)
+    seen = set()
+    refs = []
+    for (designation, arsutgava, lopnummer), hits in rows.items():
+        proper, hit = next(((p, h) for p, h in hits if p), hits[0])
+        docref = direct_docref(agency, fs_code(designation), arsutgava, lopnummer,
+                               hit["link"], seen,
+                               identifier="%s %s:%s" % (designation, arsutgava, lopnummer),
+                               title=hit.get("title"))
+        if docref:
+            refs.append(docref)
+    yield from newest_first(refs)
 
 
 SJVFS = Agency(
@@ -2418,6 +2426,13 @@ SJVFS = Agency(
                           "4.3b03b79b16ee86d57cada45c/"
                           "12.44ec123117d9b92687e63acd/search"},
 )
+# the predecessor series the SJVFS register keeps, filed under their own codes
+LSFS = frozen_agency("lsfs", "Lantbruksstyrelsen", "Statens jordbruksverk", "LSFS",
+                     "https://jordbruksverket.se")
+LBS = frozen_agency("lbs", "Lantbruksstyrelsen", "Statens jordbruksverk", "LBS",
+                    "https://jordbruksverket.se")
+DFS = frozen_agency("dfs", "Djurskyddsmyndigheten", "Statens jordbruksverk", "DFS",
+                    "https://jordbruksverket.se")
 
 SVKFS = frozen_agency("svkfs", "Affärsverket svenska kraftnät",
                       "Affärsverket svenska kraftnät", "SvKFS",
@@ -2637,6 +2652,7 @@ REGISTRY = {a.scope or a.fs: a for a in (
     SVKFS,                                             # closed: no public documents/register
     MTFS, SKVFS,                                       # live: Camoufox for the F5 wall
     RSFS, SOSFS, SLVFS,                                # closed series; RSFS also emitted by SKVFS, SLVFS by LIVSFS
+    LSFS, LBS, DFS,                                    # closed series the SJVFS register keeps
     HSLFFS_SOS, HSLFFS_FOHM, HSLFFS_IVO,               # one samling, six publishing
     HSLFFS_MFOF, HSLFFS_TLV, HSLFFS_LV,                #   sites (fs="hslffs")
 )}

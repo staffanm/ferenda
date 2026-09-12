@@ -78,7 +78,7 @@
   "sivfs": {"designation": "SIVFS", "title": "Statens invandrarverks författningssamling", "successor": "migrfs"},
   "sjofs": {"designation": "SJÖFS", "title": "Sjöfartsverkets författningssamling"},
   "slvfs": {"designation": "SLVFS", "title": "Statens livsmedelsverks författningssamling", "successor": "livsfs"},
-  "sjvfs": {"designation": "SJVFS", "title": "Statens jordbruksverks författningssamling"},
+  "sjvfs": {"designation": "SJVFS", "title": "Statens jordbruksverks författningssamling", "from": 1991},
   "skolfs": {"designation": "SKOLFS", "title": "Statens skolverks författningssamling"},
   "sksfs": {"designation": "SKSFS", "title": "Skogsstyrelsens författningssamling"},
   "skvfs": {"designation": "SKVFS", "title": "Skatteverkets författningssamling"},

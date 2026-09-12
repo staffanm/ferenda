@@ -126,7 +126,6 @@ class Regulation:
     lopnummer: str               # "10"
     title: str | None = None
     publisher: str | None = None         # the issuing agency (org)
-    status: str | None = None
 
     # metadata that only the PDF text carries (filled at parse, not harvest)
     beslutsdatum: str | None = None
@@ -164,7 +163,6 @@ class Regulation:
                 "lopnummer": self.lopnummer,
                 "title": self.title,
                 "publisher": self.publisher,
-                "status": self.status,
                 "beslutsdatum": self.beslutsdatum,
                 "ikrafttradandedatum": self.ikrafttradandedatum,
                 "utkomFranTryck": self.utkomFranTryck,
