@@ -456,6 +456,16 @@ def test_fold_fs_versions_drops_the_base_and_marks_the_consolidated():
     assert consolidated == {"https://lagen.nu/afs/2023:11"}
 
 
+def test_a_pure_repeal_instrument_lists_subdued():
+    """KKVFS 2021:2 only repeals KKVFS 2015:2; relate stamps `upphavande` from
+    its title and body, and the listing subdues it like a repealed one."""
+    row = Row(uri="https://lagen.nu/kkvfs/2021:2", local="kkvfs/2021:2", kind="kkvfs",
+              label="KKVFS 2021:2", title="Upphävande av Konkurrensverkets allmänna råd",
+              display="Upphävande av Konkurrensverkets allmänna råd", upphavande=1)
+    assert facets._browse_doc("foreskrift", row)["subdued"] is True
+    assert "subdued" not in facets._browse_doc("foreskrift", row._replace(upphavande=None))
+
+
 def test_fold_fs_versions_leaves_a_bucket_with_no_base_versions_alone():
     grouped = {("AFS", "2020"): [
         Row(uri="https://lagen.nu/afs/2020:1", local="afs/2020:1", kind="afs",

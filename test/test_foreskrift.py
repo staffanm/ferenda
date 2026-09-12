@@ -117,6 +117,17 @@ def test_ref_falls_back_to_filename_when_title_has_no_designation():
     assert ref.basefile == "rgkfs/2006:1"
 
 
+def test_ref_number_from_slug_outranks_a_repeal_target_in_the_text():
+    # KKVFS's register row for a repeal document names the *repealed* regulation
+    # in its text; the filename is the document's own number
+    ref = _ref(_Agency(fs="kkvfs", params={"number_from_slug": True}),
+               "Upphävande av Konkurrensverkets allmänna råd (KKVFS 2015:2) om näringsförbud",
+               "/globalassets/dokument/om-oss/forfattningssamling/kkvfs_2021-2.pdf",
+               set(), direct=True)
+    assert ref.basefile == "kkvfs/2021:2"
+    assert ref.identifier == "KKVFS 2021:2"
+
+
 def test_ref_dedupes_by_basefile():
     seen = set()
     a = _ref(_Agency(fs="kifs"), "Gå till KIFS 2017:7", "/kifs-20177", seen)

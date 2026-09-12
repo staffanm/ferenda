@@ -1300,8 +1300,13 @@ KAMFS = Agency(
 
 # indexed + DIRECT: one static page of direct PDF links under
 # /forfattningssamling/kkvfs_YYYY-N.pdf. Base rows name "KKVFS YYYY:N" in the
-# text; upphävande-rows carry only a description, so ref falls back to the
-# filename slug for the number. konkurrensverket.se sits behind a Cloudflare
+# text, but an upphävande row names the regulation it *repeals* ("Upphävande av
+# … (KKVFS 2015:2)" linking kkvfs_2021-2.pdf), which minted the repeal document
+# under its target's number; the filename always names the PDF's own number, so
+# ``number_from_slug`` makes it win. Which documents are in force is not read
+# off the page's "Gällande …" headings: the repeal documents state it
+# themselves ("… (KKVFS 2015:2) … ska upphöra att gälla"), which parse.py turns
+# into upphaver relations. konkurrensverket.se sits behind a Cloudflare
 # front that 403s HTTP/1.1 and only serves HTTP/2, which requests/urllib3 cannot
 # speak, so this agency sets ``http2=True``: harvest() builds the session with
 # lib.net.make_http2_session (the httpx2 HTTP/2 client) instead of a requests
@@ -1312,7 +1317,7 @@ KKVFS = Agency(
     index_url="https://www.konkurrensverket.se/om-oss/forfattningssamling/",
     enumerate=indexed_enumerate, resolve=resolve_direct, http2=True,
     params={"link_select": 'a[href*="/forfattningssamling/kkvfs"][href$=".pdf"]',
-            "direct": True},
+            "direct": True, "number_from_slug": True},
 )
 
 

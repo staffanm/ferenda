@@ -24,8 +24,9 @@ from . import catalog, datasets, eu_structure, labels, lagrum, layout
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
 Row = namedtuple(
-    "Row", "uri local kind label title display date short_id short_title description",
-    defaults=[None, None, None, None])
+    "Row", "uri local kind label title display date short_id short_title description "
+           "upphavande",
+    defaults=[None, None, None, None, None])
 
 
 # --------------------------------------------------------------------------
@@ -958,7 +959,10 @@ def _browse_doc(source, row, repealed=frozenset()):
     when not), and its `year` -- what the listing renders and filters on. A
     föreskrift some other regulation's text repeals (`repealed`, the
     rpubl:upphaver targets) stays listed -- point-in-time law determination
-    needs it findable -- but subdued, so it never reads as in force."""
+    needs it findable -- but subdued, so it never reads as in force. So is one
+    whose only content is such a repeal (`upphavande`, stamped at relate from
+    its own title and body): it states when a repeal took effect, nothing a
+    reader looks up as a rule."""
     doc = {"uri": row.uri, "url": layout.page_url(row.uri),
            "display": _browse_label(row),
            "short_id": row.short_id or row.label,
@@ -981,7 +985,7 @@ def _browse_doc(source, row, repealed=frozenset()):
             # CELEX ("12016M/TXT") says nothing to them, so the entry is the
             # name alone, set the way a statute's title is (dt-only)
             doc.update(pre="", key=row.short_title or doc["display"])
-    elif row.uri in repealed:
+    elif row.uri in repealed or row.upphavande:
         doc["subdued"] = True
     return doc
 
@@ -1024,9 +1028,9 @@ def _rows(con, source):
     would put it back."""
     expired = catalog.expired_uris(con, date.today().isoformat())
     rows = [Row(uri, local, kind, label, title, display, doc_date,
-                short_id, short_title, description)
+                short_id, short_title, description, upphavande)
             for uri, _src, kind, label, title, _url, _path, display, doc_date,
-                short_id, short_title, description
+                short_id, short_title, description, upphavande
             in catalog.facet_documents(con, source)
             for local in (catalog.local(uri),)          # bind once, reuse below
             if uri not in expired and _is_browsable(source, local)]
