@@ -29,6 +29,12 @@ One uvicorn process serves both the static site and the API; the API lives under
 `/api/v1`. Because the site and API share an origin, the site calls the API with
 relative URLs — there is no separate API host to configure.
 
+Two standalone one-page apps read this API from a browser and show what it
+gives a third party: **paraGRAF** (github.com/staffanm/para-graf) draws the
+citation graph, and **paraTEXT** (`paratext/` in this repo) searches, browses
+and reads documents. Both log every request they make, with a link to the raw
+JSON answer.
+
 - **Base path:** `/api/v1`. Everything under it is public, read-only and `GET`.
 - **CORS:** open to any origin, GET only (`allow_origins: ["*"]`,
   `allow_methods: ["GET"]`).

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>paraTEXT — svensk rätt att läsa, ur lagen.nu:s öppna API</title>
+<meta name="description"
+      content="paraTEXT söker, bläddrar och läser svensk rätt live ur lagen.nu:s öppna API: lagar, förarbeten, rättsfall, EU-rätt och folkrätt, med hänvisningarna till varje bestämmelse.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23141414'/%3E%3Ctext x='16' y='25' font-size='24' font-family='Georgia,serif' font-weight='bold' fill='%23ffd23f' text-anchor='middle'%3E%C2%A7%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<div class="pt"
+     data-api="https://lagen.nu"
+     data-graph="https://para-graf.tomtebo.org">
+
+<header class="pt-mast">
+  <a class="pt-wordmark" href="#/">para<span>TEXT</span></a>
+  <form class="pt-search pt-search-mast" role="search" autocomplete="off">
+    <input type="search" spellcheck="false" autocomplete="off"
+           placeholder="Sök lag, paragraf, rättsfall …"
+           aria-label="Sök lag, paragraf, rättsfall">
+    <div class="pt-hits" hidden></div>
+  </form>
+  <nav class="pt-nav" aria-label="Källor"></nav>
+  <span class="pt-mast-tools">
+    <a href="https://lagen.nu/docs" target="_blank" rel="noopener">API ↗</a>
+    <a class="pt-graf-link" href="https://para-graf.tomtebo.org" target="_blank"
+       rel="noopener">paraGRAF ↗</a>
+  </span>
+</header>
+
+<div class="pt-grid">
+  <div class="pt-side pt-side-l">
+    <aside class="pt-card pt-card-l">
+      <div class="pt-cardhead">
+        <h2 class="pt-cardtitle">Innehåll</h2>
+        <button type="button" class="pt-fold" aria-expanded="true"
+                aria-label="Fäll ihop kortet"><span class="pt-chevron"></span></button>
+      </div>
+      <div class="pt-cardbody"></div>
+    </aside>
+  </div>
+
+  <main class="pt-main">
+    <div class="pt-page"></div>
+  </main>
+
+  <div class="pt-side pt-side-r">
+    <aside class="pt-card pt-card-r">
+      <div class="pt-cardhead">
+        <h2 class="pt-cardtitle">Kontext</h2>
+        <button type="button" class="pt-fold" aria-expanded="true"
+                aria-label="Fäll ihop kortet"><span class="pt-chevron"></span></button>
+      </div>
+      <div class="pt-cardbody"></div>
+    </aside>
+    <aside class="pt-card pt-card-t">
+      <div class="pt-cardhead">
+        <h2 class="pt-cardtitle">API-trafik <span class="sum pt-traffic-sum"></span></h2>
+        <button type="button" class="pt-fold" aria-expanded="true"
+                aria-label="Fäll ihop trafikloggen"><span class="pt-chevron"></span></button>
+      </div>
+      <div class="pt-cardbody">
+        <p class="pt-traffic-intro">Varje skärm är svaret på anropen nedan.
+          Klicka på ett anrop för att se dess JSON —
+          <a href="https://lagen.nu/docs" target="_blank"
+             rel="noopener">API-dokumentation ↗</a></p>
+        <ol class="pt-traffic" reversed></ol>
+      </div>
+    </aside>
+  </div>
+</div>
+
+</div>
+<script src="app.js" defer></script>
+</body>
+</html>
