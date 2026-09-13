@@ -434,8 +434,12 @@
     page.querySelector(".sources").innerHTML = order
       .filter(s => counts.get(s))
       .map(s => {
+        // a source with no facet scheme has no /browse tree, so its card opens
+        // the search screen for it instead. Not a wildcard search: /search runs
+        // `simple_query_string` with default_operator=and, and `q=*` matches
+        // nothing at all (measured against the live API).
         const browse = BROWSABLE.includes(s);
-        const href = browse ? browseHash(s) : searchHash("*", { source: s });
+        const href = browse ? browseHash(s) : "#/sok?source=" + encodeURIComponent(s);
         return '<li><a href="' + href + '"><span class="dot" style="--c:'
           + colorOf(groupOf(s, "")) + '"></span><span class="nm">'
           + esc(SOURCE_LABEL[s] || s) + '<span class="how">'
@@ -453,7 +457,22 @@
                       sort: params.get("sort") || "", cursor: params.get("cursor") || "" };
     document.title = q + " — sök — paraTEXT";
     mastInput.value = q;
-    if (!q) { go("#/", true); return; }
+    if (!q) {
+      // the screen a source with no browse tree lands on: say why there is no
+      // listing, and hand the reader the search box rather than an empty page
+      if (!filters.source) { go("#/", true); return; }
+      const label = SOURCE_LABEL[filters.source] || filters.source;
+      document.title = label + " — sök — paraTEXT";
+      page.innerHTML = '<div class="results-h"><div class="eyebrow"><span class="dot" style="--c:'
+        + colorOf(groupOf(filters.source, "")) + '"></span>' + esc(label) + "</div></div>"
+        + "<h1>" + esc(label) + "</h1>"
+        + '<p class="pt-empty">Den här källan har ingen bläddringsvy i API:et — '
+        + "den går att nå genom sökning. Skriv en fråga i sökrutan ovan.</p>";
+      setCard(cardL, "Filter", '<div class="pt-empty">Filtren visas när en sökning är gjord.</div>');
+      setCard(cardR, "Sökning", "");
+      mastInput.focus();
+      return;
+    }
     page.innerHTML = '<div class="results-h"><h1>”' + esc(q) + "”</h1></div>" + LOADING;
     setCard(cardL, "Filter", '<div class="pt-empty">…</div>');
     setCard(cardR, "Sökning", "");

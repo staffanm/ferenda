@@ -510,6 +510,47 @@ expect a slow response on a big document.
 | bulk download | `GET /api/v1/dumps` + static fetch |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 
+### What this API does not answer yet
+
+A client that reads documents to a person needs six things this API cannot
+supply. They are written down here so a consumer stops looking for the route,
+and so each gap keeps its shape beside the endpoints. The list comes from
+building [paraTEXT](../../paratext/README.md) against this surface.
+
+- **The editorial layers under a provision.** The site's context rail shows
+  författningskommentar per paragraf, lagen.nu's own commentary, remissvar,
+  curated external links, the directive-to-paragraf transposition and the
+  old-to-new paragraf map. Each is assembled server-side from a catalog table
+  (`genomforande`, `correspondence`), an `.ann` sidecar, or an index over every
+  proposition's `kommentarer` list. None has a route. The nearest answer a
+  client can reach is `/document/inbound?source=kommentar`, which names the
+  citing document but not the prose written under the provision.
+- **The text of an older lydelse.** `/document/versions` lists a statute's
+  archived consolidations and `/document/diff` compares two of them, but no
+  route returns a version's own artifact. A client can show what changed
+  between two wordings. It cannot show the older wording as a document.
+- **A most-cited listing.** `/search` ranks by `inbound_count` under
+  `sort=citations`, but it requires a query, and `/documents` orders by uri with
+  no sort parameter. So "the 25 most-referenced statutes", which the site's own
+  frontpage prints, cannot be rebuilt from this API.
+- **What a citing document says.** An inbound row carries the citer's name, date
+  and own citation count, which is enough to rank it, but none of its text. A
+  prose line per citer costs one `/document/outbound` call per row, which a list
+  of fifty citers cannot afford. A `snippet` stamped at relate and served on the
+  row would close this, the same way `inbound_count` already rides each row.
+- **Browse for the sources with no facet scheme.** `/facets` and `/browse`
+  answer 404 for lawreview (20 930 documents) and kommentar (324), because
+  neither has an entry in `facets.SCHEMES`. Both are searchable, so their
+  documents are reachable, but they cannot be enumerated by bucket the way every
+  other source can. Note that a wildcard is not a way around this: `/search?q=*`
+  matches nothing, because the query runs through `simple_query_string` with
+  `default_operator=and`.
+- **Two asymmetries in the citation routes.** An inbound row states the printed
+  `page` its citation sits on; an outbound row does not. And `predicate`
+  separates the typed relations (`rpubl:bemyndigande`, `rpubl:andrar`,
+  `rpubl:upphaver`) but is not a query parameter on either route, so a client
+  filters the returned rows itself.
+
 ---
 
 ## Bulk download
