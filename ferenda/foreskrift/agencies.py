@@ -2619,19 +2619,18 @@ HSLFFS_MFOF = Agency(
     name="Myndigheten för familjerätt och föräldraskapsstöd",
     publisher="Myndigheten för familjerätt och föräldraskapsstöd",
     designation="HSLF-FS",
-    base_url="https://mfof.se",
-    index_url="https://mfof.se/sarskilda-innehallssidor/"
-              "foreskrifter-och-allmanna-rad.html",
+    base_url="https://www.mfof.se",
+    # MFoF relaunched its site on 2026-09-10 and the old page 404s. The listing
+    # is now one page under familjeratt/regler-och-riktlinjer, and its rows are
+    # Sitevision /download/ links whose own text carries the whole title, the
+    # designation and the role ("… (HSLF-FS 2021:64 KONSOLIDERAD VERSION)") --
+    # so no enclosing row has to supply the number any more.
+    index_url="https://www.mfof.se/familjeratt/regler-och-riktlinjer/"
+              "foreskrifter-och-allmanna-rad",
     enumerate=hslffs.enumerate_files, resolve=resolve_direct,
     params={
         "samlingar": {"hslffs": "HSLF-FS"},
-        "link_select": 'p.mfof-link-text-medium a[href$=".pdf"]',
-        # one title is split across two anchors ("… (HSLF-FS" + "2022:25) (pdf)"),
-        # so the number is read off the paragraph that holds them both -- where
-        # the download chrome sits between the designation and the number, and
-        # only the bare number survives in one piece
-        "unit": "p",
-        "bare_numbers": True,
+        "link_select": 'a[href*="/download/"]',
     },
 )
 

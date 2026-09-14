@@ -69,7 +69,10 @@ from .harvest import (
 # what actually reads these sites.
 RE_UNICODE_HYPHEN = re.compile("[\u2010-\u2015\u2212]")
 RE_SPLIT_DESIGNATION = re.compile(r"\b([A-ZÅÄÖ][A-ZÅÄÖa-zåäö]*) *- *FS\b")
-RE_LOOSE_NUMBER = re.compile(r"(?<=FS)[ _-]?(\d{4}) ?[:_] ?(\d+)")
+# the separator between year and lopnummer is a colon in print; these sites
+# also set an underscore and a hyphen ("HSLF-FS 2023-3", MFoF). A hyphen
+# followed by more digits is a date, not a number ("HSLF-FS 2023-03-15").
+RE_LOOSE_NUMBER = re.compile(r"(?<=FS)[ _-]?(\d{4}) ?[:_-] ?(\d{1,3})(?![\d-])")
 
 # The designations these sites misprint, each on one document whose number is
 # right: Socialstyrelsen's publication list spells HSLF-FS 2017:25 "HSLS-FS",
@@ -608,9 +611,7 @@ def enumerate_files(session, agency):
     """One static index page whose anchors *are* the documents: group them by
     the number each names and hand the URLs to :func:`harvest.resolve_direct`.
 
-    params: ``link_select`` (CSS for the document anchors); ``unit`` (an
-    enclosing tag whose text names the number, when the anchor's own does not --
-    MFoF splits one title across two anchors).
+    params: ``link_select`` (CSS for the document anchors).
 
     An anchor naming no number is not a document: these pages also carry the
     agency's own förteckning över gällande författningar."""
@@ -619,15 +620,9 @@ def enumerate_files(session, agency):
                          "html.parser")
     seen, refs, konsoliderade = set(), {}, []
     for a in soup.select(p["link_select"]):
-        unit = a.find_parent(p["unit"]) if p.get("unit") else a
-        if unit is None:
-            raise ValueError("%s: %s hangs outside the %r row its number is "
-                             "read from (%s)"
-                             % (agency.scope, a.get("href"), p["unit"],
-                                agency.index_url))
-        text = plain(unit.get_text(" ", strip=True))
+        text = plain(a.get_text(" ", strip=True))
         url = absolute(agency.base_url, a["href"])
-        found = numbered(text) or bare_number(text, agency)
+        found = numbered(text)
         if not found:
             continue
         if RE_KONSOLIDERAD.search(text + " " + url):
@@ -640,18 +635,6 @@ def enumerate_files(session, agency):
             refs[ref.basefile] = ref
     attach(agency, refs, konsoliderade)
     yield from newest_first(refs.values())
-
-
-def bare_number(text, agency):
-    """``(designation, årsutgåva, löpnummer)`` for an index row that prints its
-    number without a designation in front of it, filed under the scope's own
-    samling. MFoF interleaves the download chrome into the row, so "(HSLF-FS
-    pdf, 233.2 kB, öppnas i nytt fönster. 2022:25)" carries the number but no
-    designation the number can be read off."""
-    m = RE_COLON_NUMBER.search(plain(text))
-    if not m or not agency.params.get("bare_numbers"):
-        return None
-    return (agency.params["samlingar"][agency.fs], m.group(1), str(int(m.group(2))))
 
 
 # TLV publishes one accordion panel per base act, its files under three

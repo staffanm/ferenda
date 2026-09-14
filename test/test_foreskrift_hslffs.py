@@ -10,6 +10,7 @@ that is what the number-reading has to survive.
 
 import json
 import types
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -406,21 +407,6 @@ def test_ivo_yields_one_docref_per_number_with_its_pdf():
     assert not any("forteckning" in r.url for r in refs.values())
 
 
-def test_mfof_reads_the_number_off_the_row_the_chrome_interrupts():
-    refs, _ = enumerate_scope(
-        "hslffs-mfof", {REGISTRY["hslffs-mfof"].index_url: "mfof-foreskrifter.html"})
-    assert sorted(refs) == ["hslffs/2017:51", "hslffs/2021:64", "hslffs/2022:18",
-                            "hslffs/2022:25", "hslffs/2022:66", "hslffs/2023:3"]
-    # MFoF splits this title across two anchors, so only the bare number
-    # survives in one piece: "… (HSLF-FS pdf, 233.2 kB, … 2022:25) (pdf)"
-    assert refs["hslffs/2022:25"].identifier == "HSLF-FS 2022:25"
-    assert refs["hslffs/2023:3"].url.endswith("_20230502.pdf")
-    # the konsoliderad file hangs on 2021:64, which the page also lists as
-    # GRUNDFÖRFATTNING
-    assert len(refs["hslffs/2021:64"].extra["consolidations"]) == 1
-    assert "(inklusive%20bilagor).pdf" in refs["hslffs/2021:64"].extra["regulation_url"]
-
-
 # --------------------------------------------------------------------------
 # TLV (an accordion panel per base act)
 # --------------------------------------------------------------------------
@@ -721,3 +707,26 @@ def test_each_scope_keeps_its_own_watermark(tmp_path, monkeypatch):
     assert calls == ["hslffs-sos", "hslffs-ivo"]
     # a samling one agency owns keeps the unsuffixed name it already has on disk
     assert not (tmp_path / "hslffs" / ".watermark.json").exists()
+
+
+def test_mfof_index_reads_four_base_rad_an_amendment_and_a_consolidation(monkeypatch):
+    """MFoF relaunched its site on 2026-09-10 and the registered listing 404ed,
+    so the scope harvested nothing (#102). The new page's rows carry the whole
+    title, the designation and the role in the anchor's own text, and the role
+    word decides what each file is: the konsoliderad version of HSLF-FS 2021:64
+    is listed *before* its grundförfattning, and would otherwise be stored as
+    the regulation itself."""
+    html = (Path(__file__).parent / "files/foreskrift/mfof-index.html").read_text()
+    monkeypatch.setattr(hslffs, "request",
+                        lambda *_a, **_kw: SimpleNamespace(text=html))
+    refs = list(hslffs.enumerate_files(None, REGISTRY["hslffs-mfof"]))
+    assert [r.basefile for r in refs] == [
+        "hslffs/2025:64", "hslffs/2023:3", "hslffs/2022:66",
+        "hslffs/2022:18", "hslffs/2021:64"]
+    # "HSLF-FS 2023-3" is printed with a hyphen where the samling uses a colon
+    assert refs[1].identifier == "HSLF-FS 2023:3"
+    # the konsoliderad file belongs to the act it consolidates, not to a
+    # document of its own
+    konsoliderade = {r.basefile: r.extra.get("consolidations") for r in refs}
+    assert len(konsoliderade["hslffs/2021:64"]) == 1
+    assert not konsoliderade["hslffs/2022:66"]
