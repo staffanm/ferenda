@@ -174,12 +174,54 @@ def test_ref_fs_from_designation_preserves_mixed_case_designation():
         and uv.identifier == "SiSUVFS 2025:1"
 
 
-def test_ref_without_fs_from_designation_normalises_to_agency_fs():
-    # the default (no opt-in): a stray designation is still normalised onto the
-    # agency's own fs, so ordinary agencies are unaffected by the new capability
+def test_ref_files_every_row_under_its_own_printed_designation():
+    # the printed designation decides the samling for every agency, with no
+    # opt-in: a row printing the agency's own series is unaffected, and one
+    # printing a predecessor's keeps that predecessor's identity rather than
+    # being published under a designation the agency never used ("NFS 1987:12"
+    # for a document whose own file is snfs1987-12.pdf)
     seen = set()
     ref = _ref(_Agency(fs="kifs"), "KIFS 2017:7", "/kifs-20177", seen)
-    assert ref.basefile == "kifs/2017:7" and ref.fs is None
+    assert ref.basefile == "kifs/2017:7" and ref.fs == "kifs"
+    old = _ref(_Agency(fs="nfs"), "SNFS 1987:12 Föreskrifter om Pieljekaise",
+               "/nfs/1970-89/snfs1987-12.pdf", seen)
+    assert old.basefile == "snfs/1987:12" and old.fs == "snfs" \
+        and old.identifier == "SNFS 1987:12"
+
+
+def test_ref_reads_the_row_designation_the_row_claims_as_its_own():
+    # a row names more than one document: an amendment's names the base it
+    # amends, a repeal's what it repeals, an omtryck's the base it reprints.
+    # Taking the leftmost filed four scopes' documents under another
+    # document's number.
+    seen = set()
+    agency = _Agency(fs="memyfs")
+    r = _ref(agency, "Föreskrifter om upphävande av MPRTFS 2019:3 om "
+             "mediestöd (MPRTFS 2021:1)", "/x/a.pdf", seen, direct=True)
+    assert r.basefile == "mprtfs/2021:1"
+    # nothing but the base's number: the filename carries the document's own
+    r = _ref(agency, "Föreskrifter om ändring i Mediemyndighetens föreskrifter "
+             "(MEMYFS 2024:1) om mediestöd", "/x/memyfs-2024-2.pdf", seen, direct=True)
+    assert r.basefile == "memyfs/2024:2"
+    # an omtryck prints the base first and itself last
+    r = _ref(_Agency(fs="tvfs"), "TVFS 2015:1 omtryckt genom Tillväxtverkets "
+             "föreskrifter om stöd TVFS 2019:1", "/x/b.pdf", seen, direct=True)
+    assert r.basefile == "tvfs/2019:1"
+
+
+def test_ref_drops_the_samlings_own_forteckning():
+    # the catalogue 18 c § författningssamlingsförordningen has an agency
+    # publish is not a document in the samling, and its filename's date reads
+    # as a number (Konsumentverket's became the document "KOVFS 2021:1")
+    assert _ref(_Agency(fs="kovfs"), "Förteckning över gällande föreskrifter",
+                "/x/forteckning-2021-01.pdf", set(), direct=True) is None
+
+
+def test_ref_needs_a_year_before_it_reads_a_number_off_a_slug():
+    # Integritetsskyddsmyndigheten's links are "/link/<uuid>.aspx", whose hex
+    # digits minted the document "IMYFS 0008:2"
+    assert _ref(_Agency(fs="imyfs"), "Allmänna råd",
+                "/link/f3da97d00082.aspx", set(), direct=True) is None
 
 
 # --- direct_docref / newest_first: the shared tail of a bespoke enumerator ----
@@ -502,6 +544,36 @@ def test_publisher_series_title_optional_genitive_and_capital_f():
     # (no genitive -s, capital F) -- still the agency
     mast = ("Krisberedskapsmyndigheten Författningssamling Utgivare: Maria Broms "
             "Hagelin SN 165 587 ISSN 1651-5587 KBMFS Krisberedskapsmyndighetens "
+
+
+def test_ref_files_a_designation_under_its_registered_slug_not_its_spelling():
+    # four samlingar carry a Swedish vowel their slug transliterates. Reading
+    # the slug straight off the printed designation filed 51 Elsäkerhetsverket
+    # documents under an "elsäkfs" no registry knows, beside the 37 already
+    # held under elsakfs.
+    seen = set()
+    r = _ref(_Agency(fs="elsakfs"), "ELSÄK-FS 2008:1 om elektriska anläggningar",
+             "/x/elsak-fs-2008-1.pdf", seen, direct=True)
+    assert r.basefile == "elsakfs/2008:1" and r.fs == "elsakfs"
+    # ÅFS is Åklagarmyndighetens; afs is Arbetsmiljöverkets
+    r = _ref(_Agency(fs="aafs"), "ÅFS 2021:3 om förundersökning", "/x/afs-2021-3.pdf",
+             seen, direct=True)
+    assert r.basefile == "aafs/2021:3"
+
+
+def test_every_registered_samling_cites_itself_the_way_it_is_printed():
+    # `printed_designation` falls back to the slug in capitals, which is right
+    # for the 40-odd samlingar whose slug is their designation and wrong for
+    # the ones carrying a Swedish vowel: ELSÄK-FS was cited as "ELSAKFS".
+    from ferenda.foreskrift.model import printed_designation
+    from ferenda.lib import datasets
+    for fs, row in datasets.load_fs_series().items():
+        designation = row.get("designation")
+        if not designation:
+            continue
+        printed = printed_designation("https://lagen.nu/%s/2020:1" % fs)
+        assert printed == "%s 2020:1" % designation, \
+            "%s is cited as %r, not as the %r it prints" % (fs, printed, designation)
             "föreskrifter 2008:1")
     assert extract_publisher(mast) == "Krisberedskapsmyndigheten"
 

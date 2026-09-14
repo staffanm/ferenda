@@ -211,6 +211,10 @@ BFS = Agency(
 # indexed + landing + filename-classify (PDFs under /globalassets/foreskrifter/)
 ELSAKFS = Agency(
     fs="elsakfs", name="Elsäkerhetsverket", publisher="Elsäkerhetsverket",
+    # the printed form, which the slug transliterates. Without it the fallback
+    # spells the slug back out and the samling is cited as "ELSAKFS 2008:1",
+    # a designation the agency has never used
+    designation="ELSÄK-FS",
     base_url="https://www.elsakerhetsverket.se",
     index_url="https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter-i-nummerordning/",
     enumerate=indexed_enumerate, resolve=resolve_landing,

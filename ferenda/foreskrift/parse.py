@@ -53,9 +53,8 @@ from ..lib.pdftext import (
     pdf_pages,
     ruled_footnotes,
 )
-from ..lib.util import MONTHS, approximate_date, confine, fold_swedish
-from .agencies import AAFS_SERIES, SAMLINGAR
-from .harvest import fs_code
+from ..lib.util import MONTHS, approximate_date, confine
+from .harvest import RE_DESIGNATION, series_slug
 from .model import Amendment, Block, Consolidation, Regulation, regulation_uri
 from .structure import RE_LEAD_PARA, nest
 
@@ -281,7 +280,12 @@ RE_UPPHAVANDE = re.compile(r"\bupphävande\s+av\b(?!\s+vissa\s+(?:regler|bestäm
 # 1996:1" with a space, which `_fs_key` folds away like the hyphen. "…FA" is
 # ESVFA/STKFA, published as föreskrifter och allmänna råd rather than as a
 # författningssamling
-RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+(?:-| )?(?:FS|FA))\s*(\d{4}):(\d+)")
+# the vertical's one designation pattern (`harvest.RE_DESIGNATION`), under the
+# name the parser has always read a *cited* designation by. It used to be a
+# second, narrower spelling here -- all-capitals, and ending in FS or FA -- so
+# a citation of RA-MS, BFNAR, LBS, FoHMFS, JvSFS, SiSUVFS or Naturvårdsverkets
+# AR matched nothing and the repeal or amendment it stated was never recorded.
+RE_FS_REF = RE_DESIGNATION
 # an ändringsförfattning's own title names its target: "… föreskrifter om
 # ändring i <agency>s föreskrifter (ÅFS 2005:5) om …". Some agencies drop
 # their own series designation in the parenthesis ("föreskrifter (2007:12)");
@@ -1200,25 +1204,13 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     return _structure(body, parser), meta, footnote_nodes(notes, parser)
 
 
-# printed designation (lowercased, hyphens/spaces dropped, Swedish vowels
-# kept) -> registered samling slug, for series whose slug is not the naive
-# transliteration: 'ÅFS' -> aafs (afs is Arbetsmiljöverkets samling) and its
-# predecessor 'RÅFS' -> raafs (rafs is Riksarkivets RA-FS)
-_DESIGNATION_SLUGS = {
-    **{fs_code(a.designation): fs
-       for fs, a in SAMLINGAR.items() if a.designation},
-    **{d.lower(): fs for d, (fs, _) in AAFS_SERIES.items()},
-}
 
 
 def _fs_key(designation):
-    """Fold an FS designation to its slug form for matching -- `harvest.fs_code`
-    (lowercase, drop every separator), then let the registry's own
-    designation->slug rows override the åäö transliteration ('ÅFS' folds to
-    ``aafs``, never ``afs``; 'ELSÄK-FS' matches the agency's ``elsakfs`` slug
-    either way)."""
-    key = fs_code(designation)
-    return _DESIGNATION_SLUGS.get(key, fold_swedish(key))
+    """Fold an FS designation to its slug form for matching -- the harvest's
+    own :func:`harvest.series_slug`, so a designation read out of a document's
+    text lands on the same samling the harvest files that document under."""
+    return series_slug(designation)
 
 
 def masthead_amendments(masthead, fs, base_ars, base_lop):

@@ -39,7 +39,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from ..lib import compress
+from ..lib import compress, datasets
 from ..lib.browser import CamoufoxBrowser
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk, write_record
@@ -52,7 +52,7 @@ from ..lib.net import (
     set_deadline,
 )
 from ..lib.util import basefile_slug as slug
-from ..lib.util import document_extension, record_path
+from ..lib.util import document_extension, fold_swedish, record_path
 
 
 @dataclass
@@ -123,6 +123,130 @@ def fs_code(designation):
     return re.sub(r"[^0-9a-zåäö]", "", designation.lower())
 
 
+# --------------------------------------------------------------------------
+# designations: the one reader of a printed FS number
+# --------------------------------------------------------------------------
+
+# Characters a publisher's markup and a PDF's text layer put *inside* a
+# designation, where every pattern that reads one would otherwise have to know
+# about them: a zero-width space or a soft hyphen between the year and the
+# lopnummer (Energimyndigheten's listing hides 16 documents that way), a
+# non-breaking space in an anchor's text (Kammarkollegiet), an en dash for the
+# hyphen (RA-FS in an OCR layer), a space after the colon ("SKVFS 2013: 18",
+# "1977: 1"). Removed once, here, rather than spelled again in each pattern.
+_INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad"), None)
+_SPACES = dict.fromkeys(map(ord, "\u00a0\u2007\u202f"), " ")
+_DASHES = dict.fromkeys(map(ord, "\u2010\u2011\u2012\u2013\u2014\u2212"), "-")
+RE_COLON_SPACE = re.compile(r"(?<=\d):[ \t]+(?=\d)")
+# a designation whose number is set with a hyphen rather than a colon
+# ("HSLF-FS 2023-3"). Anchored on the series suffix, and refused when more
+# digits follow, so a date ("HSLF-FS 2023-03-15") is left alone
+RE_HYPHEN_NUMBER = re.compile(r"((?:FS|FA|MS|AR|BS)\s*\d{4})-(\d{1,3})(?![\d-])")
+
+
+def normalise(text):
+    """`text` with the typography that hides a designation from a pattern
+    removed: invisible characters dropped, the space variants and dash variants
+    folded to a plain space and hyphen, and the space after a number's colon
+    closed. Applied to the strings a designation is read out of -- a listing
+    row, an href, a title, a masthead -- never to a body, whose spacing is the
+    document's own."""
+    if not text:
+        return text
+    return RE_HYPHEN_NUMBER.sub(
+        r"\1:\2", RE_COLON_SPACE.sub(":", text.translate(_INVISIBLE)
+                                     .translate(_SPACES).translate(_DASHES)))
+
+
+# The vertical's one designation pattern: an agency prefix, its series suffix,
+# and the number. The suffix alternation is what a samling's name can end in --
+# "FS" for a författningssamling, "FA" for the two föreskrifter-och-allmänna-råd
+# series (ESVFA, STKFA), "MS" for RA-MS, "AR" for BFNAR and Naturvårdsverkets
+# pre-1994 AR, "BS" for LBS. Requiring "FS" left every one of the others
+# unreadable: 53 RA-MS repeals and every BFNAR amendment link were empty.
+# The prefix keeps its printed case rather than being uppercased, because six
+# series are spelled mixed ("SiSFS", "FoHMFS", "JvSFS", "AgVFS"); matching only
+# all-capitals lost their relations too.
+RE_DESIGNATION = re.compile(
+    r"\b([A-ZÅÄÖ][A-ZÅÄÖa-zåäö]{0,9}(?:-| )?(?:FS|FA|MS|AR|BS))\s*(\d{4}):(\d+)")
+
+# What tells a listing row that the designation beside it is *another*
+# document's: an ändringsförfattning and a repeal both name their target in
+# their own title. The first designation after one of these belongs to that
+# target; a later one is the document speaking about itself again
+# ("Föreskrifter om upphävande av MPRTFS 2019:3 om mediestöd (MPRTFS 2021:1)").
+RE_OTHERS_NEXT = re.compile(r"ändring(?:ar)?\s+(?:i|av)\b|upphäv(?:ande\s+av|s|er)\b"
+                            r"|ersätter\b", re.IGNORECASE)
+# and what says the opposite -- an omtryck's row names the base it reprints
+# first and its own number last ("TVFS 2015:1 omtryckt genom … TVFS 2019:1")
+RE_OWN_NEXT = re.compile(r"omtryck(?:t|et)?\s+(?:genom|av)\b", re.IGNORECASE)
+# a filename slug's number ("rgkfs_2015_2.pdf"). Anchored on a year, so an
+# opaque id cannot supply one: Integritetsskyddsmyndigheten's links are
+# "/link/<uuid>.aspx", whose hex digits minted the document "IMYFS 0008:2".
+RE_SLUG_NUMBER = re.compile(r"[a-zåäö]+[-_ ]?((?:19|20)\d{2})[-_ ]?(\d{1,3})(?:\D|$)",
+                            re.IGNORECASE)
+# a bare number in a row that prints no designation at all
+RE_COLON_NUMBER = re.compile(r"\b(\d{4}):(\d+)\b")
+# the list 18 c § författningssamlingsförordningen has an agency publish. It is
+# a catalogue of the samling, not a document in it, and its filename carries a
+# date a slug regex reads as a number (Konsumentverket's "...2021-01.pdf" was
+# harvested as the regulation KOVFS 2021:1, hiding the real one).
+RE_FORTECKNING_ROW = re.compile(
+    r"f[öo]\s?rteckning(?:en|ar)?\s+över\s+(?:gällande\s+)?(?:föreskrifter|författningar)",
+    re.IGNORECASE)
+
+
+def own_designation(text):
+    """The designation a listing row gives its *own* document, as a
+    ``(printed, year, lopnummer)`` triple -- or None when the row names none of
+    its own.
+
+    A row names more than one. Taking the leftmost, which this did until
+    2026-09, files a document under another document's number: an amendment
+    row's first designation is the base it amends, and a repeal row's is what
+    it repeals. Four scopes were filing documents that way (#72, #99, #81,
+    #84), and Konkurrensverket needed a per-agency flag to opt out of it.
+
+    So each designation in the row is placed against the words around it. The
+    first one after "om ändring i", "upphävande av" or "ersätter" is that
+    other document; the first after "omtryckt genom" is this one. What is left
+    unclaimed, read left to right, is the row's own."""
+    text = normalise(text or "")
+    spans = [(m.start(), m.groups()) for m in RE_DESIGNATION.finditer(text)]
+    if not spans:
+        return None
+    others = set()
+    for m in RE_OTHERS_NEXT.finditer(text):
+        nxt = next((i for i, (at, _g) in enumerate(spans) if at >= m.end()), None)
+        if nxt is not None:
+            others.add(nxt)
+    for m in RE_OWN_NEXT.finditer(text):
+        others |= {i for i, (at, _g) in enumerate(spans) if at < m.start()}
+    return next((g for i, (_at, g) in enumerate(spans) if i not in others), None)
+
+
+# printed designation (`fs_code`, so lowercased and stripped of separators, the
+# Swedish vowels still in it) -> the samling slug it is registered under. Four
+# series carry a vowel their slug transliterates: ÅFS is `aafs` (`afs` is
+# Arbetsmiljöverkets), RÅFS `raafs` (`rafs` is Riksarkivets), SJÖFS `sjofs`,
+# ELSÄK-FS `elsakfs`. Reading the slug straight off the printed designation
+# filed 51 Elsäkerhetsverket documents under an `elsäkfs` no registry knows.
+_SERIES_SLUGS = {fs_code(row["designation"]): fs
+                 for fs, row in datasets.load_fs_series().items()
+                 if row.get("designation")}
+
+
+def series_slug(designation):
+    """The registered samling slug a printed designation names.
+
+    `fs_code` spells the rule -- lowercase, drop every separator -- and this
+    puts the registry's own designation->slug rows over it, falling back to the
+    transliteration for a series the registry does not know (a predecessor a
+    listing still carries, whose documents belong under its own name)."""
+    key = fs_code(designation)
+    return _SERIES_SLUGS.get(key, fold_swedish(key))
+
+
 def absolute(base_url, href):
     """Absolute URL for a possibly-relative href. Query strings are kept -- some
     document stores need them (a-w2m's ``?id=&res=``); a harmless tracking query
@@ -152,7 +276,6 @@ RE_KONSOLIDERAD = re.compile(r"konsol", re.IGNORECASE)
 RE_MEMO = re.compile(r"beslutsprom|besluts-?pm|konsekvensutredning", re.IGNORECASE)
 RE_ATTACHMENT = re.compile(r"anvisning|blankett|bilaga|mall|vägledning", re.IGNORECASE)
 RE_FS_NUMBER = re.compile(r"\b([A-ZÅÄÖ-]+FS)\s*(\d{4}):(\d+)", re.IGNORECASE)
-RE_SLUG_NUMBER = re.compile(r"[a-zåäö]+[-_ ]?(\d{4})[-_ ]?(\d{1,3})(?:\D|$)", re.IGNORECASE)
 
 
 def _own_number(text, fs):
@@ -433,30 +556,35 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
 # Each yields DocRefs over the shared harvest loop. A new agency picks one and
 # supplies its params; a genuinely new site shape is one new enumerator here.
 
-RE_COLON_NUMBER = re.compile(r"(\d{4}):(\d+)")
-
-
 def ref(agency, ident_text, href, seen, title=None, direct=False):
-    """Build a DocRef for a base regulation from a designation string ('NFS
-    2026:6' / 'SSMFS 2018:1 …') and an href. The (year, lopnummer) come from the
-    first ``YYYY:N`` in the text. When ``direct``, the href *is* the PDF (no
-    landing) so it goes into ``extra`` for :func:`resolve_direct`. Returns None
-    on no number or an already-seen base (dedup keeps one DocRef per base)."""
-    # Find the regulation's own number, most reliable signal first:
-    #  1. an FS-prefixed designation in the text ("RGKFS 2015:2") -- skips an SFS
-    #     reference in a title ("med stöd av förordning (2006:1097)");
-    #  2. for a direct (PDF-href) agency, the filename slug ("rgkfs_2015_2.pdf")
-    #     -- when the title carries no designation at all, or first of all when
-    #     the agency sets ``number_from_slug``: KKVFS's upphävande rows name the
-    #     *repealed* regulation in their text ("Upphävande av … (KKVFS 2015:2)")
-    #     while the filename (kkvfs_2021-2.pdf) is the document's own number;
-    #  3. a bare "YYYY:N" in the text, as a last resort.
-    fsm = RE_FS_NUMBER.search(ident_text)
+    """Build a DocRef for a base regulation from a listing row's text and its
+    href. When ``direct``, the href *is* the PDF (no landing page) so it goes
+    into ``extra`` for :func:`resolve_direct`. Returns None when the row names
+    no number, and None for an already-seen base (dedup keeps one DocRef per
+    base).
+
+    The number comes from the evidence in this order:
+
+      1. the row's own designation (:func:`own_designation`), which is the
+         designation the row's words do not attribute to another document;
+      2. for a direct (PDF-href) agency, the filename slug -- the row that
+         names only its target has its own number there ("Upphävande av …
+         (KKVFS 2015:2)", kkvfs_2021-2.pdf);
+      3. a bare "YYYY:N" in the row, for the rows that print no designation.
+
+    A förteckning över gällande föreskrifter is not a document in the samling
+    and is dropped before any of that: it is the catalogue, and its filename's
+    date reads as a number ("...2021-01.pdf" was harvested as KOVFS 2021:1)."""
+    ident_text = normalise(ident_text or "")
+    if RE_FORTECKNING_ROW.search(ident_text):
+        return None
+    own = own_designation(ident_text)
     slugm = RE_SLUG_NUMBER.search(href.rsplit("/", 1)[-1].split("?")[0]) if direct else None
+    designation = None
     if slugm and agency.params.get("number_from_slug"):
         arsutgava, lopnummer = slugm.group(1), str(int(slugm.group(2)))
-    elif fsm:
-        arsutgava, lopnummer = fsm.group(2), str(int(fsm.group(3)))
+    elif own:
+        designation, arsutgava, lopnummer = own[0], own[1], str(int(own[2]))
     elif slugm:
         arsutgava, lopnummer = slugm.group(1), str(int(slugm.group(2)))
     else:
@@ -464,23 +592,24 @@ def ref(agency, ident_text, href, seen, title=None, direct=False):
         if not bare:
             return None
         arsutgava, lopnummer = bare.group(1), str(int(bare.group(2)))
-    # Normally every document lands under agency.fs. But when an agency has taken
-    # over a renamed/disbanded agency's samling, its listing mixes författnings-
-    # samlingar (MCF's "gällande regler" carries new MCFFS *and* still-in-force
-    # MSBFS + older SÄIFS). ``fs_from_designation`` keeps each document under its
-    # own fs, taken from the printed designation, rather than collapsing the lot
-    # onto agency.fs -- so an MSBFS regulation keeps its MSBFS identity. The fs
-    # code is the lowercased designation stripped of separators ("HSLF-FS" ->
-    # "hslffs"); it only applies when the row actually names a designation.
+    # Normally every document lands under agency.fs. But a listing mixes
+    # författningssamlingar wherever an agency has taken over a renamed or
+    # disbanded agency's samling (MCF's "gällande regler" carries new MCFFS
+    # *and* still-in-force MSBFS and older SÄIFS), and a predecessor's document
+    # filed under the successor's slug is published under a designation no
+    # agency ever printed -- "NFS 1987:12", whose own file is snfs1987-12.pdf.
+    # So the printed designation decides the samling whenever the row prints
+    # one. This was an opt-in flag (``fs_from_designation``) until 2026-09;
+    # 139 documents sat under the wrong series because their scope had not set
+    # it, and no scope wants the opposite.
     fs = agency.fs
     doc_fs = None      # DocRef.fs override; None == agency.fs (the common case)
     identifier = "%s %s:%s" % (agency.designation or agency.fs.upper(),
                                arsutgava, lopnummer)
-    if agency.params.get("fs_from_designation") and fsm:
+    if designation:
         # the printed designation verbatim -- uppercasing would mangle the
         # mixed-case series (SiSFS, SiSUVFS)
-        designation = fsm.group(1)
-        fs = doc_fs = fs_code(designation)
+        fs = doc_fs = series_slug(designation)
         identifier = "%s %s:%s" % (designation, arsutgava, lopnummer)
     basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
     if basefile in seen:

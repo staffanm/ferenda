@@ -28,8 +28,8 @@ page list the regulations issued under it.
 
 from dataclasses import dataclass, field
 
+from ..lib import datasets
 from ..lib.artifact import prune
-from .agencies import SAMLINGAR
 
 BASE = "https://lagen.nu"
 
@@ -41,8 +41,14 @@ def regulation_uri(fs, arsutgava, lopnummer):
 
 def printed_designation(uri):
     """The designation a regulation is cited by ("RPSFS 2011:16"), read back out
-    of its URI -- `regulation_uri`'s inverse, spelled the same way the harvest
-    spells an identifier (`agency.designation or fs.upper()`).
+    of its URI -- `regulation_uri`'s inverse.
+
+    Read from the samling's own row in `series.json`, which names every one of
+    them, rather than from the live registry: fifteen samlingar print a
+    designation their slug transliterates ("ELSÄK-FS" as `elsakfs`, "FoHMFS" as
+    `fohmfs`, "RA-MS" as `rams`), and five of those are closed predecessor
+    series with no registry entry to carry it. Spelling the slug back out in
+    capitals cited them as designations no agency ever used.
 
     For the regulations a page references but the corpus does not hold: a
     repealed predecessor series nobody harvests still has to be *named* in the
@@ -52,9 +58,8 @@ def printed_designation(uri):
     fs, _, number = rest.partition("/")
     if not number or "/" in number:
         return None
-    agency = SAMLINGAR.get(fs)
-    return "%s %s" % ((agency.designation if agency and agency.designation
-                       else fs.upper()), number)
+    series = datasets.load_fs_series().get(fs) or {}
+    return "%s %s" % (series.get("designation") or fs.upper(), number)
 
 
 @dataclass
