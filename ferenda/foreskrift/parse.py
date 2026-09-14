@@ -54,7 +54,7 @@ from ..lib.pdftext import (
     ruled_footnotes,
 )
 from ..lib.util import MONTHS, approximate_date, confine
-from .harvest import RE_DESIGNATION, series_slug
+from .harvest import RE_DESIGNATION, normalise, series_slug
 from .model import Amendment, Block, Consolidation, Regulation, regulation_uri
 from .structure import RE_LEAD_PARA, nest
 
@@ -988,15 +988,93 @@ RE_TITLE_BOILERPLATE = re.compile(
     r"öppnas|nytt\s+fönster)\b", re.IGNORECASE)
 
 
+# A word the printed page broke across lines, rejoined by the extraction with
+# the hyphen still in it ("före- skrifter", "stråldo- ser"). Swedish also hangs
+# a hyphen on the first half of a coordinated compound ("Tandvårds- och
+# läkemedelsförmånsverkets"), where the hyphen is the author's and stays -- the
+# word after one of those is a conjunction. The body text is rejoined line by
+# line (`pdftext.dehyphenate`); a title read off the masthead was not, so six
+# scopes published titles with a word broken in half, and the broken word hid
+# the designation beside it: KKVFS 2020:3's "före- skrifter (2020:2)" matched
+# no amendment target.
+RE_WRAP_HYPHEN = re.compile(r"(\w)-\s+(?!och\b|eller\b|samt\b)([a-zåäö])")
+#: a running header is a line, not a sentence
+FURNITURE_MAX = 60
+
+
+def join_wrapped(text):
+    """`text` with the line-break hyphens closed, the masthead's counterpart of
+    the body's line-by-line rejoining."""
+    return RE_WRAP_HYPHEN.sub(r"\1\2", text or "")
+
+
+def running_furniture(blocks):
+    """The short texts this document prints on more than one page: its own
+    running headers, page footers and margin codes.
+
+    Furniture in a masthead is what makes a title unreadable, and each agency
+    prints its own -- Patent- och registreringsverkets "V:11", Polisens "FAP
+    206-2", Sjöfartsverkets "SFH" stamp. Listing them agency by agency
+    (`RE_MASTHEAD_BOILERPLATE`) only ever catches the ones already met. What
+    repeats across the document's pages is furniture by construction, whichever
+    agency set it, and the document says so itself.
+
+    A run that names what the document *is* is never furniture: several
+    layouts repeat the title as the running header, and removing it would take
+    the title with it. Longest first, so removing a short run cannot break a
+    longer one apart."""
+    pages = {}
+    for b in blocks:
+        run = " ".join((b.text or "").split())
+        if run and len(run) <= FURNITURE_MAX and b.page is not None \
+                and not RE_TITLE_TYPE.search(run):
+            pages.setdefault(run, set()).add(b.page)
+    return sorted((run for run, seen in pages.items() if len(seen) > 1),
+                  key=len, reverse=True)
+
+
+def _strip_own_designation(title, identifier):
+    """`title` without the leading designation naming the document itself.
+
+    Matched as a designation rather than as the identifier's literal text: an
+    agency prints its own number its own way, and Kulturrådet's leading zero
+    ("KRFS 2022:01" against our "KRFS 2022:1") left the designation glued to
+    the front of every title it set that way."""
+    own = RE_DESIGNATION.search(identifier)
+    if own:
+        number = (own.group(2), int(own.group(3)))
+
+        def names_itself(m):
+            return (m.group(2), int(m.group(3))) == number
+
+        printed = RE_DESIGNATION.match(title)
+        if printed and names_itself(printed):
+            title = title[printed.end():].strip(" -–—:").strip()
+        # and the parenthesis at the end in which the listing files the
+        # document under its role ("… (HSLF-FS 2021:64 GRUNDFÖRFATTNING)",
+        # MFoF). The role is not part of the title, and the number beside it
+        # is the document's own. A parenthesis naming *another* document
+        # stays, designation and all -- an ändringsförfattning's title names
+        # the regulation it amends -- and so does one that carries only the
+        # document's own number, which is how a föreskrift is cited.
+        opened = title.rfind("(")
+        tail = title[opened:] if opened > 0 else ""
+        if (RE_TITLE_BOILERPLATE.search(tail)
+                and any(names_itself(m) for m in RE_DESIGNATION.finditer(tail))):
+            title = title[:opened].strip(" -–—:").strip()
+        return title
+    return re.sub(r"^%s\s*[-–—:]*\s*" % re.escape(identifier), "", title).strip()
+
+
 def clean_title(raw, identifier):
     """A harvest title stripped of link chrome and its own-designation prefix,
     or None when nothing title-like remains ('.pdf', 'KKVFS 2025:1',
     'Grundförfattning (MDFFS 2019:1)') -- many harvests hand us the PDF link's
     text, which is file chrome rather than a title (F7). None sends the
     caller to the PDF's own rubric (title_from_body)."""
-    t = RE_TITLE_CHROME.sub("", raw or "").strip()
+    t = join_wrapped(normalise(RE_TITLE_CHROME.sub("", raw or ""))).strip()
     if identifier:
-        t = re.sub(r"^%s\s*[-–—:]*\s*" % re.escape(identifier), "", t).strip()
+        t = _strip_own_designation(t, identifier)
     # what remains once designations, numbers and role words go: a title has
     # prose left, chrome does not
     probe = re.sub(r"[\d\s:/().,–—-]+", "",
@@ -1123,8 +1201,11 @@ def title_from_masthead(blocks, start):
     # repaired twice: once joined, and once more after the column headers are
     # gone, since one can land between a designation and its number
     # ("(SLVFS Utkom från trycket 1994: 13)", SLVFS 1998:41)
-    masthead = _repair_ocr_text(_strip_boilerplate(
-        _repair_ocr_text(" ".join(_full_text(blocks[:start]).split()))))
+    masthead = " ".join(_full_text(blocks[:start]).split())
+    for run in running_furniture(blocks):
+        masthead = masthead.replace(run, " ")
+    masthead = join_wrapped(normalise(_repair_ocr_text(_strip_boilerplate(
+        _repair_ocr_text(masthead)))))
     for word in RE_TITLE_TYPE.finditer(masthead):
         head = _agency_possessive(masthead[:word.start()].rstrip())
         rest = masthead[word.end():word.end() + TITLE_MAX]

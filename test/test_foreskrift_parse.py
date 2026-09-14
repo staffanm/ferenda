@@ -1776,3 +1776,56 @@ def test_foreskrift_definitions_reach_the_catalog():
     assert catalog.definition_sentences(art) == [
         ("https://lagen.nu/begrepp/Incident", "P2", "incident",
          "incident: en händelse med faktisk negativ inverkan på säkerheten.")]
+# --- the masthead's own furniture, and the words the page broke in half ------
+
+def test_join_wrapped_closes_a_broken_word_and_keeps_a_hanging_hyphen():
+    # six scopes published a title with a word broken in half; the same break
+    # hid the designation beside it (KKVFS 2020:3's "före- skrifter (2020:2)")
+    assert fp.join_wrapped("Konkurrensverkets före- skrifter (2020:2)") \
+        == "Konkurrensverkets föreskrifter (2020:2)"
+    assert fp.join_wrapped("stråldo- ser vid arbete") == "stråldoser vid arbete"
+    # the author's own hyphen in a coordinated compound stays
+    assert fp.join_wrapped("Tandvårds- och läkemedelsförmånsverkets föreskrifter") \
+        == "Tandvårds- och läkemedelsförmånsverkets föreskrifter"
+    assert fp.join_wrapped("Post- och telestyrelsens allmänna råd") \
+        == "Post- och telestyrelsens allmänna råd"
+
+
+def test_running_furniture_is_what_the_document_repeats_across_pages():
+    # Polisens margin code, printed beside the text on every page; the title
+    # is repeated as a running header in the same document and is never
+    # furniture, however often it recurs
+    blocks = [fp.Block(kind="stycke", text="FAP 206-2", page=1),
+              fp.Block(kind="rubrik", text="Polismyndighetens föreskrifter", page=1),
+              fp.Block(kind="stycke", text="FAP 206-2", page=2),
+              fp.Block(kind="rubrik", text="Polismyndighetens föreskrifter", page=2),
+              fp.Block(kind="stycke", text="om stråldoser", page=2)]
+    assert fp.running_furniture(blocks) == ["FAP 206-2"]
+
+
+def test_clean_title_strips_a_leading_designation_however_it_is_printed():
+    # Kulturrådet prints the lopnummer with a leading zero, so a literal match
+    # against our own identifier left the designation on the front of the title
+    assert clean_title("KRFS 2022:01 Riksantikvarieämbetets föreskrifter om "
+                       "utmärkning av kulturegendom", "KRFS 2022:1") \
+        == "Riksantikvarieämbetets föreskrifter om utmärkning av kulturegendom"
+    # another document's number in the title is not the document's own
+    assert clean_title("Föreskrifter om ändring i (KKVFS 2020:2)", "KKVFS 2020:3") \
+        == "Föreskrifter om ändring i (KKVFS 2020:2)"
+
+
+def test_clean_title_drops_the_parenthesis_that_names_the_document_itself():
+    # MFoF files each row under its role and prints both in the link text;
+    # neither is part of the title
+    assert clean_title("Allmänna råd om socialnämndens utredning (HSLF-FS "
+                       "2021:64 GRUNDFÖRFATTNING) pdf, 1.2 MB.",
+                       "HSLF-FS 2021:64") == "Allmänna råd om socialnämndens utredning"
+    # the chrome can cut the parenthesis open; the title ends where it opened
+    assert clean_title("Allmänna råd om socialnämndens utredning (HSLF-FS "
+                       "2022:66 ÄNDRINGSFÖRFATTNING, pdf, 233 kB)",
+                       "HSLF-FS 2022:66") == "Allmänna råd om socialnämndens utredning"
+    # a parenthesis naming another document is the one place a designation
+    # belongs in a title: an ändringsförfattning names what it amends
+    assert clean_title("Föreskrifter om ändring i Konkurrensverkets "
+                       "föreskrifter (KKVFS 2020:2) om avgifter", "KKVFS 2020:3") \
+        == "Föreskrifter om ändring i Konkurrensverkets föreskrifter (KKVFS 2020:2) om avgifter"
