@@ -98,6 +98,137 @@ def test_classify_href_by_filename():
         == ("regulation", "2022", "9")
 
 
+def test_classify_href_reads_andring_by_where_it_stands():
+    # "ändring" before the number names the document the file amends; after it
+    # the word is part of this document's own title, and the file is its text.
+    # Every SIFS ändringsföreskrift lost its PDF to the unconditional rule.
+    assert classify_href(anchor('<a href="/x/andring-nfs-2014-29.pdf">a</a>'),
+                         "nfs", "2014", "29") == ("amendment", "2014", "29")
+    assert classify_href(
+        anchor('<a href="/x/sifs-2023_1-foreskrift-om-andring-i-sifs-2020_2.pdf">a</a>'),
+        "sifs", "2023", "1") == ("regulation", "2023", "1")
+
+
+def test_classify_href_decodes_the_percent_escaped_vowel():
+    # Energimarknadsinspektionen escapes the "ä", so no rule saw the "ändring"
+    # and an amending act was stored as EIFS 2015:4's own text
+    assert classify_href(
+        anchor('<a href="/x/EIFS-om-%C3%A4ndring-av-EIFS-2015-4.pdf">a</a>'),
+        "eifs", "2015", "4") == ("amendment", "2015", "4")
+
+
+def test_classify_href_reads_the_k_that_marks_a_konsoliderad_text():
+    # Naturvårdsverket writes the "k" straight after the number, or after a
+    # hyphen. 34 stored NFS documents hang such a file (ten distinct texts --
+    # one konsolidering serves several base regulations); without the rule each
+    # is read as a plain number, which is how the konsoliderad text of NFS
+    # 1987:13 came to sit in that regulation's own regulation slot.
+    assert classify_href(anchor('<a href="/x/snfs-1987-12k.pdf">k</a>'),
+                         "nfs", "1987", "12") == ("consolidation", "1987", "12")
+    assert classify_href(anchor('<a href="/x/nfs-2018-5-k.pdf">k</a>'),
+                         "nfs", "2018", "5") == ("consolidation", "2018", "5")
+
+
+def test_classify_href_drops_the_guidance_beside_the_regulation():
+    # Spelinspektionen hangs the regulation, a Swedish vägledning and English
+    # guidelines, all three named after the regulation. The guidelines PDF was
+    # what we stored and parsed as SIFS 2022:3.
+    base = ("sifs", "2022", "3")
+    assert classify_href(
+        anchor('<a href="/x/vagledning-for-sifs-2022_3.pdf">v</a>'), *base) is None
+    assert classify_href(
+        anchor('<a href="/x/guidelines-for-sifs-2022_3.pdf">g</a>'), *base) is None
+    assert classify_href(
+        anchor('<a href="/x/sifs-2022_3-spelinspektionens-foreskrifter.pdf">f</a>'),
+        *base) == ("regulation", "2022", "3")
+    # the word has to be in the file's own name, not in the path: every
+    # Spelinspektionen regulation is served out of /foreskrifter-och-vagledning/
+    assert classify_href(
+        anchor('<a href="/dokument/foreskrifter-och-vagledning/gallande/'
+               'sifs-2022_1-foreskrift.pdf">f</a>'),
+        "sifs", "2022", "1") == ("regulation", "2022", "1")
+    # a konsekvensutredning is refused wherever the href carries it
+    assert classify_href(
+        anchor('<a href="/konsekvensutredningar/ptsfs-2023-2.pdf">m</a>'),
+        "ptsfs", "2023", "2") is None
+
+
+def test_classify_file_reads_a_companion_out_of_the_filename():
+    # Havs- och vattenmyndigheten gives the rättelseblad and the original the
+    # same link text; only the file's own name tells them apart
+    base = ("hvmfs", "2018", "1")
+    rattelse = anchor('<a href="/d/HVMFS%202018-1-ev%20R%C3%A4ttelseblad%20till'
+                      '%20tryck.pdf">HVMFS 2018:1 pdf, 120.8 kB.</a>')
+    original = anchor('<a href="/d/HVMFS%202018-1-ev%20Ursprunglig.pdf">'
+                      'HVMFS 2018:1 pdf, 224.1 kB.</a>')
+    assert classify_file(rattelse, *base) == ("attachment", "2018", "1")
+    assert classify_file(original, *base) == ("regulation", "2018", "1")
+
+
+def test_filename_decodes_before_it_splits():
+    # a publisher escapes the separator as well as the vowel, so a raw split
+    # reads the whole path as the name. 668 of 13,450 stored regulation URLs
+    # carry a name that reads differently decoded; 510 of them read a different
+    # number through RE_SLUG_NUMBER.
+    assert harvest.filename("/d/rafs%2FRA-FS%201997-04.pdf") == "RA-FS 1997-04.pdf"
+    assert harvest.filename("/d/TVFS%202025-3.pdf") == "TVFS 2025-3.pdf"
+    assert harvest.filename("/d/UPPH%C3%84VD_TRMFS%202017_2.pdf") \
+        == "UPPHÄVD_TRMFS 2017_2.pdf"
+    # the query goes: it carries digits of its own that a slug pattern reads as
+    # a number (SSMFS's ?searchQuery=)
+    assert harvest.filename("/d/ssmfs-2018-1.pdf?searchQuery=2021") == "ssmfs-2018-1.pdf"
+
+
+def test_slug_number_refuses_a_year_inside_an_opaque_id():
+    # Integritetsskyddsmyndigheten's links are "/link/<uuid>.aspx". Read
+    # mid-string the hex digits mint a document: "f3da2014895c" was IMYFS
+    # 2014:895. The name boundary is what refuses it.
+    assert harvest.RE_SLUG_NUMBER.search("f3da2014895c.aspx") is None
+    assert harvest.RE_SLUG_NUMBER.search("8f3da2014895c4b19c0f.aspx") is None
+    # the boundary still admits every shape a real filename uses
+    for name, number in (("rgkfs_2015_2.pdf", ("2015", "2")),
+                         ("nfs-2014-29.pdf", ("2014", "29")),
+                         ("RA-MS 2018-5.pdf", ("2018", "5")),
+                         ("x/y/stafs-2022-9.pdf", ("2022", "9"))):
+        m = harvest.RE_SLUG_NUMBER.search(name)
+        assert m and m.groups() == number, name
+
+
+def test_classify_keeps_a_regulation_whose_name_says_underrattelse():
+    # "rättelse" unanchored also reads "underrättelse", and a regulation
+    # classified as a companion is neither fetched nor recorded as a reference.
+    # Five stored regulations name one in their file.
+    assert classify_href(
+        anchor('<a href="/f/hslf-fs-2015-9-foreskrifter-om-underrattelseskyldighet.pdf">'
+               'HSLF-FS 2015:9</a>'), "hslffs", "2015", "9") == ("regulation", "2015", "9")
+    assert classify_file(
+        anchor('<a href="/f/kamfs-2013-4.pdf">Föreskrifter om underrättelse om '
+               'tillfällig verksamhet (KAMFS 2013:4)</a>'),
+        "kamfs", "2013", "4") == ("regulation", "2013", "4")
+    # the correction sheet itself is still a companion, spelled either way
+    assert classify_file(anchor('<a href="/f/x.pdf">Rättelseblad FFFS 2017:11</a>'),
+                         "fffs", "2017", "11")[0] == "attachment"
+    assert classify_file(anchor('<a href="/f/hvmfs-2018-1-ev-rattelseblad.pdf">'
+                                'HVMFS 2018:1</a>'), "hvmfs", "2018", "1")[0] == "attachment"
+
+
+def test_classify_reads_the_other_companion_words():
+    # each of these is about the regulation and none is its text
+    base = ("fffs", "2026", "1")
+    assert classify_file(anchor('<a href="/f/x.pdf">Remissammanställning FFFS 2026:1</a>'),
+                         *base)[0] == "memo"
+    assert classify_file(anchor('<a href="/f/fffs-2026-1-hjalpdokument.pdf">FFFS 2026:1</a>'),
+                         *base)[0] == "attachment"
+    assert classify_file(anchor('<a href="/f/x.pdf">Hjälpdokument till FFFS 2026:1</a>'),
+                         *base)[0] == "attachment"
+    assert classify_file(anchor('<a href="/f/fffs-2026-1-faq.pdf">FFFS 2026:1</a>'),
+                         *base)[0] == "attachment"
+    # "faq" is anchored on the word: a name that merely contains the letters is
+    # the regulation
+    assert classify_file(anchor('<a href="/f/fffs-2026-1-faqir.pdf">FFFS 2026:1</a>'),
+                         *base) == ("regulation", "2026", "1")
+
+
 def test_classify_single_is_always_regulation():
     assert classify_single(anchor('<a href="/whatever">x</a>'), "stemfs", "2025", "8") \
         == ("regulation", "2025", "8")
@@ -215,6 +346,17 @@ def test_ref_drops_the_samlings_own_forteckning():
     # as a number (Konsumentverket's became the document "KOVFS 2021:1")
     assert _ref(_Agency(fs="kovfs"), "Förteckning över gällande föreskrifter",
                 "/x/forteckning-2021-01.pdf", set(), direct=True) is None
+
+
+def test_ref_drops_the_publication_list_under_the_agencys_own_name():
+    # each agency names that catalogue its own way; Konsumentverket calls it
+    # "Samtliga publikationer i Konsumentverkets författningssamling (KOVFS)",
+    # and its filename's date minted the document "KOVFS 2021:1", hiding the
+    # real one
+    assert _ref(_Agency(fs="kovfs"),
+                "Samtliga publikationer i Konsumentverkets författningssamling (KOVFS)",
+                "/downloads/kovfs-alla-publikationer-2021-01-konsumentverket.pdf",
+                set(), direct=True) is None
 
 
 def test_ref_needs_a_year_before_it_reads_a_number_off_a_slug():
@@ -480,6 +622,95 @@ def test_browser_agency_selects_the_camoufox_transport_only(tmp_path, monkeypatc
     }
 
 
+# --- paginated_enumerate: the archive pages under the listing's own parameter -
+
+def _paginated_agency(page_url):
+    return harvest.Agency(
+        fs="mcffs", name="MCF", publisher="MCF", base_url="https://e",
+        index_url="https://e/list", enumerate=harvest.paginated_enumerate,
+        params={"page_url": page_url, "row_select": "a.row"})
+
+
+def test_paginated_enumerate_pages_the_archive_with_the_listings_own_parameter(
+        monkeypatch):
+    # MCF pages with "selectedpage"; "?page=2" gives it the rows of page 1, so
+    # the archive walk never ended and wrote nothing over two --force runs
+    asked = []
+
+    def fake_request(_session, _method, url, **_kw):
+        asked.append(url)
+        if "selectedpage=1" not in url:
+            body = ""                                  # past the last page
+        elif "upphavda" in url:
+            body = '<a class="row" href="/r/msbfs-20181/">MSBFS 2018:1</a>'
+        else:
+            body = ('<a href="/upphavda/">Upphävda regler</a>'
+                    '<a class="row" href="/r/mcffs-20261/">MCFFS 2026:1</a>')
+        return SimpleNamespace(text=body)
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    agency = _paginated_agency("https://e/gallande/?sortOrder=Desc&selectedpage={page}")
+    refs = list(harvest.paginated_enumerate(None, agency))
+    assert [r.basefile for r in refs] == ["mcffs/2026:1", "msbfs/2018:1"]
+    assert "https://e/upphavda/?selectedpage=1" in asked
+
+
+def test_paginated_enumerate_ends_where_a_page_names_no_new_row(monkeypatch):
+    # a listing that ignores its page parameter serves page 1 forever, and a
+    # view whose rows have run out serves its last page again -- the same
+    # answer, which is why `lib.harvest.paginated` reads both as the end. The
+    # walk keeps page 1's rows and asks for one page more, never for a third.
+    asked = []
+
+    def fake_request(_session, _method, url, **_kw):
+        asked.append(url)
+        return SimpleNamespace(
+            text='<a class="row" href="/r/mcffs-20261/">MCFFS 2026:1</a>')
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    agency = _paginated_agency("https://e/gallande/?page={page}")
+    agency.params["no_archive"] = True
+    out = list(harvest.paginated_enumerate(None, agency))
+    assert [r.basefile for r in out] == ["mcffs/2026:1"]
+    assert asked == ["https://e/gallande/?page=1", "https://e/gallande/?page=2"]
+
+
+def test_paginated_enumerate_raises_on_a_pager_that_never_terminates(monkeypatch):
+    # every page names rows nobody has seen: that is a changed site, not a
+    # large samling, and an uncapped walk over it is a hang. The cap raises
+    # rather than asserts -- under -O an assert would let the walk run on
+    # (rule:errors-drive-retry-use-raise).
+    def fake_request(_session, _method, url, **_kw):
+        page = url.rsplit("=", 1)[1]
+        return SimpleNamespace(
+            text='<a class="row" href="/r/mcffs-2026%s/">MCFFS 2026:%s</a>'
+                 % (page, page))
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    agency = _paginated_agency("https://e/gallande/?page={page}")
+    agency.params["no_archive"] = True
+    try:
+        list(harvest.paginated_enumerate(None, agency))
+    except ValueError as exc:
+        assert "no longer terminates" in str(exc)
+    else:
+        raise AssertionError("an endless pager must stop the walk")
+
+
+def test_paginated_enumerate_needs_a_named_page_parameter():
+    # a page_url with no {page} would page the archive at the bare listing url
+    agency = _paginated_agency("https://e/gallande/")
+    try:
+        list(harvest.paginated_enumerate(None, agency))
+    except AssertionError as exc:
+        assert "names no {page} parameter" in str(exc)
+    else:
+        raise AssertionError("a page_url without {page} must not pass")
+
+
 # --- magic-sniff: a non-PDF body is logged + counted, never silently dropped -
 
 def _agency_fffs():
@@ -504,6 +735,55 @@ def test_resolve_landing_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
     assert len(rejects) == 1
     assert any("non-PDF" in m for m in logs)
     assert not (tmp_path / "fffs" / "fffs-2013-10-regulation.pdf").exists()
+
+
+class _PdfResp:
+    """A landing page whose every PDF link serves a real PDF body."""
+    content = b"%PDF-1.4 body"
+
+    def __init__(self, text):
+        self.text = text
+
+
+def test_resolve_landing_lets_a_second_anchor_classify_the_same_href(
+        tmp_path, monkeypatch):
+    # Havs- och vattenmyndigheten hangs one PDF under two anchors: a generic
+    # "Ursprunglig utgåva" first and the one naming the document second.
+    # Marking the href seen on the anchor the classifier rejected left seven
+    # regulations unfetched.
+    page = ('<a href="/d/HVMFS-2017-20-ev.pdf">Ursprunglig utgåva pdf, 1.2 MB.</a>'
+            '<a href="/d/HVMFS-2017-20-ev.pdf">HVMFS 2017:20 pdf, 1.2 MB.</a>')
+    monkeypatch.setattr(harvest, "request", lambda *a, **kw: _PdfResp(page))
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    agency = harvest.Agency(fs="hvmfs", name="HaV", publisher="HaV",
+                            base_url="https://e", index_url="https://e/list",
+                            params={"pdf_select": 'a[href*="/d/"]'})
+    ref = DocRef(basefile="hvmfs/2017:20", identifier="HVMFS 2017:20",
+                 url="https://e/landing")
+    record = harvest.resolve_landing(None, agency, ref, str(tmp_path), delay=0)
+    assert record["files"]["regulation"]["url"] == "https://e/d/HVMFS-2017-20-ev.pdf"
+
+
+def test_resolve_landing_keeps_the_first_regulation_and_files_the_rest(
+        tmp_path, monkeypatch):
+    # SCB hangs the föreskrift first and its bilagor after it, each of which
+    # classify_single reads as another regulation. Overwriting the slot stored
+    # the last bilaga as the law.
+    page = ('<a href="/d/scb-fs-2016-7.pdf">Statistiska centralbyråns föreskrifter</a>'
+            '<a href="/d/scb-fs-2016-7-variabelforteckning.pdf">Variabelförteckning</a>')
+    monkeypatch.setattr(harvest, "request", lambda *a, **kw: _PdfResp(page))
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    agency = harvest.Agency(fs="scbfs", name="SCB", publisher="SCB",
+                            base_url="https://e", index_url="https://e/list",
+                            designation="SCB-FS",
+                            params={"pdf_select": 'a[href*="/d/"]',
+                                    "classify": classify_single})
+    ref = DocRef(basefile="scbfs/2016:7", identifier="SCB-FS 2016:7",
+                 url="https://e/landing")
+    record = harvest.resolve_landing(None, agency, ref, str(tmp_path), delay=0)
+    assert record["files"]["regulation"]["url"] == "https://e/d/scb-fs-2016-7.pdf"
+    assert [e["url"] for e in record["files"]["attachment"]] == \
+        ["https://e/d/scb-fs-2016-7-variabelforteckning.pdf"]
 
 
 def test_resolve_direct_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
@@ -688,6 +968,115 @@ def test_every_registered_samling_cites_itself_the_way_it_is_printed():
 
 # --- bespoke enumerators: the archive, and each row's own designation -------
 
+def _pages(monkeypatch, pages, asked=None):
+    """Serve `pages` (url -> HTML) to both modules, with no delays. The listing
+    walk fetches from `harvest`; an agency that reads a JSON API still fetches
+    from `agencies`."""
+    def fake_request(_session, _method, url, **_kwargs):
+        if asked is not None:
+            asked.append(url)
+        return SimpleNamespace(text=pages[url])
+
+    monkeypatch.setattr(agencies, "request", fake_request)
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _seconds: None)
+
+
+def test_index_soups_reads_the_listing_and_the_archive_it_links(monkeypatch):
+    # the listing an agency calls "gällande föreskrifter" is not the samling.
+    # Seven bespoke enumerators read only it, so ~800 repealed regulations --
+    # and the documents that repealed them -- were never fetched.
+    asked = []
+    _pages(monkeypatch, {"https://x.se/list": '<a href="/old/">Upphävda föreskrifter</a>',
+                         "https://x.se/old/": "<p>old</p>"}, asked)
+    agency = _Agency(base_url="https://x.se", index_url="https://x.se/list")
+    pages = list(harvest.index_soups(None, agency))
+    assert len(pages) == 2
+    assert asked == ["https://x.se/list", "https://x.se/old/"]
+    # the archive is followed from the listing only, never from itself
+    assert pages[1][1].get_text(strip=True) == "old"
+
+
+def test_index_soups_makes_a_skip_of_an_archive_page_that_will_not_fetch(monkeypatch):
+    # a 404 on the archive used to abort the agency mid-enumeration: the rows
+    # of the in-force listing were already enumerated and the walk ended with a
+    # traceback. A Skip keeps them and leaves the store dirty for the next run.
+    def fake_request(_session, _method, url, **_kwargs):
+        if url.endswith("/old/"):
+            raise requests.exceptions.HTTPError(
+                "404", response=SimpleNamespace(status_code=404))
+        return SimpleNamespace(text='<a href="/old/">Upphävda föreskrifter</a>')
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _seconds: None)
+    agency = _Agency(base_url="https://x.se", index_url="https://x.se/list")
+    pages = list(harvest.index_soups(None, agency))
+    assert len(pages) == 2
+    assert isinstance(pages[1], Skip) and "https://x.se/old/" in pages[1].reason
+
+
+def test_index_soups_raises_when_the_scopes_only_listing_is_gone(monkeypatch):
+    # nothing has been enumerated and the entry point itself answers 404: that
+    # is a changed site, not a hole to retry next run
+    def fake_request(_session, _method, _url, **_kwargs):
+        raise requests.exceptions.HTTPError(
+            "404", response=SimpleNamespace(status_code=404))
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    agency = _Agency(base_url="https://x.se", index_url="https://x.se/list")
+    try:
+        list(harvest.index_soups(None, agency))
+    except requests.exceptions.HTTPError:
+        pass
+    else:
+        raise AssertionError("a dead sole listing must not pass as a Skip")
+
+
+def test_uhrfs_enumerate_reads_the_upphavda_archive(monkeypatch):
+    # UHRFS 2013:2 is what our own UHRFS 2023:5 names as the föreskrift it
+    # repeals; it sits only on the archive page.
+    _pages(monkeypatch, {
+        agencies.UHRFS.index_url:
+            '<a href="/f/uhrfs-2026-4-om-x.pdf">Föreskrifter om ändring</a>'
+            '<a href="/upphavda/">Upphävda föreskrifter</a>',
+        "https://www.uhr.se/upphavda/":
+            '<a href="/f/uhrfs-2013-2-om-omradesbehorigheter.pdf">Områdesbehörigheter</a>'})
+    refs = list(agencies.uhrfs_enumerate(None, agencies.UHRFS))
+    assert [r.basefile for r in refs] == ["uhrfs/2026:4", "uhrfs/2013:2"]
+
+
+def test_prvfs_enumerate_reads_a_number_printed_with_a_space_after_the_colon(monkeypatch):
+    # A1 prints one row as "1977: 1, M:1". The space alone dropped PRVFS
+    # 1977:1, the act PRVFS 2023:1 names as the one it repeals. Avdelning C
+    # (upphävda författningar) holds 107 more the harvest never visited.
+    _pages(monkeypatch, {
+        agencies.PRVFS.index_url:
+            '<a href="/globalassets/dokument/om-prv/prvfs/77prvfs_m1.pdf">1977: 1, M:1</a>'
+            '<a href="/avdelning-c/">Avdelning C - Upphävda författningar</a>',
+        "https://www.prv.se/avdelning-c/":
+            '<a href="/globalassets/dokument/om-prv/prvfs/prvfs2015-1.pdf">2015:1, P:64</a>'})
+    refs = list(agencies.prvfs_enumerate(None, agencies.PRVFS))
+    assert [(r.basefile, r.identifier) for r in refs] == [
+        ("prvfs/1977:1", "PRVFS 1977:1"), ("prvfs/2015:1", "PRVFS 2015:1")]
+
+
+def test_last_designation_enumerate_reads_a_designation_only_the_filename_prints(monkeypatch):
+    # Pliktverket's archive rows carry the title as link text and the
+    # designation only in the PDF filename, so TRMFS 2017:2 and 2017:3 -- both
+    # named by TPPVFS 2024:1's own repeal clause -- were unreachable.
+    _pages(monkeypatch, {
+        agencies.TPPVFS.index_url:
+            '<a href="/download/18.a/TPPVFS 2024_1.pdf">Föreskrifter (TPPVFS 2024:1)</a>'
+            '<a href="/foreskrifter/upphavda-foreskrifter">Upphävda föreskrifter</a>',
+        "https://www.pliktverket.se/foreskrifter/upphavda-foreskrifter":
+            '<a href="/download/18.b/UPPH%C3%84VD_TRMFS%202017_2.pdf">'
+            'Föreskrifter och allmänna råd om förmåner</a>'})
+    refs = list(agencies.last_designation_enumerate(None, agencies.TPPVFS))
+    assert [(r.basefile, r.identifier, r.fs) for r in refs] == [
+        ("tppvfs/2024:1", "TPPVFS 2024:1", "tppvfs"),
+        ("trmfs/2017:2", "TRMFS 2017:2", "trmfs")]
+
+
 def test_bfs_enumerate_keeps_a_bostadsstyrelsen_act_under_its_own_series(monkeypatch):
     # Boverkets API lists two Bostadsstyrelsen acts under their own BOFS
     # designation. Stamping agency.fs on every row published them as BFS, a
@@ -733,6 +1122,136 @@ def test_memy_enumerate_files_a_row_under_the_number_it_claims_as_its_own(monkey
         ("mprtfs/2019:3", "MPRTFS 2019:3"),
         # the row prints no designation, so the filename names the series
         ("memyfs/2025:3", "MEMYFS 2025:3")]
+
+
+def test_pmfs_enumerate_reads_the_flat_template_and_the_upphavda_archive(monkeypatch):
+    # the listing renders a single-version family in either of two templates.
+    # The flat one has no .c-regulation__label, so 23 families were skipped by
+    # `continue`; the archive holds 88 repeal acts the in-force listing never
+    # shows again.
+    full = ('<li class="c-list__item">'
+            '<span class="c-regulation__label">PMFS 2026:18</span>'
+            '<span class="c-regulation__title">Föreskrifter om ordningsvakter</span>'
+            '<h4 class="c-regulation__subtitle">Grundförfattning</h4>'
+            '<a class="icon-document" href="/forfattningssamling/pmfs-2026-18.pdf">PMFS 2026:18</a>'
+            '</li>')
+    flat = ('<li class="c-list__item">'
+            '<a class="c-link icon-document" href="/forfattningssamling/pmfs-2024-10.pdf">'
+            'PMFS 2024:10 (pdf, 99 kB)</a></li>')
+    archive = ('<li class="c-list__item">'
+               '<a class="icon-document" href="/forfattningssamling/pmfs-2026-21.pdf">'
+               'PMFS 2026:21 om upphävande av RPSFS 2014:6</a></li>')
+    _pages(monkeypatch, {
+        "https://polisen.se/lagar-och-regler/polismyndighetens-forfattningssamling/1/":
+            full + flat + '<a href="/lagar-och-regler/pmfs---upphavda/">Upphävda</a>',
+        "https://polisen.se/lagar-och-regler/polismyndighetens-forfattningssamling/2/": "",
+        "https://polisen.se/lagar-och-regler/pmfs---upphavda/1/": archive,
+        "https://polisen.se/lagar-och-regler/pmfs---upphavda/2/": ""})
+    refs = list(agencies.pmfs_enumerate(None, agencies.PMFS))
+    assert [r.identifier for r in refs] == [
+        "PMFS 2026:18", "PMFS 2024:10", "PMFS 2026:21"]
+    # the flat template's sole link is the regulation, not a reference
+    assert refs[1].extra["regulation_url"].endswith("pmfs-2024-10.pdf")
+
+
+def test_stafs_and_stemfs_select_the_rows_of_their_archive_page():
+    # the archive keeps its rows under its own path (swedac) or drops the
+    # data-headline attributes (Energimyndigheten); the in-force selector read
+    # neither, so following the archive returned nothing.
+    archive = BeautifulSoup(
+        '<a href="/foreskrifter/swedac/upphavda/stafs-2019-4.html">STAFS 2019:4</a>'
+        '<a href="/foreskrifter/swedac/stafs-2018-7.html">STAFS 2018:7</a>', "html.parser")
+    assert len(archive.select(agencies.STAFS.params["link_select"])) == 2
+    stemfs = BeautifulSoup(
+        '<div class="fake-tr"><div class="fake-td"><a href="/f/stemfs-2005-4">'
+        'STEMFS 2005:4</a></div><div class="fake-td"><a href="/x">Ändrad</a></div></div>',
+        "html.parser")
+    rows = stemfs.select(agencies.STEMFS.params["link_select"])
+    assert [a.get_text(strip=True) for a in rows] == ["STEMFS 2005:4"]
+
+
+def test_afs_iaf_and_myh_enumerate_read_their_archive_of_repealed_regulations(monkeypatch):
+    # AFS 2001:1, IAFFS 2018:3 and MYHFS 2014:1 are each named by a document we
+    # already hold as the regulation it repeals, and each sits only on its
+    # agency's archive page.
+    _pages(monkeypatch, {
+        agencies.AFS.index_url:
+            '<a href="/publikationer/foreskrifter/afs-20231/">Systematiskt arbetsmiljöarbete</a>'
+            '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/">Upphävda föreskrifter</a>',
+        "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/":
+            '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/afs-20011/">'
+            'Systematiskt arbetsmiljöarbete (AFS 2001:1)</a>'})
+    refs = list(agencies.afs_enumerate(None, agencies.AFS))
+    assert [r.identifier for r in refs] == ["AFS 2023:1", "AFS 2001:1"]
+    assert refs[1].url.endswith("/afs-20011/forfattningshistorik-afs-20011/")
+
+    _pages(monkeypatch, {
+        agencies.IAFFS.index_url:
+            '<a href="/lag-ratt/foreskrifter/iaffs-20253/">IAFFS 2025:3</a>'
+            '<a href="/lag-ratt/foreskrifter/upphavda-foreskrifter/">Upphävda föreskrifter</a>',
+        "https://www.iaf.se/lag-ratt/foreskrifter/upphavda-foreskrifter/":
+            '<a href="/lag-ratt/foreskrifter/upphavda-foreskrifter/iaffs-20183/">'
+            'IAFFS 2018:3</a>'})
+    assert [r.identifier for r in agencies.iaf_enumerate(None, agencies.IAFFS)] == [
+        "IAFFS 2025:3", "IAFFS 2018:3"]
+
+    _pages(monkeypatch, {
+        agencies.MYHFS.index_url:
+            '<a href="https://assets.myh.se/docs/myhfs-2026-5.pdf">MYHFS 2026:5</a>'
+            '<a href="/lag-och-ratt/upphavda-foreskrifter-och-allmanna-rad">Upphävda</a>',
+        "https://www.myh.se/lag-och-ratt/upphavda-foreskrifter-och-allmanna-rad":
+            '<a href="https://assets.myh.se/docs/myhfs-2014-1.pdf">MYHFS 2014:1</a>'})
+    assert [r.identifier for r in agencies.myh_enumerate(None, agencies.MYHFS)] == [
+        "MYHFS 2026:5", "MYHFS 2014:1"]
+
+
+def test_ts_classify_reads_every_separator_transportstyrelsen_prints():
+    # Transportstyrelsen separates the year from the number with a space, an
+    # underscore or a hyphen, and marks the konsoliderad text "…113k" or
+    # "…113_k". Reading only the underscore form lost 136 of 2,450 linked PDFs.
+    base = ("tsfs", "2012", "113")
+    assert agencies.ts_classify(anchor('<a href="/TSFS/TSFS 2012_113.pdf">g</a>'),
+                                *base) == ("regulation", "2012", "113")
+    assert agencies.ts_classify(anchor('<a href="/TSFS/TSFS 2012_113k.pdf">k</a>'),
+                                *base) == ("consolidation", "2012", "113")
+    assert agencies.ts_classify(anchor('<a href="/TSFS/TSFS 2012_113_k.pdf">k</a>'),
+                                *base) == ("consolidation", "2012", "113")
+    # the hyphen form, which a document whose only regulation link is
+    # hyphenated needs for any content at all
+    assert agencies.ts_classify(anchor('<a href="/TSFS/TVFS 2025-3.pdf">g</a>'),
+                                "tvfs", "2025", "3") == ("regulation", "2025", "3")
+    # …and the same name as the store holds it, percent-encoded: read raw it
+    # names no number at all
+    assert agencies.ts_classify(anchor('<a href="/TSFS/TVFS%202025-3.pdf">g</a>'),
+                                "tvfs", "2025", "3") == ("regulation", "2025", "3")
+    # a predecessor samling's file on a TSFS base page is an amendment
+    assert agencies.ts_classify(anchor('<a href="/TSFS/jvsfs_2008_3.pdf">a</a>'),
+                                *base) == ("amendment", "2008", "3")
+    # a file whose name names no number is not a document
+    assert agencies.ts_classify(anchor('<a href="/TSFS/bilaga.pdf">b</a>'), *base) is None
+
+
+def test_ffs_enumerate_drops_a_variant_row_that_shares_a_number(monkeypatch):
+    # Försvarsmaktens listing carries a konsoliderad text and a rättelseblad
+    # under the document's own number, and `ref` keeps whichever row comes
+    # first -- which stored the konsoliderad text as FFS 2019:3 and the
+    # rättelse as FFS 2021:2 instead of the law. The review measured the live
+    # API: 134 rows, 131 plain numbers, 1 variant, and no variant without a
+    # plain row for the same number, so dropping the variant loses nothing.
+    rows = [{"name": "FFS 2019:3 Konsoliderad", "url": "/f/ffs-2019-03-kons.pdf",
+             "preamble": "konsoliderad"},
+            {"name": "FFS 2019:3", "url": "/f/ffs-2019-03.pdf", "preamble": "grund"},
+            {"name": "Rättelseblad FFS 2021:2", "url": "/f/ffs-2021-02-rat.pdf",
+             "preamble": "rättelse"},
+            {"name": "FFS 2021:2", "url": "/f/ffs-2021-02.pdf", "preamble": "grund"},
+            {"name": "FIB 2020:1", "url": "/f/fib-2020-01.pdf", "preamble": "intern"}]
+    monkeypatch.setattr(agencies, "request",
+                        lambda _s, _m, _url, **_kw: {"documentInfo": rows})
+    agency = replace(agencies.FFS,
+                     params={"api_url": "https://x/%s", "page_ids": ["1"]})
+    refs = list(agencies.ffs_enumerate(None, agency))
+    assert [(r.identifier, r.extra["regulation_url"].rsplit("/", 1)[-1]) for r in refs] == [
+        ("FFS 2019:3", "ffs-2019-03.pdf"), ("FFS 2021:2", "ffs-2021-02.pdf")]
 
 
 def test_fi_enumerate_routes_the_bankinspektionen_act_off_the_rows_own_words(monkeypatch):

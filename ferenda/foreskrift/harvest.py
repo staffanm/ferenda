@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urljoin
+from urllib.parse import unquote, urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -189,19 +189,25 @@ RE_OTHERS_NEXT = re.compile(r"ändring(?:ar)?\s+(?:i|av)\b|upphäv(?:ande\s+av|s
 # and what says the opposite -- an omtryck's row names the base it reprints
 # first and its own number last ("TVFS 2015:1 omtryckt genom … TVFS 2019:1")
 RE_OWN_NEXT = re.compile(r"omtryck(?:t|et)?\s+(?:genom|av)\b", re.IGNORECASE)
-# a filename slug's number ("rgkfs_2015_2.pdf"). Anchored on a year, so an
-# opaque id cannot supply one: Integritetsskyddsmyndigheten's links are
-# "/link/<uuid>.aspx", whose hex digits minted the document "IMYFS 0008:2".
-RE_SLUG_NUMBER = re.compile(r"[a-zåäö]+[-_ ]?((?:19|20)\d{2})[-_ ]?(\d{1,3})(?:\D|$)",
-                            re.IGNORECASE)
+# a filename slug's number ("rgkfs_2015_2.pdf"). Anchored on a year *and* on a
+# name boundary, so an opaque id cannot supply one: Integritetsskyddsmyndigheten's
+# links are "/link/<uuid>.aspx", whose hex digits minted "IMYFS 0008:2" and, read
+# mid-string, "IMYFS 2014:89". Every one of the 14,738 stored filenames still reads.
+RE_SLUG_NUMBER = re.compile(
+    r"(?:^|[-_/ ])[a-zåäö]+[-_ ]?((?:19|20)\d{2})[-_ ]?(\d{1,3})(?:\D|$)",
+    re.IGNORECASE)
 # a bare number in a row that prints no designation at all
 RE_COLON_NUMBER = re.compile(r"\b(\d{4}):(\d+)\b")
 # the list 18 c § författningssamlingsförordningen has an agency publish. It is
 # a catalogue of the samling, not a document in it, and its filename carries a
 # date a slug regex reads as a number (Konsumentverket's "...2021-01.pdf" was
-# harvested as the regulation KOVFS 2021:1, hiding the real one).
+# harvested as the regulation KOVFS 2021:1, hiding the real one). Each agency
+# names the list its own way: most print "förteckning över gällande
+# föreskrifter", Konsumentverket "Samtliga publikationer i Konsumentverkets
+# författningssamling (KOVFS)".
 RE_FORTECKNING_ROW = re.compile(
-    r"f[öo]\s?rteckning(?:en|ar)?\s+över\s+(?:gällande\s+)?(?:föreskrifter|författningar)",
+    r"f[öo]\s?rteckning(?:en|ar)?\s+över\s+(?:gällande\s+)?(?:föreskrifter|författningar)"
+    r"|samtliga\s+(?:publikationer|föreskrifter|författningar)\s+i\b",
     re.IGNORECASE)
 
 
@@ -263,6 +269,27 @@ def absolute(base_url, href):
     return urljoin(base_url + "/" if not base_url.endswith("/") else base_url, href)
 
 
+def filename(href):
+    """The file's own name in a link: percent-decoded first, then cut at the
+    last "/" and at the query string. The one reader of an href's name -- a
+    role rule, a number slug and a designation all ask for it.
+
+    Decoding comes first because a publisher escapes the separator as well as
+    the vowel ("rafs%2FRA-FS%201997-04.pdf"): split raw, the name is the whole
+    path. Of the 13,450 stored regulation URLs, 668 carry a name that reads
+    differently once decoded, and 510 of those read a different number through
+    :data:`RE_SLUG_NUMBER` -- "MTFS%202016-2%20…", "UPPH%C3%84VD_TRMFS%202017_2.pdf"
+    and "TVFS%202025-3.pdf" name no number raw and the right one decoded. Over
+    every role the count is 792 of 21,633 URLs.
+
+    The query goes because it carries digits of its own that a slug pattern
+    reads as a number (SSMFS's ``?searchQuery=``). The two document stores that
+    put the file's name *in* the query instead (a-w2m's ``&fn=``, Sametinget's
+    ``?file_id=``) are resolved straight from the listing, so no role rule or
+    number slug reads one of their names."""
+    return unquote(href).rsplit("/", 1)[-1].split("?")[0]
+
+
 # --------------------------------------------------------------------------
 # file-role classification (shared Swedish-convention rules)
 # --------------------------------------------------------------------------
@@ -282,9 +309,39 @@ def absolute(base_url, href):
 #   attachment     anvisning / blankett / bilaga
 # "konsol", not "konsolider": Swedac's filenames abbreviate ("stafs-2022-9-konsol.pdf")
 RE_KONSOLIDERAD = re.compile(r"konsol", re.IGNORECASE)
-RE_MEMO = re.compile(r"beslutsprom|besluts-?pm|konsekvensutredning", re.IGNORECASE)
-RE_ATTACHMENT = re.compile(r"anvisning|blankett|bilaga|mall|vägledning", re.IGNORECASE)
+RE_MEMO = re.compile(r"beslutsprom|besluts-?pm|konsekvensutred|remissammanst",
+                     re.IGNORECASE)
+# A companion is what a landing page hangs *beside* the regulation: a
+# correction sheet, guidance, a form, a help document. Each is about the
+# regulation, none is its text. Both spellings of the Swedish vowels are
+# listed because a filename usually drops them ("rattelseblad", "vagledning").
+# "rattelse" starts a word: unanchored it also reads "underrättelse", and a
+# regulation classified as a companion is neither fetched nor recorded as a
+# reference. Five stored regulations name one in their file -- affs/2021:1,
+# agvfs/2026:1, agvfs/2026:3, hslffs/2015:9, kamfs/2013:4. The other words are
+# safe unanchored: over 22,866 stored file rows only "anvisning" matches inside
+# another word, in "samordnad lägesanvisning" (MCFFS 1989:1) -- which is an
+# anvisning, so the row is a companion either way.
+RE_ATTACHMENT = re.compile(r"anvisning|blankett|bilaga|mall|v[äa]gledning"
+                           r"|guideline|\br[äa]ttelse|hj[äa]lpdokument|\bfaq\b",
+                           re.IGNORECASE)
 RE_FS_NUMBER = re.compile(r"\b([A-ZÅÄÖ-]+FS)\s*(\d{4}):(\d+)", re.IGNORECASE)
+# "ändring" in a filename. Unaccented too: half the publishers fold the vowel.
+RE_ANDRING = re.compile(r"\b[aä]ndring", re.IGNORECASE)
+
+
+def link_words(a):
+    """One link's words for a role rule: the anchor's own text followed by the
+    file's name.
+
+    Which of the two names a companion file is the publisher's choice, not a
+    rule: Finansinspektionen says it in the text ("Rättelseblad FFFS 2017:11"),
+    Havs- och vattenmyndigheten only in the name ("HVMFS 2018-1-ev Rättelseblad
+    till tryck.pdf") under a link text identical to the regulation's. Reading
+    one of the two stored a correction sheet as the law. The href is
+    percent-decoded first -- an escaped "ä" hid the "ändring" in every EIFS
+    filename."""
+    return "%s %s" % (a.get_text(" ", strip=True), filename(a.get("href", "")))
 
 
 def _own_number(text, fs):
@@ -296,14 +353,16 @@ def _own_number(text, fs):
 
 
 def classify_file(a, fs, base_ars, base_lop):
-    """Text-based classifier (FFFS, SSMFS): role + number from the link text."""
+    """Text-based classifier (FFFS, SSMFS): role + number from the link text.
+    The companion roles also read the file's own name (:func:`link_words`)."""
     text = a.get_text(" ", strip=True)
+    words = link_words(a)
     ars, lop = _own_number(text, fs)
-    if RE_MEMO.search(text):
+    if RE_MEMO.search(words):
         return ("memo", ars, lop)
     if RE_KONSOLIDERAD.search(text):
         return ("consolidation", ars or base_ars, lop or base_lop)
-    if RE_ATTACHMENT.search(text):
+    if RE_ATTACHMENT.search(words):
         return ("attachment", ars, lop)
     if ars is None:
         return None
@@ -312,10 +371,12 @@ def classify_file(a, fs, base_ars, base_lop):
 
 def classify_section(a, fs, base_ars, base_lop):
     """Heading-based classifier (KIFS, Sitevision): role from the nearest
-    preceding <h2>/<h3>, the file's number from the link text."""
+    preceding <h2>/<h3>, the file's number from the link text. The companion
+    roles also read the file's own name (:func:`link_words`)."""
     text = a.get_text(" ", strip=True)
+    words = link_words(a)
     ars, lop = _own_number(text, fs)
-    if RE_MEMO.search(text):
+    if RE_MEMO.search(words):
         return ("memo", ars, lop)
     head = a.find_previous(["h2", "h3"])
     head = head.get_text(" ", strip=True).lower() if head else ""
@@ -325,34 +386,65 @@ def classify_section(a, fs, base_ars, base_lop):
         return ("regulation", base_ars, base_lop)
     if "ändring" in head:
         return ("amendment", ars, lop) if ars else None
-    if RE_ATTACHMENT.search(text):
+    if RE_ATTACHMENT.search(words):
         return ("attachment", ars, lop)
     return None
 
 
 def classify_href(a, fs, base_ars, base_lop):
     """Filename-based classifier (NFS, ELSÄK-FS, PTSFS): role + number from the
-    PDF href slug (``nfs-2014-29.pdf``, ``…-konsoliderad.pdf``, ``andring-…``)."""
-    href = a.get("href", "").lower()
-    name = href.rsplit("/", 1)[-1]
+    PDF href slug (``nfs-2014-29.pdf``, ``…-konsoliderad.pdf``, ``andring-…``).
+
+    The href is percent-decoded before it is read: Energimarknadsinspektionen
+    escapes the vowel, and "EIFS-om-%C3%A4ndring-av-EIFS-2015-4.pdf" matched no
+    "ändring" at all, so an amending act was stored as EIFS 2015:4's own text."""
+    href = unquote(a.get("href", "")).lower()
+    name = filename(a.get("href", "")).lower()
     m = RE_SLUG_NUMBER.search(name)
-    if "konsekvensutred" in href:                 # impact assessment, not the law
+    # a companion the page hangs beside the law -- an impact assessment, a
+    # vägledning, a rättelseblad. The companion words are read from the file's
+    # own name and the link's text, never from the path: Spelinspektionen
+    # serves every regulation out of /foreskrifter-och-vagledning/, and a path
+    # rule would reject the whole scope. "konsekvensutred" is the exception --
+    # it is read from the whole href, because Post- och telestyrelsen files an
+    # impact assessment under /konsekvensutredningar/ and gives it the
+    # regulation's own name
+    words = link_words(a)
+    if RE_MEMO.search(words) or RE_ATTACHMENT.search(words) \
+            or "konsekvensutred" in href:
         return None
     if RE_KONSOLIDERAD.search(href):              # incl. Swedac's '-konsol' abbreviation
         return ("consolidation", base_ars, base_lop)
     if not m:
         return None
     ars, lop = m.group(1), str(int(m.group(2)))
-    if re.search(r"\bandring|\bändring", name):
+    # Naturvårdsverket marks its konsoliderade texter with a "k" after the
+    # number ("snfs-1987-12k.pdf", "nfs-2018-5-k.pdf"), the same convention
+    # Transportstyrelsen uses. 34 stored NFS documents hang such a file (ten
+    # distinct texts -- one konsolidering serves several base regulations);
+    # without this rule each is read as a plain number, which stored the
+    # konsoliderad text of NFS 1987:13 as that regulation's own text
+    if re.match(r"-?k(?![a-zåäö])", name[m.end(2):]):
+        return ("consolidation", base_ars, base_lop)
+    # "ändring" *before* the number names the document the file amends
+    # ("andring-nfs-2014-29.pdf" on NFS 2014:29's page). After it, the word is
+    # part of this document's own title, and the file is its own text
+    # ("sifs-2023_1-foreskrift-om-andring-i-sifs-2020_2-...pdf")
+    andring = RE_ANDRING.search(name)
+    if andring and andring.start() < m.start():
         return ("amendment", ars, lop)
     return (("regulation" if (ars, lop) == (base_ars, base_lop) else "amendment"), ars, lop)
 
 
 def classify_single(a, fs, base_ars, base_lop):
-    """Trivial classifier for landing pages that hang exactly the base
-    regulation's PDF (no per-file type signal); every kept file is the
-    regulation. Used where the type axis lives on the index, not the landing
-    (STEMFS)."""
+    """Trivial classifier for landing pages that hang the base regulation's PDF
+    under no per-file type signal; every kept file is the regulation. Used where
+    the type axis lives on the index, not the landing (STEMFS).
+
+    "Exactly one PDF" is the assumption, not a guarantee: SCB hangs the
+    regulation first and its bilagor after it ("Variabelförteckning …",
+    "Varukoder"), each of which this reads as another regulation.
+    :func:`resolve_landing` keeps the first of them, which is the law."""
     return ("regulation", base_ars, base_lop)
 
 
@@ -365,12 +457,13 @@ def classify_default_regulation(a, fs, base_ars, base_lop):
     Safe only where a landing hangs the one regulation plus, at most, keyworded
     companions (MSBFS: regulation + 'Konsekvensutredning')."""
     text = a.get_text(" ", strip=True)
-    if RE_MEMO.search(text):
+    words = link_words(a)
+    if RE_MEMO.search(words):
         return ("memo", *_own_number(text, fs))
     if RE_KONSOLIDERAD.search(text):
         ars, lop = _own_number(text, fs)
         return ("consolidation", ars or base_ars, lop or base_lop)
-    if RE_ATTACHMENT.search(text):
+    if RE_ATTACHMENT.search(words):
         return ("attachment", *_own_number(text, fs))
     return ("regulation", base_ars, base_lop)
 
@@ -459,6 +552,19 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
     ``rejects`` is given) counted -- never silently dropped while the record is
     still written, which used to mask the document with zero trace.
 
+    Two rules keep a companion file out of the ``regulation`` slot, both learned
+    from pages that had put one there:
+
+      * a link the classifier rejects does not claim its href. Havs- och
+        vattenmyndigheten hangs one PDF under two anchors, the generic one
+        ("Ursprunglig utgåva") first and the one naming the document
+        ("HVMFS 2017:20") second; marking the href seen on the first left seven
+        regulations unfetched.
+      * the first regulation-role PDF on the page is the document's text. A
+        later one is a companion the classifier could not name -- SCB's
+        bilagor, Arbetsmiljöverkets rättelsesidor -- and is recorded as an
+        attachment reference instead of overwriting the law.
+
     Returns the stored record (also written to disk)."""
     fs = ref.fs or agency.fs     # the document's own samling (see DocRef.fs)
     arsutgava, lopnummer = ref.basefile.split("/", 1)[1].split(":")
@@ -474,12 +580,14 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
         href = a.get("href")
         if not href or href in seen:
             continue
-        seen.add(href)
         assert isinstance(href, str)
         result = classify(a, fs, arsutgava, lopnummer)
         if result is None:
             continue
+        seen.add(href)
         role, ars, lop = result
+        if role == "regulation" and files["regulation"] is not None:
+            role = "attachment"
         # the printed designation when the link names one: a landing page can
         # hang another series' documents (an SLVFS base amended by LIVSFS, MSBFS
         # hosting SÄIFS), and "SLVFS 2016:9" for LIVSFS 2016:9 would mint a
@@ -588,7 +696,7 @@ def ref(agency, ident_text, href, seen, title=None, direct=False):
     if RE_FORTECKNING_ROW.search(ident_text):
         return None
     own = own_designation(ident_text)
-    slugm = RE_SLUG_NUMBER.search(href.rsplit("/", 1)[-1].split("?")[0]) if direct else None
+    slugm = RE_SLUG_NUMBER.search(filename(href)) if direct else None
     designation = None
     if slugm and agency.params.get("number_from_slug"):
         arsutgava, lopnummer = slugm.group(1), str(int(slugm.group(2)))
@@ -668,14 +776,25 @@ def newest_first(refs):
 
 # What an agency calls the rest of its samling. Thirteen scopes publish their
 # repealed regulations on a second page, linked from the listing the harvest
-# reads, and never enumerated: 177 documents for MCF, 107 for PRV, 66 for IAF.
-# The repeal that ended a regulation lives on that page, so the gap took the
-# repeal relations with it.
+# reads. Until this rule followed that link none of those pages was enumerated:
+# 245 documents for MCF, 107 for PRV, 66 for IAF. The repeal that ended a
+# regulation lives on that page, so the gap took the repeal relations with it.
+# A full walk delivers them, not an incremental run -- see `archive_links`.
 RE_ARCHIVE_LINK = re.compile(
     r"upphävd|upphäva|upphörd|upphört|tidigare\s+(?:föreskrifter|regler|författningar)"
     r"|äldre\s+(?:föreskrifter|regler|författningar)|historiska\s+föreskrifter", re.I)
 #: at most this many archive pages are followed from one listing
 ARCHIVE_MAX = 3
+
+# The query parameter a paged listing takes its page number in ("?page=N",
+# MCF's "?sortOrder=…&selectedpage=N"). The archive of repealed regulations is
+# the same listing, so it pages the same way. Hardcoding "page" on a site that
+# calls it something else asks for page 1 forever: MCF answers "?page=2" with
+# the rows of page 1. That used to spin the walk at one request per half second
+# -- two `--force` runs of mcffs cost 56 and 14 minutes and wrote nothing --
+# and now reads as the end of the listing, which is quieter and just as wrong:
+# one page of eleven. So the parameter is read off page_url, never assumed.
+RE_PAGE_PARAM = re.compile(r"[?&]([A-Za-z_]+)=\{page\}")
 
 
 def archive_links(soup, agency):
@@ -687,7 +806,17 @@ def archive_links(soup, agency):
     thirteen scopes nobody had. Bounded to `ARCHIVE_MAX` pages on the agency's
     own host, and read with the scope's own ``link_select`` -- an archive page
     is the same listing with older rows. ``params["no_archive"]`` opts out for
-    an agency whose "upphävda" link is prose rather than a listing."""
+    an agency whose "upphävda" link is prose rather than a listing.
+
+    **A full walk reaches these pages; an incremental run does not.** The
+    archive is queued behind the in-force listing, and
+    :meth:`lib.harvest.HarvestWatermark.should_stop` ends the walk at the first
+    row that is old and already held -- which the in-force listing supplies
+    long before the queue reaches the archive. A real incremental `stafs`
+    harvest makes one request, sees five items and stops. So the repealed
+    regulations arrive on a first harvest, on ``--force``, and on the periodic
+    ``--force`` run scheduled for exactly this reason. Every docstring below
+    that says the archive "is walked" means under that condition."""
     if agency.params.get("no_archive"):
         return []
     host = agency.base_url.split("//")[-1].split("/")[0]
@@ -699,6 +828,93 @@ def archive_links(soup, agency):
         if host in url and url not in out:
             out.append(url)
     return out[:ARCHIVE_MAX]
+
+
+#: how many pages one paged listing may name before the walk calls it broken.
+#: The largest real listing is MCF's archive of repealed regulations: 245
+#: documents over 25 pages. A pager that runs past this cap is a changed site,
+#: not a large samling.
+PAGE_CAP = 100
+
+
+def index_soups(session, agency, urls=None, *, method="GET", data=None,
+                optional=False, delay=0.3, form=None, rows=None, cap=PAGE_CAP):
+    """Every listing page of one scope, newest first, as ``(listing, soup)``
+    pairs -- or a :class:`Skip` in place of a page that would not fetch.
+
+    `urls` seeds the queue (the scope's ``index_url`` by default; a per-year
+    index passes its own list). After the first page the queue grows once, by
+    the archive of repealed regulations that page links
+    (:func:`archive_links`), each link passed through `form` -- a paged caller
+    appends its own page parameter there. The queue is deduped, so a listing
+    that links its archive twice is walked once. An incremental run stops at
+    the in-force listing and never reaches the queued archive; a first harvest
+    and a ``--force`` run do (:func:`archive_links`).
+
+    `rows` marks the listing paged: it reads one soup into that page's row
+    keys, and the queue entries carry ``{page}`` for the 1-based page number.
+    The walk takes the next page while the last one named a row it had not seen
+    -- the rule :func:`lib.harvest.paginated` states for a view read whole. A
+    page that names only rows already seen ends the listing, and after `cap`
+    pages the walk raises: a pager that never repeats itself no longer
+    terminates (rule:errors-drive-retry-use-raise).
+
+    A page that will not fetch becomes a ``Skip``, which leaves the store dirty
+    for the next run and keeps the other queued listings walkable. The one
+    exception is a scope that has served no page at all and names one listing:
+    nothing has been enumerated and the entry point itself is gone, which is a
+    real break. `optional` marks a per-year index where a year with no
+    regulations simply 404s -- that page is neither an error nor a Skip."""
+    queue = list(urls or [agency.index_url])
+    seeds = len(queue)
+    served = False
+    for base in queue:
+        listed: set = set()
+        for page in range(1, cap + 1):
+            url = base.format(page=page) if rows else base
+            try:
+                body = request(session, method, url, data=data).text
+            except requests.exceptions.RequestException as exc:
+                if optional and is_not_found(exc):
+                    break                  # a year with no regulations -- no page
+                if len(queue) == 1 and not served:
+                    raise                  # the scope's only listing -- a real break
+                yield Skip("%s: %r" % (url, exc))
+                break
+            soup = BeautifulSoup(body, "html.parser")
+            if len(queue) == seeds:        # nothing followed yet -- read this page
+                for link in archive_links(soup, agency):
+                    listing = form(link) if form else link
+                    if listing not in queue:
+                        queue.append(listing)
+            served = True
+            yield base, soup
+            time.sleep(delay)
+            if rows is None:
+                break
+            fresh = [key for key in rows(soup) if key not in listed]
+            if not fresh:
+                break                      # walked past the last page
+            listed.update(fresh)
+        else:
+            raise ValueError("%s: %s still named new rows after %d pages -- the "
+                             "listing no longer terminates" % (agency.fs, base, cap))
+
+
+def index_refs(session, agency, page_refs, **kwargs):
+    """One scope's DocRefs over :func:`index_soups`: `page_refs(soup)` reads one
+    listing page into this scope's DocRefs, and the ``Skip`` that stands for a
+    page which would not fetch passes through to :func:`lib.harvest.walk`.
+
+    The one walk of an agency's listing plus its archive. Four copies of it had
+    drifted apart -- one deduped the queue, one turned a failed page into a
+    Skip, one normalised a trailing slash -- so an archive page that 404s ended
+    one scope's enumeration and was a recorded hole in the next."""
+    for item in index_soups(session, agency, **kwargs):
+        if isinstance(item, Skip):
+            yield item
+        else:
+            yield from page_refs(item[1])
 
 
 def indexed_enumerate(session, agency):
@@ -713,80 +929,64 @@ def indexed_enumerate(session, agency):
 
     The listing an agency calls "gällande föreskrifter" is not the samling: the
     regulations it has repealed sit on a second page, and so do the documents
-    that repealed them. Those pages are followed from the index rather than
-    listed per agency, because a scope only names one after someone notices it
-    is missing."""
+    that repealed them. :func:`index_soups` follows that page from the index
+    rather than reading it out of per-agency params, because a scope only names
+    one after someone notices it is missing. A full walk reaches it, an
+    incremental run does not (:func:`archive_links`)."""
     p = agency.params
     direct = p.get("direct", False)
     skip = re.compile(p["skip_re"]) if p.get("skip_re") else None
-    method = "POST" if p.get("post_data") else "GET"      # some "show all" lists POST
     seen = set()
-    queue = list(p.get("index_urls", [agency.index_url]))
-    multi = len(queue) > 1
-    archives_from = len(queue)      # pages past this point are followed archives
-    for url in queue:
-        try:
-            response = request(session, method, url, data=p.get("post_data"))
-        except requests.exceptions.HTTPError as exc:
-            if p.get("optional_pages") and is_not_found(exc):
-                continue                       # a year with no regulations -- no page
-            if multi:                          # one bad page in a per-year index
-                yield Skip("%s: %r" % (url, exc))
-                continue
-            raise                              # the sole index page -- a real break
-        except requests.exceptions.RequestException as exc:
-            if multi:
-                yield Skip("%s: %r" % (url, exc))
-                continue
-            raise
-        soup = BeautifulSoup(response.text, "html.parser")
-        if len(queue) == archives_from:        # from the listing itself, once
-            queue += [u for u in archive_links(soup, agency) if u not in queue]
-            multi = multi or len(queue) > archives_from
+
+    def page_refs(soup):
         for a in soup.select(p["link_select"]):
             text = a.get_text(" ", strip=True)
             if skip and skip.search(text):
                 continue
             docref = ref(agency, text, a.get("href", ""), seen,
-                          title=text if direct else None, direct=direct)
+                         title=text if direct else None, direct=direct)
             if docref:
                 yield docref
-        time.sleep(0.3)
+
+    return index_refs(session, agency, page_refs,
+                      urls=p.get("index_urls", [agency.index_url]),
+                      method="POST" if p.get("post_data") else "GET",
+                      data=p.get("post_data"),
+                      optional=p.get("optional_pages", False))
 
 
 def paginated_enumerate(session, agency):
-    """The index is paged HTML at ``page_url.format(page=N)`` (newest-first);
-    walk until a page yields no rows. params: ``page_url``, ``row_select``,
-    ``no_archive`` (:func:`archive_links`).
+    """The index is paged HTML at ``page_url.format(page=N)`` (newest-first).
+    params: ``page_url``, ``row_select``, ``no_archive``
+    (:func:`archive_links`).
 
     The archive of repealed regulations the first page links is walked the same
-    way, page by page: MCF's "gällande regler" is 10 documents and its
-    "upphävda regler" 177."""
+    way on a full walk, page by page and under the listing's own page parameter
+    (:data:`RE_PAGE_PARAM`): MCF's "gällande regler" is 99 documents over 11
+    pages and its "upphävda regler" 245. An incremental run stops in the
+    in-force listing and never reaches it (:func:`archive_links`).
+
+    Where the listing ends, and what a listing that ignores its page parameter
+    does, are :func:`index_soups`'s rules: the walk takes the next page while
+    the last one named a row it had not seen, and raises past
+    :data:`PAGE_CAP` pages."""
+    param = RE_PAGE_PARAM.search(agency.params["page_url"])
+    assert param, "%s: page_url names no {page} parameter" % agency.fs
+    row_select = agency.params["row_select"]
     seen = set()
-    queue = [agency.params["page_url"]]
-    followed = False
-    for base in queue:                       # grows once, from the first page
-        page = 1
-        while True:
-            try:
-                response = request(session, "GET", base.format(page=page))
-            except requests.exceptions.RequestException as exc:
-                yield Skip("page %d: %r" % (page, exc))   # cannot trust paging past it
-                break
-            soup = BeautifulSoup(response.text, "html.parser")
-            if not followed:
-                followed = True
-                queue += [u + ("&page={page}" if "?" in u else "?page={page}")
-                          for u in archive_links(soup, agency)]
-            rows = soup.select(agency.params["row_select"])
-            if not rows:
-                break
-            for a in rows:
-                docref = ref(agency, a.get_text(" ", strip=True), a.get("href", ""), seen)
-                if docref:
-                    yield docref
-            page += 1
-            time.sleep(0.5)
+
+    def page_refs(soup):
+        for a in soup.select(row_select):
+            docref = ref(agency, a.get_text(" ", strip=True), a.get("href", ""), seen)
+            if docref:
+                yield docref
+
+    return index_refs(
+        session, agency, page_refs, urls=[agency.params["page_url"]], delay=0.5,
+        form=lambda u: u + ("&" if "?" in u else "?") + "%s={page}" % param.group(1),
+        # the row's stable identity, which is what tells a fresh page from one
+        # the site served again under a page number it ignored
+        rows=lambda soup: [a.get("href", "") for a in soup.select(row_select)])
 
 
 def json_enumerate(session, agency):

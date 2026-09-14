@@ -46,18 +46,19 @@ from collections import defaultdict
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, util
-from ..lib.harvest import write_record
+from ..lib.harvest import Skip, write_record
 from ..lib.net import BROWSER_UA, is_not_found, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
 from . import harvest, hslffs, mtfs, skvfs, statskontoret
 from .harvest import (
+    RE_FILE_DESIGNATION,
     Agency,
     DocRef,
     classify_default_regulation,
@@ -402,7 +403,12 @@ STEMFS = Agency(
     base_url="https://www.energimyndigheten.se",
     index_url="https://www.energimyndigheten.se/om-oss/foreskrifter/",
     enumerate=indexed_enumerate, resolve=resolve_landing,
-    params={"link_select": 'div.fake-td[data-headline="Nummer"] a',
+    # the archive of repealed föreskrifter the gällande page links reuses the
+    # same fake-table markup *without* the data-headline attributes, so the
+    # number column is selected by position there. 44 STEMFS and 4 NUTFS
+    # designations sit only on that page.
+    params={"link_select": 'div.fake-td[data-headline="Nummer"] a,'
+                           ' div.fake-tr div.fake-td:first-child a',
             "pdf_select": 'a.link-download, a[href*="GetTemplateResource"]',
             "classify": classify_single},
 )
@@ -455,26 +461,58 @@ SIFS = Agency(
 RE_PMFS_DESIG = re.compile(r"\b((?:PM|RPS)FS)\s+(\d{4}):(\d+)")
 
 
+def _pmfs_page_url(url):
+    """The page-N template for one Polisen listing. Polisen pages under a
+    trailing path segment (".../forfattningssamling/2/"), where the other paged
+    scopes use a query parameter, and its archive link comes without the
+    trailing slash the segment needs."""
+    return (url if url.endswith("/") else url + "/") + "{page}/"
+
+
+def _pmfs_families(soup):
+    """Each family ``<li>`` of one listing page, paired with the first document
+    link in it -- the link whose text names the family where the flat template
+    prints no label."""
+    return [(li, first) for li in soup.select("li.c-list__item")
+            if (first := li.select_one(
+                'a.icon-document[href*="forfattningssamling"]')) is not None]
+
+
 def pmfs_enumerate(session, agency):
     """One DocRef per base regulation of the series ``params['keep_prefix']``
     (``PMFS``/``RPSFS``), with its consolidation + amendments attached, read
-    inline from each family <li> across the paginated in-force listing."""
+    inline from each family <li>.
+
+    Two listings are walked the same way, page by page: the in-force one and
+    the archive of repealed regulations it links (88 acts, every one of them a
+    repeal the corpus otherwise never sees). A full walk (a first harvest or
+    ``--force``) reaches that page; an incremental run stops in the in-force
+    listing before the queue gets to it (:func:`harvest.archive_links`).
+
+    The listing renders a single-version family in either of two templates. The
+    full one puts the designation in a ``.c-regulation__label``; the flat one
+    (23 families) has no label element at all and prints the designation as the
+    link's own text ("PMFS 2024:10 (pdf, 99 kB)")."""
     keep = agency.params["keep_prefix"]
     seen = set()
-    page = 1
-    while True:
-        soup = BeautifulSoup(request(session, "GET", "%s%d/" % (agency.index_url, page)).text,
-                             "html.parser")
-        items = [li for li in soup.select("li.c-list__item")
-                 if li.select_one('a.icon-document[href*="forfattningssamling"]')]
-        if not items:
-            return                                  # walked past the last page
-        for li in items:
+    for item in harvest.index_soups(
+            session, agency, [_pmfs_page_url(agency.index_url)], delay=0.5,
+            form=_pmfs_page_url,
+            rows=lambda soup: [first.get("href", "")
+                               for _li, first in _pmfs_families(soup)]):
+        if isinstance(item, Skip):
+            yield item
+            continue
+        template, soup = item
+        listing = template.removesuffix("{page}/")     # the listing, page number off
+        for li, first in _pmfs_families(soup):
             base = next((m for lab in li.select(".c-regulation__label")
                          if (m := RE_PMFS_DESIG.search(lab.get_text(" ", strip=True)))), None)
-            if base is None or base.group(1) != keep:
+            designation = (base.group(1), base.group(2), base.group(3)) if base else \
+                harvest.own_designation(first.get_text(" ", strip=True))
+            if designation is None or designation[0] != keep:
                 continue
-            year, lop = base.group(2), str(int(base.group(3)))
+            year, lop = designation[1], str(int(designation[2]))
             basefile = "%s/%s:%s" % (agency.fs, year, lop)
             if basefile in seen:
                 continue
@@ -490,23 +528,21 @@ def pmfs_enumerate(session, agency):
                 if "icon-document" not in cls or "forfattningssamling" not in (el.get("href") or ""):
                     continue
                 url = harvest.absolute(agency.base_url, el["href"])
-                if "grund" in role:
-                    regulation_url = regulation_url or url
-                elif "sammanst" in role:
+                if "sammanst" in role:
                     consolidations.append({"url": url})
                 elif "ndring" in role:
                     am = RE_PMFS_DESIG.search(el.get_text(" ", strip=True))
                     amendments.append({"url": url,
                                        "identifier": "%s %s:%s" % (am.group(1), am.group(2),
                                                                    str(int(am.group(3)))) if am else None})
+                else:                    # "grundförfattning", or the flat
+                    regulation_url = regulation_url or url   # template's sole link
             yield DocRef(
                 basefile=basefile, identifier="%s %s:%s" % (keep, year, lop),
-                url=regulation_url or agency.index_url, title=title,
+                url=regulation_url or listing, title=title,
                 extra={"regulation_url": regulation_url, "consolidations": consolidations,
                        "amendments": amendments, "title": title,
-                       "source_url": agency.index_url})
-        page += 1
-        time.sleep(0.5)
+                       "source_url": listing})
 
 
 PMFS = Agency(
@@ -593,7 +629,7 @@ def skogs_enumerate(session, agency):
     seen = set()
     for a in soup.select('a[href$=".pdf"][href*="/foreskrifter-efter-amne/"]'):
         href = util.href(a)
-        name = href.rsplit("/", 1)[-1].lower()
+        name = harvest.filename(href).lower()
         if "-bilaga" in name:                     # a separately-published annex
             continue
         m = RE_SKSFS_FILE.search(name)
@@ -793,6 +829,9 @@ FFS_API = "https://www.forsvarsmakten.se/api/episerver/v3.0/content/%s?expand=PD
 FFS_PAGE_IDS = ["2562", "2563", "2564", "2565"]   # 1978-94, 1995-2011, 2012-13, 2014-
 
 
+RE_FFS_VARIANT = re.compile(r"konsolider|rättels", re.IGNORECASE)
+
+
 def ffs_enumerate(session, agency):
     """One DocRef per FFS text across the four Episerver listing pages; `ref`
     reads the number from the name ("FFS 2017:5") or, failing that, the PDF
@@ -804,6 +843,14 @@ def ffs_enumerate(session, agency):
         for doc in data.get("documentInfo", []):
             name = (doc.get("name") or "").strip()
             if name.upper().startswith("FIB"):     # interna bestämmelser, out of scope
+                continue
+            # the listing carries a konsoliderad text and a rättelseblad under
+            # the document's own number, and `ref` keeps whichever row comes
+            # first -- which stored the konsoliderad text as FFS 2019:3 and the
+            # rättelse as FFS 2021:2 instead of the law. Every variant row in
+            # the listing has a plain row for the same number, so dropping it
+            # loses nothing.
+            if RE_FFS_VARIANT.search(name):
                 continue
             docref = harvest.ref(agency, name, doc.get("url", ""), seen,
                                  title=doc.get("preamble"), direct=True)
@@ -906,27 +953,40 @@ RE_PRV_FILE = re.compile(r"/(\d{2})prvfs-?(\d+)_", re.IGNORECASE)
 
 
 def prvfs_enumerate(session, agency):
-    """One DocRef per PRVFS grundförfattning from Avdelning A1. Number from the
-    anchor's bare "YYYY:N", else the 2-digit-year filename slug (pivot at 50:
-    77->1977, 25->2025) for the stray empty-text second links."""
-    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
+    """One DocRef per PRVFS författning from Avdelning A1 and from Avdelning C
+    (upphävda författningar), which A1 links. Number from the anchor's bare
+    "YYYY:N", else the 2-digit-year filename slug (pivot at 50: 77->1977,
+    25->2025) for the stray empty-text second links.
+
+    The anchor text is normalised first. A1 prints one row as "1977: 1, M:1",
+    with a space after the colon, and the space alone dropped PRVFS 1977:1 --
+    the act PRVFS 2023:1 names as the one it repeals.
+
+    A full walk (a first harvest or ``--force``) reaches Avdelning C; an
+    incremental run stops in Avdelning A1 before the queue gets to it
+    (:func:`harvest.archive_links`)."""
     seen = set()
-    for a in soup.select('a[href*="/prvfs/"][href$=".pdf"]'):
-        href = util.href(a)
-        m = RE_PRV_TEXT.search(a.get_text(" ", strip=True))
-        if m:
-            year, lop = m.group(1), str(int(m.group(2)))
-        else:
-            fm = RE_PRV_FILE.search(href)
-            if not fm:
-                continue
-            yy = int(fm.group(1))
-            year, lop = str(1900 + yy if yy > 50 else 2000 + yy), str(int(fm.group(2)))
-        title = a.get_text(" ", strip=True) or None
-        docref = direct_docref(agency, agency.fs, year, lop,
-                               harvest.absolute(agency.base_url, href), seen, title=title)
-        if docref:
-            yield docref
+
+    def page_refs(soup):
+        for a in soup.select('a[href*="/prvfs/"][href$=".pdf"]'):
+            href = util.href(a)
+            title = harvest.normalise(a.get_text(" ", strip=True))
+            m = RE_PRV_TEXT.search(title)
+            if m:
+                year, lop = m.group(1), str(int(m.group(2)))
+            else:
+                fm = RE_PRV_FILE.search(href)
+                if not fm:
+                    continue
+                yy = int(fm.group(1))
+                year, lop = str(1900 + yy if yy > 50 else 2000 + yy), str(int(fm.group(2)))
+            docref = direct_docref(agency, agency.fs, year, lop,
+                                   harvest.absolute(agency.base_url, href), seen,
+                                   title=title or None)
+            if docref:
+                yield docref
+
+    return harvest.index_refs(session, agency, page_refs)
 
 
 PRVFS = Agency(
@@ -1116,7 +1176,7 @@ def bfnar_enumerate(session, agency):
     order = []
     for a in soup.select('a[href*="bfnar" i][href$=".pdf" i]'):
         href = util.href(a)
-        name = href.rsplit("/", 1)[-1].lower()
+        name = harvest.filename(href).lower()
         number = _bfnar_number(name)
         if number is None:
             continue
@@ -1168,7 +1228,7 @@ RE_BOLFS = re.compile(r"BOLFS\s+(\d{4}):(\d+)")
 def _bolfs_amend_id(href):
     """A BOLFS amendment's own number from its filename's *last* YYYY_N pair
     (``bolfs_2004_4_2006_3`` -> 2006:3), or None when unparseable."""
-    nums = re.findall(r"(\d{4})[_-](\d{1,3})", href.rsplit("/", 1)[-1])
+    nums = re.findall(r"(\d{4})[_-](\d{1,3})", harvest.filename(href))
     return "BOLFS %s:%s" % (nums[-1][0], str(int(nums[-1][1]))) if len(nums) >= 2 else None
 
 
@@ -1297,27 +1357,40 @@ RIFS = Agency(
 # role + number are read off the filename slug (classify_href), not the link text.
 # --------------------------------------------------------------------------
 
-RE_IAF_BASE = re.compile(r"/foreskrifter/iaffs-(\d{4})(\d+)/?$")
+# the landing slug, wherever the listing that links it sits: the archive of
+# repealed regulations hangs its rows under its own path segment
+# (".../foreskrifter/upphavda-foreskrifter/iaffs-20041/"), so the leading
+# separator is not required
+RE_IAF_BASE = re.compile(r"foreskrifter/iaffs-(\d{4})(\d+)/?$")
 
 
 def iaf_enumerate(session, agency):
-    """One DocRef per base regulation from IAF's single förteckning."""
-    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
+    """One DocRef per base regulation from IAF's förteckning and from the
+    archive of repealed regulations it links (66 designations, none of which
+    the in-force listing shows).
+
+    A full walk (a first harvest or ``--force``) reaches that page; an
+    incremental run stops in the in-force listing before the queue gets to it
+    (:func:`harvest.archive_links`)."""
     seen = set()
-    for a in soup.find_all("a", href=True):
-        href = util.href(a)
-        m = RE_IAF_BASE.search(href)
-        if not m:
-            continue
-        arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
-        basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
-        if basefile in seen:
-            continue
-        seen.add(basefile)
-        yield DocRef(basefile=basefile,
-                     identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
-                     url=harvest.absolute(agency.base_url, href),
-                     title=a.get_text(" ", strip=True))
+
+    def page_refs(soup):
+        for a in soup.find_all("a", href=True):
+            href = util.href(a)
+            m = RE_IAF_BASE.search(href)
+            if not m:
+                continue
+            arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
+            basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
+            if basefile in seen:
+                continue
+            seen.add(basefile)
+            yield DocRef(basefile=basefile,
+                         identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
+                         url=harvest.absolute(agency.base_url, href),
+                         title=a.get_text(" ", strip=True))
+
+    return harvest.index_refs(session, agency, page_refs)
 
 
 IAFFS = Agency(
@@ -1376,7 +1449,7 @@ def kam_enumerate(session, agency):
         text = a.get_text(" ", strip=True)
         if RE_KAM_SKIP.search(text):
             continue
-        href_num = RE_KAM_HREF.findall(unquote(href).rsplit("/", 1)[-1])
+        href_num = RE_KAM_HREF.findall(harvest.filename(href))
         text_pair = (m.group(1), m.group(2)) if (m := RE_KAM_TEXT.search(text)) else None
         # an ändrings-/upphävande-row's parenthesis names the amended regulation,
         # not its own number -- take the own number from the filename slug there.
@@ -1520,21 +1593,36 @@ SJOFS = Agency(
 # otherwise take. We hand ref just that last designation; direct + resolve_direct.
 # --------------------------------------------------------------------------
 
+
 def last_designation_enumerate(session, agency):
     """One direct DocRef per row of a /download/ index, keyed on the LAST FS
-    designation in the row text (the document's own number)."""
-    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
+    designation in the row text (the document's own number).
+
+    The index page and the archive of repealed regulations it links are read
+    the same way. An archive row can name its designation only in the PDF's
+    filename (Pliktverket's "UPPHÄVD_TRMFS 2017_2.pdf" has a title as link
+    text), so the filename is read when the text names none.
+
+    A full walk (a first harvest or ``--force``) reaches that page; an
+    incremental run stops in the in-force listing before the queue gets to it
+    (:func:`harvest.archive_links`)."""
     seen = set()
-    for a in soup.select(agency.params["link_select"]):
-        text = a.get_text(" ", strip=True)
-        matches = harvest.RE_FS_NUMBER.findall(text)
-        if not matches:
-            continue
-        prefix, year, lop = matches[-1]
-        docref = harvest.ref(agency, "%s %s:%s" % (prefix, year, lop),
-                             a.get("href", ""), seen, title=text, direct=True)
-        if docref:
-            yield docref
+
+    def page_refs(soup):
+        for a in soup.select(agency.params["link_select"]):
+            text = a.get_text(" ", strip=True)
+            href = a.get("href", "")
+            matches = harvest.RE_FS_NUMBER.findall(text) \
+                or RE_FILE_DESIGNATION.findall(harvest.filename(href))
+            if not matches:
+                continue
+            prefix, year, lop = matches[-1]
+            docref = harvest.ref(agency, "%s %s:%s" % (prefix, year, lop),
+                                 href, seen, title=text, direct=True)
+            if docref:
+                yield docref
+
+    return harvest.index_refs(session, agency, page_refs)
 
 
 # TPPVFS (Totalförsvarets plikt- och prövningsverk) -- tiny samling on one page;
@@ -1729,20 +1817,30 @@ RE_MYHFS_FILE = re.compile(r"myhfs-(\d{1,4})-(\d{1,4})", re.IGNORECASE)
 
 
 def myh_enumerate(session, agency):
-    """One DocRef per MYHFS PDF; number parsed from the filename (either order)."""
-    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
+    """One DocRef per MYHFS PDF on the in-force listing and on the archive of
+    repealed regulations it links (46 rows, 17 of them nowhere else); number
+    parsed from the filename (either order).
+
+    A full walk (a first harvest or ``--force``) reaches that page; an
+    incremental run stops in the in-force listing before the queue gets to it
+    (:func:`harvest.archive_links`)."""
     seen = set()
-    for a in soup.select('a[href*="assets.myh.se"][href$=".pdf"]'):
-        href = util.href(a)
-        m = RE_MYHFS_FILE.search(href.rsplit("/", 1)[-1])
-        if not m:                                # title-only filename, no number
-            continue
-        first, second = int(m.group(1)), int(m.group(2))
-        arsutgava, lopnummer = (first, second) if first > 999 else (second, first)
-        title = a.get_text(" ", strip=True)
-        docref = direct_docref(agency, agency.fs, arsutgava, lopnummer, href, seen, title=title)
-        if docref:
-            yield docref
+
+    def page_refs(soup):
+        for a in soup.select('a[href*="assets.myh.se"][href$=".pdf"]'):
+            href = util.href(a)
+            m = RE_MYHFS_FILE.search(harvest.filename(href))
+            if not m:                                # title-only filename, no number
+                continue
+            first, second = int(m.group(1)), int(m.group(2))
+            arsutgava, lopnummer = (first, second) if first > 999 else (second, first)
+            title = a.get_text(" ", strip=True)
+            docref = direct_docref(agency, agency.fs, arsutgava, lopnummer, href, seen,
+                                   title=title)
+            if docref:
+                yield docref
+
+    return harvest.index_refs(session, agency, page_refs)
 
 
 MYHFS = Agency(
@@ -1853,23 +1951,34 @@ RE_UHRFS_SKIP = re.compile(r"Konsekvensutredning|Promemoria|Rättelse|Förteckni
 
 
 def uhrfs_enumerate(session, agency):
-    """One DocRef per in-force UHRFS PDF, keyed by the number in its filename
-    slug (the link text names the amended base, not the file's own number)."""
-    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
+    """One DocRef per UHRFS PDF, keyed by the number in its filename slug (the
+    link text names the amended base, not the file's own number).
+
+    Both listings are read: the in-force one and the archive of repealed
+    föreskrifter it links, whose 35 designations include every target our three
+    self-repeal notices name.
+
+    A full walk (a first harvest or ``--force``) reaches that page; an
+    incremental run stops in the in-force listing before the queue gets to it
+    (:func:`harvest.archive_links`)."""
     seen = set()
-    for a in soup.select('a[href*="uhrfs"][href$=".pdf"]'):
-        href = util.href(a)
-        text = a.get_text(" ", strip=True)
-        if RE_UHRFS_SKIP.search(text):
-            continue
-        m = RE_UHRFS_FILE.search(href.rsplit("/", 1)[-1])
-        if not m:
-            continue
-        year, lop = m.group(1), str(int(m.group(2)))
-        docref = direct_docref(agency, agency.fs, year, lop,
-                               harvest.absolute(agency.base_url, href), seen, title=text)
-        if docref:
-            yield docref
+
+    def page_refs(soup):
+        for a in soup.select('a[href*="uhrfs"][href$=".pdf"]'):
+            href = util.href(a)
+            text = a.get_text(" ", strip=True)
+            if RE_UHRFS_SKIP.search(text):
+                continue
+            m = RE_UHRFS_FILE.search(harvest.filename(href))
+            if not m:
+                continue
+            year, lop = m.group(1), str(int(m.group(2)))
+            docref = direct_docref(agency, agency.fs, year, lop,
+                                   harvest.absolute(agency.base_url, href), seen, title=text)
+            if docref:
+                yield docref
+
+    return harvest.index_refs(session, agency, page_refs)
 
 
 UHRFS = Agency(
@@ -1935,7 +2044,12 @@ SCBFS = Agency(
     params={"index_urls": [
                 "https://www.scb.se/om-scb/scbs-verksamhet/regelverk-och-policyer/foreskrifter/?currentpageId=98388&type=UL",
                 "https://www.scb.se/om-scb/scbs-verksamhet/regelverk-och-policyer/foreskrifter/?currentpageId=98388&type=KPI"],
-            "pdf_select": 'a[href*="/contentassets/"][href$=".pdf"]',
+            # SCB serves some regulations from /contentassets/ under a friendly
+            # slug with no ".pdf" suffix, which left 7 documents with no text at
+            # all. Over the 202 stored landing pages the looser selector adds 8
+            # links, every one of them extensionless; `fetch_pdf` sniffs the
+            # magic bytes, so a link that is not a PDF costs a refused fetch.
+            "pdf_select": 'a[href*="/contentassets/"]',
             "classify": classify_single},
 )
 
@@ -1953,7 +2067,12 @@ STAFS = Agency(
     base_url="https://regelverk.swedac.se",
     index_url="https://regelverk.swedac.se/foreskrifter/",
     enumerate=indexed_enumerate, resolve=resolve_landing,
-    params={"link_select": 'a[href*="/foreskrifter/swedac/stafs-"]',
+    # the archive of repealed föreskrifter that the in-force page links keeps
+    # its rows under its own path segment
+    # (/foreskrifter/swedac/upphavda/stafs-YYYY-N.html), so the selector matches
+    # the slug wherever it sits rather than only under /swedac/ itself; 206 of
+    # the archive's 208 designations were in no other listing
+    params={"link_select": 'a[href*="/foreskrifter/swedac/"][href*="/stafs-"]',
             "pdf_select": 'a[href$=".pdf"]:not([href^="http"])',
             "classify": classify_href},
 )
@@ -1996,7 +2115,8 @@ TVFS = Agency(
 # amendment's own number is the afsYYYY-N that is *not* the base's.
 # --------------------------------------------------------------------------
 
-RE_AFS_BASE = re.compile(r"/foreskrifter/afs-(\d{4})(\d+)/$")
+# as RE_IAF_BASE: the slug, under the in-force listing or under the archive
+RE_AFS_BASE = re.compile(r"foreskrifter/afs-(\d{4})(\d+)/$")
 RE_AFS_NUM = re.compile(r"afs\s*(\d{4})[-_](\d+)", re.IGNORECASE)
 
 
@@ -2005,7 +2125,7 @@ def afs_classify(a, fs, base_ars, base_lop):
     'konsoliderad' path segment; an ändring names two afsYYYY-N numbers (base +
     its own, in either order) so the own number is the one that isn't the base;
     a plain afsYYYY-N is the base regulation."""
-    name = a.get("href", "").rsplit("/", 1)[-1].lower()
+    name = harvest.filename(a.get("href", "")).lower()
     if "konsekvensutred" in name or "beslutsprom" in name:
         return None
     if "konsolider" in name:
@@ -2021,26 +2141,39 @@ def afs_classify(a, fs, base_ars, base_lop):
 
 
 def afs_enumerate(session, agency):
-    """One DocRef per in-force AFS grundföreskrift, its url pointed at the
-    författningshistorik subpage (where the PDFs live)."""
-    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
+    """One DocRef per AFS grundföreskrift, its url pointed at the
+    författningshistorik subpage (where the PDFs live).
+
+    Arbetsmiljöverket replaced its whole samling on 2025-01-01: AFS 2023:1..15
+    repeal 71 older regulations, which the agency moved to the archive the
+    in-force listing links. That page is read here too -- 47 of the 71 are in
+    no other listing, and several are what the new regulations name as their
+    own repeal target.
+
+    A full walk (a first harvest or ``--force``) reaches that page; an
+    incremental run stops in the in-force listing before the queue gets to it
+    (:func:`harvest.archive_links`)."""
     seen = set()
-    for a in soup.find_all("a", href=True):
-        href = util.href(a)
-        m = RE_AFS_BASE.search(href)
-        if not m:
-            continue
-        arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
-        basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
-        if basefile in seen:
-            continue
-        seen.add(basefile)
-        fused = m.group(1) + m.group(2)      # the slug fuses year+lopnummer
-        hist = harvest.absolute(agency.base_url,
-                        href.rstrip("/") + "/forfattningshistorik-afs-%s/" % fused)
-        yield DocRef(basefile=basefile,
-                     identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
-                     url=hist, title=a.get_text(" ", strip=True))
+
+    def page_refs(soup):
+        for a in soup.find_all("a", href=True):
+            href = util.href(a)
+            m = RE_AFS_BASE.search(href)
+            if not m:
+                continue
+            arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
+            basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
+            if basefile in seen:
+                continue
+            seen.add(basefile)
+            fused = m.group(1) + m.group(2)      # the slug fuses year+lopnummer
+            hist = harvest.absolute(agency.base_url,
+                            href.rstrip("/") + "/forfattningshistorik-afs-%s/" % fused)
+            yield DocRef(basefile=basefile,
+                         identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
+                         url=hist, title=a.get_text(" ", strip=True))
+
+    return harvest.index_refs(session, agency, page_refs)
 
 
 AFS = Agency(
@@ -2069,13 +2202,17 @@ AFS = Agency(
 
 RE_TS_ROW = re.compile(r"RuleNumber=(\d{4}):(\d+)&(?:amp;)?ruleprefix=([A-Za-zÅÄÖåäö]+)",
                        re.IGNORECASE)
-RE_TS_PDF = re.compile(r"([a-zåäö]+)[ _](\d{4})[_ ](\d+)(k)?\.pdf$", re.IGNORECASE)
+# Transportstyrelsen separates the year from the number with a space, an
+# underscore *or* a hyphen, and marks the konsoliderad text "…113k" or "…113_k".
+# Reading only the underscore form lost 136 of 2,450 linked PDFs, and a document
+# whose only regulation link is hyphenated lost its whole content (#104).
+RE_TS_PDF = re.compile(r"([a-zåäö]+)[ _](\d{4})[-_ ](\d+)_?(k)?\.pdf$", re.IGNORECASE)
 
 
 def ts_classify(a, fs, base_ars, base_lop):
     """Role + number from the TSFS PDF filename ('TSFS 2012_113.pdf', the
     konsoliderad 'TSFS 2012_113k.pdf', predecessor 'jvsfs_2008_3.pdf')."""
-    m = RE_TS_PDF.search(a.get("href", "").rsplit("/", 1)[-1])
+    m = RE_TS_PDF.search(harvest.filename(a.get("href", "")))
     if not m:
         return None
     ars, lop, kons = m.group(2), str(int(m.group(3))), m.group(4)
