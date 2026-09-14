@@ -185,6 +185,13 @@ def _relpath_eurlex(basefile):
 
 
 def _relpath_foreskrift(basefile):
+    # a föreskrift's basefile is "<fs>/<year>:<nr>". A scope name on its own is
+    # a download argument that reached a per-document stage ("lagen foreskrift
+    # parse elsakfs"), which unpacked into a ValueError six frames down
+    assert "/" in basefile, (
+        "%r is a scope, not a basefile: a föreskrift basefile names one "
+        "document (\"elsakfs/2003:3\"). Parse takes basefiles or none at all; "
+        "the scope is a download argument." % basefile)
     fs, rest = basefile.split("/", 1)            # "fffs/2013:10"
     return Path(fs) / rest.replace(":", "-").replace(" ", "_")
 
