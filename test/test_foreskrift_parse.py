@@ -149,14 +149,14 @@ def test_body_start_skips_the_masthead_to_the_first_marker():
               Block("stycke", "beslutade den 25 juni 2013. … föreskriver följande", 1),
               Block("kapitel", "1 kap. Innehåll", 1, num="1"),
               Block("paragraf", "1 § …", 1, num="1")]
-    assert _body_start(blocks) == 2          # drop the two masthead blocks
+    assert _body_start(blocks) == (2, True)  # drop the two masthead blocks
 
 
 def test_body_start_no_marker_falls_back_to_preamble_verb():
     blocks = [Block("stycke", "Naturvårdsverkets författningssamling", 1),
               Block("stycke", "Med stöd av 1 § kungör Naturvårdsverket följande", 1),
               Block("stycke", "den egentliga förteckningen börjar här", 1)]
-    assert _body_start(blocks) == 2          # past the "kungör" preamble verb
+    assert _body_start(blocks) == (2, True)  # past the "kungör" preamble verb
 
 
 def test_ingress_is_kept_as_the_documents_own_opening_words():
@@ -169,7 +169,7 @@ def test_ingress_is_kept_as_the_documents_own_opening_words():
               Block("stycke", "beslutade den 15 juni 2026.", 1),
               Block("stycke", "Myndigheten föreskriver följande med stöd av 38 §.", 1),
               Block("paragraf", "1 § …", 1, num="1")]
-    assert _ingress_start(blocks, _body_start(blocks)) == 3
+    assert _ingress_start(blocks, _body_start(blocks)[0]) == 3
 
 
 # --- konsolideradTom: the one fact that pins a consolidation -----------------
@@ -312,7 +312,7 @@ def test_ikraft_date_reads_the_declaration_from_the_title_when_the_masthead_is_g
               Block("paragraf", "1 § Dessa föreskrifter gäller stöd.", 1, num="1"),
               Block("stycke", "Denna författning träder i kraft den 12 mars 2015.", 2),
               Block("stycke", "Denna författning träder i kraft den 11 maj 2015.", 2)]
-    masthead = fp._full_text(blocks[:_body_start(blocks)])
+    masthead = fp._full_text(blocks[:_body_start(blocks)[0]])
     assert masthead == "GRUNDLÄGGANDE BESTÄMMELSER"      # the declaration is not in it
     title = "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (SJVFS 2015:2)"
     text = fp._full_text(blocks)
@@ -815,7 +815,7 @@ def test_body_start_does_not_take_kungorelse_for_the_preamble_verb():
               Block("stycke", "beslutad den 10 maj 1996.", 1),
               Block("stycke", "Med stöd av 11 § kungörelsen (1974:271) meddelar Statens livsmedelsverk", 1),
               Block("stycke", "Denna kungörelse träder i kraft den 1 juli 1996.", 1)]
-    assert fp._body_start(blocks) == 4
+    assert fp._body_start(blocks) == (4, True)
     assert title_from_masthead(blocks, 4) == \
         "Statens livsmedelsverks kungörelse om ändring i kungörelsen (SLVFS 1990:9) med föreskrifter om stämplar"
 
@@ -1106,8 +1106,8 @@ def test_body_start_falls_back_to_the_decision_date_line():
                               "är som utgångspunkt sådana avtal förbjudna.", 1),
               Block("stycke", "2. I det här allmänna rådet informerar "
                               "Konkurrensverket om hur verket tolkar begreppet.", 1)]
-    start = fp._body_start(blocks)
-    assert start == 7
+    start, separated = fp._body_start(blocks)
+    assert (start, separated) == (7, True)
     assert title_from_masthead(blocks, start) == \
         ("Konkurrensverkets allmänna råd om avtal av mindre betydelse "
          "(bagatellavtal) som inte omfattas av förbudet i 2 kap. 1 § "
@@ -1487,7 +1487,7 @@ def test_rubriker_are_ranked_by_size_under_the_chapter_heading():
               Block("rubrik", "Tillämpningsområde", 1, size=22),
               Block("paragraf", "1 § …", 1, num="1", size=18),
               Block("rubrik", "Undantag", 1, size=20)]
-    fp._rank_rubriker(blocks, _body_start(blocks))
+    fp._rank_rubriker(blocks, _body_start(blocks)[0])
     # the masthead heading is outside the body and stays unranked; inside it the
     # 22-point rubrik is level 2 and the 20-point one level 3
     assert [b.level for b in blocks] == [None, None, 2, None, 3]
@@ -2071,3 +2071,192 @@ def test_parse_record_reads_a_repeal_notice_that_has_no_pdf(tmp_path):
     reg = parse_record(record, tmp_path)
     assert _uris(reg.upphaver) == ["https://lagen.nu/skolfs/1991:52"]
     assert reg.structure == []
+
+
+# --- titles the audit of September 2026 found missing or chromed -------------
+
+def test_title_reads_a_forordning_masthead():
+    # AgVFS 2003:7: Arbetsgivarverket publishes government ordinances in its
+    # own samling, and every one of them opens "Förordning om …"
+    blocks = [Block("stycke", "Författningssamling", 1),
+              Block("stycke", "AgVFS 2003:7 A 2", 1),
+              Block("stycke", "Utkom från trycket den 22 december 2003", 1),
+              Block("rubrik", "Förordning om skyldighet för myndigheter att lämna "
+                              "uppgifter om anställdas kompetenskategorier;", 1),
+              Block("stycke", "utfärdad den 11 december 2003.", 1),
+              Block("paragraf", "1 § Denna förordning gäller myndigheter.", 1)]
+    assert title_from_masthead(blocks, 5) == \
+        ("Förordning om skyldighet för myndigheter att lämna uppgifter om "
+         "anställdas kompetenskategorier")
+
+
+def test_body_start_finds_a_decision_line_the_second_column_merged():
+    # TFS 2024:17: pdftohtml merges "Utkom från trycket / den 4 december 2024"
+    # into the line that follows it, so the decision clause is not at the
+    # block's start and an anchored test left 64 documents with no masthead
+    blocks = [Block("rubrik", "Tullverkets författningssamling", 1),
+              Block("rubrik", "Tullverkets tillkännagivande av värdegräns för "
+                              "lämnande av tullvärderelaterade uppgifter;", 1),
+              Block("stycke", "den 4 december 2024 beslutat den 19 november 2024.", 1),
+              Block("stycke", "Med hänvisning till anmärkning 14 i bilaga B.", 1)]
+    assert _body_start(blocks) == (3, True)
+    assert title_from_masthead(blocks, 3) == \
+        ("Tullverkets tillkännagivande av värdegräns för lämnande av "
+         "tullvärderelaterade uppgifter")
+
+
+def test_body_start_tells_an_empty_masthead_from_no_masthead_at_all():
+    # both states answer index 0. Read as one -- `start or len(blocks)` -- a
+    # document whose first block *is* the boundary has its whole body searched
+    # for a masthead title, and a heading out of the operative text is
+    # published as the title. No stored document has a paragraf as its first
+    # block (0 of 13,498), which is why the difference belongs in the answer.
+    first_is_body = [Block("paragraf", "1 § Dessa föreskrifter gäller stöd.", 1, num="1"),
+                     Block("rubrik", "Myndighetens föreskrifter om buller; "
+                                     "beslutade den 1 januari 2020.", 1)]
+    start, separated = fp._body_start(first_is_body)
+    assert (start, separated) == (0, True)
+    assert title_from_masthead(first_is_body, start if separated else
+                               len(first_is_body)) is None
+    # the whole run would have found one, out of the body
+    assert title_from_masthead(first_is_body, len(first_is_body)) == \
+        "föreskrifter gäller stöd. Myndighetens föreskrifter om buller"
+    # nothing separated a masthead: keep everything, which is the other state
+    no_masthead = [Block("stycke", "Upphävande av vissa föreskrifter", 1)]
+    assert fp._body_start(no_masthead) == (0, False)
+
+
+def test_title_is_read_from_the_whole_run_when_no_masthead_separates():
+    # RPSFS 2009:17: a one-page repeal notice with no §§, no preamble verb and
+    # no decision line of its own -- `_body_start` keeps everything, and the
+    # empty slice blocks[:0] could only ever yield None
+    blocks = [Block("stycke", "Rikspolisstyrelsens författningssamling", 1),
+              Block("stycke", "ISSN 0347–545X Utgivare: chefsjuristen Lotta Gustavson", 1),
+              Block("stycke", "Upphävande av vissa av Rikspolisstyrelsens "
+                              "föreskrifter och allmänna råd; FAP 000-0", 1),
+              Block("stycke", "beslutade den 3 november 2009.", 1)]
+    start, separated = _body_start(blocks)
+    assert title_from_masthead(blocks, start if separated else len(blocks)) == \
+        "Upphävande av vissa av Rikspolisstyrelsens föreskrifter och allmänna råd"
+
+
+def test_title_drops_an_omtryck_stamp_from_a_held_parenthesis():
+    # UFS 2023:1: the second column sets "Omtryck" beside the title, and the
+    # reading order drops it inside the parenthesis. The parenthesis is held
+    # back from the boilerplate pass, so only the column rule reaches it.
+    blocks = [Block("rubrik", "Upphandlingsmyndighetens författningssamling", 1),
+              Block("rubrik", "Upphandlingsmyndighetens föreskrifter om ändring av "
+                              "Upphandlingsmyndighetens föreskrifter (UFS Omtryck "
+                              "2020:1) om insamling av uppgifter för statistikändamål1", 1),
+              Block("stycke", "Upphandlingsmyndigheten föreskriver2 med stöd av 12 § "
+                              "lagen (2019:668) om upphandlingsstatistik", 1)]
+    title = title_from_masthead(blocks, 3)
+    assert title == ("Upphandlingsmyndighetens föreskrifter om ändring av "
+                     "Upphandlingsmyndighetens föreskrifter (UFS 2020:1) om "
+                     "insamling av uppgifter för statistikändamål")
+    assert andrar_target(title, "ufs", "https://lagen.nu/ufs/2023:1") == \
+        "https://lagen.nu/ufs/2020:1"
+
+
+def test_title_stop_takes_a_capitalised_subject_but_not_a_lower_case_word():
+    # the preamble's own subject goes with its verb ("… för statistikändamål
+    # Upphandlingsmyndigheten föreskriver", UFS 2023:1), so the stop takes the
+    # capitalised word standing before "föreskriver". Read case-insensitively,
+    # which is what the flag on the whole pattern did to the class, the same
+    # rule ate a lower-case word that belonged to the title -- 3 of 1,200
+    # sampled documents, SKOLFS 1992:1 among them.
+    blocks = [Block("rubrik", "Skolverkets författningssamling", 1),
+              Block("rubrik", "Skolverkets föreskrifter om statsbidrag till "
+                              "anskaffning av utrustning i gymnasieskolan "
+                              "föreskriver Skolverket följande", 1)]
+    assert title_from_masthead(blocks, 2) == \
+        ("Skolverkets föreskrifter om statsbidrag till anskaffning av "
+         "utrustning i gymnasieskolan")
+    # the rest of the pattern stays case-insensitive: the page prints
+    # "Utfärdad" and "Beslutade" with the capital, and 27 of the same 1,200
+    # titles changed when the flag was dropped outright
+    blocks = [Block("rubrik", "Riksdagsförvaltningens författningssamling", 1),
+              Block("rubrik", "Riksdagsdirektörens föreskrift om ansvarsområden "
+                              "inom Riksdagsförvaltningen Utfärdad den 3 maj 2018", 1)]
+    assert title_from_masthead(blocks, 2) == \
+        "Riksdagsdirektörens föreskrift om ansvarsområden inom Riksdagsförvaltningen"
+
+
+def test_undouble_crosses_the_utgivare_name_the_masthead_leaves_behind():
+    # SSMFS 2012:2: "Utgivare: Ulf Yngvesson" names no agency after a comma,
+    # so the boilerplate pass removes the label and leaves the name between
+    # the two printings of the title
+    assert fp.undouble(
+        "Strålsäkerhetsmyndighetens föreskrifter om bäringskikare "
+        "Ulf Yngvesson "
+        "Strålsäkerhetsmyndighetens föreskrifter om bäringskikare som "
+        "innehåller tritium") == \
+        ("Strålsäkerhetsmyndighetens föreskrifter om bäringskikare som "
+         "innehåller tritium")
+    # what stands between has to be furniture: a title that opens the way a
+    # repeal notice does is not a second printing of itself
+    whole = ("Försvarsmaktens föreskrifter om upphävande av Försvarsmaktens "
+             "föreskrifter (FFS 1994:32) om befordringsberedningar")
+    assert fp.undouble(whole) == whole
+
+
+def test_clean_title_cuts_the_listing_rows_other_columns():
+    # KBVFS 2025:1: the row prints no file type, so the chrome rule found no
+    # anchor and the whole tail -- decision clause, size and date -- survived
+    assert clean_title("Kustbevakningens föreskrifter och allmänna råd om avgifter "
+                       "vid uppdragsverksamhet Beslutade den 24 november 2025. "
+                       "Träder i kraft den 1 januari 2026. 115 kb 2025-12-01",
+                       "KBVFS 2025:1") == \
+        "Kustbevakningens föreskrifter och allmänna råd om avgifter vid uppdragsverksamhet"
+    # a title of its own that names a decision is not a decision clause
+    assert clean_title("Statens folkhälsoinstituts föreskrifter om upphävande av "
+                       "vissa föreskrifter om yrkesmässig tillverkning av alkohol "
+                       "beslutade av Alkoholinspektionen", "FHIFS 2010:2") == \
+        ("Statens folkhälsoinstituts föreskrifter om upphävande av vissa "
+         "föreskrifter om yrkesmässig tillverkning av alkohol beslutade av "
+         "Alkoholinspektionen")
+
+
+def test_clean_title_drops_a_trailing_designation_and_the_rows_separator():
+    # Kronofogden's index files the number after the title and separates the
+    # row's cells with a pipe: "<title> KFMFS 2007:1 | pdf | 142 kB"
+    assert clean_title("Kronofogdemyndighetens föreskrifter om vid vilka tillfällen "
+                       "särskilt tjänstekort får användas av Kronofogdemyndighetens "
+                       "fältpersonal KFMFS 2007:1 | pdf | 142 kB", "KFMFS 2007:1") == \
+        ("Kronofogdemyndighetens föreskrifter om vid vilka tillfällen särskilt "
+         "tjänstekort får användas av Kronofogdemyndighetens fältpersonal")
+    # a parenthesised own number is how a föreskrift is cited, and stays
+    assert clean_title("Läkarnas specialiseringstjänstgöring (SOSFS 2008:17)",
+                       "SOSFS 2008:17") == \
+        "Läkarnas specialiseringstjänstgöring (SOSFS 2008:17)"
+
+
+def test_extract_publisher_reads_an_agency_name_of_sixty_characters():
+    # MTFS 2023:1: "Myndigheten för tillväxtpolitiska utvärderingar och
+    # analyser" overran the capture bound, so the search ran on and took the
+    # agency's short name out of a repeal clause further down the page
+    mast = ("Myndigheten för tillväxtpolitiska utvärderingar och analysers "
+            "författningssamling ISSN 2001-4287 "
+            "Föreskrift om upphävande av föreskrift MTFS 2009:1; "
+            "beslutad den 30 mars 2023, då Tillväxtanalys föreskrifter "
+            "MTFS 2009:1 upphör att gälla.")
+    assert fp.extract_publisher(mast) == \
+        "Myndigheten för tillväxtpolitiska utvärderingar och analyser"
+
+
+def test_title_is_none_where_the_masthead_kept_no_subject():
+    # SSMFS 2012:2 sets its title across three lines and repeats them on the
+    # next page, so `running_furniture` takes the subject lines for a running
+    # header. What is left says nothing about the document.
+    blocks = [Block("rubrik", "Strålsäkerhetsmyndighetens författningssamling", 1),
+              Block("stycke", "ISSN: 2000-0987", 1),
+              Block("rubrik", "Strålsäkerhetsmyndighetens föreskrifter om", 2),
+              Block("stycke", "Strålsäkerhetsmyndigheten föreskriver följande med "
+                              "stöd av 7 § strålskyddsförordningen (1988:293).", 2),
+              Block("paragraf", "1 § Dessa föreskrifter gäller tritium.", 2)]
+    assert title_from_masthead(blocks, 4) is None
+    # a title cut short at the same shape keeps what was read: its own type
+    # word stands earlier, and the words between say what it is about
+    assert fp._states_a_subject("Domstolsverkets föreskrifter om upphävande "
+                                "av vissa föreskrifter i")
+    assert not fp._states_a_subject("Strålsäkerhetsmyndighetens föreskrifter om")

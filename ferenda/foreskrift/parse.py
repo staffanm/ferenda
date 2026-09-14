@@ -399,13 +399,18 @@ RE_UTGIVARE = re.compile(
 # uppercase, so the capture cannot bleed left into a preceding heading word
 # ("Skyltning Överlåtelse Transport Sprängämnesinspektionen"), and the optional
 # trailing -s absorbs the genitive.
+# The bound is 70 characters, not 55: "Myndigheten för tillväxtpolitiska
+# utvärderingar och analyser" needs 59 after its leading capital, and with the
+# shorter bound neither of its masthead occurrences matched -- RE_FS_TITLE then
+# searched on and captured "Tillväxtanaly" out of the agency's short name in a
+# repeal clause further down the page (MTFS 2023:1, MTFS 2023:2).
 RE_FS_SERIES = re.compile(
-    r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,55}?)s?\s+[Ff]örfattningssamling\b")
+    r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,70}?)s?\s+[Ff]örfattningssamling\b")
 #   3. failing that, the föreskrift's own name "<agency>s föreskrifter/allmänna råd"
 #      -- the genitive -s is mandatory here so a prose "följande allmänna råd" can
 #      never be mistaken for a possessive agency prefix.
 RE_FS_TITLE = re.compile(
-    r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,55}?)s\s+(?:[Ff]öreskrift(?:er)?|[Aa]llmänna\s+råd)\b")
+    r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,70}?)s\s+(?:[Ff]öreskrift(?:er)?|[Aa]llmänna\s+råd)\b")
 # HSLF-FS is the one samling several agencies issue into, and its masthead is
 # the samling's rather than the document's: the series line reads "Gemensamma
 # författningssamlingen avseende hälso- och sjukvård, socialtjänst, läkemedel,
@@ -614,24 +619,40 @@ def _group_allmanna_rad(blocks):
 
 
 def _body_start(blocks):
-    """The index where the operative body begins, i.e. past the masthead and the
-    ingress (författningssamling name, utgivare, ISSN, the Utkom/beslutade/
-    med-stöd-av lines). The first ``kapitel``/``paragraf`` marker is the reliable
-    boundary; a föreskrift with no §§ at all (a short declarative, a förteckning)
-    has none, so we fall back to the block just after the closing preamble verb
-    ('… föreskriver följande'); an allmänt råd with neither (KKVFS 2017:3, a
+    """Where the operative body begins, as ``(index, separated)``: the index
+    past the masthead and the ingress (författningssamling name, utgivare,
+    ISSN, the Utkom/beslutade/med-stöd-av lines), and whether anything marked
+    that boundary at all.
+
+    The first ``kapitel``/``paragraf`` marker is the reliable boundary; a
+    föreskrift with no §§ at all (a short declarative, a förteckning) has none,
+    so we fall back to the block just after the closing preamble verb ('…
+    föreskriver följande'); an allmänt råd with neither (KKVFS 2017:3, a
     numbered list after "beslutat den 31 augusti 2017.") ends its masthead on
-    that decision date; failing even that keep everything."""
+    that decision date; failing even that, ``(0, False)`` keeps everything.
+
+    ``separated`` is what tells that last case from a document whose first
+    block *is* the boundary. Both give index 0, and a caller that reads the two
+    as one searches a whole body for a masthead title. No stored document has a
+    paragraf as its first block -- 0 of 13,498 -- so the two states have never
+    yet met, which is exactly why the difference belongs in the answer rather
+    than in the caller.
+
+    The decision date is *searched* for, not matched at the block's start:
+    pdftohtml merges the masthead's second column into the line beside it, so
+    TFS 2024:17's block reads "den 4 december 2024 beslutat den 19 november
+    2024." and an anchored test never fired -- 64 Tullverket documents were
+    left with a masthead of nothing and published no title."""
     for i, b in enumerate(blocks):
         if b.kind in ("kapitel", "paragraf"):
-            return i
+            return i, True
     for i, b in enumerate(blocks):
         if RE_PREAMBLE_END.search(b.text):
-            return i + 1
+            return i + 1, True
     for i, b in enumerate(blocks):
-        if RE_BESLUTAD_LINE.match(b.text):
-            return i + 1
-    return 0
+        if RE_BESLUTAD_LINE.search(b.text):
+            return i + 1, True
+    return 0, False
 
 
 # the masthead lines that are the *samling's* furniture rather than this
@@ -704,7 +725,7 @@ def parse_body(pages, identifier):
                                   pageno):
                 blocks += _split_bullets(block)
     blocks = _group_allmanna_rad(tabell.merge_continued(blocks))
-    _rank_rubriker(blocks, _body_start(blocks))
+    _rank_rubriker(blocks, _body_start(blocks)[0])
     return blocks, notes
 
 
@@ -1095,9 +1116,14 @@ def _full_text(blocks):
 # the standing masthead text (the ISSN, the publisher line, the samling's name,
 # the FS number, a date) is the issuing agency's possessive; everything after it up
 # to the semicolon or the beslutade/utfärdad clause is the subject.
+# "förordning" is in the list without its definite forms: Arbetsgivarverket
+# prints government ordinances in its own samling and every one of them opens
+# "Förordning om …" (7 of the 9 AgVFS documents published no title at all),
+# while "förordningen (2010:1879)" in a bemyndigande names an act this
+# document is not.
 RE_TITLE_TYPE = re.compile(
     r"\b(?:föreskrifter|föreskrift|allmänna\s+råd|allmänt\s+råd|kungörelse"
-    r"|tillkännagivande)\b", re.IGNORECASE)
+    r"|tillkännagivande|förordning)\b", re.IGNORECASE)
 # What the masthead prints on every föreskrift, whatever it says: the
 # samling's name, the ISSN, the utgivare, "Utkom från trycket", the FS number,
 # the dates. Only the title varies, so everything here is removed to leave it.
@@ -1135,17 +1161,68 @@ RE_TITLE_DOUBLED = re.compile(r"\b(\w{3,})(\s+\1)+\b", re.IGNORECASE)
 # title, so those spans are held back from the removal and restored after
 RE_TITLE_PARENS = re.compile(r"\([^()]{0,80}\)")
 # the second column's own headers, which land wherever the first column's line
-# broke -- including inside a parenthesis
+# broke -- including inside a parenthesis -- and the Omtryck stamp, which the
+# same column drops in there too ("(UFS Omtryck 2020:1)", UFS 2023:1, whose
+# designation then named no regulation and lost the document its ändrar target)
 RE_MASTHEAD_COLUMN = re.compile(
-    r"Utkom\s+från\s+trycket|Publicerings?datum|Publicerade?\s+den"
+    r"Utkom\s+från\s+trycket|Publicerings?datum|Publicerade?\s+den|\bOmtryck\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?" % "|".join(MONTHS),
     re.IGNORECASE)
-# where the title stops: its own semicolon, or the clause that follows it
-RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b", re.IGNORECASE)
+# where the title stops: its own semicolon, or the clause that follows it --
+# the decision line, or the preamble verb where the layout drops the semicolon
+# ("… om insamling av uppgifter för statistikändamål1 Upphandlingsmyndigheten
+# föreskriver2 med stöd av …", UFS 2023:1, which published no title at all).
+# The preamble's own subject goes with its verb, so the stop takes the
+# capitalised word standing before it -- and the verb carries the footnote
+# marker the page sets on it.
+# That word is read case-sensitively, inside a pattern that is otherwise
+# case-insensitive: the page prints "Utfärdad" and "Beslutade" with the
+# capital, and dropping the whole flag to fix the class changed 27 of 1,200
+# sampled titles and lost three of them altogether. Folded to any letter, the
+# class ate a lower-case word that belonged to the title ("… anskaffning av
+# utrustning i gymnasieskolan", SKOLFS 1992:1) -- 3 of the same 1,200.
+RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b"
+                          r"|(?-i:\s[A-ZÅÄÖ][\wåäöÅÄÖ-]+)?\s*\bföreskriver\d{0,2}\b",
+                          re.IGNORECASE)
+# the footnote marker the masthead sets on the title's last word, which the
+# extraction glues to it ("… för statistikändamål1", UFS 2023:1)
+RE_TITLE_FOOTNOTE = re.compile(r"(?<=[^\W\d_])\d{1,2}$")
+# A type word and a preposition are the whole title where the masthead's copy
+# was cut short before the subject ("Strålsäkerhetsmyndighetens föreskrifter
+# om", SSMFS 2012:2, whose subject the page sets on the lines below and
+# repeats, so `running_furniture` takes them for a running header).
+RE_TITLE_DANGLING = re.compile(
+    RE_TITLE_TYPE.pattern + r"\s+(?:om|i|av|och|för|med|till|samt|enligt|på)$",
+    re.IGNORECASE)
+
+
+def _states_a_subject(title):
+    """Whether `title` says what the document is about.
+
+    A title that ends in a type word and a preposition, with nothing before
+    them but the agency, is the masthead read down to its first line and no
+    further -- there is no subject in it. A title merely *truncated* at the
+    same shape keeps what was read ("Domstolsverkets föreskrifter om
+    upphävande av vissa föreskrifter i", DVFS 1991:4): its own type word
+    stands earlier, and the words between still say what it is about."""
+    dangling = RE_TITLE_DANGLING.search(title)
+    return not dangling or bool(RE_TITLE_TYPE.search(title[:dangling.start()]))
 # link chrome a harvest title trails off into ('(pdf, 63 kB)', 'Pdf, 278.1 kB,
-# öppnas i nytt fönster.', a bare '.pdf') -- from the pdf token to the end
-RE_TITLE_CHROME = re.compile(r"\s*[,(]?\s*(?:pdf|\.pdf)\b.*$",
-                             re.IGNORECASE | re.DOTALL)
+# öppnas i nytt fönster.', a bare '.pdf') -- from the pdf token to the end.
+# The listing's own separator counts as the lead-in: Kronofogden writes
+# "<title> KFMFS 2007:1 | pdf | 142 kB", and with only "," and "(" admitted
+# the cut left a bare pipe standing at the end of seven titles. A file size
+# is the same chrome where the row prints no file type at all ("115 kb
+# 2025-12-01", KBVFS 2025:1).
+RE_TITLE_CHROME = re.compile(
+    r"\s*[,(|]?\s*(?:pdf|\.pdf|\d+(?:[.,]\d+)?\s*[kKmM][bB]\b).*$",
+    re.IGNORECASE | re.DOTALL)
+# What a listing row runs the title into: the printed sentence's own
+# semicolon, or the decision clause where the row prints one. The clause is
+# recognised by its date, so "beslutade av Alkoholinspektionen" -- which is
+# part of FHIFS 2010:2's title -- is not read as one.
+RE_ROW_TITLE_END = re.compile(r";|\b(?:beslutad|beslutat)\w*\s+den\s+\d",
+                              re.IGNORECASE)
 # words that make a harvest "title" a role label, not a title
 RE_TITLE_BOILERPLATE = re.compile(
     r"\b(?:grundförfattning|ändringsförfattning|konsoliderad(?:\s+version)?|"
@@ -1226,6 +1303,18 @@ def _strip_own_designation(title, identifier):
         if (RE_TITLE_BOILERPLATE.search(tail)
                 and any(names_itself(m) for m in RE_DESIGNATION.finditer(tail))):
             title = title[:opened].strip(" -–—:").strip()
+        # and a bare one the listing files after the title instead of before
+        # it ("… av Kronofogdemyndighetens fältpersonal KFMFS 2007:1"). Bare,
+        # not parenthesised: "(KFMFS 2007:1)" at the end is how a föreskrift
+        # is cited and belongs to the title, which is why the rule above asks
+        # for a role word before it removes such a parenthesis.
+        trailing = title.rstrip(" -–—:|.,")
+        last = None
+        for m in RE_DESIGNATION.finditer(trailing):
+            last = m
+        if (last and last.end() == len(trailing) and names_itself(last)
+                and trailing[last.start() - 1:last.start()] != "("):
+            title = trailing[:last.start()].strip(" -–—:|,")
         return title
     return re.sub(r"^%s\s*[-–—:]*\s*" % re.escape(identifier), "", title).strip()
 
@@ -1237,6 +1326,13 @@ def clean_title(raw, identifier):
     text, which is file chrome rather than a title (F7). None sends the
     caller to the PDF's own rubric (title_from_body)."""
     t = join_wrapped(normalise(RE_TITLE_CHROME.sub("", raw or ""))).strip()
+    # the listing's other columns, where the row runs them into the title cell
+    # ("… uppdragsverksamhet Beslutade den 24 november 2025. Träder i kraft
+    # den 1 januari 2026.", KBVFS 2025:1): a title ends where the decision
+    # clause begins, in a listing row as in the printed masthead.
+    end = RE_ROW_TITLE_END.search(t)
+    if end and end.start() >= TITLE_MIN:
+        t = t[:end.start()].strip()
     if identifier:
         t = _strip_own_designation(t, identifier)
     # what remains once designations, numbers and role words go: a title has
@@ -1247,6 +1343,12 @@ def clean_title(raw, identifier):
 
 
 TITLE_MAX = 300      # a subject longer than this is extraction running on
+#: the earliest offset in a harvest title where the decision clause may cut it
+#: -- a floor on the cut in :func:`clean_title`, not a test of what a title is.
+#: A row whose clause stands earlier than this prints no title before it, and
+#: the cut would leave nothing. No stored harvest title trips the floor: of
+#: 12,473, the 685 that print a clause all print it past character 20.
+TITLE_MIN = 20
 # lower-case words that join an agency's name ("Myndigheten *för* civilt
 # försvars", "Post- *och* telestyrelsens")
 _NAME_JOINERS = {"för", "och", "av", "i", "med", "samt", "vid", "om"}
@@ -1329,6 +1431,12 @@ def _agency_possessive(before):
 # genuinely opens the way it continues ("Föreskrifter om föreskrifter…") would
 # be truncated. Every real case runs to 40+ characters.
 UNDOUBLE_MIN = 20
+#: how much of the masthead can stand between the two printings. The utgivare
+#: line is what lands there: "Utgivare: Ulf Yngvesson" names no agency after
+#: the comma, so RE_MASTHEAD_BOILERPLATE removes the label and leaves the
+#: person's name between the two copies (22 of Strålsäkerhetsmyndighetens 47
+#: documents, whose title was then published twice over or not at all).
+UNDOUBLE_GAP = 40
 
 
 def undouble(title):
@@ -1343,11 +1451,24 @@ def undouble(title):
 
     The split is found from the longest candidate down, so a title that repeats
     a short phrase inside itself keeps it -- only a head that begins what
-    follows it is a second printing."""
+    follows it is a second printing. The second printing may start a little
+    way in rather than straight away (:data:`UNDOUBLE_GAP`), since the masthead
+    can leave a line of its own standing between the two."""
     for i in range(len(title) - UNDOUBLE_MIN, UNDOUBLE_MIN - 1, -1):
         head, rest = title[:i].strip(), title[i:].strip()
-        if len(head) >= UNDOUBLE_MIN and rest.startswith(head):
-            return rest
+        if len(head) < UNDOUBLE_MIN:
+            continue
+        at = rest.find(head)
+        if at < 0 or at > UNDOUBLE_GAP:
+            continue
+        # what stands in the gap has to be masthead furniture, not the title
+        # carrying on: every word of it begins with a capital, as a person's
+        # name does. Without that test "Försvarsmaktens föreskrifter om
+        # upphävande av Försvarsmaktens föreskrifter (FFS 1994:32) om
+        # befordringsberedningar" read its own opening as a first printing and
+        # published the repealed regulation's title as its own.
+        if all(w[:1].isupper() or not w[:1].isalpha() for w in rest[:at].split()):
+            return rest[at:]
     return title
 
 
@@ -1379,7 +1500,9 @@ def title_from_masthead(blocks, start):
         # a bare type word with no subject is the samling's own name or a
         # running header, not this document's title
         if stop and len(title) > len(word.group()) + 4:
-            return undouble(" ".join(title.split()))
+            title = RE_TITLE_FOOTNOTE.sub("", undouble(" ".join(title.split())))
+            if _states_a_subject(title):
+                return title
     return None
 
 
@@ -1429,7 +1552,7 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
     blocks, notes = parse_body(_pages(path, patch_key), identifier)
     _repair_ocr(blocks)
-    start = _body_start(blocks)
+    start, separated = _body_start(blocks)
     masthead = _repair_ocr_text(_full_text(blocks[:start]))
     # the notes are read for metadata with the body: the "Jfr … direktiv" clause
     # that names what a föreskrift genomför is *printed as* a page-foot note, so
@@ -1440,8 +1563,14 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
     meta["publisher"] = extract_publisher(masthead or _full_text(blocks))
-    # the body's own rubric, for records whose harvest title is link chrome (F7)
-    meta["title"] = title_from_masthead(blocks, start)
+    # the body's own rubric, for records whose harvest title is link chrome (F7).
+    # A document that separates no masthead at all (no §§, no preamble verb, no
+    # decision line -- a one-page repeal notice such as RPSFS 2008:8) still
+    # prints its title, so its whole run is read instead of the empty slice
+    # blocks[:0], which could only ever yield None. A document whose *first*
+    # block is the boundary separates an empty masthead on purpose, and reading
+    # its whole body for a title would take a heading out of the operative text.
+    meta["title"] = title_from_masthead(blocks, start if separated else len(blocks))
     ingress = _ingress_start(blocks, start)
     body = ([Block("ingress", "", blocks[ingress].page,
                    children=blocks[ingress:start])] if ingress < start else []) \
@@ -1545,7 +1674,7 @@ def parse_consolidation(path, identifier, fs, base_ars, base_lop, parser):
     (0 of 150 sampled), which is why the discard went unnoticed."""
     blocks, notes = parse_body(_pages(path), identifier)
     _repair_ocr(blocks)
-    start = _body_start(blocks)
+    start = _body_start(blocks)[0]
     masthead = _full_text(blocks[:start]) or _full_text(blocks)
     return (_structure(blocks[start:], parser), footnote_nodes(notes, parser),
             konsoliderad_tom(masthead, fs, base_ars, base_lop),
@@ -1749,12 +1878,12 @@ def parse_consolidation_html(path, parser, identifier=None, fs=None,
             continue
         paras.append(Para(text, bold=el.name not in ("p", "li")))
     blocks = classify(paras, None)
-    _rank_rubriker(blocks, _body_start(blocks))
+    _rank_rubriker(blocks, _body_start(blocks)[0])
     refs.sort(key=lambda r: (int(r[1]), int(r[2])))
     tom = (regulation_uri(_fs_key(refs[-1][0]), refs[-1][1], refs[-1][2])
            if refs else None)
     # an HTML consolidation has no page-foot rule, so it carries no notes
-    return _structure(blocks[_body_start(blocks):], parser), [], tom, refs
+    return _structure(blocks[_body_start(blocks)[0]:], parser), [], tom, refs
 
 
 def andrar_target(title, fs, self_uri):
