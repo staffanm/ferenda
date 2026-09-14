@@ -177,10 +177,37 @@ def stodav_clause(text):
 # 2019:71), like "saknr." and "m.m." not sentence ends.
 # The verb is prose, so never all capitals: "UPPHÄVS" alone is the register's
 # stamp again, split from its "GENOM" line (SJVFS 2012:24).
-RE_ERSATTER = re.compile(r"\b(?-i:[eE]rsätter|[uU]pphäv(?:er|s)(?!\s+[gG][eE][nN][oO][mM]\b)|[uU]pphör(?!\s+(?:att\s+)?gälla))\b"
-                         r"(.{0,1800}?)(?:(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])"
-                         r"|\n\s*\n|_{5,}|$)",
-                         re.DOTALL | re.I)
+RE_ERSATTER = re.compile(
+    r"\b(?:[eE]rsätter|[uU]pphäv(?:er|s)(?!\s+[gG][eE][nN][oO][mM]\b)"
+    r"|[uU]pphör(?!\s+(?:att\s+)?gälla))\b")
+ERSATTER_WINDOW = 1800      # longest real clause seen is SJVFS 2021:48's ~1 500
+# Where that clause stops: the sentence end, a blank line or the signature
+# rule. The capital after the full stop is read case-sensitively -- folded to
+# any letter (which is what re.IGNORECASE did to the class), "upphävs 1.
+# föreskriften (RFS 2001:7) …" ended at the item number and the target was
+# never reached (RFS 2002:9).
+RE_ERSATTER_END = re.compile(
+    r"(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])"
+    r"|\n\s*\n|_{5,}")
+
+
+def ersatter_clauses(text):
+    """Every "ersätter/upphäver(s) …" clause of `text`, each as (its object,
+    the object plus the text just past it -- where the date stands).
+
+    The window is bounded first and cut at the sentence end after, the way
+    :func:`stodav_clause` reads the bemyndigande, rather than by one pattern
+    that has to find the end before it matches at all: where the page foot
+    runs the sentence straight into the signature line ("… 2013.Socialstyrelsen
+    LARS-ERIK HOLM") the window holds no sentence end, and the clause was then
+    not read at all -- SOSFS 2008:17 names two föreskrifter it repeals and
+    recorded neither."""
+    for verb in RE_ERSATTER.finditer(text):
+        window = text[verb.end():verb.end() + ERSATTER_WINDOW]
+        end = RE_ERSATTER_END.search(window)
+        obj = window[:end.start()] if end else window
+        past = verb.end() + len(obj)
+        yield obj, obj + " " + text[past:past + REPEAL_DATE_WINDOW]
 # the target *before* the verb, in an ikraftträdande sentence: "träder i kraft
 # den 28 februari 2003, då Livsmedelsverkets föreskrifter (SLVFS 1993:18) om
 # material … upphör att gälla" (LIVSFS 2003:2). Bounded by the sentence, whose
@@ -194,9 +221,21 @@ RE_SKALL_UPPHORA = re.compile(r"\bska(?:ll)?\s+([^.;]{0,300}?)\s+upphöra\s+att\
 # ("upphör gälla", SJVFS 2019:6, drops the "att")
 RE_UPPHOR_BEFORE = re.compile(r"([^;]{0,2500}?)\b(?:upphör|ska(?:ll)?\s+upphöra)\s+(?:att\s+)?gälla",
                               re.DOTALL | re.I)
+# the same shape with "upphävs" for the verb, which RE_ERSATTER reads only
+# forwards: "Dessa föreskrifter träder i kraft den 1 juli 2006 då
+# Kammarkollegiets föreskrifter (KAMFS 1998:1) … upphävs" (KAMFS 2006:1). The
+# subordinating "då" is required -- a bare backwards "upphävs" would read the
+# subject of "Genom författningen upphävs …" as the object -- and "upphävs
+# genom" is the register's stamp, as in RE_ERSATTER.
+RE_UPPHAVS_BEFORE = re.compile(
+    r"\bdå\b([^;]{0,600}?)\bupphävs\b(?!\s+[gG][eE][nN][oO][mM]\b)", re.DOTALL | re.I)
 # where that sentence starts: the last full stop followed by a capital
-# ("m.m." and "t.o.m." are not sentence ends)
-RE_SENTENCE_START = re.compile(r"(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])")
+# ("m.m." and "t.o.m." are not sentence ends), or the rule a föreskrift draws
+# above its ikraftträdande clause -- without it the clause runs on back into
+# the last paragraf of the body, whose "23 §" then reads as a repeal of a
+# provision and drops the regulation the clause names (RIFS 2018:2)
+RE_SENTENCE_START = re.compile(r"(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])"
+                               r"|_{5,}")
 # a repeal of a *provision* names one before the regulation: "att 17 § verkets
 # föreskrifter (LIVSFS 2005:20) … ska upphöra att gälla" (LIVSFS 2011:8),
 # "bilaga 2 till …", "övergångsbestämmelserna till …" -- the regulation stays
@@ -247,9 +286,17 @@ def _repeal_object(segment, whole=False, tail=False):
 # sentence or the signature rule; each item is cut at "om ändring i" like a
 # title, so repealing an amendment leaves its base regulation alone.
 RE_UPPHOR_LIST = re.compile(
-    r"(?:följande|nedanstående)\s+(?:föreskrifter|allmänna\s+råd|författningar|kungörelser)\b"
+    # the agency may stand between the announcement and the noun: "att följande
+    # av Riksarkivets allmänna råd för kommuner och landsting ska upphöra att
+    # gälla:" (RA-FS 2011:1, and four more RA-FS documents)
+    r"(?:följande|nedanstående)\s+(?:av\s+\S{1,40}\s+)?"
+    r"(?:föreskrifter|allmänna\s+råd|författningar|kungörelser)\b"
     r"[^:]{0,160}?(?:upphävs|upphöra\s+att\s+gälla|upphör\s+att\s+gälla)[^:]{0,160}?"
-    r"(?::|nämligen|enligt\s+följande\.)\s*(.{0,12000}?)"
+    # the announcement may end in a full stop and a line break where the list
+    # that follows it needs no colon ("Följande allmänna råd upphör att gälla
+    # den 15 september 2008.\nRikspolisstyrelsens allmänna råd (RPSFS
+    # 2000:13) om …", RPSFS 2008:8)
+    r"(?::|nämligen|enligt\s+följande\.|\.\s*\n)\s*(.{0,12000}?)"
     r"(?=\n\s*\n|Dessa\s+föreskrifter\s+träder|_{5,}|$)", re.DOTALL | re.I)
 RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-zåäö][.)]|[−•–-])\s)")
 # the enumerated passive: "Genom författningen upphävs 1. Statens jordbruksverks
@@ -273,7 +320,14 @@ RE_UPPHORA = re.compile(r"\b(?:beslutar|föreskriver)\b.{0,200}?\batt\b(.*?)\bsk
 # a förteckning över gällande föreskrifter, the list 18 c § författnings-
 # samlingsförordningen (1976:725) has an agency publish (LIVSFS 2007:1, whose
 # masthead is that very line; SLVFS 1997:3, OCR'd as "fö rteckningar")
-RE_FORTECKNING = re.compile(r"\bf[öo]\s?rteckning(?:en|ar)?\s+över\s+(?:gällande\s+)?(?:föreskrifter|författningar)"
+# The indefinite article says the sentence *mentions* one instead: every SOSFS
+# cover prints "Socialstyrelsen ger årligen ut en förteckning över gällande
+# föreskrifter och allmänna råd", and that standing line disarmed the repeal
+# step for all 58 SOSFS documents on the first two pages of which it stands --
+# SOSFS 2008:17 names two föreskrifter it repeals and recorded neither. A
+# document that *is* a förteckning prints the phrase as its own title.
+RE_FORTECKNING = re.compile(r"(?<!\ben\s)\bf[öo]\s?rteckning(?:en|ar)?\s+över\s+"
+                            r"(?:gällande\s+)?(?:föreskrifter|författningar)"
                             r"|18\s*c\s*§\s*författningssamlingsförordningen", re.I)
 # noun form in a title ("föreskrift om upphävande av … (BOLFS 2006:1)")
 RE_UPPHAVANDE = re.compile(r"\bupphävande\s+av\b(?!\s+vissa\s+(?:regler|bestämmelser|delar)\b|\s+\d+\s*§)(.*?)(?:\.|$)",
@@ -314,8 +368,15 @@ RE_TITLE_DESIGNATION = re.compile(
 # is not SJVFS 2005:1 om ansökan om vissa jordbrukarstöd); allmänna råd in
 # the författningssamling print its designation or share a "föreskrifter och
 # allmänna råd" title.
+# The singular definite is the same reference: Riksdagsförvaltningen writes
+# "Genom föreskriften upphävs föreskriften (2001:5) om särskilt betalkort …"
+# (RFS 2015:5), never naming the agency or the series. The bare singular is
+# not: "föreskrift om övertagande av uppgiften enligt 7 a §
+# förvaltningsprocesslagen (1971:291)" (KVVFS 2005:7) describes a regulation
+# and names an act.
 RE_BARE_OWN_REF = re.compile(
-    r"(?:föreskrifter(?:na)?(?:\s+och\s+allmänna\s+råd)?|kungörelsen?)[^()]*\((\d{4}):(\d+)\)")
+    r"(?:föreskrift(?:en|er(?:na)?)(?:\s+och\s+allmänna\s+råd)?|kungörelsen?)"
+    r"[^()]*\((\d{4}):(\d+)\)")
 # the issuing agency, read from the masthead (searched over a whitespace-collapsed
 # copy, since two-column extraction breaks the lines apart). Three signals, tried
 # in order:
@@ -725,8 +786,13 @@ def role_declaration(masthead, harvest_title):
     surviving copy of the "om ändring i …" phrase, so both are searched. The
     harvest title cannot be trusted *alone* -- it is link chrome often enough
     that `clean_title` exists to throw it away -- but as a second place to find
-    a declaration the masthead lost, it costs nothing."""
-    return f"{masthead} {harvest_title or ''}"
+    a declaration the masthead lost, it costs nothing.
+
+    Both are read through `normalise`: a masthead and a listing title are
+    exactly the strings a designation is read out of, and the ändring or
+    repeal a declaration states is named by one ("RA–FS 1991:1", RA-FS
+    2019:2, whose en dash matched no designation at all)."""
+    return normalise(f"{masthead} {harvest_title or ''}")
 
 
 #: how far past a repeal clause its effective date can stand ("… ska upphöra
@@ -762,8 +828,26 @@ def repeal_date(around):
     return "%04d-%02d-%02d" % (year, month, calendar.monthrange(year, month)[1])
 
 
+def _reprinted(sentence, own):
+    """Whether a transitional sentence states an entry into force that is not
+    this document's own -- so the repeal it declares is somebody else's.
+
+    An omtryck reprints the base regulation's whole transitional block, repeal
+    clause and all. VALFS 2013:1 prints VALFS 2008:1's "träder i kraft den 1
+    januari 2009, då Valmyndighetens föreskrifter (VALFS 2006:1) ska upphöra
+    att gälla" above its own 2014 clause, and so claimed a repeal VALFS 2008:1
+    had already made. Each such sentence dates itself, which is what separates
+    the reprint from the document's own."""
+    dates = {_iso(*m.groups()) for m in RE_IKRAFT.finditer(sentence)}
+    return bool(own and dates) and own not in dates
+
+
 def _repeal_targets(target, fs):
-    """The regulations a repeal clause's object names, as uris."""
+    """The regulations a repeal clause's object names, as uris. The object is
+    read through `normalise`, since it is a string a designation is read out of
+    -- a dash the extraction set as an en dash ("RA–FS 1991:1") is that
+    designation, and matched nothing before it was folded."""
+    target = normalise(target)
     uris = {_ref_uri(_own_series_typo(f, fs), y, n)
             for f, y, n in RE_FS_REF.findall(target)}
     if fs:
@@ -827,15 +911,34 @@ def extract_metadata(text, declaration, parser, fs=None):
         # step is skipped: returning from the whole function here cost every
         # document whose cover page tripped this pattern its amendment
         # relations and its dates too (AFS 2023:1-15).
-        for rx, kind, hay in ((RE_ERSATTER, {}, listed),
-                              (RE_UPPHORA, {"tail": True}, text),
-                              (RE_SKALL_UPPHORA, {"tail": True}, text),
-                              (RE_UPPHOR_BEFORE, {"tail": True}, text),
-                              (RE_UPPHOR_LIST, {"whole": True}, listed),
-                              (RE_UPPHAVS_LIST, {"whole": True}, listed)):
-            clauses += [(_repeal_object(m.group(1), **kind),
-                         m.group(1) + " " + hay[m.end():m.end() + REPEAL_DATE_WINDOW])
-                        for m in rx.finditer(hay)]
+        clauses += [(_repeal_object(obj), around)
+                    for obj, around in ersatter_clauses(listed)]
+        # the forms whose target stands before the verb, each read out of one
+        # ikraftträdande or decision sentence -- and only where that sentence
+        # is the document's own (:func:`_reprinted`)
+        for rx in (RE_UPPHORA, RE_SKALL_UPPHORA, RE_UPPHOR_BEFORE, RE_UPPHAVS_BEFORE):
+            for m in rx.finditer(text):
+                # the whole sentence the clause stands in, not the captured
+                # object alone: RE_UPPHAVS_BEFORE captures only what stands
+                # between "då" and "upphävs", while the entry into force that
+                # dates the sentence stands before the "då" ("… träder i kraft
+                # den 1 juli 2006 då Kammarkollegiets föreskrifter (KAMFS
+                # 1998:1) … upphävs", KAMFS 2006:1). Read the object alone, the
+                # guard saw no date in that form and could never fire for it.
+                if _reprinted(RE_SENTENCE_START.split(text[:m.end()])[-1],
+                              meta["ikrafttradandedatum"]):
+                    continue
+                clauses.append((_repeal_object(m.group(1), tail=True),
+                                m.group(1) + " "
+                                + text[m.end():m.end() + REPEAL_DATE_WINDOW]))
+        # and the enumerated list forms, whose object is the list itself. The
+        # date is read from the whole match: a list announces one date for
+        # every item it holds, and announces it before the colon ("Följande
+        # allmänna råd upphör att gälla den 15 september 2008.")
+        for rx in (RE_UPPHOR_LIST, RE_UPPHAVS_LIST):
+            clauses += [(_repeal_object(m.group(1), whole=True),
+                         m.group(0) + " " + listed[m.end():m.end() + REPEAL_DATE_WINDOW])
+                        for m in rx.finditer(listed)]
     # the noun form in the declaration (masthead + harvest title), cut the same
     # way: "upphävande av X (HSLF-FS 2019:43) om ändring i Y (HSLF-FS 2019:32)"
     # repeals the amendment X, and Y stays in force
@@ -1723,11 +1826,20 @@ def parse_record(record, root):
                         written=approximate_date(arsutgava))
 
     reg_file = files.get("regulation") or None
-    structure, meta, notes = [], {}, []
+    structure, notes = [], []
     if reg_file:
         structure, meta, notes = parse_pdf(
             body_path(root, fs, reg_file), record["identifier"], parser,
             ("foreskrift", basefile), record.get("title"), fs=fs)
+    else:
+        # A record with no PDF still declares what it is in its harvest title,
+        # and a repeal notice's title names the regulation it repeals
+        # ("Förordning om upphävande av förordningen (SKOLFS 1991:52) om
+        # statsbidrag …", SKOLFS 2001:14). Reading the declaration is what
+        # already mints 294 of the 301 SKOLFS repeal notices; only the seven
+        # whose PDF never arrived recorded nothing.
+        meta = extract_metadata("", role_declaration("", record.get("title")),
+                                parser, fs=fs)
 
     # the PDF masthead is the authoritative issuer; the harvest label (the current
     # custodian agency) is only the fallback when the PDF names none

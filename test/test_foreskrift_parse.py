@@ -1894,3 +1894,180 @@ def test_clean_title_drops_the_parenthesis_that_names_the_document_itself():
     assert clean_title("Föreskrifter om ändring i Konkurrensverkets "
                        "föreskrifter (KKVFS 2020:2) om avgifter", "KKVFS 2020:3") \
         == "Föreskrifter om ändring i Konkurrensverkets föreskrifter (KKVFS 2020:2) om avgifter"
+
+
+# --- repeal clauses the audit of September 2026 found unread -----------------
+
+def test_extract_metadata_upphaver_target_before_upphavs():
+    # KAMFS 2006:1 (verbatim): the subordinate "då …" clause names the target
+    # before the verb, and the verb is "upphävs", which RE_ERSATTER reads only
+    # forwards -- on this sentence it captured nothing at all
+    text = ("Dessa föreskrifter träder i kraft den 1 juli 2006 då Kammarkollegiets "
+            "föreskrifter (KAMFS 1998:1) till förordningen (1993:1138) om hantering "
+            "av statliga fordringar upphävs.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/kamfs/1998:1"]
+
+
+def test_extract_metadata_upphaver_list_names_the_agency_after_foljande():
+    # RA-FS 2011:1 (verbatim): "följande av <agency>s allmänna råd … ska
+    # upphöra att gälla:" -- the agency stands between the announcement and
+    # the noun, and five RA-FS documents recorded no target at all
+    text = ("Riksarkivet föreskriver att följande av Riksarkivets allmänna råd för "
+            "kommuner och landsting ska upphöra att gälla: 1. Riksarkivets allmänna "
+            "råd (RA-FS 1997:8) om bevarande och gallring av vissa handlingar. "
+            "2. Riksarkivets allmänna råd (RA-FS 2002:2) om bevarande och gallring "
+            "av handlingar rörande utbildningsväsendet.\n\n"
+            "Denna författning träder i kraft omedelbart.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="rafs")
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/rafs/1997:8",
+                                       "https://lagen.nu/rafs/2002:2"]
+
+
+def test_extract_metadata_upphaver_a_bare_ref_after_the_singular():
+    # RFS 2015:5 (verbatim): Riksdagsförvaltningen names neither agency nor
+    # series, and writes the singular definite "föreskriften (2001:5)"
+    text = ("1. Denna föreskrift träder i kraft den 1 juli 2015. 2. Genom "
+            "föreskriften upphävs föreskriften (2001:5) om särskilt betalkort "
+            "för talmannen och de vice talmännen.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="rfs")
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/rfs/2001:5"]
+
+
+def test_extract_metadata_upphaver_past_a_lower_case_list_item():
+    # RFS 2002:9 (verbatim): the list item opens with a lower-case noun, so
+    # RE_ENUMERATOR leaves it a number -- and the clause's own sentence end,
+    # folded to any letter by re.IGNORECASE, stopped at "upphävs 1. "
+    text = ("Genom föreskriften upphävs 1. föreskriften (RFS 2001:7) om "
+            "tillhandahållande och nyttjande av arbetsrum och "
+            "övernattningslägenheter m.m. för riksdagens ledamöter och "
+            "2. riktlinjerna (2001:3) för tillhandahållande av arbetsrum.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="rfs")
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/rfs/2001:7"]
+
+
+def test_extract_metadata_upphaver_past_the_signature_rule():
+    # RIFS 2018:2 (verbatim, shortened): the rule the föreskrift draws above
+    # its ikraftträdande clause ends the sentence. Without it the clause ran
+    # back into the last paragraf, whose "23 §" read as a repeal of a
+    # provision and dropped the RNFS regulation the clause names.
+    text = ("Upplysningar om utvecklingen på revisionsmarknaden\n"
+            "23 § Revisorer och registrerade revisionsbolag är skyldiga att på "
+            "Revisorsinspektionens begäran lämna de upplysningar som inspektionen "
+            "behöver. _________________ Dessa föreskrifter träder i kraft den "
+            "1 juli 2018, när Revisorsnämndens föreskrifter (RNFS 2001:2) om "
+            "villkor för revisorers verksamhet ska upphöra att gälla.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/rnfs/2001:2"]
+
+
+def test_extract_metadata_ignores_a_repeal_an_omtryck_reprints():
+    # VALFS 2013:1 (verbatim): the omtryck reprints VALFS 2008:1's whole
+    # transitional block. Its 2009 clause repealed VALFS 2006:1 and is dated
+    # 2009; this document's own clause is the last one and repeals nothing.
+    text = ("Dessa föreskrifter träder i kraft den 1 januari 2009, då "
+            "Valmyndighetens föreskrifter (VALFS 2006:1) ska upphöra att gälla. "
+            "Dessa föreskrifter träder i kraft den 1 januari 2010. "
+            "Dessa föreskrifter träder i kraft den 1 februari 2014")
+    declaration = ("Valmyndigheten föreskriver med stöd av 16 § valförordningen "
+                   "(2005:874) i fråga om Valmyndighetens föreskrifter (VALFS 2008:1)")
+    meta = extract_metadata(text, declaration, sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["ikrafttradandedatum"] == "2014-02-01"
+    assert _uris(meta["upphaver"]) == []
+    # the base regulation itself, whose own clause that sentence is, keeps it
+    meta = extract_metadata(text.split(". Dessa")[0] + ".", "",
+                            sfs_parser("foreskrift", PARSE_TYPES))
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/valfs/2006:1"]
+
+
+def test_extract_metadata_ignores_a_reprinted_da_upphavs_clause():
+    # the same omtryck rule for the other form the transitional block takes:
+    # "träder i kraft den 1 juli 2006 då … (KAMFS 1998:1) … upphävs". The date
+    # that dates the sentence stands *before* the "då", outside what
+    # RE_UPPHAVS_BEFORE captures, so the guard read no date and could never
+    # fire for this form.
+    text = ("Dessa föreskrifter träder i kraft den 1 juli 2006 då "
+            "Kammarkollegiets föreskrifter (KAMFS 1998:1) om resegaranti "
+            "upphävs. Dessa föreskrifter träder i kraft den 1 mars 2020.")
+    declaration = ("Kammarkollegiet föreskriver i fråga om Kammarkollegiets "
+                   "föreskrifter (KAMFS 2006:1) om resegaranti")
+    meta = extract_metadata(text, declaration, sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["ikrafttradandedatum"] == "2020-03-01"
+    assert _uris(meta["upphaver"]) == []
+    # KAMFS 2006:1 itself, whose own clause that sentence is, keeps the repeal
+    meta = extract_metadata(text.split(". Dessa")[0] + ".", "",
+                            sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["ikrafttradandedatum"] == "2006-07-01"
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/kamfs/1998:1"]
+
+
+def test_extract_metadata_repeals_where_the_cover_only_mentions_a_forteckning():
+    # Every SOSFS cover prints "Socialstyrelsen ger årligen ut en förteckning
+    # över gällande föreskrifter och allmänna råd". That standing line is not
+    # this document saying it *is* a förteckning, and it disarmed the repeal
+    # step for all 58 SOSFS documents that print it (SOSFS 2008:17).
+    text = ("Socialstyrelsen ger årligen ut en förteckning över gällande "
+            "föreskrifter och allmänna råd. 2. Genom författningen upphävs "
+            "– Socialstyrelsens föreskrifter (SOSFS 1996:26) Målbeskrivningar, "
+            "– Socialstyrelsens föreskrifter och allmänna råd (SOSFS 1996:27) "
+            "Läkarnas specialiseringstjänstgöring m.m.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sosfs/1996:26",
+                                       "https://lagen.nu/sosfs/1996:27"]
+    # a document that *is* one still repeals nothing (LIVSFS 2007:1)
+    meta = extract_metadata("Förteckning över gällande föreskrifter. Genom denna "
+                            "upphävs Livsmedelsverkets föreskrifter (SLVFS 1978:21) "
+                            "om undersökning.", "",
+                            sfs_parser("foreskrift", PARSE_TYPES))
+    assert _uris(meta["upphaver"]) == []
+
+
+def test_extract_metadata_upphaver_a_list_a_full_stop_introduces():
+    # RPSFS 2008:8 (verbatim): the announcement ends in a full stop and the
+    # list follows on the next line, with no colon to introduce it
+    text = ("Följande allmänna råd upphör att gälla den 15 september 2008.\n"
+            "Rikspolisstyrelsens allmänna råd (RPSFS 2000:13) om åtgärder vid "
+            "dykolyckor med dödlig utgång (FAP 416-1).")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == [["https://lagen.nu/rpsfs/2000:13", "2008-09-15"]]
+
+
+def test_ersatter_clause_reads_a_window_with_no_sentence_end_in_it():
+    # a page foot that runs the sentence into the signature line leaves the
+    # window without a terminator; the clause is then read to the window's end
+    # rather than not read at all
+    text = "Genom författningen upphävs Socialstyrelsens föreskrifter (SOSFS 1996:26)" \
+        + " och andra bestämmelser om detta" * 90
+    [(obj, _around)] = list(fp.ersatter_clauses(text))
+    assert obj.startswith(" Socialstyrelsens föreskrifter (SOSFS 1996:26)")
+    assert len(obj) == fp.ERSATTER_WINDOW
+
+
+def test_repeal_target_reads_a_designation_the_extraction_set_with_an_en_dash():
+    # RA-FS 2019:2's own title prints "RA–FS 1991:1" with an en dash, which
+    # matched no designation and lost the document its ändrar target
+    declaration = ("Föreskrifter om ändring av Riksarkivets föreskrifter "
+                   "(RA–FS 1991:1) och allmänna råd om arkiv hos statliga "
+                   "myndigheter; Riksarkivet föreskriver i fråga om "
+                   "Riksarkivets föreskrifter (RA–FS 1991:1)")
+    meta = extract_metadata("", fp.role_declaration(declaration, None),
+                            sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["andrar"] == ["https://lagen.nu/rafs/1991:1"]
+    # and the same designation standing in a repeal clause's object
+    text = ("Genom denna författning upphävs Riksarkivets föreskrifter "
+            "(RA–FS 1991:1) om arkiv. Den träder i kraft omedelbart.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/rafs/1991:1"]
+
+
+def test_parse_record_reads_a_repeal_notice_that_has_no_pdf(tmp_path):
+    # SKOLFS 2001:14: the register served no PDF, so nothing was parsed at all
+    # -- but the title alone names the regulation the notice repeals
+    record = {"fs": "skolfs", "basefile": "skolfs/2001:14",
+              "identifier": "SKOLFS 2001:14",
+              "title": "Förordning om upphävande av förordningen (SKOLFS 1991:52) "
+                       "om statsbidrag för riksrekryterande teknisk vuxenutbildning",
+              "files": {"regulation": None}}
+    reg = parse_record(record, tmp_path)
+    assert _uris(reg.upphaver) == ["https://lagen.nu/skolfs/1991:52"]
+    assert reg.structure == []
