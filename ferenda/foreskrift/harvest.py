@@ -657,20 +657,65 @@ def newest_first(refs):
                   reverse=True)
 
 
+# What an agency calls the rest of its samling. Thirteen scopes publish their
+# repealed regulations on a second page, linked from the listing the harvest
+# reads, and never enumerated: 177 documents for MCF, 107 for PRV, 66 for IAF.
+# The repeal that ended a regulation lives on that page, so the gap took the
+# repeal relations with it.
+RE_ARCHIVE_LINK = re.compile(
+    r"upphävd|upphäva|upphörd|upphört|tidigare\s+(?:föreskrifter|regler|författningar)"
+    r"|äldre\s+(?:föreskrifter|regler|författningar)|historiska\s+föreskrifter", re.I)
+#: at most this many archive pages are followed from one listing
+ARCHIVE_MAX = 3
+
+
+def archive_links(soup, agency):
+    """The listings this index page links as its own archive of repealed
+    regulations, absolute and deduped.
+
+    Followed rather than configured: a scope that has to name the page in its
+    params only names it once someone has noticed it is missing, and for
+    thirteen scopes nobody had. Bounded to `ARCHIVE_MAX` pages on the agency's
+    own host, and read with the scope's own ``link_select`` -- an archive page
+    is the same listing with older rows. ``params["no_archive"]`` opts out for
+    an agency whose "upphävda" link is prose rather than a listing."""
+    if agency.params.get("no_archive"):
+        return []
+    host = agency.base_url.split("//")[-1].split("/")[0]
+    out = []
+    for a in soup.find_all("a", href=True):
+        if not RE_ARCHIVE_LINK.search(a.get_text(" ", strip=True)):
+            continue
+        url = absolute(agency.base_url, a["href"])
+        if host in url and url not in out:
+            out.append(url)
+    return out[:ARCHIVE_MAX]
+
+
 def indexed_enumerate(session, agency):
     """HTML index page(s) list every (base) regulation. params: ``link_select``
     (CSS selector for the anchors); ``index_urls`` (a list, for a per-year index;
     defaults to the single ``index_url``); ``direct`` (the anchor href is the PDF
     itself, not a landing page); ``skip_re`` (drop anchors whose text matches,
     e.g. companion 'Beslutspromemoria' PDFs); ``optional_pages`` (a per-year index
-    where a year with no regulations simply 404s -- skip it rather than abort)."""
+    where a year with no regulations simply 404s -- skip it rather than abort);
+    ``no_archive`` (do not follow the archive of repealed regulations the
+    listing links, :func:`archive_links`).
+
+    The listing an agency calls "gällande föreskrifter" is not the samling: the
+    regulations it has repealed sit on a second page, and so do the documents
+    that repealed them. Those pages are followed from the index rather than
+    listed per agency, because a scope only names one after someone notices it
+    is missing."""
     p = agency.params
     direct = p.get("direct", False)
     skip = re.compile(p["skip_re"]) if p.get("skip_re") else None
     method = "POST" if p.get("post_data") else "GET"      # some "show all" lists POST
     seen = set()
-    multi = len(p.get("index_urls", [agency.index_url])) > 1
-    for url in p.get("index_urls", [agency.index_url]):
+    queue = list(p.get("index_urls", [agency.index_url]))
+    multi = len(queue) > 1
+    archives_from = len(queue)      # pages past this point are followed archives
+    for url in queue:
         try:
             response = request(session, method, url, data=p.get("post_data"))
         except requests.exceptions.HTTPError as exc:
@@ -686,6 +731,9 @@ def indexed_enumerate(session, agency):
                 continue
             raise
         soup = BeautifulSoup(response.text, "html.parser")
+        if len(queue) == archives_from:        # from the listing itself, once
+            queue += [u for u in archive_links(soup, agency) if u not in queue]
+            multi = multi or len(queue) > archives_from
         for a in soup.select(p["link_select"]):
             text = a.get_text(" ", strip=True)
             if skip and skip.search(text):
@@ -699,25 +747,37 @@ def indexed_enumerate(session, agency):
 
 def paginated_enumerate(session, agency):
     """The index is paged HTML at ``page_url.format(page=N)`` (newest-first);
-    walk until a page yields no rows. params: ``page_url``, ``row_select``."""
+    walk until a page yields no rows. params: ``page_url``, ``row_select``,
+    ``no_archive`` (:func:`archive_links`).
+
+    The archive of repealed regulations the first page links is walked the same
+    way, page by page: MCF's "gällande regler" is 10 documents and its
+    "upphävda regler" 177."""
     seen = set()
-    page = 1
-    while True:
-        try:
-            response = request(session, "GET", agency.params["page_url"].format(page=page))
-        except requests.exceptions.RequestException as exc:
-            yield Skip("page %d: %r" % (page, exc))   # cannot trust paging past it
-            return
-        soup = BeautifulSoup(response.text, "html.parser")
-        rows = soup.select(agency.params["row_select"])
-        if not rows:
-            return
-        for a in rows:
-            docref = ref(agency, a.get_text(" ", strip=True), a.get("href", ""), seen)
-            if docref:
-                yield docref
-        page += 1
-        time.sleep(0.5)
+    queue = [agency.params["page_url"]]
+    followed = False
+    for base in queue:                       # grows once, from the first page
+        page = 1
+        while True:
+            try:
+                response = request(session, "GET", base.format(page=page))
+            except requests.exceptions.RequestException as exc:
+                yield Skip("page %d: %r" % (page, exc))   # cannot trust paging past it
+                break
+            soup = BeautifulSoup(response.text, "html.parser")
+            if not followed:
+                followed = True
+                queue += [u + ("&page={page}" if "?" in u else "?page={page}")
+                          for u in archive_links(soup, agency)]
+            rows = soup.select(agency.params["row_select"])
+            if not rows:
+                break
+            for a in rows:
+                docref = ref(agency, a.get_text(" ", strip=True), a.get("href", ""), seen)
+                if docref:
+                    yield docref
+            page += 1
+            time.sleep(0.5)
 
 
 def json_enumerate(session, agency):

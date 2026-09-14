@@ -544,36 +544,6 @@ def test_publisher_series_title_optional_genitive_and_capital_f():
     # (no genitive -s, capital F) -- still the agency
     mast = ("Krisberedskapsmyndigheten Författningssamling Utgivare: Maria Broms "
             "Hagelin SN 165 587 ISSN 1651-5587 KBMFS Krisberedskapsmyndighetens "
-
-
-def test_ref_files_a_designation_under_its_registered_slug_not_its_spelling():
-    # four samlingar carry a Swedish vowel their slug transliterates. Reading
-    # the slug straight off the printed designation filed 51 Elsäkerhetsverket
-    # documents under an "elsäkfs" no registry knows, beside the 37 already
-    # held under elsakfs.
-    seen = set()
-    r = _ref(_Agency(fs="elsakfs"), "ELSÄK-FS 2008:1 om elektriska anläggningar",
-             "/x/elsak-fs-2008-1.pdf", seen, direct=True)
-    assert r.basefile == "elsakfs/2008:1" and r.fs == "elsakfs"
-    # ÅFS is Åklagarmyndighetens; afs is Arbetsmiljöverkets
-    r = _ref(_Agency(fs="aafs"), "ÅFS 2021:3 om förundersökning", "/x/afs-2021-3.pdf",
-             seen, direct=True)
-    assert r.basefile == "aafs/2021:3"
-
-
-def test_every_registered_samling_cites_itself_the_way_it_is_printed():
-    # `printed_designation` falls back to the slug in capitals, which is right
-    # for the 40-odd samlingar whose slug is their designation and wrong for
-    # the ones carrying a Swedish vowel: ELSÄK-FS was cited as "ELSAKFS".
-    from ferenda.foreskrift.model import printed_designation
-    from ferenda.lib import datasets
-    for fs, row in datasets.load_fs_series().items():
-        designation = row.get("designation")
-        if not designation:
-            continue
-        printed = printed_designation("https://lagen.nu/%s/2020:1" % fs)
-        assert printed == "%s 2020:1" % designation, \
-            "%s is cited as %r, not as the %r it prints" % (fs, printed, designation)
             "föreskrifter 2008:1")
     assert extract_publisher(mast) == "Krisberedskapsmyndigheten"
 
@@ -616,3 +586,101 @@ def test_closed_series_agencies_registered_without_a_live_harvester():
         assert fs in REGISTRY
         assert REGISTRY[fs].enumerate is None and REGISTRY[fs].resolve is None
         assert REGISTRY[fs].designation == designation
+
+
+# --- the archive of repealed regulations the listing links -------------------
+
+ARCHIVE_INDEX = """
+<ul>
+  <li><a href="/regler/mcffs-2026-1/">MCFFS 2026:1 om ledningssystem</a></li>
+  <li><a href="/regler/upphavda-regler/">Upphävda regler</a></li>
+  <li><a href="https://someone.else/upphavda/">Upphävda hos annan</a></li>
+</ul>"""
+
+ARCHIVE_PAGE = """
+<ul><li><a href="/regler/srvfs-2004-3/">SRVFS 2004:3 om skriftlig redogörelse</a></li></ul>"""
+
+
+def test_archive_links_are_the_agencys_own_listing_of_repealed_regulations():
+    # thirteen scopes publish their repealed regulations behind a link like
+    # this one and never enumerated them, so the documents that repealed them
+    # were missing too. Another host's link is not this agency's archive.
+    agency = _Agency(fs="mcffs", base_url="https://www.mcf.se")
+    soup = BeautifulSoup(ARCHIVE_INDEX, "html.parser")
+    assert harvest.archive_links(soup, agency) == [
+        "https://www.mcf.se/regler/upphavda-regler/"]
+    opted_out = replace(agency, params={"no_archive": True})
+    assert harvest.archive_links(soup, opted_out) == []
+
+
+def test_indexed_enumerate_follows_the_archive_once(monkeypatch):
+    pages = {"https://www.mcf.se/regler/": ARCHIVE_INDEX,
+             "https://www.mcf.se/regler/upphavda-regler/": ARCHIVE_PAGE}
+    asked = []
+
+    def fake_request(_session, _method, url, **_kwargs):
+        asked.append(url)
+        return SimpleNamespace(text=pages[url])
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _seconds: None)
+    agency = _Agency(fs="mcffs", base_url="https://www.mcf.se",
+                     index_url="https://www.mcf.se/regler/",
+                     params={"link_select": "li a"})
+    refs = list(harvest.indexed_enumerate(None, agency))
+    # the repealed SRVFS regulation is reached, and keeps its own samling
+    assert [r.basefile for r in refs] == ["mcffs/2026:1", "srvfs/2004:3"]
+    # the archive is followed from the listing only, never from itself
+    assert asked == ["https://www.mcf.se/regler/",
+                     "https://www.mcf.se/regler/upphavda-regler/"]
+
+
+def test_paginated_enumerate_walks_the_archive_it_finds(monkeypatch):
+    # MCF's "gällande regler" is ten documents and its "upphävda regler" 177,
+    # each paged the same way
+    index = ('<div><a class="r" href="/x/mcffs-2026-1/">MCFFS 2026:1 om x</a>'
+             '<a href="/upphavda/">Upphävda regler</a></div>')
+    pages = {"https://www.mcf.se/regler/?page=1": index,
+             "https://www.mcf.se/regler/?page=2": "<div></div>",
+             "https://www.mcf.se/upphavda/?page=1":
+                 '<div><a class="r" href="/x/srvfs-2004-3/">SRVFS 2004:3 om y</a></div>',
+             "https://www.mcf.se/upphavda/?page=2": "<div></div>"}
+    monkeypatch.setattr(harvest, "request",
+                        lambda _s, _m, url, **_kw: SimpleNamespace(text=pages[url]))
+    monkeypatch.setattr(harvest.time, "sleep", lambda _seconds: None)
+    agency = _Agency(fs="mcffs", base_url="https://www.mcf.se",
+                     index_url="https://www.mcf.se/regler/",
+                     params={"page_url": "https://www.mcf.se/regler/?page={page}",
+                             "row_select": "a.r"})
+    refs = list(harvest.paginated_enumerate(None, agency))
+    assert [r.basefile for r in refs] == ["mcffs/2026:1", "srvfs/2004:3"]
+
+
+def test_ref_files_a_designation_under_its_registered_slug_not_its_spelling():
+    # four samlingar carry a Swedish vowel their slug transliterates. Reading
+    # the slug straight off the printed designation filed 51 Elsäkerhetsverket
+    # documents under an "elsäkfs" no registry knows, beside the 37 already
+    # held under elsakfs.
+    seen = set()
+    r = _ref(_Agency(fs="elsakfs"), "ELSÄK-FS 2008:1 om elektriska anläggningar",
+             "/x/elsak-fs-2008-1.pdf", seen, direct=True)
+    assert r.basefile == "elsakfs/2008:1" and r.fs == "elsakfs"
+    # ÅFS is Åklagarmyndighetens; afs is Arbetsmiljöverkets
+    r = _ref(_Agency(fs="aafs"), "ÅFS 2021:3 om förundersökning", "/x/afs-2021-3.pdf",
+             seen, direct=True)
+    assert r.basefile == "aafs/2021:3"
+
+
+def test_every_registered_samling_cites_itself_the_way_it_is_printed():
+    # `printed_designation` falls back to the slug in capitals, which is right
+    # for the 40-odd samlingar whose slug is their designation and wrong for
+    # the ones carrying a Swedish vowel: ELSÄK-FS was cited as "ELSAKFS".
+    from ferenda.foreskrift.model import printed_designation
+    from ferenda.lib import datasets
+    for fs, row in datasets.load_fs_series().items():
+        designation = row.get("designation")
+        if not designation:
+            continue
+        printed = printed_designation("https://lagen.nu/%s/2020:1" % fs)
+        assert printed == "%s 2020:1" % designation, \
+            "%s is cited as %r, not as the %r it prints" % (fs, printed, designation)
