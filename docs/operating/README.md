@@ -693,21 +693,59 @@ confs. It now saves the diff of a dirty tree to `~/wds/deploy-lost/<stamp>.patch
 first, so a host-side edit is recoverable. A recent git lock file stops the
 deploy instead of being deleted; one older than an hour is removed as stale.
 
-The same push does **not** fold in data. `staffan`'s crontab does that. `staffan`'s crontab runs the
-pipeline as inlined `docker compose exec` lines: `lagen all all` nightly (which
-now skips the browser-shielded föreskrift agencies skvfs/mtfs), plus a weekly
-`lagen foreskrift browser-download` (Sundays) for those — the browser transport
-runs one navigation at a time, so it stays off the nightly sweep.
+The same push does **not** fold in data. `staffan`'s crontab does that, as
+four inlined `docker compose exec` lines:
 
-`lagen rs browser-download` wants the same weekly slot, for the same reason and
-one more. Skatteverkets 2,614 ställningstaganden are one browser navigation
-each. The run paces them 20 seconds apart: at 2-second spacing the site's front
-refuses navigation 31 and keeps refusing for minutes. That is a rate rule, not a
-bot verdict — no browser gets around it. A weekly run costs the register plus
-what moved. The first run takes ~15 hours, so slice it with `--limit N` and let
-the next run resume. Nothing is stranded — a run stores a record only once its
-page is on disk. Run both browser jobs **one at a time**: Playwright's sync API
-is not built for one browser per thread.
+    0  0 * * *   lagen all all --ignore-code-changes   -> ~/lagen-nightly.log
+    0  5 * * 0   lagen all browser-download            -> ~/lagen-browser.log
+    0 14 * * 0   lagen all compact                     -> ~/lagen-compact.log
+    0  6 1 * *   lagen foreskrift download --force     -> ~/lagen-foreskrift-full.log
+
+The nightly `all all` skips the browser-shielded föreskrift agencies (skvfs,
+mtfs) and Skatteverkets ställningstaganden. `all browser-download` covers
+both on Sundays: rs and föreskrift each register the action, and the sweep
+runs them one after the other, one navigation at a time — never two
+Playwright threads at once. `all compact` runs last, after both are done —
+see §4 on `lagen all compact` and the catalog file's page layout.
+
+Skatteverkets 2,614 ställningstaganden are one browser navigation each. The
+run paces them 20 seconds apart: at 2-second spacing the site's front refuses
+navigation 31 and keeps refusing for minutes. That is a rate rule, not a bot
+verdict — no browser gets around it. A weekly run costs the register plus
+what moved. The first run takes ~15 hours, so slice it with `--limit N` and
+let the next run resume. Nothing is stranded — a run stores a record only
+once its page is on disk.
+
+### The monthly föreskrift `--force`
+
+An agency often publishes its repealed regulations on a second listing page,
+linked from the in-force one. The enumerator queues that archive *after* the
+in-force rows (`ferenda/foreskrift/harvest.py`, `archive_links`). An
+incremental run never reaches it. `HarvestWatermark.should_stop`
+(`ferenda/lib/harvest.py:154`) treats the first in-force row that is old and
+already on disk as conclusive, and `walk` (`ferenda/lib/harvest.py:419`) then
+breaks there and abandons the enumerator.
+
+Measured: `lagen foreskrift download stafs` without `--force` makes one HTTP
+request, sees 5 items, and never fetches the archive URL. That one scope's
+archive alone holds 206 documents.
+
+`--force` walks the whole listing instead of stopping short. A full sweep of
+all 80 non-browser scopes took 55 minutes. The cost is a network fetch per
+document, not a reparse: `compress.write_download` leaves an unchanged file
+alone, so the freshness watermarks and the poppler cache both survive.
+Removing this cron line does not just skip one month's refresh — it makes
+every future addition to an agency's repealed-regulations archive invisible
+to the corpus.
+
+This is one case of a general gap. `lib.harvest.walk` already has a `deep`
+mode: it walks a whole listing but fetches only what is missing. No CLI flag
+reaches that mode outside forarbete, whose own `--force` is wired to it.
+Eight watermark-gated sources could use the same flag — avg, coe, dv,
+foreskrift, hudoc, icc, icj, icrc. Guidance, lawreview and rs need nothing:
+their `walk_records` calls pass `watermark=None`. Tracked as
+[issue #110](https://github.com/staffanm/ferenda/issues/110); the monthly
+`--force` line above is the interim fix, for foreskrift alone.
 
 ### The facsimile render gate
 
