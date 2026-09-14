@@ -158,17 +158,26 @@ def normalise(text):
                                      .translate(_SPACES).translate(_DASHES)))
 
 
-# The vertical's one designation pattern: an agency prefix, its series suffix,
-# and the number. The suffix alternation is what a samling's name can end in --
-# "FS" for a författningssamling, "FA" for the two föreskrifter-och-allmänna-råd
-# series (ESVFA, STKFA), "MS" for RA-MS, "AR" for BFNAR and Naturvårdsverkets
-# pre-1994 AR, "BS" for LBS. Requiring "FS" left every one of the others
-# unreadable: 53 RA-MS repeals and every BFNAR amendment link were empty.
+# The vertical's one designation vocabulary: an agency prefix and its series
+# suffix. Two patterns read it -- the printed designation and the one a
+# document store writes into a filename -- so it is named once. The suffix
+# alternation is what a samling's name can end in: "FS" for a
+# författningssamling, "FA" for the two föreskrifter-och-allmänna-råd series
+# (ESVFA, STKFA), "MS" for RA-MS, "AR" for BFNAR and Naturvårdsverkets pre-1994
+# AR, "BS" for LBS. Requiring "FS" left every one of the others unreadable: 53
+# RA-MS repeals and every BFNAR amendment link were empty. That alternation has
+# grown once already, and a second copy of it would not have grown with it.
 # The prefix keeps its printed case rather than being uppercased, because six
 # series are spelled mixed ("SiSFS", "FoHMFS", "JvSFS", "AgVFS"); matching only
 # all-capitals lost their relations too.
-RE_DESIGNATION = re.compile(
-    r"\b([A-ZÅÄÖ][A-ZÅÄÖa-zåäö]{0,9}(?:-| )?(?:FS|FA|MS|AR|BS))\s*(\d{4}):(\d+)")
+FS_PREFIX = r"[A-ZÅÄÖ][A-ZÅÄÖa-zåäö]{0,9}(?:-| )?(?:FS|FA|MS|AR|BS)"
+# the designation as a page prints it, colon and all ("TRMFS 2017:2")
+RE_DESIGNATION = re.compile(r"\b(%s)\s*(\d{4}):(\d+)" % FS_PREFIX)
+# a designation a document store puts in a *filename*, where the number's colon
+# is written as the separator the filesystem allows ("UPPHÄVD_TRMFS 2017_2.pdf").
+# Read only when the row's visible text names no designation at all.
+RE_FILE_DESIGNATION = re.compile(
+    r"(%s)[ _-]*(\d{4})[:._ -](\d{1,3})(?:\D|$)" % FS_PREFIX)
 
 # What tells a listing row that the designation beside it is *another*
 # document's: an ändringsförfattning and a repeal both name their target in

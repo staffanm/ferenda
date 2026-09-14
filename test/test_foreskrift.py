@@ -684,3 +684,67 @@ def test_every_registered_samling_cites_itself_the_way_it_is_printed():
         printed = printed_designation("https://lagen.nu/%s/2020:1" % fs)
         assert printed == "%s 2020:1" % designation, \
             "%s is cited as %r, not as the %r it prints" % (fs, printed, designation)
+
+
+# --- bespoke enumerators: the archive, and each row's own designation -------
+
+def test_bfs_enumerate_keeps_a_bostadsstyrelsen_act_under_its_own_series(monkeypatch):
+    # Boverkets API lists two Bostadsstyrelsen acts under their own BOFS
+    # designation. Stamping agency.fs on every row published them as BFS, a
+    # designation Boverket never used.
+    items = [{"forfattning": "BOFS 1986:72", "typ": "grundforfattning",
+              "titel": "Bostadsstyrelsens föreskrifter om tidskoefficienter",
+              "dokumentlank": "https://rinfo.boverket.se/bofs1986-72.pdf"},
+             {"forfattning": "BFS 2023:8", "typ": "grundforfattning",
+              "titel": "Boverkets föreskrifter om upphävande av vissa författningar",
+              "dokumentlank": "https://rinfo.boverket.se/bfs2023-8.pdf"}]
+    monkeypatch.setattr(agencies, "request",
+                        lambda _s, _m, _url, **_kw: items)
+    refs = list(agencies.bfs_enumerate(None, agencies.BFS))
+    assert [(r.basefile, r.identifier, r.fs) for r in refs] == [
+        ("bofs/1986:72", "BOFS 1986:72", "bofs"),
+        ("bfs/2023:8", "BFS 2023:8", None)]
+
+
+def test_row_designation_ignores_a_number_that_is_not_the_rows_own():
+    # an amendment row cites the base it amends; that designation says nothing
+    # about the samling of the row's own document
+    assert agencies.row_designation("BOFS 1986:72", "1986", "72") == "BOFS"
+    assert agencies.row_designation("BFFS 1991:15", "1991", "15") == "BFFS"
+    assert agencies.row_designation(
+        "Föreskrifter om ändring i Boverkets föreskrifter (BFS 2011:6)",
+        "2023", "8") is None
+    assert agencies.row_designation("Föreskrifter om mediestöd", "2024", "1") is None
+
+
+def test_memy_enumerate_files_a_row_under_the_number_it_claims_as_its_own(monkeypatch):
+    # "Föreskrifter om upphävande av MPRTFS 2019:3 … (MPRTFS 2021:1)" is
+    # MPRTFS 2021:1. Reading the leftmost designation filed it as MPRTFS
+    # 2019:3 and then dropped the real MPRTFS 2019:3 as a duplicate basefile.
+    _pages(monkeypatch, {agencies.MEMYFS.index_url: (
+        '<a href="/a-mprtfs-2021_1.pdf">Föreskrifter om upphävande av MPRTFS 2019:3'
+        ' om mediestöd (MPRTFS 2021:1)</a>'
+        '<a href="/b-mprtfs-2019_3.pdf">Föreskrifter om mediestöd (MPRTFS 2019:3)</a>'
+        '<a href="/c-memyfs-2025_3.pdf">Mediemyndighetens föreskrifter</a>'
+        '<a href="/riksdagen/sfs-2018-2.pdf">Lag (2018:2) om mediestöd</a>')})
+    refs = list(agencies.memy_enumerate(None, agencies.MEMYFS))
+    assert [(r.basefile, r.identifier) for r in refs] == [
+        ("mprtfs/2021:1", "MPRTFS 2021:1"),
+        ("mprtfs/2019:3", "MPRTFS 2019:3"),
+        # the row prints no designation, so the filename names the series
+        ("memyfs/2025:3", "MEMYFS 2025:3")]
+
+
+def test_fi_enumerate_routes_the_bankinspektionen_act_off_the_rows_own_words(monkeypatch):
+    # the number is the detail URL's, the only clean number on the row; the
+    # samling is what the row prints for that number. FI's förteckning still
+    # carries one Bankinspektionen act, published as "FFFS 1991:15".
+    _pages(monkeypatch, {agencies.FFFS.index_url: (
+        '<a href="/sv/vara-register/fffs/sok-fffs/1991/199115/">'
+        'BFFS 1991:15 om kapitaltäckning</a>'
+        '<a href="/sv/vara-register/fffs/sok-fffs/2013/20139/">'
+        'FFFS 2013:9 om värdepappersrörelse</a>')})
+    refs = list(agencies.fi_enumerate(None, agencies.FFFS))
+    assert [(r.basefile, r.identifier, r.fs) for r in refs] == [
+        ("bffs/1991:15", "BFFS 1991:15", "bffs"),
+        ("fffs/2013:9", "FFFS 2013:9", None)]

@@ -77,6 +77,25 @@ from .harvest import (
 )
 
 # --------------------------------------------------------------------------
+# what every bespoke enumerate shares with the generic ones
+# --------------------------------------------------------------------------
+
+def row_designation(text, arsutgava, lopnummer):
+    """The designation a listing row prints for *this* number, or None when the
+    row names none of its own or names another document's.
+
+    An enumerate that reads the number off a URL or an API field still has to
+    place the document in a samling, and the row's own words are the evidence:
+    Finansinspektionens förteckning carries one Bankinspektionen act (BFFS
+    1991:15) and Boverkets API two Bostadsstyrelsen ones (BOFS 1984:8, BOFS
+    1986:72), none of which the agency has ever called by its own series name.
+    The designation counts only when it names the number the enumerate has read,
+    so an amendment row that cites the base it amends decides nothing."""
+    own = harvest.own_designation(text)
+    return own[0] if own and (own[1], str(int(own[2]))) == (arsutgava, lopnummer) else None
+
+
+# --------------------------------------------------------------------------
 # FFFS (Finansinspektionen) -- bespoke enumerate: the förteckning row links the
 # base by a detail URL /sok-fffs/{year}/{base-digits}/ (year+lopnummer fused),
 # not by a clean "FFFS YYYY:N" string, so the generic indexed_enumerate can't
@@ -88,7 +107,11 @@ RE_FI_BASE = re.compile(r"/sok-fffs/(\d{4})/(\d{4})(\d+)/?$")
 
 
 def fi_enumerate(session, agency):
-    """One DocRef per distinct *base* regulation from FI's single förteckning."""
+    """One DocRef per distinct *base* regulation from FI's single förteckning.
+
+    The number comes from the detail URL, the only clean number on the row; the
+    samling from the designation the row prints for that number, so the
+    Bankinspektionen act the förteckning still carries stays BFFS."""
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.find_all("a", href=True):
@@ -97,12 +120,15 @@ def fi_enumerate(session, agency):
         if not m:
             continue
         arsutgava, lopnummer = m.group(1), str(int(m.group(3)))
-        basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
+        designation = row_designation(a.get_text(" ", strip=True), arsutgava, lopnummer)
+        fs = harvest.series_slug(designation) if designation else agency.fs
+        basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
         if basefile in seen:
             continue
         seen.add(basefile)
-        yield DocRef(basefile=basefile,
-                     identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
+        yield DocRef(basefile=basefile, fs=fs if fs != agency.fs else None,
+                     identifier="%s %s:%s" % (designation or agency.fs.upper(),
+                                              arsutgava, lopnummer),
                      url=harvest.absolute(agency.base_url, a["href"]))
 
 
@@ -165,7 +191,12 @@ KIFS = Agency(
 def bfs_enumerate(session, agency):
     """One DocRef per grundförfattning from Boverket's REST API, with its
     amendments + consolidations attached (the whole register in one call; the
-    API requires an explicit Accept header)."""
+    API requires an explicit Accept header).
+
+    ``forfattning`` carries the designation as well as the number, and the
+    register still lists two Bostadsstyrelsen acts (BOFS 1984:8, BOFS 1986:72).
+    Stamping ``agency.fs`` on every row published them as BFS, a designation
+    Boverket never used."""
     items = request(session, "GET", agency.params["api_url"], parse_json=True,
                     headers={"Accept": "application/json"})
     family = {}
@@ -178,6 +209,8 @@ def bfs_enumerate(session, agency):
         if not m:
             continue
         arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
+        designation = row_designation(it["forfattning"], arsutgava, lopnummer)
+        fs = harvest.series_slug(designation) if designation else agency.fs
         members = family.get(it["forfattning"], [])
         amendments = [{"identifier": x["forfattning"], "url": x.get("dokumentlank")}
                       for x in members if x.get("typ") == "andringsforfattning"]
@@ -185,8 +218,9 @@ def bfs_enumerate(session, agency):
                           for x in members for d in (x.get("ovrigaDokument") or [])
                           if d.get("typ") == "Konsolidering"]
         yield DocRef(
-            basefile="%s/%s:%s" % (agency.fs, arsutgava, lopnummer),
-            identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
+            basefile="%s/%s:%s" % (fs, arsutgava, lopnummer),
+            fs=fs if fs != agency.fs else None,
+            identifier="%s %s:%s" % (designation or agency.fs.upper(), arsutgava, lopnummer),
             url=it.get("dokumentlank") or "", title=it.get("titel"),
             extra={"regulation_url": it.get("dokumentlank"),
                    "consolidations": consolidations, "amendments": amendments,
@@ -1556,28 +1590,40 @@ VALFS = Agency(
 
 RE_MEMY_DESIG = re.compile(r"(MEMYFS|MPRTFS|MRTVFS)[\s_-]*(\d{4})[:._\- ]*(\d{1,3})",
                            re.IGNORECASE)
+MEMY_SERIES = {"MEMYFS", "MPRTFS", "MRTVFS"}
 
 
 def memy_enumerate(session, agency):
     """One DocRef per föreskrift PDF on Mediemyndigheten's flat listing, each
-    filed under its own series (MEMYFS / predecessor MPRTFS / MRTVFS)."""
+    filed under its own series (MEMYFS / predecessor MPRTFS / MRTVFS).
+
+    A row names more than one document. "Föreskrifter om upphävande av MPRTFS
+    2019:3 om mediestöd (MPRTFS 2021:1)" is MPRTFS 2021:1; taking the leftmost
+    designation filed it as MPRTFS 2019:3 and then dropped the real MPRTFS
+    2019:3 as a duplicate basefile. :func:`harvest.own_designation` places each
+    designation against the words around it. The filename
+    ("...-memyfs-2025_3.pdf") is read only when the text names none."""
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.select('a[href$=".pdf"], a[href$=".PDF"]'):
         href = util.href(a)
         if "/Recycle-Bin/" in href:              # trashed duplicates, often 404
             continue
-        # the designation lives in the visible text ("(MEMYFS 2025:3)"); the
-        # filename ("...-memyfs-2025_3.pdf") is the fallback when the text omits it
-        m = RE_MEMY_DESIG.search(a.get_text(" ", strip=True)) or RE_MEMY_DESIG.search(href)
-        if not m:
-            continue
-        fs = m.group(1).lower()
-        arsutgava, lopnummer = m.group(2), str(int(m.group(3)))
         title = a.get_text(" ", strip=True)
-        docref = direct_docref(agency, fs, arsutgava, lopnummer,
+        own = harvest.own_designation(title)
+        if own is None or own[0].upper() not in MEMY_SERIES:
+            # the row cites a law or another agency's föreskrift before its own
+            m = RE_MEMY_DESIG.search(href)
+            if not m:
+                continue
+            own = m.groups()
+        # the three series are printed in capitals, so the filename's lowercase
+        # spelling is the same designation
+        designation = own[0].upper()
+        arsutgava, lopnummer = own[1], str(int(own[2]))
+        docref = direct_docref(agency, harvest.series_slug(designation), arsutgava, lopnummer,
                                harvest.absolute(agency.base_url, href), seen,
-                               identifier="%s %s:%s" % (m.group(1).upper(), arsutgava, lopnummer),
+                               identifier="%s %s:%s" % (designation, arsutgava, lopnummer),
                                title=title)
         if docref:
             yield docref
