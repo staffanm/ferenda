@@ -26,7 +26,7 @@ from ..lib.page import (
     render_toc,
 )
 from ..lib.text import presented_consolidation
-from .model import printed_designation
+from .model import printed_designation, upphaver_uris
 
 ENV = tpl.environment("ferenda.foreskrift")
 
@@ -189,7 +189,7 @@ def render(art, site):
         # what this regulation replaces is identity-level metadata
         ("Upphäver", Markup(", ").join(
             ref_link(site, u, printed_designation)
-            for u in md.get("upphaver") or [])),
+            for u in upphaver_uris(md.get("upphaver")))),
     ]
     # outbound typed relations: what this regulation amends and replaces, the
     # empowering statute paragrafer (whose inbound mirror is the SFS paragraf's
@@ -197,7 +197,8 @@ def render(art, site):
     # transposes -- plus the inbound mirror of upphäver: who replaced *this*
     upphavd_rows = [] if grund else catalog.upphaver_inbound(site.con, base_uri)
     refs = (ref_list(site, "Ändrar", md.get("andrar"), printed_designation)
-            + ref_list(site, "Upphäver", md.get("upphaver"), printed_designation)
+            + ref_list(site, "Upphäver", upphaver_uris(md.get("upphaver")),
+                       printed_designation)
             + ref_list(site, "Bemyndigande", md.get("bemyndigande"))
             + ref_list(site, "Genomför EU-direktiv", md.get("genomfor"))
             + _upphavd_av(upphavd_rows))

@@ -604,20 +604,25 @@ def _synthesize_ladder_stubs(con):
 
 def _repeal_dates(con, info, art):
     """doc -> its repeal date, for every ranked document known repealed:
-    `documents.expired` where the source stamps it (sfs, eurlex); for a
-    föreskrift -- where `expired` is NULL even when repealed -- the inbound
-    rpubl:upphaver link, dated by the repealing document's own
-    ikraftträdande (its `documents.date` is the beslutsdatum, which would
-    print "upphävd" while the rules were still in force). An undated repeal
-    is the sentinel, never a wrong date (PRD §9.5)."""
+    `documents.expired` where a source or `catalog.stamp_repeal_dates` has
+    stamped it, and otherwise the inbound rpubl:upphaver link read here.
+
+    The link is dated the same way that pass dates it: by the day the repeal
+    clause itself names (`metadata.upphaver`, ``[uri, datum]``), failing that
+    by the repealing document's own ikraftträdande (`documents.date` is the
+    beslutsdatum, which would print "upphävd" while the rules were still in
+    force), failing that the sentinel -- never a wrong date (PRD §9.5)."""
     out = {uri: expired
            for uri, (_l, _k, _d, expired, _p) in info.items() if expired}
     for repealer, _pin, repealed, _target, predicate in catalog.norm_links(con):
         if (predicate == "rpubl:upphaver"
                 and repealed in info and repealed not in out and repealer in info):
-            ikraft = (art(repealer).get("metadata") or {}).get(
-                "ikrafttradandedatum")
-            out[repealed] = ikraft or catalog_rows.EXPIRED_UNDATED
+            meta = art(repealer).get("metadata") or {}
+            stated = {uri: datum for uri, datum in
+                      (e for e in meta.get("upphaver") or [] if isinstance(e, list))}
+            out[repealed] = (stated.get(repealed)
+                             or meta.get("ikrafttradandedatum")
+                             or catalog_rows.EXPIRED_UNDATED)
     return out
 
 

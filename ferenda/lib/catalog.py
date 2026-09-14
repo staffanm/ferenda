@@ -893,8 +893,7 @@ _RELATION_PREDICATES = (("andrar", "rpubl:andrar"),
 
 
 def relation_links(art):
-    """The typed relation edges a document's metadata carries as plain uri
-    lists: what it amends (`andrar`), replaces/repeals (`upphaver`), transposes
+    """The typed relation edges a document's metadata carries as uri lists: what it amends (`andrar`), replaces/repeals (`upphaver`), transposes
     a directive (`genomfor`), carries out another EU act (`genomfor_akt`) and
     is amended by (`andradAv`, the amendment register's inverse). These are
     metadata, not body text, so the inline-link walk misses them. Field-driven:
@@ -902,11 +901,17 @@ def relation_links(art):
     today the föreskrift vertical from its own harvest, and eurlex from the
     amends/implements relations its CELLAR notice carries. Unanchored -- the
     relation belongs to the document; `text` carries the document's own id so
-    the target's mirror display can name it."""
+    the target's mirror display can name it.
+
+    An entry is a uri, or a ``[uri, datum]`` pair where the source dates the
+    relation as well as stating it (a föreskrift's repeal clause names the day
+    its repeal takes effect). The date is read from the artifact by the pass
+    that needs it (`stamp_repeal_dates`); an edge is an edge either way."""
     label = art.get("identifier") or local(art["uri"])
-    return [(None, {"uri": uri, "predicate": pred, "text": label})
+    return [(None, {"uri": entry[0] if isinstance(entry, list) else entry,
+                    "predicate": pred, "text": label})
             for key, pred in _RELATION_PREDICATES
-            for uri in art.get("metadata", {}).get(key) or []]
+            for entry in art.get("metadata", {}).get(key) or []]
 
 
 def curated_links(art):
@@ -2086,7 +2091,7 @@ def andrar_inbound(con, uri):
         "ORDER BY d.label", (uri,)).fetchall()
 
 
-def upphaver_targets(con):
+def upphaver_targets(con, on=None):
     """Every uri some other document's text repeals or replaces (the target
     side of all rpubl:upphaver edges) -- what the föreskrift browse listing
     subdues as no longer in force. The evidence is the replacing documents'
@@ -2095,9 +2100,23 @@ def upphaver_targets(con):
     into the base and has nothing left to apply to (Livsmedelsverket's register
     marks SLVFS 1996:3, which amended SLVFS 1993:18, "upphävd genom LIVSFS
     2003:2", the document that repealed 1993:18), so the rpubl:andrar sources
-    of every target are included."""
+    of every target are included.
+
+    A repeal that has not taken effect yet does not count. The clause commonly
+    names a day months after the one it was written on (AFS 2023:1-15 replaced
+    Arbetsmiljöverkets rules from 2025-01-01), and `stamp_repeal_dates` has put
+    that day on the target's `expired`. Subduing on the existence of the
+    relation alone struck those regulations out while they still stated law.
+    A repeal whose clause names no day keeps today's behaviour: the sentinel
+    `catalog_rows.EXPIRED_UNDATED` lies in the past, so its target is spent as
+    soon as the relation is read. `on` is the day to judge by, today's date
+    unless a caller (a test, a point-in-time view) names another."""
     spent = {r[0] for r in con.execute(
-        "SELECT DISTINCT to_uri FROM links WHERE predicate = 'rpubl:upphaver'")}
+        "SELECT DISTINCT l.to_uri FROM links l "
+        "LEFT JOIN documents d ON d.uri = l.to_uri "
+        "WHERE l.predicate = 'rpubl:upphaver' "
+        "AND (d.expired IS NULL OR d.expired <= ?)",
+        (on or date.today().isoformat(),))}
     amends = {}
     for source, target in con.execute(
             # not an amendment that itself repeals the base it amends: an
@@ -2166,6 +2185,59 @@ def stamp_inbound_counts(con: sqlite3.Connection) -> int:
     con.executemany("UPDATE documents SET inbound_count = ? WHERE rowid = ?",
                     [(n, rowid) for rowid, n in sorted(changed)])
     return len(counts)
+
+
+def stamp_repeal_dates(con: sqlite3.Connection) -> int:
+    """Stamp `documents.expired` on every document another document's text
+    repeals, from the date that repeal states -- the föreskrift half of what
+    `catalog_rows._expired_date` does for a statute, whose own register prints
+    `rpubl:upphavandedatum`.
+
+    A föreskrift carries no status of its own: the repealing document's clause
+    is the only evidence, and it is recorded as the relation's own date
+    (`metadata.upphaver`, ``[uri, datum]``). Three answers, in order:
+
+      1. the day the repeal clause names ("… ska upphöra att gälla den 1 mars
+         2021");
+      2. the repealing document's own ikraftträdande, when the clause names no
+         day -- a repeal takes effect with the document that states it, never
+         on the day it was decided (`documents.date` is the beslutsdatum, which
+         would expire a regulation while its rules were still in force);
+      3. `catalog_rows.EXPIRED_UNDATED`, when the repealer states neither.
+
+    The date is the point of the whole exercise: a repeal announced today
+    commonly takes effect months from now (CSNFS 2025:6 repealed CSNFS 2017:1
+    from 2026-01-01), and an undated relation subdued the target from the day
+    the relation was read. Only artifacts that repeal something are opened --
+    the repealers, not the corpus.
+
+    Runs after the links are written and before any listing reads `expired`.
+    Documents whose own source stamps `expired` (sfs, eurlex, rs) are left
+    alone: their register is the better authority."""
+    root = data_root(con)
+    repealers = {}
+    for repealer, repealed, stored in con.execute(
+            "SELECT l.from_uri, l.to_root, d.path FROM links l "
+            "JOIN documents d ON d.uri = l.from_uri "
+            "JOIN documents t ON t.uri = l.to_root "
+            "WHERE l.predicate = 'rpubl:upphaver' AND t.expired IS NULL"):
+        repealers.setdefault((repealer, stored), []).append(repealed)
+    dates: dict[str, str] = {}
+    for (_repealer, stored), targets in sorted(repealers.items()):
+        meta = (load_artifact(root, stored) or {}).get("metadata") or {}
+        stated = {uri: datum for uri, datum in
+                  (e for e in meta.get("upphaver") or [] if isinstance(e, list))}
+        ikraft = meta.get("ikrafttradandedatum")
+        for target in targets:
+            when = (stated.get(target) or ikraft
+                    or catalog_rows.EXPIRED_UNDATED)
+            # several documents can repeal the same target (a bulk repeal and
+            # a later tidying-up). The earliest is when it stopped applying.
+            if dates.get(target, "9999") > when:
+                dates[target] = when
+    con.executemany("UPDATE documents SET expired = ? WHERE uri = ?",
+                    [(when, uri) for uri, when in sorted(dates.items())])
+    return len(dates)
 
 
 def document_inbound_counts(con: sqlite3.Connection) -> dict[str, int]:

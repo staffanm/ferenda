@@ -39,6 +39,17 @@ def regulation_uri(fs, arsutgava, lopnummer):
     return "%s/%s/%s:%s" % (BASE, fs, arsutgava, lopnummer)
 
 
+def upphaver_uris(upphaver):
+    """The target uris of an `upphaver` list, dropping the dates.
+
+    An entry is ``[uri, datum]``. A bare uri is an artifact written before the
+    relation carried its date, which the corpus holds until the next parse of
+    that document -- the artifact on disk is the source of truth, and it is
+    read as it was written."""
+    return [entry[0] if isinstance(entry, list) else entry
+            for entry in upphaver or ()]
+
+
 def printed_designation(uri):
     """The designation a regulation is cited by ("RPSFS 2011:16"), read back out
     of its URI -- `regulation_uri`'s inverse.
@@ -137,7 +148,14 @@ class Regulation:
     ikrafttradandedatum: str | None = None
     utkomFranTryck: str | None = None
     bemyndigande: list[str] = field(default_factory=list)   # SFS paragraf uris
-    upphaver: list[str] = field(default_factory=list)       # föreskrift uris
+    # what this regulation repeals, as ``[uri, datum]`` pairs: the target and
+    # the day the repeal takes effect where the clause states one ("… ska
+    # upphöra att gälla den 1 mars 2021"), else None. The date belongs to
+    # the relation, not to either document: a föreskrift carries no status
+    # of its own, and the repealed regulation's artifact is never written
+    # to. A None is resolved against the repealing document's own
+    # ikraftträdande where it is read (`catalog.stamp_repeal_dates`).
+    upphaver: list[list[str | None]] = field(default_factory=list)
     andrar: list[str] = field(default_factory=list)         # föreskrift uris
     genomfor: list[str] = field(default_factory=list)       # EU directive uris
 

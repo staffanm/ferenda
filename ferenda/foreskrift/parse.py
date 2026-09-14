@@ -26,6 +26,7 @@ Two layers over the shared font-aware extraction (``lib.pdftext``):
     directives a footnote says it ``genomför``, and the regulations it replaces.
 """
 
+import calendar
 import re
 from pathlib import Path
 
@@ -177,7 +178,8 @@ def stodav_clause(text):
 # The verb is prose, so never all capitals: "UPPHÄVS" alone is the register's
 # stamp again, split from its "GENOM" line (SJVFS 2012:24).
 RE_ERSATTER = re.compile(r"\b(?-i:[eE]rsätter|[uU]pphäv(?:er|s)(?!\s+[gG][eE][nN][oO][mM]\b)|[uU]pphör(?!\s+(?:att\s+)?gälla))\b"
-                         r"(.{0,600}?)(?:(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])|$)",
+                         r"(.{0,1800}?)(?:(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])"
+                         r"|\n\s*\n|_{5,}|$)",
                          re.DOTALL | re.I)
 # the target *before* the verb, in an ikraftträdande sentence: "träder i kraft
 # den 28 februari 2003, då Livsmedelsverkets föreskrifter (SLVFS 1993:18) om
@@ -247,7 +249,7 @@ def _repeal_object(segment, whole=False, tail=False):
 RE_UPPHOR_LIST = re.compile(
     r"(?:följande|nedanstående)\s+(?:föreskrifter|allmänna\s+råd|författningar|kungörelser)\b"
     r"[^:]{0,160}?(?:upphävs|upphöra\s+att\s+gälla|upphör\s+att\s+gälla)[^:]{0,160}?"
-    r"(?::|nämligen|enligt\s+följande\.)\s*(.{0,4000}?)"
+    r"(?::|nämligen|enligt\s+följande\.)\s*(.{0,12000}?)"
     r"(?=\n\s*\n|Dessa\s+föreskrifter\s+träder|_{5,}|$)", re.DOTALL | re.I)
 RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-zåäö][.)]|[−•–-])\s)")
 # the enumerated passive: "Genom författningen upphävs 1. Statens jordbruksverks
@@ -260,7 +262,7 @@ RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-zåäö][.)]|[−•–-])\s)
 # when the next line is an entry-into-force sentence (an omtryck prints its
 # amendments' "1. Denna författning träder i kraft …" points right after).
 RE_UPPHAVS_LIST = re.compile(
-    r"\bupphävs\s+(?:respektive\s+upphör\s+att\s+gälla\s+)?(?=(?:−|[a-zåäö][.)])\s)(.{0,6000}?)"
+    r"\bupphävs\s+(?:respektive\s+upphör\s+att\s+gälla\s+)?(?=(?:−|[a-zåäö][.)])\s)(.{0,12000}?)"
     r"(?:(?<!m\.m)(?<!\s[a-zåäö])\.\s*\n(?!(?:[^\n]*\n){0,4}\s*(?:−|[a-zåäö][.)])\s)"
     r"|\n(?=[^\n]*\bträder\s+i\s+kraft\b)|\n\s*\n|$)", re.DOTALL | re.I)
 # the decision form of a pure repeal, where the target precedes the verb:
@@ -727,6 +729,53 @@ def role_declaration(masthead, harvest_title):
     return f"{masthead} {harvest_title or ''}"
 
 
+#: how far past a repeal clause its effective date can stand ("… ska upphöra
+#: att gälla den 1 mars 2021.")
+REPEAL_DATE_WINDOW = 200
+# the two forms a repeal clause dates itself in, measured over the corpus in
+# #39: 31 documents say "den D <månad> YYYY", 80 "vid utgången av [<månad>]
+# YYYY", 53 say nothing. "Vid utgången av" is the last day of the month named,
+# or of the year when none is.
+RE_REPEAL_DEN = re.compile(r"\bden\s+(\d{1,2})\s+(%s)\s+(\d{4})" % "|".join(MONTHS),
+                           re.IGNORECASE)
+RE_REPEAL_UTGANG = re.compile(r"\bvid\s+utgången\s+av\s+(?:(%s)\s+)?(\d{4})" % "|".join(MONTHS),
+                              re.IGNORECASE)
+
+
+def repeal_date(around):
+    """The day a repeal clause says its repeal takes effect, ISO, or None when
+    the clause names no day. `around` is the clause and the text just past it.
+
+    None is not "today": a repeal stated now commonly takes effect months
+    later (CSNFS 2025:6 repealed CSNFS 2017:1 from 2026-01-01), so an undated
+    repeal is resolved against the repealing document's own ikraftträdande
+    where it is read, never against the day it was decided."""
+    m = RE_REPEAL_DEN.search(around)
+    if m:
+        return _iso(m.group(1), m.group(2), m.group(3))
+    m = RE_REPEAL_UTGANG.search(around)
+    if not m:
+        return None
+    # the month word came out of a pattern built from MONTHS, so it is in it
+    month = MONTHS[(m.group(1) or "december").lower()]
+    year = int(m.group(2))
+    return "%04d-%02d-%02d" % (year, month, calendar.monthrange(year, month)[1])
+
+
+def _repeal_targets(target, fs):
+    """The regulations a repeal clause's object names, as uris."""
+    uris = {_ref_uri(_own_series_typo(f, fs), y, n)
+            for f, y, n in RE_FS_REF.findall(target)}
+    if fs:
+        # a bare "(1993:21)" right after "föreskrifter" names the document's own
+        # series (RE_BARE_OWN_REF), as it does in an ändring title -- or its
+        # predecessor when the year predates the series (LIVSFS 2014:4 repeals
+        # "föreskrifter (1993:21)": SLVFS, since LIVSFS began in 2002)
+        uris |= {regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
+                 for y, n in RE_BARE_OWN_REF.findall(target)}
+    return uris
+
+
 def extract_metadata(text, declaration, parser, fs=None):
     """Best-effort masthead facts from the regulation's plain text. ``text`` is
     the whole document (ikraftträdande sits at the end, the rest up front);
@@ -765,29 +814,41 @@ def extract_metadata(text, declaration, parser, fs=None):
     # _fs_key, not lower(): 'ÅFS' must mint aafs/…, never a dangling åfs/…
     # A förteckning över gällande föreskrifter (LIVSFS 2007:1) restates every
     # regulation's "Upphäver …" entry; the document itself repeals nothing.
-    if RE_FORTECKNING.search(text[:1500]):
-        return meta
     listed = RE_ENUMERATOR.sub(" − ", text)
-    targets = [_repeal_object(m.group(1)) for m in RE_ERSATTER.finditer(listed)]
-    targets += [_repeal_object(m.group(1), tail=True) for m in RE_UPPHORA.finditer(text)]
-    targets += [_repeal_object(m.group(1), tail=True) for m in RE_SKALL_UPPHORA.finditer(text)]
-    targets += [_repeal_object(m.group(1), tail=True) for m in RE_UPPHOR_BEFORE.finditer(text)]
-    targets += [_repeal_object(m.group(1), whole=True) for m in RE_UPPHOR_LIST.finditer(listed)]
-    targets += [_repeal_object(m.group(1), whole=True) for m in RE_UPPHAVS_LIST.finditer(listed)]
+    # Each clause is kept with the text it was read out of, because the date
+    # the repeal takes effect stands beside the target and not inside it: the
+    # object of "beslutar att … (KKVFS 2015:2) … ska upphöra att gälla den 1
+    # mars 2021" ends before the date, and the object of an ikraftträdande
+    # sentence is cut off its own "träder i kraft den 28 februari 2003".
+    clauses = []
+    if not RE_FORTECKNING.search(text[:1500]):
+        # A förteckning över gällande föreskrifter restates every regulation's
+        # "Upphäver …" entry, so its own text repeals nothing. Only the repeal
+        # step is skipped: returning from the whole function here cost every
+        # document whose cover page tripped this pattern its amendment
+        # relations and its dates too (AFS 2023:1-15).
+        for rx, kind, hay in ((RE_ERSATTER, {}, listed),
+                              (RE_UPPHORA, {"tail": True}, text),
+                              (RE_SKALL_UPPHORA, {"tail": True}, text),
+                              (RE_UPPHOR_BEFORE, {"tail": True}, text),
+                              (RE_UPPHOR_LIST, {"whole": True}, listed),
+                              (RE_UPPHAVS_LIST, {"whole": True}, listed)):
+            clauses += [(_repeal_object(m.group(1), **kind),
+                         m.group(1) + " " + hay[m.end():m.end() + REPEAL_DATE_WINDOW])
+                        for m in rx.finditer(hay)]
     # the noun form in the declaration (masthead + harvest title), cut the same
     # way: "upphävande av X (HSLF-FS 2019:43) om ändring i Y (HSLF-FS 2019:32)"
     # repeals the amendment X, and Y stays in force
-    targets += [RE_ANDRING.split(m.group(1))[0] for m in RE_UPPHAVANDE.finditer(declaration)]
-    upphaver = {_ref_uri(_own_series_typo(f, fs), y, n)
-                for target in targets for f, y, n in RE_FS_REF.findall(target)}
-    if fs:
-        # a bare "(1993:21)" right after "föreskrifter" names the document's own
-        # series (RE_BARE_OWN_REF), as it does in an ändring title -- or its
-        # predecessor when the year predates the series (LIVSFS 2014:4 repeals
-        # "föreskrifter (1993:21)": SLVFS, since LIVSFS began in 2002)
-        upphaver |= {regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
-                     for target in targets for y, n in RE_BARE_OWN_REF.findall(target)}
-    meta["upphaver"] = sorted(upphaver)
+    clauses += [(RE_ANDRING.split(m.group(1))[0],
+                 m.group(0) + " " + declaration[m.end():m.end() + REPEAL_DATE_WINDOW])
+                for m in RE_UPPHAVANDE.finditer(declaration)]
+    upphaver = {}
+    for target, around in clauses:
+        datum = repeal_date(around)
+        for uri in _repeal_targets(target, fs):
+            if upphaver.get(uri) is None:
+                upphaver[uri] = datum
+    meta["upphaver"] = [[uri, upphaver[uri]] for uri in sorted(upphaver)]
     # andrar, from the amending enacting formula in the masthead ("föreskriver
     # … i fråga om verkets föreskrifter och allmänna råd (SJVFS 2010:45) om …",
     # SJVFS 2011:24, an omtryck whose title restates the base's); a title
@@ -1691,7 +1752,7 @@ def parse_record(record, root):
         reg.andrar = [target]
     # an "ersätter/upphäver …" clause restating the document's own designation
     # must not claim the regulation replaces itself (LIVSFS 2022:4 does this)
-    reg.upphaver = [u for u in reg.upphaver if u != reg.uri]
+    reg.upphaver = [pair for pair in reg.upphaver if pair[0] != reg.uri]
     reg.andrar = [u for u in reg.andrar if u != reg.uri]
 
     for am in files.get("amendment", []):

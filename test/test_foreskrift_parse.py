@@ -197,6 +197,12 @@ def test_konsoliderad_tom_folds_designation_to_the_fs_slug():
     assert konsoliderad_tom(masthead, "elsakfs", "2012", "1") == "https://lagen.nu/elsakfs/2018:2"
 
 
+def _uris(upphaver):
+    """The target uris of a dated `upphaver` list -- ``[[uri, datum], …]``. The
+    date each entry carries is asserted where it is the point of the test."""
+    return [uri for uri, _datum in upphaver]
+
+
 def test_extract_metadata_lifts_dates_bemyndigande_and_directive():
     text = ("Finansinspektionens föreskrifter; FFFS 2013:10 "
             "Utkom från trycket den 5 juli 2013 beslutade den 25 juni 2013. "
@@ -336,7 +342,7 @@ def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
             "2. Genom föreskrifterna upphävs Säkerhetspolisens föreskrifter "
             "om säkerhetsskydd (PMFS 2019:2).")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/pmfs/2019:2"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/pmfs/2019:2"]
 
 
 def test_extract_metadata_upphaver_target_before_upphor_att_galla():
@@ -348,7 +354,7 @@ def test_extract_metadata_upphaver_target_before_upphor_att_galla():
             "material och produkter avsedda att komma i kontakt med livsmedel "
             "upphör att gälla. Äldre föreskrifter om tillverkning får tillämpas.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1993:18"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1993:18"]
 
 
 def test_extract_metadata_upphaver_from_a_list_of_repealed_regulations():
@@ -364,7 +370,7 @@ def test_extract_metadata_upphaver_from_a_list_of_repealed_regulations():
             "föreskrifter och allmänna råd (SLVFS 1996:13) om köttbesiktning.\n\n"
             "Dessa föreskrifter träder i kraft den 1 januari 2006.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/livsfs/2002:5",
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/livsfs/2002:5",
                                 "https://lagen.nu/slvfs/1978:21",
                                 "https://lagen.nu/slvfs/1996:13"]
     text = ("Nedanstående föreskrifter upphör att gälla enligt följande. "
@@ -373,7 +379,7 @@ def test_extract_metadata_upphaver_from_a_list_of_repealed_regulations():
             "2. Livsmedelsverkets föreskrifter (SLVFS 1996:1) om aromer.\n\n"
             "BERTIL NORBELIE")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/livsfs/2007:15", "https://lagen.nu/slvfs/1996:1"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/livsfs/2007:15", "https://lagen.nu/slvfs/1996:1"]
 
 
 def test_extract_metadata_upphaver_enumerated_bare_own_series_refs():
@@ -386,7 +392,7 @@ def test_extract_metadata_upphaver_enumerated_bare_own_series_refs():
             "om märkning av vissa livsmedel, och 3. Livsmedelsverkets föreskrifter "
             "(2004:27) om märkning. Äldre bestämmelser gäller till 2016.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="livsfs")
-    assert meta["upphaver"] == ["https://lagen.nu/livsfs/2002:47", "https://lagen.nu/livsfs/2004:27",
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/livsfs/2002:47", "https://lagen.nu/livsfs/2004:27",
                                 "https://lagen.nu/slvfs/1993:21"]
 
 
@@ -399,7 +405,7 @@ def test_extract_metadata_upphaver_before_verb_across_a_long_list():
             "(SLVFS 1997:40) om kontroll vid import av pistaschmandlar från Iran "
             "upphör att gälla. INGER ANDERSSON")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1987:20", "https://lagen.nu/slvfs/1993:5",
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1987:20", "https://lagen.nu/slvfs/1993:5",
                                 "https://lagen.nu/slvfs/1997:40"]
 
 
@@ -415,7 +421,7 @@ def test_upphavande_of_some_rules_is_not_a_repeal():
     meta = extract_metadata("", "Statens livsmedelsverks kungörelse med föreskrifter om "
                             "upphävande av vissa regler i kungörelsen (SLVFS 1984:8) med allmänna råd",
                             sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
 
 
 def test_decision_form_with_the_agency_between_the_verb_and_att():
@@ -425,7 +431,7 @@ def test_decision_form_with_the_agency_between_the_verb_and_att():
             "Livsmedelsverket att Livsmedelsverkets föreskrifter (SLVFS 1998:28) om "
             "utfärdande av intyg m.m. ska upphöra att gälla den 1 mars 2022.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1998:28"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1998:28"]
 
 
 def test_bare_ref_before_the_series_began_names_the_predecessor():
@@ -439,7 +445,7 @@ def test_bare_ref_before_the_series_began_names_the_predecessor():
     assert fp._series_for_year("slvfs", 1993) == "slvfs"
     text = "Genom dessa föreskrifter upphävs Livsmedelsverkets föreskrifter (1993:21) om näringsvärdesdeklaration."
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="livsfs")
-    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1993:21"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1993:21"]
 
 
 def test_a_provision_repeal_does_not_repeal_the_regulation():
@@ -448,7 +454,7 @@ def test_a_provision_repeal_does_not_repeal_the_regulation():
             "Livsmedelsverket att 17 § verkets föreskrifter (LIVSFS 2005:20) om "
             "livsmedelshygien ska upphöra att gälla.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
 
 
 def test_decision_form_stays_inside_its_sentence():
@@ -460,7 +466,7 @@ def test_decision_form_stays_inside_its_sentence():
             "1 juni 2005, då Livsmedelsverkets föreskrifter och allmänna råd (SLVFS "
             "1989:2) om användning av viss symbol ska upphöra att gälla. Bestämmelserna")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1989:2"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1989:2"]
 
 
 def test_a_designated_ref_before_its_series_began_names_the_predecessor():
@@ -498,7 +504,7 @@ def test_decision_form_with_skall_and_a_two_word_subject():
             "allmänna råd om slakt av tamboskap och hägnat vilt skall upphöra att gälla "
             "den 1 januari 1997.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1994:1"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1994:1"]
 
 
 def test_title_drops_the_second_columns_iso_date():
@@ -542,7 +548,7 @@ def test_decision_form_across_a_bemyndigande_clause():
             "där mul- och klövsjuka förekommer ska upphöra att gälla. Denna författning "
             "träder i kraft den 21 april 2021.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/lsfs/1980:9"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/lsfs/1980:9"]
 
 
 def test_skall_target_upphora_att_galla():
@@ -551,7 +557,7 @@ def test_skall_target_upphora_att_galla():
             "föreskrifter (SJVFS 1994:123) om utförsel av vattenbruksdjur till länder "
             "som ingår i Europeiska ekonomiska samarbetsområdet upphöra att gälla.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1994:123"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/1994:123"]
 
 
 def test_enumerated_repeal_list_reads_items_and_spares_provision_items():
@@ -564,7 +570,7 @@ def test_enumerated_repeal_list_reads_items_and_spares_provision_items():
             "(SJVFS 2012:24) om anmälningspliktiga djursjukdomar. Denna författning "
             "träder i kraft den 1 mars 2026.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2012:24"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/2012:24"]
 
 
 def test_enumerated_repeal_list_runs_past_the_sentence_window_and_page_furniture():
@@ -585,7 +591,7 @@ def test_enumerated_repeal_list_runs_past_the_sentence_window_and_page_furniture
             "1 kap. 2 § tillämpas första gången den 1 juli 2026.")
     assert len(text) > 1200
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == sorted(["https://lagen.nu/sjvfs/2000:%d" % i for i in range(1, 13)]
+    assert _uris(meta["upphaver"]) == sorted(["https://lagen.nu/sjvfs/2000:%d" % i for i in range(1, 13)]
                                       + ["https://lagen.nu/sjvfs/1995:71"])
 
 
@@ -598,7 +604,7 @@ def test_a_forteckning_over_gallande_foreskrifter_repeals_nothing():
             "följande förteckningar.\n- Upph. LIVSFS 2006:22 Upphäver LIVSFS 2004:14\n"
             "Saknr: H 64 Ikraft: 9 december 2006\n2004 26 Se LIVSFS 2003:13\n")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="livsfs")
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
 
 
 def test_bare_allmanna_rad_number_is_not_an_own_series_ref():
@@ -609,7 +615,7 @@ def test_bare_allmanna_rad_number_is_not_an_own_series_ref():
             "lagring och spridning av gödsel m.m. samt Statens jordbruksverks "
             "föreskrifter och allmänna råd (2004:62) om miljöhänsyn i jordbruket.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2004:62"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/2004:62"]
 
 
 def test_extract_metadata_andrar_from_the_amending_formula():
@@ -637,7 +643,7 @@ def test_the_registers_upphavs_genom_stamp_is_not_a_repeal():
             "1995. Genom författningen upphävs Statens jordbruksverks föreskrifter "
             "(SJVFS 1994:125) om införsel av fjäderfä.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1994:125"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/1994:125"]
 
 
 def test_a_dels_att_provision_repeal_spares_the_base_named_in_the_formula():
@@ -650,7 +656,7 @@ def test_a_dels_att_provision_repeal_spares_the_base_named_in_the_formula():
             "skydd av djur som används för vetenskapliga ändamål, dels att 3 § ska "
             "upphöra att gälla, dels att 5 § ska ha följande lydelse.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
 
 
 def test_a_footnote_inside_a_repeal_item_names_no_target():
@@ -661,7 +667,7 @@ def test_a_footnote_inside_a_repeal_item_names_no_target():
             "föreskrifter (SJVFS 2009:3) om obligatorisk\n12 SJVFS 2021:10.\n"
             "hälsoövervakning. Denna författning träder i kraft den 1 april 2025.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2007:17", "https://lagen.nu/sjvfs/2009:3"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/2007:17", "https://lagen.nu/sjvfs/2009:3"]
 
 
 def test_upphor_att_galla_vid_ikrafttradandet_av_names_the_successor():
@@ -672,7 +678,7 @@ def test_upphor_att_galla_vid_ikrafttradandet_av_names_the_successor():
             "ikraftträdandet av Statens jordbruksverks föreskrifter (SJVFS 1994:22) om "
             "certifiering m.m. av utsäde av stråsäd. Ansökan görs hos verket.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/lsfs/1989:26"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/lsfs/1989:26"]
 
 
 def test_repeal_wordings_upphor_galla_letter_items_and_an_own_series_typo():
@@ -681,31 +687,31 @@ def test_repeal_wordings_upphor_galla_letter_items_and_an_own_series_typo():
     meta = extract_metadata("Denna författning träder i kraft den 1 april 2019, då "
                             "Djurskyddsmyndighetens föreskrifter (DFS 2006:8) om odling av "
                             "fisk upphör gälla. CHRISTINA NORDIN", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/dfs/2006:8"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/dfs/2006:8"]
     # SJVFS 2019:71 lists its targets as "a. …, samt b. …"; SJVFS 2022:21 as
     # "följande föreskrifter upphör att gälla: a. … b. …"
     meta = extract_metadata("2. Genom författningen upphävs a. Statens jordbruksverks "
                             "föreskrifter (SJVFS 1995:94) om skyddsåtgärder, samt b. Statens "
                             "jordbruksverks föreskrifter (SJVFS 1996:13) om införsel. "
                             "3. Bestämmelserna i 4 § tillämpas första gången 2020.", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1995:94", "https://lagen.nu/sjvfs/1996:13"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/1995:94", "https://lagen.nu/sjvfs/1996:13"]
     meta = extract_metadata("Denna författning träder i kraft den 1 juli 2022, då följande "
                             "föreskrifter upphör att gälla: a. Statens jordbruksverk föreskrifter "
                             "(SJVFS 2011:16) om rutiner, b. Statens jordbruksverk föreskrifter "
                             "(SJVFS 2007:6) om rutiner vid länsstyrelsens handläggning.\n\n"
                             "CHRISTINA NORDIN", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2007:6", "https://lagen.nu/sjvfs/2011:16"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/2007:6", "https://lagen.nu/sjvfs/2011:16"]
     # SJVFS 2020:8: the sentence ends before a numbered point, which
     # RE_ENUMERATOR has turned into an item dash
     meta = extract_metadata("1. Denna författning träder i kraft den 15 juni 2020. Genom "
                             "författningen upphävs Statens jordbruksverks föreskrifter och allmänna "
                             "råd (SJVFS 2019:28) om hållande av hund och katt. 2. Bestämmelserna i "
                             "3 kap. tillämpas från 2021.", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2019:28"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/2019:28"]
     # SJVFS 2025:7 misspells its own series: "(SVJFS 2008:33)"
     meta = extract_metadata("2. Genom författningen upphävs Statens Jordbruksverks föreskrifter "
                             "(SVJFS 2008:33) om avgifter i växtsortärenden.", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2008:33"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/2008:33"]
 
 
 def test_footnote_lines_and_the_bare_stamp_name_no_target():
@@ -714,15 +720,15 @@ def test_footnote_lines_and_the_bare_stamp_name_no_target():
     meta = extract_metadata("Genom författningen upphävs Statens jordbruksverks allmänna råd "
                             "(2005:1) om lagring och spridning av gödsel m.m.\n6 SJVFS 2004:62 "
                             "7 SJVFS 2005:74 8 SJVFS 2006:66\nSJVFS 2010:1", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
     # SJVFS 2000:105: footnote 3 cites the base, footnote 4 says a provision
     # "upphör att gälla"
     meta = extract_metadata("utan certifiering eller kontroll\n3 SJVFS 1994:23. 4 Föreskrifterna "
                             "upphör att gälla den 1 juli 2001.", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
     # SJVFS 2021:33: "upphävs" ends a provision repeal, a footnote follows
     meta = extract_metadata("dels att 2 kap. 4 § ska upphävs\n78 SJVFS 2021:13.\n", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
     # SJVFS 2012:24: the stamp's "UPPHÄVS" line, split from its "GENOM", above a
     # bilaga whose footnotes name other regulations
     meta = extract_metadata("UPPHÄVS\n1 00 017 boskapspest rinderpestvirus\n1 Första siffran: 1 = "
@@ -730,7 +736,7 @@ def test_footnote_lines_and_the_bare_stamp_name_no_target():
                             "1999:102) om epizootiska sjukdomar m.m., 2 = Sjukdomar som omfattas av "
                             "Statens jordbruksverks föreskrifter (SJVFS 1999:101) om zoonotiska "
                             "sjukdomar. Ersätter inget.", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == []
+    assert _uris(meta["upphaver"]) == []
     # SJVFS 2025:10 opens its list with "upphävs respektive upphör att gälla"
     meta = extract_metadata("2. Genom författningen upphävs respektive upphör att gälla 1. 2 kap. 1 § "
                             "Statens jordbruksverks föreskrifter (SJVFS 2002:98) om epizootiska "
@@ -738,7 +744,7 @@ def test_footnote_lines_and_the_bare_stamp_name_no_target():
                             "anmälningspliktiga djursjukdomar, 3. Statens jordbruksverks föreskrifter "
                             "(SJVFS 2009:3) om obligatorisk\n12 SJVFS 2021:10.\nGodkänd 2025-10-14 av "
                             "Olof Johansson\nhälsoövervakning.\n\nCHRISTINA NORDIN", "", parser, fs="sjvfs")
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/2009:3", "https://lagen.nu/sjvfs/2012:24"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/2009:3", "https://lagen.nu/sjvfs/2012:24"]
 
 
 def test_repeal_capture_survives_an_abbreviation_and_stays_in_its_sentence():
@@ -751,7 +757,7 @@ def test_repeal_capture_survives_an_abbreviation_and_stays_in_its_sentence():
             "jordbruksverks föreskrifter (SJVFS 2006:42) om införsel av hästdjur. "
             "Denna författning träder i kraft den 1 april 2026.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/sjvfs/1996:24", "https://lagen.nu/sjvfs/2006:42"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/sjvfs/1996:24", "https://lagen.nu/sjvfs/2006:42"]
     text = ("Djurskyddsmyndigheten föreskriver, med stöd av 4 § djurskyddsförordningen, "
             "att bilaga 2 ska ha följande lydelse. Hingstar 8 § har upphävts genom "
             "(SJVFS 2008:26). Övrigt 9 § Om det finns särskilda skäl kan undantag "
@@ -759,7 +765,7 @@ def test_repeal_capture_survives_an_abbreviation_and_stays_in_its_sentence():
             "Djurskyddsmyndighetens föreskrifter (DFS 2004:1) om hästhållning ska "
             "upphöra att gälla.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/dfs/2004:1"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/dfs/2004:1"]
 
 
 def test_an_omtryck_amends_the_base_whose_designation_it_restates():
@@ -821,7 +827,7 @@ def test_extract_metadata_upphaver_verb_then_target_then_att_galla():
             "upphör Livsmedelsverkets föreskrifter och allmänna råd (SLVFS 1995:31) "
             "om livsmedelstillsatser att gälla.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/slvfs/1995:31"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1995:31"]
 
 
 def test_old_livsmedelsverket_masthead_reads_its_spaced_designation_and_register_code():
@@ -854,7 +860,7 @@ def test_extract_metadata_upphaver_from_a_ska_upphora_att_galla_decision():
             "(KKVFS 2015:2) om näringsförbud vid överträdelser av "
             "konkurrensreglerna ska upphöra att gälla den 1 mars 2021.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/kkvfs/2015:2"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/kkvfs/2015:2"]
 
 
 def test_extract_metadata_upphora_decision_on_an_amendment_spares_its_base():
@@ -866,7 +872,7 @@ def test_extract_metadata_upphora_decision_on_an_amendment_spares_its_base():
             "allmänna råd för verkställighet i anstalt (KVFS 2006:26) ska "
             "upphöra att gälla.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/kvfs/2007:6"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/kvfs/2007:6"]
 
 
 def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
@@ -876,7 +882,7 @@ def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
             "Föreskrifterna ersätter Åklagarmyndighetens föreskrifter "
             "(ÅFS 2005:6) om expediering.")
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/aafs/2005:6"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/aafs/2005:6"]
 
 
 def test_extract_metadata_upphaver_from_harvest_title():
@@ -893,7 +899,7 @@ def test_extract_metadata_upphaver_from_harvest_title():
              "(BOLFS 2006:2) om avgifter för bevis och uppgifter",
              "https://lagen.nu/bolfs/2006:2")]:
         meta = extract_metadata("", fp.role_declaration("", title), parser)
-        assert meta["upphaver"] == [target]
+        assert _uris(meta["upphaver"]) == [target]
 
 
 def test_title_upphavande_of_an_amendment_spares_its_base():
@@ -905,7 +911,7 @@ def test_title_upphavande_of_an_amendment_spares_its_base():
              "(HSLF-FS 2019:32) om förordnande och utlämnande av läkemedel")
     meta = extract_metadata("", fp.role_declaration("", title),
                             sfs_parser("foreskrift", PARSE_TYPES))
-    assert meta["upphaver"] == ["https://lagen.nu/hslffs/2019:43"]
+    assert _uris(meta["upphaver"]) == ["https://lagen.nu/hslffs/2019:43"]
 
 
 def test_printed_designation_names_a_regulation_the_corpus_does_not_hold():
@@ -1212,8 +1218,8 @@ def test_parse_record_drops_self_upphaver(tmp_path, monkeypatch):
     # LIVSFS 2022:4's upphäver clause restates its own designation; a
     # regulation never replaces itself
     monkeypatch.setattr(fp, "parse_pdf", lambda *a, **kw: ([], {
-        "upphaver": ["https://lagen.nu/livsfs/2022:4",
-                     "https://lagen.nu/livsfs/2005:20"],
+        "upphaver": [["https://lagen.nu/livsfs/2022:4", None],
+                     ["https://lagen.nu/livsfs/2005:20", "2022-07-01"]],
         "bemyndigande": [], "genomfor": [], "andrar": [],
         "beslutsdatum": None, "utkomFranTryck": None,
         "ikrafttradandedatum": None, "publisher": None}, []))
@@ -1221,7 +1227,7 @@ def test_parse_record_drops_self_upphaver(tmp_path, monkeypatch):
               "identifier": "LIVSFS 2022:4",
               "files": {"regulation": {"name": "r.pdf"}}}
     reg = parse_record(record, tmp_path)
-    assert reg.upphaver == ["https://lagen.nu/livsfs/2005:20"]
+    assert reg.upphaver == [["https://lagen.nu/livsfs/2005:20", "2022-07-01"]]
 
 
 def test_parse_record_dedupes_twice_listed_consolidation(tmp_path, monkeypatch):
@@ -1776,6 +1782,65 @@ def test_foreskrift_definitions_reach_the_catalog():
     assert catalog.definition_sentences(art) == [
         ("https://lagen.nu/begrepp/Incident", "P2", "incident",
          "incident: en händelse med faktisk negativ inverkan på säkerheten.")]
+
+
+# --- the day a repeal takes effect ------------------------------------------
+
+def test_repeal_date_reads_both_forms_the_clauses_use():
+    # the two forms measured over the corpus in #39, and the third case: a
+    # clause that names no day at all
+    assert fp.repeal_date("… ska upphöra att gälla den 1 mars 2021.") == "2021-03-01"
+    assert fp.repeal_date("… ska upphöra att gälla vid utgången av november "
+                          "2022.") == "2022-11-30"
+    assert fp.repeal_date("… ska upphöra att gälla vid utgången av 2007.") == "2007-12-31"
+    assert fp.repeal_date("… ska upphöra att gälla.") is None
+
+
+def test_extract_metadata_dates_each_repeal_from_its_own_clause():
+    # KKVFS 2021:2's shape: the clause names the target and the day, and the
+    # day is the target's, not the repealing document's own
+    text = ("Konkurrensverket beslutar att Konkurrensverkets allmänna råd "
+            "(KKVFS 2015:2) om näringsförbud ska upphöra att gälla den 1 mars 2021.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == [["https://lagen.nu/kkvfs/2015:2", "2021-03-01"]]
+
+
+def test_extract_metadata_leaves_an_undated_repeal_undated():
+    # 53 of the 164 decision-form clauses name no day. None is not "today":
+    # the repealing document's own ikraftträdande answers for it where the
+    # relation is read, so the artifact records only what the document says
+    text = ("Bolagsverket föreskriver att Bolagsverkets föreskrifter "
+            "(BOLFS 2006:1) om avgifter ska upphöra att gälla.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == [["https://lagen.nu/bolfs/2006:1", None]]
+
+
+def test_extract_metadata_dates_a_repeal_from_the_entry_into_force_sentence():
+    # "Genom författningen upphävs X. Denna författning träder i kraft den …"
+    # -- the repeal takes effect with the document that states it
+    text = ("Genom författningen upphävs Statens jordbruksverks föreskrifter "
+            "(SJVFS 2006:42) om införsel av hästdjur. Denna författning träder "
+            "i kraft den 1 april 2026.")
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == [["https://lagen.nu/sjvfs/2006:42", "2026-04-01"]]
+
+
+def test_a_forteckning_cover_page_costs_a_document_only_its_repeals():
+    # LIVSFS 2007:1 is a förteckning över gällande föreskrifter, which restates
+    # every regulation's "Upphäver" entry and repeals nothing itself. Returning
+    # from the whole extraction on that phrase cost every document whose cover
+    # page carries it its amendment relation and its dates too (AFS 2023:1-15).
+    text = ("Förteckning över gällande föreskrifter. Arbetsmiljöverket "
+            "föreskriver med stöd av 18 § arbetsmiljöförordningen i fråga om "
+            "Arbetsmiljöverkets föreskrifter (AFS 2020:1) om arbetsplatsens "
+            "utformning att 3 § ska ha följande lydelse. Denna författning "
+            "träder i kraft den 1 januari 2025. Beslutad den 2 maj 2024.")
+    meta = extract_metadata(text, text, sfs_parser("foreskrift", PARSE_TYPES))
+    assert meta["upphaver"] == []
+    assert meta["andrar"] == ["https://lagen.nu/afs/2020:1"]
+    assert meta["ikrafttradandedatum"] == "2025-01-01"
+
+
 # --- the masthead's own furniture, and the words the page broke in half ------
 
 def test_join_wrapped_closes_a_broken_word_and_keeps_a_hanging_hyphen():

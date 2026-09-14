@@ -378,6 +378,10 @@ def cmd_relate(sources, names, force=None, jobs=1):
             # warm: the hierarchy's artifact reads can evict it from the OS
             # cache. Any ladder-only stubs minted later have zero citations.
             stamped = _relate_pass("inbound counts", catalog.stamp_inbound_counts, con)
+            # the repeal relations are links, so this reads them here too: a
+            # föreskrift's repeal date lives on the relation its repealer
+            # states, and every listing reads it off the target's `expired`
+            expired = _relate_pass("repeal dates", catalog.stamp_repeal_dates, con)
             # the norm hierarchy: which rule derives its authority from which. Needs
             # every source related (a chain crosses EU -> lag -> förordning ->
             # föreskrift), so it runs here rather than per source.
@@ -433,6 +437,7 @@ def cmd_relate(sources, names, force=None, jobs=1):
             print("relate: %d concept stubs minted from defined terms + nyckelord"
                   % concepts)
             print("relate: inbound counts stamped on %d cited documents" % stamped)
+            print("relate: repeal date stamped on %d repealed documents" % expired)
             # ... and their warnings, which a hook hands over already worded
             for line in warnings:
                 print("relate: %s" % line)

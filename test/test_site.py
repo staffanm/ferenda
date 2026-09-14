@@ -820,7 +820,7 @@ ANDRINGSFS = {
     "metadata": {"title": "Föreskrifter om ändring i föreskrifterna "
                           "(ÅFS 1999:1) om expediering",
                  "andrar": ["https://lagen.nu/aafs/2005:5"],
-                 "upphaver": ["https://lagen.nu/aafs/1999:1"],
+                 "upphaver": [["https://lagen.nu/aafs/1999:1", "2006-07-01"]],
                  "genomfor": ["https://lagen.nu/celex/32011L0061"],
                  "genomfor_akt": ["https://lagen.nu/celex/32001R2580"],
                  "andradAv": ["https://lagen.nu/aafs/2007:2"]},
@@ -891,6 +891,38 @@ def test_foreskrift_relation_edges_and_inbound_mirrors(tmp_path):
         "AND predicate = 'rpubl:genomforDirektiv'",
         ("https://lagen.nu/celex/32011L0061",)).fetchone() == (
         ANDRINGSFS["uri"],)
+
+
+def test_stamp_repeal_dates_puts_the_clauses_day_on_the_repealed(tmp_path):
+    # a föreskrift carries no status of its own; the repealing document's
+    # clause is the evidence, and the day it names is what the listings read
+    con = _foreskrift_catalog(tmp_path)
+    assert catalog.stamp_repeal_dates(con) == 1
+    assert con.execute("SELECT expired FROM documents WHERE uri = ?",
+                       (UPPHAVDFS["uri"],)).fetchone()[0] == "2006-07-01"
+    # and a repeal that has not taken effect yet does not subdue its target
+    assert catalog.upphaver_targets(con, on="2006-06-30") == set()
+    assert catalog.upphaver_targets(con, on="2006-07-01") == {UPPHAVDFS["uri"]}
+
+
+def test_stamp_repeal_dates_falls_back_to_the_repealers_own_ikrafttradande(tmp_path):
+    # 53 of 164 repeal clauses name no day. The repeal takes effect with the
+    # document that states it -- never on the day it was decided, which would
+    # expire a regulation while its rules were still in force.
+    art = json.loads(json.dumps(ANDRINGSFS))
+    art["metadata"]["upphaver"] = [["https://lagen.nu/aafs/1999:1", None]]
+    art["metadata"]["ikrafttradandedatum"] = "2007-01-01"
+    db = str(tmp_path / "catalog.sqlite")
+    paths = []
+    for doc in (art, UPPHAVDFS):
+        f = tmp_path / (doc["uri"].rsplit("/", 1)[-1].replace(":", "-") + ".json")
+        f.write_text(json.dumps(doc))
+        paths.append(f)
+    catalog.rebuild(db, "foreskrift", paths)
+    con = catalog.connect(db)
+    catalog.stamp_repeal_dates(con)
+    assert con.execute("SELECT expired FROM documents WHERE uri = ?",
+                       (UPPHAVDFS["uri"],)).fetchone()[0] == "2007-01-01"
 
 
 def test_foreskrift_page_renders_relation_groups(tmp_path):
