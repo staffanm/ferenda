@@ -593,7 +593,7 @@ AVSNITTNR: /\d+(?:\.\d+){1,3}/
 
 # EURATTSFALL (CJEU case law: "Case C-176/09", "mål T-201/04") -- the old
 # euratt.ebnf. Minted to a celex number "6{year}C{descriptor}{serial}"
-# (descriptor C->J Court, T->A General Court, F->W Civil Service Tribunal).
+# (CJ Court, TJ General Court, FJ Civil Service Tribunal).
 # Accepts the English "Case" and Swedish "mål" prefix (optional) and the
 # hyphen variants real EU texts use (incl. U+2011 non-breaking hyphen).
 EURATTSFALL_RULES = r"""
@@ -2901,8 +2901,6 @@ class LagrumParser:
 
     # --- EURATTSFALL (CJEU case law) ---
 
-    ECJ_DESCRIPTOR = {'C': 'J', 'T': 'A', 'F': 'W'}
-
     def fmt_ecj_ref(self, node, match, out, context):
         # the pre-1989 numbering ("Case 31/87") has no court letter: only the
         # ECJ existed, so its absence *means* the Court of Justice
@@ -2918,8 +2916,10 @@ class LagrumParser:
         # exist (2026-08-15 audit)
         if decision_node is None and not 1954 <= int(year) <= 1989:
             raise NoLink()
-        celex = '6%sC%s%04d' % (year, self.ECJ_DESCRIPTOR[decision],
-                                int(serial))
+        # EUR-Lex's sector-6 descriptors are CJ/TJ/FJ. CA is a Court of
+        # Justice judgment notice, not a General Court judgment; CW is not
+        # a descriptor. See the regression cases in test_lagrum.py.
+        celex = '6%s%sJ%04d' % (year, decision, int(serial))
         out.append({'_uri': self.base + 'celex/' + celex})
 
     # --- MYNDIGHETSBESLUT (authority decisions) ---

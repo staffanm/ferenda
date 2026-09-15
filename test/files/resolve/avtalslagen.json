@@ -1,0 +1,563 @@
+{
+  "uri": "https://lagen.nu/1915:218",
+  "structure": [
+    {
+      "children": [
+        {
+          "id": null,
+          "type": "rubrik"
+        },
+        {
+          "children": [
+            {
+              "id": "P1S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P1S2",
+              "type": "stycke"
+            },
+            {
+              "id": "P1S3",
+              "type": "stycke"
+            }
+          ],
+          "id": "P1",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P2S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P2S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P2",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P3S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P3S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P3",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P4S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P4S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P4",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P5S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P5",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P6S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P6S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P6",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P7S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P7",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P8S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P8S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P8",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P9S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P9",
+          "type": "paragraf"
+        }
+      ],
+      "id": "K1",
+      "type": "kapitel"
+    },
+    {
+      "children": [
+        {
+          "id": null,
+          "type": "rubrik"
+        },
+        {
+          "children": [
+            {
+              "id": "P10S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P10S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P10",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P11S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P11S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P11",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P12S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P12S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P12",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P13S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P13",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P14S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P14S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P14",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P15S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P15",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P16S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P16S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P16",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P17S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P17S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P17",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P18S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P18",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P19S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P19",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P20S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P20",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P21S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P21S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P21",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P22S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P22",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P23S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P23",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P24S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P24",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P25S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P25S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P25",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P26S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P26",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P27S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P27S2",
+              "type": "stycke"
+            },
+            {
+              "id": "P27S3",
+              "type": "stycke"
+            }
+          ],
+          "id": "P27",
+          "type": "paragraf"
+        }
+      ],
+      "id": "K2",
+      "type": "kapitel"
+    },
+    {
+      "children": [
+        {
+          "id": null,
+          "type": "rubrik"
+        },
+        {
+          "children": [
+            {
+              "id": "P28S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P28S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P28",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P29S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P29",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P30S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P30S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P30",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P31S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P31S2",
+              "type": "stycke"
+            },
+            {
+              "id": "P31S3",
+              "type": "stycke"
+            }
+          ],
+          "id": "P31",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P32S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P32S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P32",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P33S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P33",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P34S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P34",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P35S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P35S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P35",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P36S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P36S2",
+              "type": "stycke"
+            },
+            {
+              "id": "P36S3",
+              "type": "stycke"
+            },
+            {
+              "id": "P36S4",
+              "type": "stycke"
+            }
+          ],
+          "id": "P36",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P37S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P37",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P38S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P38",
+          "type": "paragraf"
+        }
+      ],
+      "id": "K3",
+      "type": "kapitel"
+    },
+    {
+      "children": [
+        {
+          "id": null,
+          "type": "rubrik"
+        },
+        {
+          "children": [
+            {
+              "id": "P39S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P39",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P40S1",
+              "type": "stycke"
+            },
+            {
+              "id": "P40S2",
+              "type": "stycke"
+            }
+          ],
+          "id": "P40",
+          "type": "paragraf"
+        },
+        {
+          "children": [
+            {
+              "id": "P41S1",
+              "type": "stycke"
+            }
+          ],
+          "id": "P41",
+          "type": "paragraf"
+        }
+      ],
+      "id": "K4",
+      "type": "kapitel"
+    }
+  ]
+}

@@ -30,7 +30,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from .. import config
-from . import begrepp, catalog_rows, compress, labels, text, util
+from . import begrepp, catalog_rows, compress, courtids, labels, text, util
 from .markdown import begrepp_uri
 from .util import BASE, local
 
@@ -92,6 +92,12 @@ CREATE TABLE IF NOT EXISTS links (
                                  -- an inbound line can say "s. 45" for an anchor
                                  -- with no citable designator of its own (S4)
 );
+CREATE TABLE IF NOT EXISTS citation_alias (
+    alias TEXT NOT NULL,
+    uri TEXT NOT NULL,
+    PRIMARY KEY (alias, uri)
+);
+CREATE INDEX IF NOT EXISTS idx_citation_alias_uri ON citation_alias(uri);
 CREATE TABLE IF NOT EXISTS concept_alias (
     variant   TEXT PRIMARY KEY,     -- an inflected/variant begrepp uri
     canonical TEXT NOT NULL         -- the concept it folds onto (lib.begrepp)
@@ -1125,6 +1131,7 @@ def content_hash(raw: bytes) -> str:
 def _drop_document(con, uri):
     """Remove a document and everything keyed off it: its outbound links, its
     EU-act lineage and its concept redirects."""
+    con.execute("DELETE FROM citation_alias WHERE uri = ?", (uri,))
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
     con.execute("DELETE FROM definitions WHERE from_uri = ?", (uri,))
     con.execute("DELETE FROM directive_correspondence WHERE new_uri = ?", (uri,))
@@ -1136,6 +1143,9 @@ def _index_document(con, art, path, source):
     """(Re)write one document's rows: its documents row and outbound links,
     replacing any prior version keyed by the same uri."""
     uri = art["uri"]
+    con.execute("DELETE FROM citation_alias WHERE uri = ?", (uri,))
+    con.executemany("INSERT INTO citation_alias VALUES (?, ?)",
+                    [(alias, uri) for alias in catalog_rows.citation_aliases(art)])
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
     # what this act says its defined terms mean -- the begrepp page's reading
     # matter, stored beside the edge that points at it (see definition_sentences)
@@ -2231,6 +2241,18 @@ def concept_aliases(con: sqlite3.Connection) -> dict[str, str]:
     """The variant-uri -> canonical-uri map (`concept_alias`), so the renderer can
     resolve a begrepp link baked into an artifact onto its canonical concept page."""
     return dict(con.execute("SELECT variant, canonical FROM concept_alias"))
+
+
+def citation_targets(con, query):
+    """Every held target of an exact official alias, with its source.
+
+    Multiple matches stay multiple: an alias must not select whichever
+    document SQLite happens to return first.
+    """
+    return [{"uri": uri, "source": source} for uri, source in con.execute(
+        "SELECT d.uri, d.source FROM citation_alias a "
+        "JOIN documents d ON d.uri = a.uri WHERE a.alias = ? ORDER BY d.uri",
+        (courtids.citation_key(query),))]
 
 
 def document(con: sqlite3.Connection, uri: str) -> dict | None:

@@ -24,6 +24,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from ..lib import courtids
 from ..lib.lagrum import Ref
 from ..lib.pdftext import pages_with_ocr
 from .model import decision_uri
@@ -43,9 +44,7 @@ RE_OFFICIAL = re.compile(
     r"pp?\s*\.?\s*(?P<page>\d+)")
 # how the running text cites: tighter than the cover form (body text is
 # reflowed, not raw scan debris), volume half included where the year needs it
-RE_CITE = re.compile(
-    r"I\.?\s?C\.?\s?J\.?\s+Reports\s+(?P<year>\d{4})"
-    r"\s*(?:\((?P<volume>[IVX]+)\))?,?\s*(?:at\s+)?pp?\.\s*(?P<page>\d+)")
+RE_CITE = courtids.ICJ_REPORT
 COVER_PAGES = 3
 
 

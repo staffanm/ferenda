@@ -6,13 +6,38 @@ curated datasets (sfs/data/namedlaws.json, eurlex/data/namedacts.json,
 dv/data/namedcases.json); no network, no OpenSearch, no catalog.
 """
 
+import json
 import threading
+from pathlib import Path
+
+import pytest
 
 from ferenda.dv import namedcases
 from ferenda.lib import resolve
 from ferenda.lib.lagrum import LagrumParser
 
 # --- SFS: nickname/abbreviation + chapter/§ pinpoint, in ⌘K (law-first) order
+
+@pytest.mark.parametrize("query,slug,invalid", json.loads(
+    (Path(__file__).parent / "files/resolve/nja.json").read_text()))
+def test_nja_page_citation_recognition(query, slug, invalid):
+    assert resolve.resolve(query) == [
+        {"uri": "https://lagen.nu/dom/nja/" + slug, "source": "dv"}]
+
+
+@pytest.mark.parametrize("query,path,source,invalid", json.loads(
+    (Path(__file__).parent / "files/resolve/families.json").read_text()))
+def test_citation_family_recognition(query, path, source, invalid):
+    assert resolve.resolve(query) == [{"uri": "https://lagen.nu/" + path, "source": source}]
+
+
+@pytest.mark.parametrize("query", [
+    "NJA 2013:372", "NJA 2013 s. 372-373", "NJA 2013 s. 372 och 400",
+    "NJA II 2013 s. 372", "NJA 2013 s. 3.72",
+])
+def test_nja_does_not_guess_a_page_from_other_forms(query):
+    assert resolve.resolve(query) == []
+
 
 def test_sfs_nickname_plus_bare_section():
     # "avtalslagen 36" -- the terse law-first order people actually type
@@ -310,6 +335,32 @@ def test_resolve_dispatches_and_tags_source():
 def test_resolve_empty_is_empty():
     assert resolve.resolve("") == []
     assert resolve.resolve("   ") == []
+
+
+def test_resolve_shared_treaty_name():
+    assert {hit["uri"] for hit in resolve.resolve("Geneva Conventions")} == {
+        "https://lagen.nu/icrc/365", "https://lagen.nu/icrc/370",
+        "https://lagen.nu/icrc/375", "https://lagen.nu/icrc/380"}
+
+
+@pytest.mark.parametrize("query", [
+    "12 kap. 1 § FFFS 2020:1", "12 kap. 1 § i FFFS 2020:1",
+    "FFFS 2020:1 12:1", "FFFS 2020:1 12 kap. 1 §",
+])
+def test_resolve_regulation_pinpoints(query):
+    assert resolve.resolve(query) == [
+        {"uri": "https://lagen.nu/fffs/2020:1#K12P1", "source": "foreskrift"}]
+
+
+@pytest.mark.parametrize("path,source", [
+    ("1962:700#K3P1", "sfs"), ("dom/hfd/2025:1", "dv"),
+    ("celex/32016R0679#32", "eurlex"), ("icrc/585#A6", "icrc"),
+    ("untc/I-27531#A24", "untc"), ("dom/echr/001-58257", "hudoc"),
+    ("fffs/2020:1", "foreskrift"),
+])
+def test_resolve_canonical_uri(path, source):
+    uri = "https://lagen.nu/" + path
+    assert resolve.resolve(uri) == [{"uri": uri, "source": source}]
 
 
 # --- the named-rättsfall PDF row parser (pure, over laid-out text) ----------

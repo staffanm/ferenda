@@ -5,8 +5,7 @@ The Court files every decision under one filename grammar --
 ``070-19860627-JUD-01-00-EN.pdf`` for the Nicaragua merits judgment. That stem
 without its language segment is the document's identity here, because it is the
 only id the Court itself assigns a *decision* (the case number names the case,
-which holds many decisions). ``icj`` is its only producer, so the grammar lives
-here.
+which holds many decisions). ``lib.courtids`` shares the grammar with API lookup.
 
 Scope is the Court's own word on the law: judgments, advisory opinions, and the
 orders that indicate provisional measures. The ~600 docket orders that fix and
@@ -16,17 +15,17 @@ extend time-limits are out -- see `download.in_scope`.
 import re
 from dataclasses import dataclass, field
 
+from ..lib import courtids
 from ..lib.artifact import Block, numbered_nodes
-from ..lib.catalog import BASE
+
+RE_STEM = courtids.ICJ_STEM
+doc_basefile = courtids.icj_basefile
+parse_stem = courtids.icj_parts
+decision_uri = courtids.icj_uri
 
 COURT_EN = "International Court of Justice"
 SITE = "https://www.icj-cij.org"
 
-# the decision filename stem: case number, date, kind, and the two-part
-# sequence the Court numbers a decision's parts with. The separators are
-# inconsistent at the source -- 875 files use "-", one uses "_" throughout
-# (171_20201218_JUD_01-00-EN.pdf) -- so both are accepted and normalised.
-RE_STEM = re.compile(r"^(\d{3})[-_](\d{8})[-_]([A-Za-z]{3})[-_](\d{2})[-_](\d{2})$")
 # the language segment a decision filename closes with: EN, FR, or BI
 # (bilingual). One 2022 order is published as "…-enc.pdf", a typing slip at the
 # Court for "en" -- read as English rather than skipped, since it is the only
@@ -40,35 +39,6 @@ KINDS = {"JUD": "judgment", "ADV": "advisory opinion", "ORD": "order"}
 # labels live there and this stays the identity half (rule:lib-never-imports-vertical)
 KIND_SV = {"judgment": "dom", "advisory opinion": "rådgivande yttrande",
            "order": "beslut"}
-
-
-def parse_stem(stem):
-    """A decision filename stem (language segment already removed) as its
-    parts, or None when it does not match the Court's grammar."""
-    match = RE_STEM.match(stem)
-    if not match:
-        return None
-    case, date, kind, part, sub = match.groups()
-    return {"case": case, "date": "%s-%s-%s" % (date[:4], date[4:6], date[6:]),
-            "kind": kind.upper(), "part": part, "sub": sub}
-
-
-def doc_basefile(stem):
-    """The decision's identity: its filename stem with the separators and the
-    kind normalised (``171_20201218_JUD_01-00`` -> ``171-20201218-JUD-01-00``).
-
-    Raises rather than passing an unrecognised stem through, because a stem
-    that does not parse would mint a URI no `parse_stem` consumer can read back
-    (rule:errors-drive-retry-use-raise)."""
-    parts = parse_stem(stem)
-    if parts is None:
-        raise ValueError("icj: %r is not a decision filename stem" % stem)
-    return "%s-%s-%s-%s-%s" % (parts["case"], parts["date"].replace("-", ""),
-                               parts["kind"], parts["part"], parts["sub"])
-
-
-def decision_uri(basefile):
-    return "%sicj/%s" % (BASE, basefile)
 
 
 def case_uri(case):

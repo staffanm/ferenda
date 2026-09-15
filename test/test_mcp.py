@@ -157,13 +157,22 @@ def test_resolve_citation_bare_sfs_number(corpus):
 def test_resolve_citation_names_an_unheld_citation_apart_from_the_hits(corpus):
     # a well-formed case number the corpus does not hold: an identity under
     # `recognized`, never a row under `results` (which a model would cite)
-    answer = mcpmod.resolve_citation("C-744/28")
+    answer = mcpmod.resolve_citation("C-744/24")
     assert answer["results"] == []
-    assert answer["recognized"] == [{"uri": "https://lagen.nu/celex/62028CJ0744",
+    assert answer["recognized"] == [{"uri": "https://lagen.nu/celex/62024CJ0744",
                                      "source": "eurlex"}]
     # and a query that is no citation at all leaves both lists empty
     assert mcpmod.resolve_citation("blahonga") == {"results": [],
                                                    "recognized": []}
+
+
+def test_resolve_citation_nja_validity_matches_rest(corpus):
+    assert mcpmod.resolve_citation("NJA 2013 s. 372") == {
+        "results": [], "recognized": [{
+            "uri": "https://lagen.nu/dom/nja/2013s372", "source": "dv", "invalid": True}]}
+    assert mcpmod.resolve_citation("NJA 1980 s. 3000") == {
+        "results": [], "recognized": [{
+            "uri": "https://lagen.nu/dom/nja/1980s3000", "source": "dv"}]}
 
 
 def test_get_document_full_and_pinpoint(corpus):

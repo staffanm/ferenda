@@ -461,8 +461,10 @@ def test_yield_overlaps_term_yields_to_citation():
 EURATTSFALL_CASES = [
     ("In Case C-176/09 the court", "https://lagen.nu/celex/62009CJ0176"),
     ("mål C-197/09 RX-II,", "https://lagen.nu/celex/62009CJ0197"),
-    ("By order in Case F-23/07", "https://lagen.nu/celex/62007CW0023"),
-    ("i mål T-201/04", "https://lagen.nu/celex/62004CA0201"),
+    # Adjudicated against EUR-Lex's sector-6 descriptor table: judgments
+    # use FJ/TJ, never the former CW/CA output (CA means a CJ notice).
+    ("By order in Case F-23/07", "https://lagen.nu/celex/62007FJ0023"),
+    ("i mål T-201/04", "https://lagen.nu/celex/62004TJ0201"),
     ("C-176/09", "https://lagen.nu/celex/62009CJ0176"),
     ("Case C‑197/09", "https://lagen.nu/celex/62009CJ0197"),
 ]

@@ -557,6 +557,23 @@ half is `lib/assets/matomo.js` in the `script.js` bundle. `lib/pins.py` is the
 citation-shaped-query resolver (a name+pinpoint → one exact fragment target)
 shared by the REST `/search` and the MCP `search`/`resolve_citation` tools.
 
+`lib/resolve.py` also recognizes Swedish report series, EU cases and acts,
+international court identifiers, treaty names and canonical URIs.
+It reuses `lib/lagrum.py`, `lib/treatyref.py` and `lib/courtids.py`.
+The latter shares ICC/ICJ document identities with the source models.
+The catalog derives exact ECLI and ICJ Reports aliases from artifact fields.
+Publication rules live in `lib/data/citation_series.json`: series identity,
+publication bounds and inclusive complete intervals. `pins.resolve_query` applies these rules only
+after the catalog confirms absence. REST `/resolve` and MCP `resolve_citation`
+then add `invalid: true` when absence is conclusive. Other unresolved
+citations keep their existing shape. REST responses use ETags and require
+revalidation so coverage changes cannot leave old answers fresh in caches.
+See [citation coverage](../operating/citation-coverage.md) for the configured
+assumptions, live corpus observations and alias rebuild commands.
+`pins` also checks Swedish provisions against the presented artifact tree.
+It handles continuous paragraph numbering and uses the selected consolidation
+through `text.body_id_nodes`. Invalid provisions keep their fragment in `recognized`.
+
 **Top-level**: `build.py` is the `lagen` CLI and the one place that composes across sources. Each source declares itself in its own `ferenda/<package>/source.py`, exposing a `SOURCES` tuple; `build.py` imports the nineteen modules, fills `lib/stage.py`'s `SOURCES` in the order `lagen all <verb>` walks the corpus in, and stamps each source's `registration`. What is left is the argument parsing and dispatch, the editor's post-commit rebuild (`rebuild_after_commit`/`reparse_one`), the aggregate-page callable it hands `corpus.cmd_generate`, and the handful of *cross-source* actions no single source may hold — `sfs ai-correspond`, `sfs table-correspond` and `sfs history-as-git` all read a proposition, which is förarbete's job, so they live here and are hung on sfs's registration as data. The verbs it dispatches to live in `lib/corpus.py`, the freshness engine in `lib/freshness.py`. `main`'s `finally` (so a crash or Ctrl-C still reaches it) prints `_print_failure_summary` whenever the run's `ok` flag or `freshness.RUN_ERRORS` says it exited non-zero -- which step(s) failed and, where the detail exists (`errors.json`, keyed by run id), the per-basefile message, since a `lagen all rebuild` scrolls the actual failure off screen long before the run's last line and the exit code alone does not say why. `config.py` resolves the optional `config.yml` — the corpus
 roots (`data_root`, `catalog_root`, `wiki_root` — `catalog_root`
 decouples `catalog.sqlite` from `data_root` so the latency-sensitive SQLite

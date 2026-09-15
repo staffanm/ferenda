@@ -20,6 +20,10 @@ in order:
     -> celex/<CELEX>#<N>.
   * DV  -- a case nickname ("Instagrambilden") -> the published NJA case URI.
 
+Other Swedish, EU and international citations use the shared citation engine
+and document identity grammars. `data/citation_series.json` defines when an
+absent citation is invalid (`absent_is_invalid`, called after catalog lookup).
+
 Pure and catalog-free: it maps a string to a URI. Whether that URI is hosted
 (and its title) is the caller's concern -- the /search endpoint confirms it
 against the catalog before pinning it, so an alias for a not-yet-parsed document
@@ -27,16 +31,23 @@ simply doesn't surface.
 """
 
 import functools
+import json
 import re
 import threading
+from datetime import date
+from pathlib import Path
 
-from . import datasets, markdown, text
+from . import courtids, datasets, markdown, text, treatyref
 from .coe import treaty_uri
 from .coe_ids import article_fragment
 from .labels import treaty_names
 from .lagrum import (
+    ALL_PARSE_TYPES,
     CELEX_BASE,
     EURATTSFALL,
+    FORESKRIFT,
+    FS_SLUG,
+    TREATIES,
     LagrumParser,
     lagrum_uri,
     load_abbreviations,
@@ -314,6 +325,180 @@ def resolve_dv(q):
 # unified
 # --------------------------------------------------------------------------
 
+@functools.cache
+def _series():
+    """Publication rules shipped as data. Restart the service after an edit.
+
+    Reports and notices have separate coverage rules. Complete intervals are
+    explicit corpus assumptions, never inferred from the current year.
+    """
+    return _citation_rules()["series"]
+
+
+@functools.cache
+def _citation_rules():
+    return json.loads((Path(__file__).parent / "data" / "citation_series.json")
+                      .read_text(encoding="utf-8"))
+
+
+def citation_source(uri):
+    """The source for a public citation URI, from configured namespaces."""
+    for prefix, source in _citation_rules()["namespaces"].items():
+        if uri.startswith("https://lagen.nu/" + prefix):
+            return source
+    if re.fullmatch(r"https://lagen\.nu/[0-9]{4}:[^/#]+(?:#.*)?", uri):
+        return "sfs"
+    if uri.removeprefix("https://lagen.nu/").split("/", 1)[0] in FS_SLUG.values():
+        return "foreskrift"
+    return None
+
+
+def _resolve_page_citation(q):
+    """Recognize standalone page citations, including impossible values.
+
+    This input boundary accepts signed pages so a negative page can be
+    reported as invalid. The document citation grammar only links unsigned
+    values. Full matching avoids turning a range or trailing text into a
+    different citation whose absence we would incorrectly certify.
+    """
+    for series in _series():
+        if "citation" not in series:
+            continue
+        match = re.fullmatch(
+            re.escape(series["citation"])
+            + r"\s+([0-9]{4})\s*s\.?\s*(-?[0-9]+)\.?", q, re.IGNORECASE)
+        if match:
+            year, page = map(int, match.groups())
+            return [{"uri": "%s%04ds%d" % (series["uri_prefix"], year, page),
+                     "source": series["source"]}]
+    return []
+
+
+def absent_is_invalid(uri):
+    """Whether a citation *absent from the catalog* is provably invalid.
+
+    Call only after checking existence. A high page number is never proof;
+    outside complete coverage, missing reports remain unconfirmed.
+    """
+    for series in _series():
+        match = re.fullmatch(re.escape("https://lagen.nu/") + series["uri_pattern"], uri)
+        if match:
+            values = match.groupdict()
+            if any(int(values[name]) <= 0 for name in series["positive"]):
+                return True
+            if values.get("number") and any(
+                    start <= int(values["number"]) <= end
+                    for start, end in series.get("complete_numbers", [])):
+                return True
+            if values.get("year"):
+                year = int(values["year"])
+                return (year <= 0 or year > date.today().year
+                        or year < series.get("first_year", 0)
+                        or year > series.get("last_year", date.today().year)
+                        or any(start <= year <= end
+                               for start, end in series["complete_years"]))
+    return False
+
+
+def _fresh_citation_parser():
+    parser = getattr(_parsers, "all", None)
+    if parser is None:
+        parser = _parsers.all = LagrumParser(
+            load_namedlaws(datasets.NAMEDLAWS), basefile="query",
+            abbreviations=load_abbreviations(datasets.NAMEDLAWS),
+            named_acts=load_namedacts(datasets.NAMEDACTS),
+            parse_types=ALL_PARSE_TYPES)
+    parser.reset()
+    return parser
+
+
+def resolve_regulation(q):
+    """A registered regulation with a Swedish provision before or after it.
+
+    The shared regulation grammar owns the identity, and the statute grammar
+    owns the pinpoint. A standalone lookup supplies the context joining them.
+    """
+    parser = getattr(_parsers, "regulation", None)
+    if parser is None:
+        parser = _parsers.regulation = LagrumParser(
+            {}, basefile="query", parse_types=[FORESKRIFT])
+    parser.reset()
+    refs = parser.parse_text(q, context={})
+    if len(refs) != 1:
+        return None
+    ref = refs[0]
+    before, after = q[:ref.start].strip(), q[ref.end:].strip()
+    if before and after:
+        return None
+    pinpoint = re.sub(r"\s+i$", "", before) if before else after
+    if pinpoint:
+        pins = _fresh_sfs_parser().parse_text(
+            _normalize_pinpoint(pinpoint), context={"law": "query"})
+        if len(pins) == 1 and "#" in pins[0].uri:
+            return ref.uri + "#" + pins[0].uri.split("#", 1)[1]
+    return ref.uri
+
+
+@functools.cache
+def _instrument_names():
+    names = list(TREATIES.items())
+    names += [(name.lower(), entry["target"])
+              for entry in treatyref.instruments().values()
+              for name in entry["names"]]
+    names += [(name.lower(), target) for pattern, target, name, context
+              in treatyref.patterns() if name and context is None]
+    return sorted(set(names), key=lambda item: -len(item[0]))
+
+
+def _resolve_instrument(q):
+    """Bare treaty names and name-first articles, in Swedish or English."""
+    targets = ["https://lagen.nu/" + target for name, target in _instrument_names()
+               if q.lower() == name]
+    if targets:
+        return targets
+    for name, _target in _instrument_names():
+        if q.lower().startswith(name + " "):
+            tail = q[len(name):].strip()
+            if _TREATY_ART.fullmatch(tail):
+                # Both engines own their article grammars (EU, CoE, UN/IHL).
+                # Let them build the fragment instead of guessing one here.
+                number = re.sub(r"^art(?:ikel|icle)?\.?\s*", "", tail, flags=re.I)
+                refs = _fresh_citation_parser().parse_text(
+                    "artikel %s i %s" % (number, name), context={})
+                if refs:
+                    return [ref.uri for ref in refs]
+                return [ref["uri"] for ref in treatyref.references(
+                    "article %s of the %s" % (number, name))]
+    return []
+
+
+def _resolve_general(q):
+    """Citation engine families not handled by name-first shortcuts."""
+    # Page citations have an exact input grammar above. Do not let the
+    # scanning parser reinterpret a rejected range or decimal as its prefix.
+    if any(re.match(re.escape(series["citation"]) + r"\s+[0-9]{4}\s*s\b", q, re.I)
+           for series in _series() if "citation" in series):
+        return []
+    if uri := courtids.resolve(q):
+        return [uri]
+    if q.startswith("https://lagen.nu/") and citation_source(q):
+        return [q]
+    if re.fullmatch(r"(?:CELEX\s*:\s*)?[01356][0-9]{4}[A-Z][A-Z0-9/()_-]*", q, re.I):
+        return [CELEX_BASE + re.sub(r"^CELEX\s*:\s*", "", q, flags=re.I).upper()]
+    if match := re.fullmatch(r"(?:C?ETS\s*(?:No\.?\s*)?|CoE\s+)([0-9]+)", q, re.I):
+        return [treaty_uri(match.group(1))]
+    if re.fullmatch(r"(?:ICRC\s+)[0-9]+", q, re.I):
+        return ["https://lagen.nu/icrc/" + str(int(q.split()[-1]))]
+    if re.fullmatch(r"(?:UNTC\s+)[IV]+-[0-9]+", q, re.I):
+        return ["https://lagen.nu/untc/" + q.split()[-1].upper()]
+    if re.fullmatch(r"(?:HUDOC\s+)?001-[0-9]+", q, re.I):
+        return ["https://lagen.nu/dom/echr/" + q.split()[-1]]
+    instruments = _resolve_instrument(q)
+    if instruments:
+        return instruments
+    return [ref.uri for ref in _fresh_citation_parser().parse_text(q, context={})]
+
+
 def resolve(q):
     """Every resource the query resolves to as `{"uri", "source"}` (uri carries
     its #fragment), in priority order CoE treaty, SFS, EU, CJEU case, DV --
@@ -324,13 +509,16 @@ def resolve(q):
     q = (q or "").strip()
     if not q:
         return []
-    out = []
-    for source, fn in (("coe", resolve_treaty), ("sfs", resolve_sfs),
+    if q.startswith("https://lagen.nu/") and (source := citation_source(q)):
+        return [{"uri": q, "source": source}]
+    out = _resolve_page_citation(q)
+    for source, fn in (("foreskrift", resolve_regulation),
+                       ("coe", resolve_treaty), ("sfs", resolve_sfs),
                        ("eurlex", resolve_eu), ("eurlex", resolve_ecj),
                        ("dv", resolve_dv)):
         uri = fn(q)
         if uri and uri not in [o["uri"] for o in out]:
-            hit = {"uri": uri, "source": source}
+            hit = {"uri": uri, "source": citation_source(uri) or source}
             # a bare span name's own rationale ("cookielagen" -> why 9 kap.
             # 28 § LEK carries that name) is worth more to a reader than the
             # provision's own words, which is what a resolved hit shows by
@@ -344,4 +532,9 @@ def resolve(q):
                 # raw markdown brackets to the reader
                 hit["reason"] = text.runs_text(markdown.to_runs(span.reason))
             out.append(hit)
+    if not out:
+        for uri in _resolve_general(q):
+            source = citation_source(uri)
+            if source and uri not in [hit["uri"] for hit in out]:
+                out.append({"uri": uri, "source": source})
     return out

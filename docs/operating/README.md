@@ -141,6 +141,23 @@ editors:                             # hand-curated; there is no self-signup
 A present-but-invalid value raises `ConfigError` at startup rather than
 silently falling back — a typo must never disable auth quietly.
 
+### Citation coverage for the API
+
+`ferenda/lib/data/citation_series.json` defines the resolver's coverage and
+publication rules. Swedish report series have separate complete intervals.
+Other Swedish, EU and international collections have recognition and
+structural checks, without blanket absence guarantees.
+See [citation coverage](citation-coverage.md) for intervals, evidence and deployment steps.
+
+Set `complete_years` to the inclusive intervals that your corpus fully holds.
+Use `[]` to disable absence checks on a partial corpus.
+Update coverage only after ingestion and verification. Restart all API processes
+after an edit. The interval does not grow automatically each year.
+
+Resolver responses use ETags and require cache revalidation.
+An affected cached answer changes when the new rules change its body.
+See [`ferenda/api/README.md`](../../ferenda/api/README.md) for the response contract.
+
 ### Content repo (wiki + site + patches)
 
 Commentary (`kommentar`), the concept glossary (`begrepp`), the editorial

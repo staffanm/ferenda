@@ -22,6 +22,7 @@ Published URIs are stable, so an artifact's `uri` is also its API key, its dump
 id and its OpenSearch `_id`.
 """
 
+import hashlib
 import logging
 import os
 import re
@@ -165,7 +166,8 @@ app = FastAPI(
 # a cross-origin browser from *reading* a response, and half the internal
 # surface is a GET whose body is nobody else's business.
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
-                   allow_methods=["GET"], allow_headers=["*"])
+                   allow_methods=["GET"], allow_headers=["*"],
+                   expose_headers=["ETag"])
 
 
 # No Referrer-Policy here. The prod vhost already sets it at server scope
@@ -361,13 +363,19 @@ class SearchResponse(BaseModel):
 
 
 class RecognizedCitation(BaseModel):
-    """A citation the resolver read, naming a document the corpus does not
-    hold: well formed, but not fetchable here -- and not known to exist."""
+    """An unresolved document or an invalid provision of a held statute."""
 
-    uri: str = Field(description="the document uri the citation names -- the "
-                     "identity the document would have here; no page answers "
-                     "it")
+    uri: str = Field(description="the unresolved document URI, or the full "
+                     "URI including its fragment for an invalid provision")
     source: str = Field(description="the source the document would belong to")
+    invalid: bool = Field(
+        False, exclude_if=lambda value: not value,
+        description="Present as true only when non-existence is established. "
+        "Omitted when existence is unknown. Rules cover configured complete "
+        "report intervals, publication bounds, future years and non-positive "
+        "identifiers, plus missing provisions in structured Swedish statutes "
+        "and agency regulations. Coverage is specific to each series; missing documents "
+        "in incomplete collections remain unconfirmed.")
 
 
 class ResolveResponse(BaseModel):
@@ -378,8 +386,8 @@ class ResolveResponse(BaseModel):
     results: list[SearchResult] = Field(
         description="the resolved target(s) the corpus holds, usually one hit")
     recognized: list[RecognizedCitation] = Field(
-        description="citations read from the query whose document the corpus "
-        "does not hold (\"C-744/28\": not decided yet, or not harvested). "
+        description="citations naming an unheld document or an invalid "
+        "provision of a held statute. "
         "Both lists empty: the query does not read as a known citation")
 
 
@@ -695,12 +703,16 @@ async def search_endpoint(
 @app.get("/api/v1/resolve", response_model=ResolveResponse, tags=["search"],
          summary="Resolve a citation to its exact target, no full-text search")
 def resolve_endpoint(
+        request: Request,
         q: str = Query(..., description="a citation-shaped query: a law "
                        "nickname/abbreviation + pinpoint (\"avtalslagen 36 §\", "
                        "\"BrB 12:1\"), an EU act with an optional article or "
                        "recital (\"GDPR artikel 32\"), a CJEU case number "
                        "(\"C-199/24\"), a CoE treaty article (\"EKMR 6\") or a "
-                       "case nickname (\"Instagrambilden\")"),
+                       "case nickname (\"Instagrambilden\"), or an NJA report "
+                       "(\"NJA 2015 s. 899\"). Also accepts other Swedish report "
+                       "series, CELEX/ECLI, HUDOC, ICC/ICJ document identifiers, "
+                       "international treaty names/numbers and canonical URIs"),
         source: str | None = Query(None, description="restrict to one source "
                                    "-- any name /api/v1/sources lists"),
         kind: str | None = Query(None, description="restrict to a document "
@@ -720,14 +732,39 @@ def resolve_endpoint(
     means the query does not read as a known citation -- that is not an error,
     it means `/api/v1/search` is the right tool instead.
 
+    An unresolved citation has `invalid: true` only when non-existence is
+    established by the configured series rules: complete report coverage,
+    publication bounds, future years or non-positive identifiers. Missing
+    documents outside complete coverage remain unconfirmed. Coverage does
+    not extend automatically each year. Found results take precedence.
+    An existing statute does not confirm an impossible provision: these appear
+    in `recognized` with the fragment and `invalid: true`, based on its presented
+    structure. The check also applies to agency regulations and uses their
+    presented consolidation. Invalid citations still return HTTP 200.
+    The API reference documents
+    the intervals and supported Swedish, EU and international citation forms.
+
+    Responses carry an ETag and require revalidation before reuse. Changes
+    to coverage, the current year, or the catalog therefore cannot leave an
+    affected response fresh in a client cache.
+
     Answers from the catalog alone -- no OpenSearch involved, so this endpoint
     stays up even when full-text search is unavailable."""
     kind_label = facets.kind_labels(singular=True)   # one hit, not a bucket
     results, recognized = pins.resolve_query(con, q, source, kind)
-    return ResolveResponse(
+    response = JSONResponse(ResolveResponse(
         query=q, recognized=recognized,
         results=[{**r, "kind_label": kind_label.get(r.get("kind"))}
-                 for r in results])
+                 for r in results]).model_dump(mode="json"))
+    response.headers["Cache-Control"] = "public, no-cache"
+    response.headers["ETag"] = '"%s"' % hashlib.sha256(response.body).hexdigest()
+    validators = [value.strip().removeprefix("W/") for value in
+                  request.headers.get("if-none-match", "").split(",")]
+    if "*" in validators or response.headers["ETag"] in validators:
+        return Response(status_code=304, headers={
+            "Cache-Control": response.headers["Cache-Control"],
+            "ETag": response.headers["ETag"]})
+    return response
 
 
 def _labelled_facets(buckets):

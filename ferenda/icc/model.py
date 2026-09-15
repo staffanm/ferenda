@@ -5,42 +5,29 @@ the curated substantive set (by Rome-Statute article) and give each record's
 document number; the ICC Legal Tools API (legal-tools.org) resolves that number
 to the decision's metadata and its PDF, whose text becomes the article tree.
 
-The document-number grammar (``icc/<doc-number>``, slashes flattened) is
-kept here -- ``icc`` is its only producer.
+The document-number grammar is shared with API lookup in ``lib.courtids``.
 """
 
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..lib import courtids
 from ..lib.artifact import Block, numbered_nodes, prune
-from ..lib.catalog import BASE
+
+RE_CASE = courtids.ICC_CASE
+RE_DOC_BASE = courtids.ICC_DOC_BASE
+doc_basefile = courtids.icc_basefile
+decision_uri = courtids.icc_uri
 
 COURT = "International Criminal Court"
 SITE = "https://www.icc-cpi.int"
 DECISION_TYPES = Path(__file__).resolve().parent / "data" / "decision_types.json"
 
-# a full ICC document number: situation/case/document, e.g. ICC-01/04-02/06-2359.
-# variant suffixes (-Red, -Corr, -tFRA, -Anx…) trail the trailing -<docnum>.
-RE_DOC_BASE = re.compile(r"ICC-\d+/\d+-\d+/\d+-\d+", re.I)
-RE_CASE = re.compile(r"ICC-\d+/\d+-\d+/\d+", re.I)
-
-
 def load_types():
     """The curated decision types as {facet_id: entry}."""
     return {t["facet"]: t
             for t in json.loads(DECISION_TYPES.read_text("utf-8"))["types"]}
-
-
-def doc_basefile(doc_number):
-    """The filesystem-safe / URI-local form of a document number: slashes to
-    underscores (ICC-01/04-02/06-2359 -> ICC-01_04-02_06-2359)."""
-    return doc_number.replace("/", "_")
-
-
-def decision_uri(doc_number):
-    return "%sicc/%s" % (BASE, doc_basefile(doc_number))
 
 
 @dataclass

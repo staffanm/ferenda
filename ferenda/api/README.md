@@ -244,7 +244,7 @@ utlösta träffen behövs.
 
 | Parameter | Typ | Förklaring |
 |---|---|---|
-| `q` | sträng (obligatorisk) | hänvisningen: ett lagnamn/förkortning + paragraf ("avtalslagen 36 §", "BrB 12:1"), en EU-akt + artikel/skäl ("GDPR artikel 32"), ett EU-domstolsmål ("C-199/24"), en fördragsartikel ("EKMR 6") eller ett vedertaget rättsfallsnamn ("Instagrambilden") |
+| `q` | sträng (obligatorisk) | hänvisningen: ett lagnamn/förkortning + paragraf ("avtalslagen 36 §", "BrB 12:1"), en EU-akt + artikel/skäl ("GDPR artikel 32"), ett EU-domstolsmål ("C-199/24"), en fördragsartikel ("EKMR 6"), ett NJA-referat ("NJA 2015 s. 899") eller ett vedertaget rättsfallsnamn ("Instagrambilden") |
 | `source` | sträng | begränsa till en källa |
 | `kind` | sträng | begränsa till en dokumenttyp inom källan |
 
@@ -256,6 +256,75 @@ meddelats eller inte hämtats. En sådan post är bara en identitet (`uri`,
 Är både `results` och `recognized` tomma läses frågan inte som en känd
 hänvisning — inte ett fel; fråga `/api/v1/search` då i stället. Kräver
 **inte** OpenSearch, bara ett byggt corpus-index (`lagen all relate`).
+
+En post i `recognized` får det valfria fältet `invalid: true` när API:t kan
+fastställa att hänvisningen är ogiltig. Annars saknas fältet helt.
+Svaret innehåller inga täckningsintervall, poäng eller förklaringar per post.
+Ogiltiga hänvisningar ger HTTP 200.
+
+Resolvern stöder följande hänvisningar:
+
+| Grupp | Exempel |
+|---|---|
+| Svenska referat och notiser | `NJA 2013 s. 372`, `RÅ 2009 ref. 5`, `HFD 2025 ref. 1`, `AD 2024 nr 1`, RH, MÖD, MIG, PMÖD, MD, RK |
+| Svenska författningar | `SFS 1962:700`, `BrB 3:1`, `FFFS 2020:1` |
+| EU-mål och rättsakter | `C-199/24`, `T-201/04`, `F-23/07`, `CELEX:32016R0679`, `direktiv 95/46/EG`, `GDPR 32` |
+| Europadomstolen | `HUDOC 001-58257`, kända partsnamn och ansökningsnummer |
+| Internationella domstolar | `ICC-01/04-02/06-2359`, `ICJ 070-19860627-JUD-01-00`, `ICJ Reports 1986, p. 14` |
+| Folkrätt | `ETS No. 5`, `ICRC 365`, `UNTC I-27531`, `Romstadgan 6`, `artikel 24 i barnkonventionen` |
+
+Kanoniska lagen.nu-URI:er stöds också. ECLI och ICJ Reports kräver
+indexerade identifierare från dokumentens JSON-artifakter.
+Svenska målnummer kräver domstolskontext och den byggda målnummerlistan.
+Svenska författningar och myndighetsföreskrifter kontrolleras också på
+bestämmelsenivå. Kontrollen använder dokumentets publicerade struktur,
+inklusive den senaste lästa konsolideringen för myndighetsföreskrifter.
+`12 kap. 1 § avtalslagen` ger `recognized` med URI:n
+`https://lagen.nu/1915:218#K12P1` och `invalid: true`.
+`1 kap. 1 § avtalslagen` ger en träff på `#P1`, eftersom paragrafnumren
+löper genom hela lagen. Fel kapitel godtas inte.
+
+En tom eller ostrukturerad text bevisar inte att en bestämmelse saknas.
+Kontrollen gäller den publicerade lydelsen. Den fastställer inte frånvaro
+i alla historiska lydelser eller existensen av EU- och fördragsartiklar.
+
+För frånvarokontrollen gäller följande regler:
+
+- Ett saknat referat inom **1981–2025** är ogiltigt. Båda gränsåren ingår.
+- År före **1874** eller efter innevarande år är ogiltiga.
+- Sidnummer som är noll eller negativa är ogiltiga.
+- Ett saknat referat utanför fullständig täckning är annars obekräftat.
+  **2026 ingår inte** förrän konfigurationen ändras.
+- Ett högt sidnummer räcker inte för att fastställa ogiltighet.
+- Ett dokument som finns får aldrig en frånvaromarkering. En bestämmelse
+  som saknas kan däremot vara ogiltig även när författningen finns.
+
+NJA-intervallet gäller sidbaserade referat, inte NJA II eller notiser.
+Övriga referatintervall är RÅ 1993–2010, HFD 2011–2025, AD 1993–2024,
+RH 1993–2025, MÖD 1999–2025, MIG 2006–2025, PMÖD 2016–2025,
+MD 2004–2016 och RK 2008–2025. Intervallen följer Domstolsverkets guide
+och den granskade samlingen. De omfattar inte andra utvalda avgöranden.
+
+Övriga källor saknar fullständighetsgaranti. Där kan publiceringsgränser,
+framtida år och icke-positiva dokumentnummer ge `invalid: true`.
+Enbart frånvaro räcker inte. Se [täckningsunderlaget](../../docs/operating/citation-coverage.md)
+för begränsningar och hur reglerna uppdateras.
+
+API:t accepterar exempelvis `NJA 2013 s. 372`, `nja 2013 s.372` och
+`NJA 2013 s 372`. Mellanslag av olika slag går bra.
+
+Reglerna finns i `ferenda/lib/data/citation_series.json`.
+Ändra `complete_years` när samlingens verifierade täckning ändras och starta
+om API-processerna. Intervallen är uttryckliga; de växer inte med kalenderåret.
+En installation med ett ofullständigt corpus ska ange sina verifierade
+intervall eller `[]` för att stänga av frånvarokontrollen.
+
+Svar har `Cache-Control: public, no-cache` och en innehållsbaserad `ETag`.
+Klienten får lagra svaret men måste kontrollera det före återanvändning.
+Skicka `If-None-Match` med taggen: oförändrat svar ger HTTP 304 utan kropp.
+Ändrad täckning, ett nytt kalenderår eller en ändrad katalog ger en ny tagg
+när svaret ändras. CORS tillåter GET från alla ursprung och exponerar `ETag`.
+MCP-verktyget `resolve_citation` använder samma regler för `recognized`.
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/resolve --data-urlencode "q=C-199/24"
@@ -286,15 +355,15 @@ curl -G http://127.0.0.1:8001/api/v1/resolve --data-urlencode "q=C-199/24"
 Ett välformat målnummer som samlingen inte har:
 
 ```sh
-curl -G http://127.0.0.1:8001/api/v1/resolve --data-urlencode "q=C-744/28"
+curl -G http://127.0.0.1:8001/api/v1/resolve --data-urlencode "q=C-744/24"
 ```
 
 ```json
 {
-  "query": "C-744/28",
+  "query": "C-744/24",
   "results": [],
   "recognized": [
-    {"uri": "https://lagen.nu/celex/62028CJ0744", "source": "eurlex"}
+    {"uri": "https://lagen.nu/celex/62024CJ0744", "source": "eurlex"}
   ]
 }
 ```

@@ -40,19 +40,26 @@ def resolve_query(con, q, source=None, kind=None):
     `resolved_results`' list. `recognized` names the citations the resolver
     read but the catalog does not hold -- `{"uri", "source"}` per citation:
     the document uri the citation mints and the source it would belong to.
+    An optional `invalid: true` marks deterministic non-existence under the
+    configured publication rules. Otherwise existence remains unknown.
     A client can then tell a well-formed citation of a document we do not
-    have ("C-744/28": not decided yet, or not harvested) from a query that is
+    have ("C-744/24": not decided yet, or not harvested) from a query that is
     no citation at all ("blahonga"), where both lists are empty.
 
     Kept apart from `results` rather than flagged inside it: a row there is a
     document a client can fetch and link to, and a minted identifier with no
     document behind it, sitting among the hits, is an invitation to cite what
-    we cannot show. The document uri, not the pinpointed one: a provision of
-    a document we do not hold cannot be confirmed either. A source filter
+    we cannot show. Missing documents use their root URI. Invalid provisions
+    of held statutes retain their fragment to identify the failed citation.
+    A source filter
     applies to both lists; a kind filter only to the held rows, since an
     unheld citation has no kind to check."""
     out, recognized = [], []
-    for hit in resolve.resolve(q):
+    targets = resolve.resolve(q)
+    for hit in catalog.citation_targets(con, q):
+        if hit["uri"] not in [target["uri"] for target in targets]:
+            targets.append(hit)
+    for hit in targets:
         if source and hit["source"] != source:
             continue
         root, _, frag = hit["uri"].partition("#")
@@ -65,15 +72,24 @@ def resolve_query(con, q, source=None, kind=None):
                 root = row[0]
         if not row:
             recognized.append({"uri": root, "source": hit["source"]})
+            if resolve.absent_is_invalid(root):
+                recognized[-1]["invalid"] = True
             continue
         _uri, src, kind_, label, title, _path, descriptive, _url = row
         if kind and kind_ != kind:
+            continue
+        art = catalog.artifact_for(con, _path) if frag else None
+        if frag:
+            frag = _canonical_provision_fragment(art, frag)
+        if frag and _missing_provision(art, frag):
+            recognized.append({"uri": root + "#" + frag, "source": src,
+                               "invalid": True})
             continue
         # the same reader-facing heading the page and full-text hits show (short
         # name + acronym where the artifact has them, else the title) -- stored
         # on the documents row at relate, so no artifact load per resolved hit
         display = catalog.document_display(con, root) or title
-        pin = _pin(con, _path, root, frag) if frag else None
+        pin = _pin(art, root, frag) if frag else None
         if pin and hit.get("reason"):
             # a named span's own rationale outranks the provision's own words
             # as the hit's snippet -- a reader who typed "cookielagen" wants
@@ -131,12 +147,49 @@ def _pin_label(frag, heading):
     return "%s - %s" % (label, heading)
 
 
-def _pin(con, path, root, frag):
+def _canonical_provision_fragment(art, frag):
+    """Keep continuous paragraph numbering while checking chapter membership.
+
+    Avtalslagen stores P1 inside K1. K1P1 therefore reaches P1, but K2P1 must
+    not reach it: naming the wrong chapter is an invalid provision citation.
+    """
+    match = re.fullmatch(r"(K[0-9]+[a-z]?)(P[0-9]+[a-z]?)(.*)", frag)
+    if match:
+        chapter = text.fragment_node(art, match[1])
+        if chapter and text.fragment_node({"structure": [chapter]}, match[2]):
+            return match[2] + match[3]
+    return frag
+
+
+def _missing_provision(art, frag):
+    """Prove a missing Swedish provision against the presented statute tree.
+
+    Empty/unstructured artifacts cannot prove absence. Chapter and paragraf
+    checks use the shared SFS/agency anchor grammar, including chapterless
+    statutes. Finer pinpoints need sibling anchors at that level before an
+    absent child is conclusive; some producers do not number stycken/points.
+    """
+    if not re.fullmatch(r"(?:K[0-9]+[a-z]?)?(?:P[0-9]+[a-z]?)?(?:S[0-9]+)?(?:N[0-9]+)?", frag):
+        return False
+    nodes = list(text.body_id_nodes(art))
+    ids = {node["id"] for node in nodes}
+    if frag in ids or not any(node.get("type") == "paragraf" for node in nodes):
+        return False
+    prefix = ""
+    for part in re.findall(r"[KPSN][0-9]+[a-z]?", frag):
+        target = prefix + part
+        if not any(re.match(re.escape(target) + r"(?:[PSN]|$)", id_) for id_ in ids):
+            return part[0] in "KP" or any(
+                re.match(re.escape(prefix + part[0]) + r"[0-9]", id_) for id_ in ids)
+        prefix = target
+    return False
+
+
+def _pin(art, root, frag):
     """The resolved provision as a Fragment: where it is, what it is called, and
     its own words -- `[]` for a fragment the presented body publishes no anchor
     for. One artifact read per citation-shaped query -- there is at most one
     pinned hit, and it is the query's answer."""
-    art = catalog.load_artifact(catalog.data_root(con), path)
     body = text.anchor_text(art, frag)
     return {
         "uri": root + "#" + frag, "pinpoint": frag,

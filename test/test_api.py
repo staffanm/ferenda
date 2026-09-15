@@ -6,6 +6,9 @@ import json
 import sqlite3
 import threading
 import time
+from datetime import date
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.staticfiles import StaticFiles
@@ -15,7 +18,7 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from ferenda import config
 from ferenda.api import app as api
 from ferenda.api import reads
-from ferenda.lib import catalog, compress, facets, inbound, layout, pathgraph
+from ferenda.lib import catalog, compress, facets, inbound, layout, pathgraph, resolve
 
 
 @pytest.fixture
@@ -802,13 +805,13 @@ def test_resolve_names_a_recognized_citation_the_corpus_does_not_hold(client):
     # answer as "not a citation": the resolver mints its identity, the catalog
     # has no row, and the client is told so -- apart from the hits, so it is
     # never cited as a document
-    body = client.get("/api/v1/resolve", params={"q": "C-744/28"}).json()
+    body = client.get("/api/v1/resolve", params={"q": "C-744/24"}).json()
     assert body["results"] == []
-    assert body["recognized"] == [{"uri": "https://lagen.nu/celex/62028CJ0744",
+    assert body["recognized"] == [{"uri": "https://lagen.nu/celex/62024CJ0744",
                                    "source": "eurlex"}]
     # the source filter applies to the recognized list too
     assert client.get("/api/v1/resolve", params={
-        "q": "C-744/28", "source": "sfs"}).json()["recognized"] == []
+        "q": "C-744/24", "source": "sfs"}).json()["recognized"] == []
 
 
 def test_resolve_source_filter_narrows(client):
@@ -817,6 +820,249 @@ def test_resolve_source_filter_narrows(client):
     assert hit and hit[0]["uri"] == "https://lagen.nu/1962:700"
     assert client.get("/api/v1/resolve", params={
         "q": "3 kap. 1 § brottsbalken", "source": "dv"}).json()["results"] == []
+
+
+@pytest.mark.parametrize("query,slug,invalid", json.loads(
+    (Path(__file__).parent / "files/resolve/nja.json").read_text()))
+def test_resolve_nja_validity_boundaries(client, monkeypatch, query, slug, invalid):
+    monkeypatch.setattr(resolve, "date", SimpleNamespace(today=lambda: date(2026, 9, 14)))
+    response = client.get("/api/v1/resolve", params={"q": query})
+    assert response.status_code == 200
+    recognized = {"uri": "https://lagen.nu/dom/nja/" + slug, "source": "dv"}
+    if invalid:
+        recognized["invalid"] = True
+    assert response.json() == {"query": query, "results": [], "recognized": [recognized]}
+
+
+def test_resolve_nja_current_year_and_future(client):
+    for year in (date.today().year, date.today().year + 1):
+        response = client.get("/api/v1/resolve", params={"q": f"NJA {year} s. 1"})
+        assert (response.json()["recognized"][0].get("invalid") is True) == (
+            year > date.today().year)
+
+
+@pytest.mark.parametrize("query,path,source,invalid", json.loads(
+    (Path(__file__).parent / "files/resolve/families.json").read_text()))
+def test_resolve_families(client, monkeypatch, query, path, source, invalid):
+    monkeypatch.setattr(resolve, "date", SimpleNamespace(today=lambda: date(2026, 9, 14)))
+    response = client.get("/api/v1/resolve", params={"q": query})
+    assert response.status_code == 200
+    expected = {"uri": "https://lagen.nu/" + path.split("#")[0], "source": source}
+    if invalid:
+        expected["invalid"] = True
+    assert response.json() == {"query": query, "results": [], "recognized": [expected]}
+
+
+@pytest.mark.parametrize("query,source,uri,metadata", [
+    ("ICJ Reports 1986, p. 14", "icj", "icj/070-19860627-JUD-01-00",
+     {"metadata": {"reportsCitation": "I.C.J. Reports 1986, p. 14"}}),
+    ("ecli:eu:c:2020:559", "eurlex", "celex/62018CJ0311", {"ecli": "ECLI:EU:C:2020:559"}),
+])
+def test_resolve_official_aliases_from_artifacts(client, tmp_path, query, source, uri, metadata):
+    artifact = tmp_path / "artifact/alias.json"
+    artifact.write_text(json.dumps({"uri": "https://lagen.nu/" + uri,
+        "title": "Fixture judgment", "doctype": "judgment", "structure": [], **metadata}))
+    catalog.rebuild(client.catalog_path, source, [artifact])
+    response = client.get("/api/v1/resolve", params={"q": query}).json()
+    assert response["recognized"] == []
+    assert [hit["uri"] for hit in response["results"]] == ["https://lagen.nu/" + uri]
+    assert client.get("/api/v1/resolve", params={"q": query, "source": "sfs"}).json() == {
+        "query": query, "results": [], "recognized": []}
+    # Removing a document removes its derived aliases too.
+    catalog.rebuild(client.catalog_path, source, [])
+    assert client.get("/api/v1/resolve", params={"q": query}).json()["results"] == []
+
+
+@pytest.mark.parametrize("series,start,end", [
+    ("ra", 1993, 2010), ("hfd", 2011, 2025), ("ad", 1993, 2024),
+    ("rh", 1993, 2025), ("mod", 1999, 2025), ("mig", 2006, 2025),
+    ("pmod", 2016, 2025), ("md", 2004, 2016), ("rk", 2008, 2025),
+])
+def test_resolve_report_coverage_boundaries(client, monkeypatch, series, start, end):
+    monkeypatch.setattr(resolve, "date", SimpleNamespace(today=lambda: date(2026, 9, 14)))
+    for year in (start - 1, start, end, end + 1):
+        uri = f"https://lagen.nu/dom/{series}/{year}:9999"
+        body = client.get("/api/v1/resolve", params={"q": uri}).json()
+        # RÅ ends in 2010 and HFD starts in 2011, independent of corpus coverage.
+        invalid = start <= year <= end or (series == "ra" and year > 2010) or (
+            series == "hfd" and year < 2011)
+        assert body["recognized"][0].get("invalid", False) == invalid
+
+
+@pytest.mark.parametrize("path", [
+    "nja/1981/not/9999", "ra/1993/not/9999", "hfd/2025/not/9999",
+    "hdo/T9999-20/2021-01-01", "pbr/9999-00/2001-01-01",
+])
+def test_resolve_selected_decisions_have_no_absence_guarantee(client, path):
+    uri = "https://lagen.nu/dom/" + path
+    assert client.get("/api/v1/resolve", params={"q": uri}).json()["recognized"] == [
+        {"uri": uri, "source": "dv"}]
+
+
+@pytest.mark.parametrize("query,fragment,invalid", [
+    ("12 kap. 1 § avtalslagen", "K12P1", True),
+    ("2 kap. 1 § avtalslagen", "K2P1", True),
+    ("1 kap. 1 § avtalslagen", "P1", False),
+    ("3 kap. 36 § avtalslagen", "P36", False),
+    ("avtalslagen 36", "P36", False),
+    ("avtalslagen 99", "P99", True),
+    ("https://lagen.nu/1915:218#P1S3", "P1S3", False),
+    ("https://lagen.nu/1915:218#P1S4", "P1S4", True),
+])
+def test_resolve_statute_provisions(client, tmp_path, query, fragment, invalid):
+    fixture = Path(__file__).parent / "files/resolve/avtalslagen.json"
+    artifact = tmp_path / "artifact/avtalslagen.json"
+    artifact.write_bytes(fixture.read_bytes())
+    catalog.rebuild(client.catalog_path, "sfs", [artifact])
+    body = client.get("/api/v1/resolve", params={"q": query}).json()
+    uri = "https://lagen.nu/1915:218#" + fragment
+    if invalid:
+        assert body == {"query": query, "results": [], "recognized": [
+            {"uri": uri, "source": "sfs", "invalid": True}]}
+    else:
+        assert body["recognized"] == []
+        assert body["results"][0]["pin"]["uri"] == uri
+
+
+@pytest.mark.parametrize("query,fragment,invalid", [
+    ("1 kap. 1 § FFFS 2020:1", "K1P1", False),
+    ("FFFS 2020:1 1:2", "K1P2", False),
+    ("3 kap. 1 § i FFFS 2020:1", "K3P1", True),
+    ("FFFS 2020:1 1 kap. 99 §", "K1P99", True),
+])
+def test_resolve_agency_provisions_use_consolidation(client, tmp_path, query, fragment, invalid):
+    # Synthetic regulation: only its consolidated text contains section 2.
+    artifact = tmp_path / "artifact/regulation.json"
+    artifact.write_text(json.dumps({"uri": "https://lagen.nu/fffs/2020:1",
+        "title": "Fixture regulation", "structure": [
+            {"type": "paragraf", "id": "K1P1", "text": ["Original text"]}],
+        "consolidations": [{"konsolideradTom": "https://lagen.nu/fffs/2025:1",
+            "structure": [{"type": "kapitel", "id": "K1", "children": [
+                {"type": "paragraf", "id": "K1P1", "text": ["Current text"]},
+                {"type": "paragraf", "id": "K1P2", "text": ["Added text"]}]}]}]}))
+    catalog.rebuild(client.catalog_path, "foreskrift", [artifact])
+    body = client.get("/api/v1/resolve", params={"q": query}).json()
+    uri = "https://lagen.nu/fffs/2020:1#" + fragment
+    if invalid:
+        assert body["results"] == []
+        assert body["recognized"] == [{"uri": uri, "source": "foreskrift", "invalid": True}]
+    else:
+        assert body["recognized"] == []
+        assert body["results"][0]["pin"]["uri"] == uri
+        assert body["results"][0]["pin"]["highlight"] == [
+            "Added text" if fragment == "K1P2" else "Current text"]
+
+
+def test_resolve_nja_filters_do_not_make_coverage_claims(client):
+    query = {"q": "NJA 2013 s. 372"}
+    assert client.get("/api/v1/resolve", params={**query, "source": "sfs"}).json() == {
+        "query": query["q"], "results": [], "recognized": []}
+    # As before, kind applies only to catalog rows; unheld citations have no kind.
+    assert client.get("/api/v1/resolve", params={
+        **query, "source": "dv", "kind": "case"}).json()["recognized"][0]["invalid"] is True
+
+
+def test_resolve_nja_found_and_cache_changes_with_catalog(client, tmp_path):
+    query = {"q": "NJA 2015 s. 899"}
+    missing = client.get("/api/v1/resolve", params=query)
+    assert missing.json()["recognized"][0]["invalid"] is True
+    # Real citation, synthetic document body. The catalog must take precedence.
+    artifact = tmp_path / "artifact/nja.json"
+    artifact.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/nja/2015s899",
+        "referat": "NJA 2015 s. 899", "label": "NJA 2015 s. 899",
+        "metadata": {"properties": {}}, "body": []}))
+    catalog.rebuild(tmp_path / "catalog.sqlite", "dv", [artifact])
+    response = client.get("/api/v1/resolve", params=query,
+                          headers={"If-None-Match": missing.headers["etag"]})
+    assert response.status_code == 200
+    assert response.headers["etag"] != missing.headers["etag"]
+    assert response.json()["recognized"] == []
+    hit, = response.json()["results"]
+    assert hit["uri"] == "https://lagen.nu/dom/nja/2015s899"
+    assert hit["source"] == "dv" and hit["kind"] == "case"
+    assert hit["score"] is None and hit["pin"] is None
+    assert "invalid" not in hit
+    # Filtering an existing row out must not turn it into an invalid reference.
+    assert client.get("/api/v1/resolve", params={**query, "kind": "lag"}).json() == {
+        "query": query["q"], "results": [], "recognized": []}
+
+
+@pytest.mark.parametrize("validator", ["strong", "weak", "list", "wildcard"])
+def test_resolve_cache_revalidation_and_cors(client, validator):
+    params = {"q": "NJA 2013 s. 372"}
+    headers = {"Origin": "https://belagg.example"}
+    response = client.get("/api/v1/resolve", params=params, headers=headers)
+    assert response.headers["cache-control"] == "public, no-cache"
+    assert response.headers["access-control-allow-origin"] == "*"
+    assert "ETag" in response.headers["access-control-expose-headers"]
+    etag = response.headers["etag"]
+    headers["If-None-Match"] = {"strong": etag, "weak": "W/" + etag,
+                                "list": '"old", W/' + etag, "wildcard": "*"}[validator]
+    cached = client.get("/api/v1/resolve", params=params, headers=headers)
+    assert cached.status_code == 304 and cached.content == b""
+    assert cached.headers["etag"] == etag
+    assert cached.headers["cache-control"] == "public, no-cache"
+    assert cached.headers["access-control-allow-origin"] == "*"
+
+
+def test_resolve_cache_changes_with_coverage(client, monkeypatch):
+    params = {"q": "NJA 2026 s. 1"}
+    monkeypatch.setattr(resolve, "date", SimpleNamespace(today=lambda: date(2026, 9, 14)))
+    response = client.get("/api/v1/resolve", params=params)
+    assert "invalid" not in response.json()["recognized"][0]
+    updated = [{**series, "complete_years": [[1981, 2026]]}
+               for series in resolve._series()]
+    monkeypatch.setattr(resolve, "_series", lambda: updated)
+    changed = client.get("/api/v1/resolve", params=params,
+                         headers={"If-None-Match": response.headers["etag"]})
+    assert changed.status_code == 200
+    assert changed.headers["etag"] != response.headers["etag"]
+    assert changed.json()["recognized"][0]["invalid"] is True
+
+
+def test_resolve_cache_changes_at_new_year(client, monkeypatch):
+    params = {"q": "NJA 2027 s. 1"}
+    monkeypatch.setattr(resolve, "date", SimpleNamespace(today=lambda: date(2026, 12, 31)))
+    response = client.get("/api/v1/resolve", params=params)
+    assert response.json()["recognized"][0]["invalid"] is True
+    monkeypatch.setattr(resolve, "date", SimpleNamespace(today=lambda: date(2027, 1, 1)))
+    changed = client.get("/api/v1/resolve", params=params,
+                         headers={"If-None-Match": response.headers["etag"]})
+    assert changed.status_code == 200
+    assert changed.headers["etag"] != response.headers["etag"]
+    assert "invalid" not in changed.json()["recognized"][0]
+
+
+def test_resolve_numeric_coverage_is_explicit(client, monkeypatch):
+    updated = [{**series, "complete_numbers": [[1, 228]]}
+               if series.get("id") == "coe" else series
+               for series in resolve._series()]
+    monkeypatch.setattr(resolve, "_series", lambda: updated)
+    for number, invalid in [(1, True), (228, True), (229, False)]:
+        response = client.get("/api/v1/resolve", params={"q": f"CETS {number}"})
+        assert (response.json()["recognized"][0].get("invalid") is True) == invalid
+
+
+@pytest.mark.parametrize("query,path,source,invalid", json.loads(
+    (Path(__file__).parent / "files/resolve/families.json").read_text()))
+def test_resolve_found_precedes_rules_for_every_family(client, query, path, source, invalid):
+    uri = "https://lagen.nu/" + path.split("#")[0]
+    # A synthetic held row proves the catalog wins even for an impossible id.
+    with sqlite3.connect(client.catalog_path) as con:
+        con.execute("INSERT OR REPLACE INTO documents (uri, source, kind, label, title, path) "
+                    "VALUES (?, ?, 'fixture', 'Fixture', 'Fixture', '')", (uri, source))
+    response = client.get("/api/v1/resolve", params={"q": query})
+    assert response.status_code == 200
+    assert response.json()["recognized"] == []
+    assert [hit["uri"] for hit in response.json()["results"]] == [uri]
+
+
+def test_resolve_openapi_invalid_is_optional(client):
+    schema = client.get("/openapi.json").json()["components"]["schemas"]["RecognizedCitation"]
+    assert "invalid" in schema["properties"]
+    assert schema["properties"]["invalid"]["type"] == "boolean"
+    assert "invalid" not in schema["required"]
 
 
 def test_resolve_requires_a_built_catalog(client, tmp_path):

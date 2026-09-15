@@ -516,6 +516,20 @@ def resolve_citation(citation: CitationArg) -> ResolvedCitations:
     dokument: den kan inte hämtas med `fetch` och ska inte citeras som en
     källa. Är både `results` och `recognized` tomma lästes frågan inte som
     någon känd hänvisning -- använd `search`.
+
+    En post i `recognized` har `invalid: true` när hänvisningen säkert är
+    ogiltig enligt seriens regler: fullständig referattäckning, utgivningsår,
+    framtida år eller nummer som är noll eller negativa. Annars saknas fältet.
+    Ett saknat dokument utanför täckningen är obekräftat. Täckningen växer
+    inte automatiskt med kalenderåret. Ett högt sidnummer räcker inte.
+    Svenska referat, EU-rättsakter och mål, internationella fördrag samt
+    HUDOC-, ICC- och ICJ-identifierare stöds. ECLI och ICJ Reports läses från
+    dokumentens indexerade identifierare.
+
+    För svenska författningar och myndighetsföreskrifter kontrolleras också
+    den angivna bestämmelsen mot dokumentets publicerade struktur.
+    En saknad bestämmelse får sin fullständiga URI med fragment i `recognized`
+    och `invalid: true`, även när författningen finns.
     """
     with _con() as con:
         results, recognized = pins.resolve_query(con, citation)

@@ -1,0 +1,290 @@
+{
+  "namespaces": {
+    "dom/echr/": "hudoc",
+    "dom/": "dv",
+    "celex/": "eurlex",
+    "coe/": "coe",
+    "icrc/": "icrc",
+    "untc/": "untc",
+    "icc/": "icc",
+    "icj/": "icj",
+    "foreskrift/": "foreskrift",
+    "avg/": "avg",
+    "rs/": "rs",
+    "guidance/": "guidance",
+    "prop/": "forarbete",
+    "sou/": "forarbete",
+    "ds/": "forarbete",
+    "dir/": "forarbete",
+    "fm/": "forarbete",
+    "skr/": "forarbete",
+    "so/": "forarbete",
+    "lr/": "forarbete",
+    "bet/": "forarbete",
+    "rskr/": "forarbete"
+  },
+  "series": [
+    {
+      "citation": "NJA",
+      "source": "dv",
+      "uri_prefix": "https://lagen.nu/dom/nja/",
+      "first_year": 1874,
+      "complete_years": [
+        [
+          1981,
+          2025
+        ]
+      ],
+      "uri_pattern": "dom/nja/(?P<year>[0-9]{4})s(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ]
+    },
+    {
+      "id": "nja-notices",
+      "source": "dv",
+      "uri_pattern": "dom/nja/(?P<year>[0-9]{4})/not/(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [],
+      "first_year": 1874
+    },
+    {
+      "id": "ra-reports",
+      "source": "dv",
+      "uri_pattern": "dom/ra/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[1993, 2010]],
+      "first_year": 1909,
+      "last_year": 2010
+    },
+    {
+      "id": "hfd-reports",
+      "source": "dv",
+      "uri_pattern": "dom/hfd/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[2011, 2025]],
+      "first_year": 2011
+    },
+    {
+      "id": "ra-notices",
+      "source": "dv",
+      "uri_pattern": "dom/ra/(?P<year>[0-9]{4})/not/(?P<number>-?[0-9]+)",
+      "positive": ["number"],
+      "complete_years": [],
+      "first_year": 1909,
+      "last_year": 2010
+    },
+    {
+      "id": "hfd-notices",
+      "source": "dv",
+      "uri_pattern": "dom/hfd/(?P<year>[0-9]{4})/not/(?P<number>-?[0-9]+)",
+      "positive": ["number"],
+      "complete_years": [],
+      "first_year": 2011
+    },
+    {
+      "id": "ad-reports",
+      "source": "dv",
+      "uri_pattern": "dom/ad/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[1993, 2024]]
+    },
+    {
+      "id": "rh-reports",
+      "source": "dv",
+      "uri_pattern": "dom/rh/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[1993, 2025]]
+    },
+    {
+      "id": "mod-reports",
+      "source": "dv",
+      "uri_pattern": "dom/mod/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[1999, 2025]]
+    },
+    {
+      "id": "mmd-reports",
+      "source": "dv",
+      "uri_pattern": "dom/mmd/(?P<year>[0-9]{4})(?:/not/|:)(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "mig-reports",
+      "source": "dv",
+      "uri_pattern": "dom/mig/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[2006, 2025]]
+    },
+    {
+      "id": "pmod-reports",
+      "source": "dv",
+      "uri_pattern": "dom/pmod/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[2016, 2025]]
+    },
+    {
+      "id": "md-reports",
+      "source": "dv",
+      "uri_pattern": "dom/md/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[2004, 2016]]
+    },
+    {
+      "id": "rk-reports",
+      "source": "dv",
+      "uri_pattern": "dom/rk/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [[2008, 2025]]
+    },
+    {
+      "id": "sfs",
+      "source": "sfs",
+      "uri_pattern": "(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)(?:_s\\.[0-9]+)?",
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "foreskrift",
+      "source": "foreskrift",
+      "uri_pattern": "[a-z-]+/(?P<year>[0-9]{4}):(?P<number>-?[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "eu-court",
+      "source": "eurlex",
+      "uri_pattern": "celex/6(?P<year>[0-9]{4})C[A-Z](?P<number>[0-9]+)",
+      "first_year": 1952,
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "eu-general-court",
+      "source": "eurlex",
+      "uri_pattern": "celex/6(?P<year>[0-9]{4})T[A-Z](?P<number>[0-9]+)",
+      "first_year": 1989,
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "eu-civil-service",
+      "source": "eurlex",
+      "uri_pattern": "celex/6(?P<year>[0-9]{4})F[A-Z](?P<number>[0-9]+)",
+      "first_year": 2005,
+      "last_year": 2016,
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "eu-legislation",
+      "source": "eurlex",
+      "uri_pattern": "celex/3(?P<year>[0-9]{4})[A-Z](?P<number>[0-9]+)(?:\\([0-9]+\\))?",
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "eu-treaties",
+      "source": "eurlex",
+      "uri_pattern": "celex/1(?P<year>[0-9]{4})[A-Z]+(?:/[^/]+)?",
+      "positive": [],
+      "complete_years": []
+    },
+    {
+      "id": "coe",
+      "source": "coe",
+      "uri_pattern": "coe/(?P<number>[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [],
+      "complete_numbers": []
+    },
+    {
+      "id": "icrc",
+      "source": "icrc",
+      "uri_pattern": "icrc/(?P<number>[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [],
+      "complete_numbers": []
+    },
+    {
+      "id": "untc",
+      "source": "untc",
+      "uri_pattern": "untc/[IV]+-(?P<number>[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [],
+      "complete_numbers": []
+    },
+    {
+      "id": "hudoc",
+      "source": "hudoc",
+      "uri_pattern": "dom/echr/001-(?P<number>[0-9]+)",
+      "positive": [
+        "number"
+      ],
+      "complete_years": [],
+      "complete_numbers": []
+    },
+    {
+      "id": "icc",
+      "source": "icc",
+      "uri_pattern": "icc/ICC-(?P<situation>[0-9]+)_[0-9]+-(?P<case>[0-9]+)_[0-9]+-(?P<number>[0-9]+)(?:-[A-Za-z0-9]+)*",
+      "positive": [
+        "situation",
+        "case",
+        "number"
+      ],
+      "complete_years": []
+    },
+    {
+      "id": "icj",
+      "source": "icj",
+      "uri_pattern": "icj/(?P<number>[0-9]{3})-(?P<year>[0-9]{4})[0-9]{4}-(?:JUD|ADV|ORD)-[0-9]{2}-[0-9]{2}",
+      "first_year": 1946,
+      "positive": [
+        "number"
+      ],
+      "complete_years": []
+    }
+  ]
+}

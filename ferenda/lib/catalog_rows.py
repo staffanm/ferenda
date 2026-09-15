@@ -16,7 +16,7 @@ imports back, so the pair stays acyclic.
 import re
 from functools import partial
 
-from . import eu_structure, labels, text
+from . import courtids, eu_structure, labels, text
 from .markdown import begrepp_uri
 from .pinpoint import pinpoint_label
 
@@ -27,6 +27,18 @@ from .util import local as _local
 # --------------------------------------------------------------------------
 # edge extraction -- one generic walk over any artifact node tree
 # --------------------------------------------------------------------------
+
+def citation_aliases(art):
+    """Alternative official identifiers stated in the artifact itself.
+
+    ECLI is not convertible to a CELEX number. A Reports page is not an ICJ
+    filename. Index these stated identities without deriving or guessing one.
+    """
+    metadata = art.get("metadata", {})
+    return {courtids.citation_key(value) for value in (
+        art.get("ecli"), metadata.get("ecli"), metadata.get("reportsCitation"))
+        if value}
+
 
 def collect_links(node, anchor, page, out):
     """Walk an artifact node tree, appending (anchor, page, run) for every
