@@ -901,6 +901,7 @@ def test_resolve_selected_decisions_have_no_absence_guarantee(client, path):
 
 @pytest.mark.parametrize("query,fragment,invalid", [
     ("12 kap. 1 § avtalslagen", "K12P1", True),
+    ("12 kap. 1§ avtalslagen", "K12P1", True),
     ("2 kap. 1 § avtalslagen", "K2P1", True),
     ("1 kap. 1 § avtalslagen", "P1", False),
     ("3 kap. 36 § avtalslagen", "P36", False),
@@ -1090,6 +1091,28 @@ def test_extract_blocks_and_context(client):
     last = response.json()["occurrences"][-1]
     assert last["locations"] == [{"block_id": "footnote-1", "start": 3, "end": 17}]
     assert last["targets"] == [{"uri": "https://lagen.nu/1915:218#P36", "source": "sfs"}]
+
+
+def test_extract_compact_provision_then_resolve(client, tmp_path):
+    artifact = tmp_path / "artifact/avtalslagen.json"
+    artifact.write_bytes((Path(__file__).parent / "files/resolve/avtalslagen.json").read_bytes())
+    catalog.rebuild(client.catalog_path, "sfs", [artifact])
+    text = "Skuldebreven är upprättade enligt 12 kap. 1§ avtalslagen, vilket innebär..."
+    response = client.post("/api/v1/citations/extract", json={"text": text})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["offset_unit"] == "utf-16"
+    occurrence, = body["occurrences"]
+    assert occurrence["text"] == "12 kap. 1§ avtalslagen"
+    uri = "https://lagen.nu/1915:218#K12P1"
+    assert occurrence["targets"] == [{"uri": uri, "source": "sfs"}]
+    location, = occurrence["locations"]
+    assert location["block_id"] == "text"
+    assert location["start"] == len(text[:text.index("12 kap.")].encode("utf-16-le")) // 2
+    assert text.encode("utf-16-le")[location["start"] * 2:location["end"] * 2].decode("utf-16-le") == occurrence["text"]
+    resolved = client.get("/api/v1/resolve", params={"q": uri}).json()
+    assert resolved["results"] == []
+    assert resolved["recognized"] == [{"uri": uri, "source": "sfs", "invalid": True}]
 
 
 @pytest.mark.parametrize("body", [

@@ -5,6 +5,7 @@ The layer rules these modules obey are in
 [`architecture.md`](architecture.md). To run the pipelines the modules
 implement, read [`../operating/pipelines.md`](../operating/pipelines.md).
 
+## Python package
 
 **SFS vertical**
 | File | What |

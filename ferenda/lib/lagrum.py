@@ -219,7 +219,7 @@ chapter_section_refs: chapter_ref _W section_refs
                     | chapter_ref _W alternate_section_refs
 
 // "2, 4-6 och 8 §§" -- one link per endpoint
-section_refs: sec_item ((COMMA _W | _W_AND_OR_W) sec_item)* _W DSM
+section_refs: sec_item ((COMMA _W | _W_AND_OR_W) sec_item)* _W? DSM
 
 // "15 eller 16 §" -- single section mark, only valid after a chapter
 // and with a final "eller" (otherwise "2 kap. 5 §" would match here
@@ -262,7 +262,7 @@ piece_item_refs: piece_ref _W item_ref (COMMA _W item_ref)* _W_AND_OR_W item_ref
 
 chapter_ref: chapter_ref_id KAP
 chapter_ref_id: NUMBER _W (CHAPTER_CHAR _W)?
-section_ref: section_ref_id _W SM
+section_ref: section_ref_id _W? SM
 section_ref_id: NUMBER (_W SECTION_CHAR)?
 piece_ref: piece_ref_id _W PIECE_WORD
 piece_ref_id: ORDINAL_WORD | PIECE_DIGIT
@@ -851,7 +851,7 @@ ORDINALS = {'första': '1', 'andra': '2', 'tredje': '3', 'fjärde': '4',
 LAGRUM_TRIGGER_SRC = r"""
     \b\d+(?:\ ?[a-n]\b)?
         (?:(?:\ ?,\ ?|\ och\ |\ eller\ |\ samt\ |\ ?[-–—]{1,2}\ ?)
-           \d+(?:\ ?[a-n]\b)?){0,50}\ §       # section (lists/intervals)
+           \d+(?:\ ?[a-n]\b)?){0,50}\ ?§      # section (lists/intervals)
   | \b\d+\ (?:[a-zåäö]\ )?[Kk]ap\b            # chapter
   | \b(?:\d+|första|andra|tredje|fjärde|femte|sjätte|sjunde|åttonde|nionde)
         (?:\ (?:första|andra|tredje|fjärde|femte|sjätte|sjunde|åttonde|nionde))?
@@ -886,7 +886,7 @@ EU_TRIGGER_SRC = r"""
 # abbreviation, so prose is not mis-scanned (loose trigger, strict term).
 KORTLAGRUM_TRIGGER_SRC = r"""
     \b[A-ZÅÄÖ][A-Za-zÅÄÖåäö]{0,7}
-        (?=\ \d+(?:\ ?[a-n]\b)?\ §|\ \d+\ (?:[a-zåäö]\ )?[Kk]ap\b|\ \d+:\d+)
+        (?=\ \d+(?:\ ?[a-n]\b)?\ ?§|\ \d+\ (?:[a-zåäö]\ )?[Kk]ap\b|\ \d+:\d+)
 """
 
 # fires at a court code / NJA immediately followed by a year

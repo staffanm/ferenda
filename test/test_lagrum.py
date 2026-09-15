@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from ferenda.lib import catalog, catalog_rows
+from ferenda.lib import catalog_rows
 from ferenda.lib.datasets import NAMEDACTS
 from ferenda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ferenda.lib.lagrum import (
@@ -128,6 +128,29 @@ def test_eglag(path):
 def test_short(path):
     got, want = run_testfile(path, abbreviations=ABBREVIATIONS)
     assert got == want
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("1§ avtalslagen", ["1915:218#P1"]),
+    ("12 kap. 1§ avtalslagen", ["1915:218#K12P1"]),
+    ("1 a§ avtalslagen", ["1915:218#P1a"]),
+    # Named-law lists retain the existing separate links for endpoints and law.
+    ("1–3§§ avtalslagen", ["1915:218#P1", "1915:218#P3", "1915:218"]),
+    ("1 och 3§§ avtalslagen", ["1915:218#P1", "1915:218#P3", "1915:218"]),
+    ("1 a–3 b§§ avtalslagen", ["1915:218#P1a", "1915:218#P3b", "1915:218"]),
+    ("3§ BrB", ["1962:700#P3"]),
+    ("BrB 3§", ["1962:700#P3"]),
+    ("BrB 3 a§", ["1962:700#P3a"]),
+    ("1–3§§ BrB", ["1962:700#P1", "1962:700#P3"]),
+    ("1§ första stycket avtalslagen", ["1915:218#P1S1"]),
+])
+@pytest.mark.parametrize("space", ["", " ", "\u00a0", "\u202f"])
+def test_optional_space_before_section_mark(text, expected, space):
+    text = re.sub(r"(?<!§)§", space + "§", text)
+    parser = LagrumParser(NAMEDLAWS, basefile="9999:999", abbreviations=ABBREVIATIONS)
+    refs = parser.parse_text(text, context={})
+    assert [ref.uri for ref in refs] == ["https://lagen.nu/" + uri for uri in expected]
+    assert all(ref.text == text[ref.start:ref.end] for ref in refs)
 
 
 @pytest.mark.parametrize("path", make_params("DV"))

@@ -95,6 +95,11 @@ end is exclusive. JavaScript `block.text.slice(start, end)` selects that part
 of the citation, including when preceding text contains emoji.
 Clients retain their mapping from block ids to pages, paragraphs or footnotes.
 
+The shared parser accepts an omitted space before `§` and `§§`.
+For example, `12 kap. 1§ avtalslagen` retains the complete `#K12P1` target.
+Returned text and offsets preserve the original spelling. Extraction does not
+establish validity; send the target URI to `/resolve` for that check.
+
 Repeated occurrences remain separate. Several targets may share an occurrence.
 An empty `targets` list means the candidate's target remains unresolved.
 For example, an unindexed ECLI remains visible without an invented CELEX URI.
