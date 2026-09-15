@@ -1065,6 +1065,113 @@ def test_resolve_openapi_invalid_is_optional(client):
     assert "invalid" not in schema["required"]
 
 
+def test_extract_citations_then_resolve(client):
+    response = client.post("/api/v1/citations/extract", json={
+        "text": "Se NJA 2013 s. 372 och 3 kap. 1 § brottsbalken."})
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    body = response.json()
+    assert body["offset_unit"] == "utf-16"
+    first, second = body["occurrences"]
+    assert first["text"] == "NJA 2013 s. 372"
+    assert first["targets"] == [{"uri": "https://lagen.nu/dom/nja/2013s372", "source": "dv"}]
+    assert "invalid" not in first["targets"][0]
+    missing = client.get("/api/v1/resolve", params={"q": first["targets"][0]["uri"]}).json()
+    assert missing["recognized"][0]["invalid"] is True
+    found = client.get("/api/v1/resolve", params={"q": second["targets"][0]["uri"]}).json()
+    assert found["results"][0]["pin"]["pinpoint"] == "K3P1"
+
+
+def test_extract_blocks_and_context(client):
+    response = client.post("/api/v1/citations/extract", json={"blocks": [
+        {"id": "paragraph-1", "text": "lagen (1915:218)."},
+        {"id": "footnote-1", "text": "Se 36 § samma lag."}]})
+    assert response.status_code == 200
+    last = response.json()["occurrences"][-1]
+    assert last["locations"] == [{"block_id": "footnote-1", "start": 3, "end": 17}]
+    assert last["targets"] == [{"uri": "https://lagen.nu/1915:218#P36", "source": "sfs"}]
+
+
+@pytest.mark.parametrize("body", [
+    {}, {"text": "private text", "blocks": [{"id": "p", "text": "private text"}]},
+    {"blocks": []}, {"text": {"secret": "private text"}},
+    {"blocks": [{"id": "p", "text": "private text"}] * 2},
+    {"text": "x" * 250001},
+    {"blocks": [{"id": "p1", "text": "x" * 125001}, {"id": "p2", "text": "x" * 125000}]},
+    {"text": "private text", "format": "pdf"},
+    {"text": "private text", "written": "invalid date"},
+])
+def test_extract_input_validation_does_not_echo_text(client, body):
+    response = client.post("/api/v1/citations/extract", json=body)
+    assert response.status_code == 422
+    assert response.headers["cache-control"] == "no-store"
+    assert "private text" not in response.text
+    assert all("input" not in error and "ctx" not in error for error in response.json()["detail"])
+
+
+def test_extract_rejects_malformed_json_without_echo(client):
+    response = client.post("/api/v1/citations/extract", content='{"text": "private text",',
+                           headers={"Content-Type": "application/json"})
+    assert response.status_code == 422
+    assert "private text" not in response.text
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_extract_rejects_file_upload(client):
+    response = client.post("/api/v1/citations/extract", files={"file": ("brief.pdf", b"%PDF-fixture")})
+    assert response.status_code == 415
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_extract_rejects_unpaired_unicode_surrogate(client):
+    response = client.post("/api/v1/citations/extract", content=b'{"text":"NJA 2013 s. 372 \\ud800"}',
+                           headers={"Content-Type": "application/json"})
+    assert response.status_code == 422
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_extract_bounds_streamed_body(client):
+    response = client.post("/api/v1/citations/extract", content=iter([b" " * 1_000_001] * 2),
+                           headers={"Content-Type": "application/json"})
+    assert response.status_code == 413
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_extract_cors_and_openapi(client):
+    response = client.options("/api/v1/citations/extract", headers={
+        "Origin": "https://belagg.example", "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type"})
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "*"
+    assert "POST" in response.headers["access-control-allow-methods"]
+    schema = client.get("/openapi.json").json()
+    endpoint = schema["paths"]["/api/v1/citations/extract"]["post"]
+    assert "application/json" in endpoint["requestBody"]["content"]
+    assert endpoint["responses"]["200"]["content"]["application/json; charset=utf-8"]["schema"]["$ref"].endswith(
+        "/ExtractionResponse")
+
+
+def test_extract_empty_text(client):
+    response = client.post("/api/v1/citations/extract", json={"text": ""})
+    assert response.status_code == 200
+    assert response.json() == {"offset_unit": "utf-16", "occurrences": []}
+
+
+def test_extract_failure_does_not_log_submitted_text(client, monkeypatch, caplog, tmp_path):
+    def fail(*args):
+        raise ValueError("private document text must not enter logs")
+    ledger = tmp_path / "extraction-errors.ndjson"
+    monkeypatch.setattr(api.errors, "LEDGER", ledger)
+    monkeypatch.setattr(api.citations.citationextract, "extract", fail)
+    response = client.post("/api/v1/citations/extract", json={"text": "private document text"})
+    assert response.status_code == 500
+    assert response.headers["cache-control"] == "no-store"
+    assert "private document text" not in response.text
+    assert "private document text" not in caplog.text
+    assert "ValueError" in caplog.text
+    assert not ledger.exists()
+
+
 def test_resolve_requires_a_built_catalog(client, tmp_path):
     # the fixture's own override replaces get_con outright, bypassing its
     # catalog_ready() check -- pop it so the real dependency (and its 503) runs

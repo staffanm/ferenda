@@ -574,6 +574,16 @@ assumptions, live corpus observations and alias rebuild commands.
 It handles continuous paragraph numbering and uses the selected consolidation
 through `text.body_id_nodes`. Invalid provisions keep their fragment in `recognized`.
 
+`api/citations.py` serves `POST /api/v1/citations/extract`. It validates text or
+ordered blocks, bounds streamed bodies, and removes input values from validation errors.
+`lib/citationextract.py` combines the shared citation grammar with lookup candidates
+and treaty references. It keeps per-document context, repeated occurrences and
+UTF-16 positions across block boundaries. Extraction returns interpretations;
+`/resolve` remains responsible for existence checks. The shared grammar records a
+standalone SFS number as context for a later “samma lag” reference.
+Extraction clears all thread-local parser text and learned context on success
+and failure. Its error boundary logs only exception types and code locations.
+
 **Top-level**: `build.py` is the `lagen` CLI and the one place that composes across sources. Each source declares itself in its own `ferenda/<package>/source.py`, exposing a `SOURCES` tuple; `build.py` imports the nineteen modules, fills `lib/stage.py`'s `SOURCES` in the order `lagen all <verb>` walks the corpus in, and stamps each source's `registration`. What is left is the argument parsing and dispatch, the editor's post-commit rebuild (`rebuild_after_commit`/`reparse_one`), the aggregate-page callable it hands `corpus.cmd_generate`, and the handful of *cross-source* actions no single source may hold — `sfs ai-correspond`, `sfs table-correspond` and `sfs history-as-git` all read a proposition, which is förarbete's job, so they live here and are hung on sfs's registration as data. The verbs it dispatches to live in `lib/corpus.py`, the freshness engine in `lib/freshness.py`. `main`'s `finally` (so a crash or Ctrl-C still reaches it) prints `_print_failure_summary` whenever the run's `ok` flag or `freshness.RUN_ERRORS` says it exited non-zero -- which step(s) failed and, where the detail exists (`errors.json`, keyed by run id), the per-basefile message, since a `lagen all rebuild` scrolls the actual failure off screen long before the run's last line and the exit code alone does not say why. `config.py` resolves the optional `config.yml` — the corpus
 roots (`data_root`, `catalog_root`, `wiki_root` — `catalog_root`
 decouples `catalog.sqlite` from `data_root` so the latency-sensitive SQLite

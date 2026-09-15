@@ -71,6 +71,7 @@ from ..lib import (
 from . import (
     analytics,
     auth,
+    citations,
     db,
     errors,
     facsimiles,
@@ -104,7 +105,8 @@ always a `uri` query parameter, never a path segment -- they contain `:` and
 are derived from it and rebuildable. `GET /api/v1/document` hands it back
 verbatim, and each line of a bulk dump *is* one.
 
-**Everything here is read-only and open to any origin** (`GET`, `*`). An error
+**Everything here is read-only and open to any origin.** Corpus reads use GET;
+`POST /api/v1/citations/extract` accepts text without changing the corpus. An error
 is `{"detail": …}`; a 404 or a 5xx adds an `error_id` that names the entry in
 the server's own error ledger, worth quoting in a bug report -- `null` on the
 rare occasion the ledger itself could not be written. (On a 422 the `detail` is
@@ -115,6 +117,9 @@ endpoints -- `GET /api/v1/dumps` is the manifest.
 """
 
 TAGS = [
+    {"name": "citations",
+     "description": "Find legal citation occurrences in submitted document text. "
+                    "Use resolve to check the interpreted targets."},
     {"name": "search",
      "description": "Full text plus citation resolution. One endpoint; the "
                     "⌘K palette uses no other."},
@@ -166,8 +171,10 @@ app = FastAPI(
 # a cross-origin browser from *reading* a response, and half the internal
 # surface is a GET whose body is nobody else's business.
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
-                   allow_methods=["GET"], allow_headers=["*"],
+                   allow_methods=["GET", "POST"], allow_headers=["*"],
                    expose_headers=["ETag"])
+
+app.include_router(citations.router)
 
 
 # No Referrer-Policy here. The prod vhost already sets it at server scope

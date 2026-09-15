@@ -400,7 +400,8 @@ def absent_is_invalid(uri):
     return False
 
 
-def _fresh_citation_parser():
+def citation_parser():
+    """This thread's full citation parser, reset for a new query or document."""
     parser = getattr(_parsers, "all", None)
     if parser is None:
         parser = _parsers.all = LagrumParser(
@@ -410,6 +411,13 @@ def _fresh_citation_parser():
             parse_types=ALL_PARSE_TYPES)
     parser.reset()
     return parser
+
+
+def clear_parser_state():
+    """Release submitted text and learned context from this thread's parsers."""
+    for cache in (_parsers, _ecj_parsers):
+        for parser in vars(cache).values():
+            parser.reset()
 
 
 def resolve_regulation(q):
@@ -463,7 +471,7 @@ def _resolve_instrument(q):
                 # Both engines own their article grammars (EU, CoE, UN/IHL).
                 # Let them build the fragment instead of guessing one here.
                 number = re.sub(r"^art(?:ikel|icle)?\.?\s*", "", tail, flags=re.I)
-                refs = _fresh_citation_parser().parse_text(
+                refs = citation_parser().parse_text(
                     "artikel %s i %s" % (number, name), context={})
                 if refs:
                     return [ref.uri for ref in refs]
@@ -496,7 +504,15 @@ def _resolve_general(q):
     instruments = _resolve_instrument(q)
     if instruments:
         return instruments
-    return [ref.uri for ref in _fresh_citation_parser().parse_text(q, context={})]
+    return [ref.uri for ref in citation_parser().parse_text(q, context={})]
+
+
+@functools.cache
+def citation_names() -> list[str]:
+    """Curated standalone names used by both lookup and document extraction."""
+    return sorted({name for name, _ in (
+        _leading_laws() + _named_acts() + _named_treaties() + _instrument_names())}
+        | set(_named_cases()), key=lambda name: (-len(name), name))
 
 
 def resolve(q):

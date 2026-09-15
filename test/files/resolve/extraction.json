@@ -1,0 +1,66 @@
+[
+  {
+    "text": "Se NJA 2013 s. 372, nja 2013 s.372 och NJA 2013 s. -1.",
+    "matches": [
+      ["NJA 2013 s. 372", ["dom/nja/2013s372"]],
+      ["nja 2013 s.372", ["dom/nja/2013s372"]],
+      ["NJA 2013 s. -1", ["dom/nja/2013s-1"]]
+    ]
+  },
+  {
+    "text": "12 kap. 1 § avtalslagen; 36 § samma lag. Se 12 kap. 1 § FFFS 2020:1 och FFFS 2020:1 12:1.",
+    "matches": [
+      ["12 kap. 1 § avtalslagen", ["1915:218#K12P1"]],
+      ["36 § samma lag", ["1915:218#P36"]],
+      ["12 kap. 1 § FFFS 2020:1", ["fffs/2020:1#K12P1"]],
+      ["FFFS 2020:1 12:1", ["fffs/2020:1#K12P1"]]
+    ]
+  },
+  {
+    "text": "HFD 2025 ref. 1, RÅ 2009 not. 1, AD 2024 nr 1, MIG 2025:1 och RH 2025:1.",
+    "matches": [
+      ["HFD 2025 ref. 1", ["dom/hfd/2025:1"]],
+      ["RÅ 2009 not. 1", ["dom/ra/2009/not/1"]],
+      ["AD 2024 nr 1", ["dom/ad/2024:1"]],
+      ["MIG 2025:1", ["dom/mig/2025:1"]],
+      ["RH 2025:1", ["dom/rh/2025:1"]]
+    ]
+  },
+  {
+    "text": "C-199/24, T-201/04, F-23/07, CELEX:32016R0679 och GDPR artikel 32.",
+    "matches": [
+      ["C-199/24", ["celex/62024CJ0199"]],
+      ["T-201/04", ["celex/62004TJ0201"]],
+      ["F-23/07", ["celex/62007FJ0023"]],
+      ["CELEX:32016R0679", ["celex/32016R0679"]],
+      ["GDPR artikel 32", ["celex/32016R0679#32"]]
+    ]
+  },
+  {
+    "text": "Rome Statute article 6; UNTC I-27531; ETS No. 5; ICRC 365; HUDOC 001-58257.",
+    "matches": [
+      ["Rome Statute article 6", ["icrc/585#A6"]],
+      ["UNTC I-27531", ["untc/I-27531"]],
+      ["ETS No. 5", ["coe/005"]],
+      ["ICRC 365", ["icrc/365"]],
+      ["HUDOC 001-58257", ["dom/echr/001-58257"]]
+    ]
+  },
+  {
+    "text": "ECLI:EU:C:2020:559; I.C.J. Reports 1986, p. 14; ICC-01/04-02/06-2359; ICJ 070-19860627-JUD-01-00.",
+    "matches": [
+      ["ECLI:EU:C:2020:559", []],
+      ["I.C.J. Reports 1986, p. 14", []],
+      ["ICC-01/04-02/06-2359", ["icc/ICC-01_04-02_06-2359"]],
+      ["ICJ 070-19860627-JUD-01-00", ["icj/070-19860627-JUD-01-00"]]
+    ]
+  },
+  {
+    "text": "NJA 2013 s. 372–374 samt NJA 2013 s. 372.5 och NJA 2013 s. 372 II.",
+    "matches": [
+      ["NJA 2013 s. 372–374", []],
+      ["NJA 2013 s. 372.5", []],
+      ["NJA 2013 s. 372 II", []]
+    ]
+  }
+]

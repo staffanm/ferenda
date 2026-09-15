@@ -147,6 +147,29 @@ curl -G http://127.0.0.1:8001/api/v1/document \
 
 ## Endpoints
 
+### `POST /api/v1/citations/extract` — hitta hänvisningar i text
+
+Skicka JSON med `text` eller ordnade `blocks` med unika `id` och `text`.
+API:t returnerar varje förekomst med originaltext, positioner och tolkade mål.
+Positionerna anger UTF-16-enheter inom respektive block. Upprepningar finns kvar.
+En hänvisning över en sidgräns kan ha flera positioner.
+
+```json
+{"text": "Se NJA 2013 s. 372 och 12 kap. 1 § avtalslagen."}
+```
+
+Skicka sedan varje unik mål-URI till `/api/v1/resolve` för giltighetskontroll.
+Ett mål från extraktionen bevisar inte att dokumentet eller bestämmelsen finns.
+En tom mållista betyder att kandidaten saknar en bestämd tolkning.
+
+Texten behandlas endast tillfälligt i minnet hos lagen.nu. Den tas bort efter
+behandlingen, sparas aldrig och skickas aldrig vidare. Resultatet skickas endast
+till dig. Originalfilen stannar på din enhet. PDF-läsning, DOCX-läsning och OCR
+hanteras av klienten. Svar får `Cache-Control: no-store`.
+Gränser: 250 000 tecken, 5 000 block och 2 000 000 byte i JSON-kroppen.
+Se [konsumentdokumentationen](../../docs/api/README.md#extract-citations--post-apiv1citationsextract)
+för hela kontraktet och begränsningarna.
+
 ### `GET /api/v1/search` — fulltextsökning
 
 | Parameter | Typ | Förklaring |

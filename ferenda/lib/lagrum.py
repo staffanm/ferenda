@@ -1991,6 +1991,8 @@ class LagrumParser:
         the same as never setting it."""
         self.state = _DocState()
         self.written = written
+        self._scan_text = ""
+        self._scan_base = 0
 
     # --- scanning ---
 
@@ -2216,6 +2218,7 @@ class LagrumParser:
 
     def fmt_sfs_nr(self, node, match, out, context):
         law = _normalize_sfsid(_find_refids(node)['law'])
+        match.currentlaw = law
         if self.nobaseuri:  # the old format_SFSNr learned the base law
             context['law'] = law
         # link just the SFS number, not any enclosing "( … )"

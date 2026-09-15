@@ -1,8 +1,8 @@
 # Consuming lagen.nu — API and data
 
 How to access the corpus programmatically: the REST API, bulk downloads, and the
-JSON artifact format. Everything here is **read-only public data** derived from,
-and rebuildable from, the JSON artifacts on disk.
+JSON artifact format. Corpus reads return public data derived from the artifacts.
+Citation extraction also accepts client text for processing; it does not change the corpus.
 
 The two things to know first:
 
@@ -29,9 +29,8 @@ One uvicorn process serves both the static site and the API; the API lives under
 `/api/v1`. Because the site and API share an origin, the site calls the API with
 relative URLs — there is no separate API host to configure.
 
-- **Base path:** `/api/v1`. Everything under it is public, read-only and `GET`.
-- **CORS:** open to any origin, GET only (`allow_origins: ["*"]`,
-  `allow_methods: ["GET"]`).
+- **Base path:** `/api/v1`. Corpus reads use GET. Citation extraction uses POST with a JSON body.
+- **CORS:** open to any origin for GET and POST, including JSON preflight requests.
 - **Interactive docs:** `GET /docs` (Swagger UI), `GET /openapi.json` (OpenAPI 3
   schema, generated from the typed handlers). Both describe *this* API and
   nothing else.
@@ -55,6 +54,74 @@ background jobs — is a **second API at `/internal-api/v1`**, kept out of this
 schema on purpose. It is same-origin only, reads included, and its shapes change
 with the UI. Nothing in it is part of this contract, and no external consumer
 needs it: whatever the site can read there, it reads from `/api/v1` too.
+
+### Extract citations — `POST /api/v1/citations/extract`
+
+Find citation occurrences in submitted text. The API reads the text using
+Ferenda's citation grammar and identity datasets. It does not check whether
+the targets exist; use `/api/v1/resolve` for that next step.
+
+```json
+{"text": "Se NJA 2013 s. 372."}
+```
+
+```json
+{
+  "offset_unit": "utf-16",
+  "occurrences": [{
+    "text": "NJA 2013 s. 372",
+    "locations": [{"block_id": "text", "start": 3, "end": 18}],
+    "targets": [{"uri": "https://lagen.nu/dom/nja/2013s372", "source": "dv"}]
+  }]
+}
+```
+
+Alternatively, submit blocks in reading order:
+
+```json
+{"blocks": [
+  {"id": "page-1", "text": "Se NJA 2013 s."},
+  {"id": "page-2", "text": "372."}
+]}
+```
+
+The parser joins blocks with one newline. A citation spanning blocks has a
+location in each block. Context continues across blocks within this request;
+it never carries between requests. Send exactly one of `text` or `blocks`.
+Undated law names use current datasets, as `/resolve` does.
+
+Offsets count UTF-16 units in the original block text. Start is inclusive;
+end is exclusive. JavaScript `block.text.slice(start, end)` selects that part
+of the citation, including when preceding text contains emoji.
+Clients retain their mapping from block ids to pages, paragraphs or footnotes.
+
+Repeated occurrences remain separate. Several targets may share an occurrence.
+An empty `targets` list means the candidate's target remains unresolved.
+For example, an unindexed ECLI remains visible without an invented CELEX URI.
+The grammar can return separately printed range endpoints; the API does not
+expand unprinted references. `NJA 2013 s. 372–374` remains a candidate without
+a target rather than being silently shortened to `NJA 2013 s. 372`.
+
+Supported forms include Swedish statutes and agency provisions, court reports,
+EU cases and acts, treaty names and numbers, HUDOC IDs, ICC document numbers,
+ICJ decision filenames, ECLI and ICJ Reports aliases.
+Send each distinct interpreted **URI** to `/resolve`; reparsing `36 § samma lag`
+as an isolated query would lose its document context.
+
+The input is JSON text, not a file upload. Clients extract DOCX paragraphs,
+tables and notes, or PDF pages, before calling this endpoint. They also handle
+OCR and PDF reading order. Empty results do not prove that OCR succeeded.
+
+Limits: 250,000 Unicode characters in total, 5,000 blocks with unique ids,
+and 2,000,000 bytes in the JSON body. Oversized bodies return 413;
+unsupported media types return 415; invalid JSON or fields return 422.
+Responses use `Cache-Control: no-store`. Validation errors omit input values.
+Extraction failures return a generic 500; logs contain only the error type and code locations.
+Requires a built catalog and the citation datasets, without OpenSearch.
+
+**Privacy:** your text is processed only in temporary memory on lagen.nu.
+It is discarded after processing, never saved, and never forwarded elsewhere.
+Results are returned only to you. Your original file stays on your device.
 
 ### Search — `GET /api/v1/search`
 

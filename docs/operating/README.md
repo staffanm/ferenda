@@ -143,6 +143,23 @@ silently falling back — a typo must never disable auth quietly.
 
 ### Citation coverage for the API
 
+`POST /api/v1/citations/extract` accepts extracted document text as JSON.
+It requires a built catalog and `artifact/dom/casenumbers.json` (`lagen dv casenumbers`).
+Allow POST and JSON preflight requests through the reverse proxy.
+The application limits request bodies to 2,000,000 bytes and text to 250,000 characters.
+It processes text only in temporary memory, releases parser state after each request,
+and sends `Cache-Control: no-store`. It never saves or forwards submitted text.
+The extraction route disables nginx request/response buffering, caching and storage.
+Deploy that proxy configuration with the API. Keep bodies out of logs and tracing;
+the application logs only error types and code locations on extraction failures.
+The same memory-only requirement applies to host swap and crash dumps.
+Ordinary access metadata may still be recorded; clients must disclose the text transfer.
+Extraction runs synchronously in a worker thread. Dense citation lists need longer timeouts:
+a local stress check takes about 28 seconds for 92,000 characters with 3,000 citations.
+The grammar scan accounts for most of that time. This does not meet the PRD's
+two-second target for such inputs. Do not divide a document into arbitrary requests
+to hide latency, since references can depend on earlier context.
+
 `ferenda/lib/data/citation_series.json` defines the resolver's coverage and
 publication rules. Swedish report series have separate complete intervals.
 Other Swedish, EU and international collections have recognition and
