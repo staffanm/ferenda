@@ -2260,3 +2260,39 @@ def test_title_is_none_where_the_masthead_kept_no_subject():
     assert fp._states_a_subject("Domstolsverkets föreskrifter om upphävande "
                                 "av vissa föreskrifter i")
     assert not fp._states_a_subject("Strålsäkerhetsmyndighetens föreskrifter om")
+
+
+def test_masthead_furniture_is_not_removed_from_inside_a_parenthesis():
+    # SJVFS prints its own designation as a running header, so it is furniture
+    # by construction. Removing every occurrence of it blanked the designation
+    # inside the title's own reference -- SJVFS 2019:1's "(SJVFS 2004:39)" read
+    # "( 2004:39)" -- which lost the document its ändrar target. LIVSFS 2005:10
+    # lost a digit the same way, "(SLVFS 2001:30)" reading "(SLVFS 2001:0)".
+    blocks = [Block("rubrik", "SJVFS", 1),
+              Block("rubrik", "Föreskrifter om ändring i Statens jordbruksverks "
+                              "föreskrifter (SJVFS 2004:39) om EG-gödselmedel;", 1),
+              Block("stycke", "beslutade den 14 februari 2019.", 1),
+              Block("rubrik", "SJVFS", 2),
+              Block("paragraf", "1 § Dessa föreskrifter gäller.", 2, num="1")]
+    assert "(SJVFS 2004:39)" in fp.clean_masthead(blocks, 3)
+    assert title_from_masthead(blocks, 3) == \
+        ("Föreskrifter om ändring i Statens jordbruksverks föreskrifter "
+         "(SJVFS 2004:39) om EG-gödselmedel")
+
+
+def test_a_repeal_target_the_second_column_split_is_still_read():
+    # FFFS 2017:19 prints "Utkom från trycket / den 17 november 2017" beside its
+    # title, and two-column extraction drops it inside the designation:
+    # "(FFFS den 17 november 2017 2011:37)" names no regulation at all. The
+    # repeal noun form is read from the cleaned masthead as well as the raw one.
+    raw = ("Finansinspektionens författningssamling Föreskrifter Utkom från trycket "
+           "om upphävande av Finansinspektionens föreskrifter (FFFS den 17 november "
+           "2017 2011:37) om rapportering av likviditetsrisker; beslutade den 13 "
+           "november 2017.")
+    repaired = ("Föreskrifter om upphävande av Finansinspektionens föreskrifter "
+                "(FFFS 2011:37) om rapportering av likviditetsrisker; beslutade.")
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    assert _uris(extract_metadata("", raw, parser, fs="fffs")["upphaver"]) == []
+    assert _uris(extract_metadata("", raw, parser, fs="fffs",
+                                  repaired=repaired)["upphaver"]) == \
+        ["https://lagen.nu/fffs/2011:37"]

@@ -881,12 +881,21 @@ def _repeal_targets(target, fs):
     return uris
 
 
-def extract_metadata(text, declaration, parser, fs=None):
+def extract_metadata(text, declaration, parser, fs=None, repaired=None):
     """Best-effort masthead facts from the regulation's plain text. ``text`` is
     the whole document (ikraftträdande sits at the end, the rest up front);
     ``declaration`` is what the document says it *is*, per
     :func:`role_declaration`, which decides which of its ikraftträdande
-    sentences is its own."""
+    sentences is its own.
+
+    ``repaired`` is the same declaration read out of :func:`clean_masthead`,
+    and only the repeal noun form is read from it as well. A two-column masthead
+    drops the second column inside the first one's sentence, which can split a
+    designation in half: FFFS 2017:19 declares "upphävande av Finansinspektionens
+    föreskrifter (FFFS den 17 november 2017 2011:37)", naming no regulation at
+    all. The cleaned copy is not used for anything else, because the same
+    cleaning can mangle a masthead whose running furniture is table debris
+    (LVFS 2011:16), and the raw declaration still states the amendment."""
     meta = {
         "beslutsdatum": _first_date(RE_BESLUTAD, text),
         "utkomFranTryck": _first_date(RE_UTKOM, text),
@@ -964,8 +973,9 @@ def extract_metadata(text, declaration, parser, fs=None):
     # way: "upphävande av X (HSLF-FS 2019:43) om ändring i Y (HSLF-FS 2019:32)"
     # repeals the amendment X, and Y stays in force
     clauses += [(RE_ANDRING.split(m.group(1))[0],
-                 m.group(0) + " " + declaration[m.end():m.end() + REPEAL_DATE_WINDOW])
-                for m in RE_UPPHAVANDE.finditer(declaration)]
+                 m.group(0) + " " + decl[m.end():m.end() + REPEAL_DATE_WINDOW])
+                for decl in ([declaration, repaired] if repaired else [declaration])
+                for m in RE_UPPHAVANDE.finditer(decl)]
     upphaver = {}
     for target, around in clauses:
         datum = repeal_date(around)
@@ -1472,6 +1482,52 @@ def undouble(title):
     return title
 
 
+def _outside_parens(text, repl):
+    """`repl` applied to every part of `text` that stands outside a
+    parenthesis, the parenthesised spans passed through untouched."""
+    out, at = [], 0
+    for m in RE_TITLE_PARENS.finditer(text):
+        out.append(repl(text[at:m.start()]))
+        out.append(m.group(0))
+        at = m.end()
+    out.append(repl(text[at:]))
+    return "".join(out)
+
+
+def clean_masthead(blocks, start):
+    """The masthead (`blocks[:start]`) as one line, with its running furniture
+    and its standing text removed and its wrapped lines closed.
+
+    Two-column extraction interleaves the columns, so the second column lands
+    inside a sentence of the first. FFFS 2017:19 prints "Utkom från trycket den
+    17 november 2017" beside its own title, and the joined text reads
+    "upphävande av Finansinspektionens föreskrifter (FFFS den 17 november 2017
+    2011:37) om rapportering …" -- a designation that matches nothing, so the
+    repeal it declares was never recorded. Both the document's title and its
+    role declaration are read out of this."""
+    # repaired twice: once joined, and once more after the column headers are
+    # gone, since one can land between a designation and its number
+    # ("(SLVFS Utkom från trycket 1994: 13)", SLVFS 1998:41)
+    runs = running_furniture(blocks)
+
+    def strip_runs(segment):
+        for run in runs:
+            segment = segment.replace(run, " ")
+        return segment
+
+    # outside the parentheses only. A run is often the agency's own designation
+    # or a bare page number, and an ändringsförfattning names the regulation it
+    # amends inside a parenthesis, so blanket removal ate the reference itself:
+    # SJVFS 2019:1's "(SJVFS 2004:39)" read "( 2004:39)" and LIVSFS 2005:10's
+    # "(SLVFS 2001:30)" read "(SLVFS 2001:0)", which lost each document its
+    # ändrar target. A column header that falls inside a parenthesis is removed
+    # there by `_strip_boilerplate`, which knows what a column header looks like.
+    masthead = _outside_parens(" ".join(_full_text(blocks[:start]).split()),
+                               strip_runs)
+    return join_wrapped(normalise(_repair_ocr_text(_strip_boilerplate(
+        _repair_ocr_text(masthead)))))
+
+
 def title_from_masthead(blocks, start):
     """The document's own title, read from the printed masthead -- '<Agency>s
     föreskrifter om …' up to the semicolon or the beslutade clause -- or None
@@ -1480,17 +1536,9 @@ def title_from_masthead(blocks, start):
     The masthead is `blocks[:start]`, not the operative body: this used to search
     the first blocks *past* `_body_start`, where the title has already been left
     behind, so it found one only for the föreskrifter whose body happens to
-    repeat it. The blocks are joined, and the standing masthead text deleted,
-    before matching: two-column extraction interleaves the columns, so neither
-    block holds the whole sentence and the second column lands inside it."""
-    # repaired twice: once joined, and once more after the column headers are
-    # gone, since one can land between a designation and its number
-    # ("(SLVFS Utkom från trycket 1994: 13)", SLVFS 1998:41)
-    masthead = " ".join(_full_text(blocks[:start]).split())
-    for run in running_furniture(blocks):
-        masthead = masthead.replace(run, " ")
-    masthead = join_wrapped(normalise(_repair_ocr_text(_strip_boilerplate(
-        _repair_ocr_text(masthead)))))
+    repeat it. It is read through :func:`clean_masthead`, which is what puts the
+    title's own sentence back together."""
+    masthead = clean_masthead(blocks, start)
     for word in RE_TITLE_TYPE.finditer(masthead):
         head = _agency_possessive(masthead[:word.start()].rstrip())
         rest = masthead[word.end():word.end() + TITLE_MAX]
@@ -1559,7 +1607,10 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     # a scan of the blocks alone would lose the very relation it exists to find
     meta = extract_metadata(_repair_ocr_text("\n".join([_full_text(blocks)]
                                                        + [text for _mark, text in notes])),
-                            role_declaration(masthead, harvest_title), parser, fs=fs)
+                            role_declaration(masthead, harvest_title), parser,
+                            fs=fs,
+                            repaired=role_declaration(clean_masthead(blocks, start),
+                                                      harvest_title))
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
     meta["publisher"] = extract_publisher(masthead or _full_text(blocks))
