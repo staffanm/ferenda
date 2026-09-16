@@ -122,8 +122,15 @@ def load_jo_arsberattelse(path=JO_ARSBERATTELSE):
 
 def load_fs_series(path=FS_SERIES):
     """The hand-edited författningssamling registry: {fs slug: {designation,
-    title, successor?}}. A pure JSON load with no source dependency, so the
-    facet scheme and the browse renderer read it straight from here."""
+    title, successor?, from?, until?, number_form?}}. A pure JSON load with no
+    source dependency, so the facet scheme and the browse renderer read it
+    straight from here.
+
+    `successor`, `from` and `until` place a series in its own chain: the slug
+    that took over, and the years the series ran. `number_form` names a series
+    that numbers its documents its own way -- Migrationsverket prints the
+    löpnummer before the årsutgåva -- and is the one key here that changes how
+    a reference parses."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 

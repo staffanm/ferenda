@@ -50,7 +50,7 @@
   "mcffs": {"designation": "MCFFS", "title": "Myndigheten för civilt försvars författningssamling"},
   "mdffs": {"designation": "MDFFS", "title": "Myndigheten för digital förvaltnings författningssamling"},
   "memyfs": {"designation": "MEMYFS", "title": "Mediemyndighetens författningssamling"},
-  "migrfs": {"designation": "MIGRFS", "title": "Migrationsverkets författningssamling"},
+  "migrfs": {"designation": "MIGRFS", "title": "Migrationsverkets författningssamling", "number_form": "lopnummer/arsutgava"},
   "mprtfs": {"designation": "MPRTFS", "title": "Myndigheten för press, radio och tv:s författningssamling", "successor": "memyfs"},
   "mrtvfs": {"designation": "MRTVFS", "title": "Myndigheten för radio och tv:s författningssamling", "successor": "mprtfs"},
   "msbfs": {"designation": "MSBFS", "title": "Myndigheten för samhällsskydd och beredskaps författningssamling", "successor": "mcffs"},

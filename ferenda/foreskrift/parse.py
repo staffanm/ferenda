@@ -377,6 +377,25 @@ RE_TITLE_DESIGNATION = re.compile(
 RE_BARE_OWN_REF = re.compile(
     r"(?:föreskrift(?:en|er(?:na)?)(?:\s+och\s+allmänna\s+råd)?|kungörelsen?)"
     r"[^()]*\((\d{4}):(\d+)\)")
+# One agency reinvented the citation: Migrationsverket numbers its own
+# föreskrifter the other way round, the lopnummer before the year.
+# "Migrationsverkets föreskrift (19/2010) med bemyndigande för Sveriges
+# ambassad i Islamabad …" (MIGRFS 2013:1) is MIGRFS 2010:19, and ten repeal
+# notices name their target in no other way. Read only for a series whose
+# series.json row declares `number_form`, so the föreskrift parser keeps one
+# spelling of a reference and the exception stays where the exception is.
+# Bounded and guarded even there, unlike RE_BARE_OWN_REF, because "N/YYYY" is
+# the ordinary way to cite an EU act and Migrationsverket cites plenty of them.
+#: the `number_form` values series.json may declare. None is the ordinary
+#: årsutgåva:löpnummer every other samling prints, and a value outside this set
+#: is a typo in a hand-edited registry: it would disable the reversed form with
+#: no signal, and the ten MIGRFS repeal notices that name their target in no
+#: other way would lose it again.
+NUMBER_FORMS = (None, "lopnummer/arsutgava")
+RE_BARE_OWN_REF_REVERSED = re.compile(
+    r"\bföreskrift(?:en|er(?:na)?)?(?:\s+och\s+allmänna\s+råd)?"
+    r"(?![^()]{0,40}förordning)[^()]{0,40}?\((\d{1,3})/((?:19|20)\d{2})\)",
+    re.IGNORECASE)
 # the issuing agency, read from the masthead (searched over a whitespace-collapsed
 # copy, since two-column extraction breaks the lines apart). Three signals, tried
 # in order:
@@ -878,6 +897,13 @@ def _repeal_targets(target, fs):
         # "föreskrifter (1993:21)": SLVFS, since LIVSFS began in 2002)
         uris |= {regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
                  for y, n in RE_BARE_OWN_REF.findall(target)}
+        number_form = _FS_SERIES.get(fs, {}).get("number_form")
+        assert number_form in NUMBER_FORMS, \
+            "%s: series.json number_form %r is not one of %s" % (
+                fs, number_form, sorted(f for f in NUMBER_FORMS if f))
+        if number_form == "lopnummer/arsutgava":
+            uris |= {regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
+                     for n, y in RE_BARE_OWN_REF_REVERSED.findall(target)}
     return uris
 
 

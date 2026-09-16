@@ -28,7 +28,7 @@ from ferenda.foreskrift.parse import (
     title_from_masthead,
 )
 from ferenda.foreskrift.render import _andrad_genom, _konsoliderad_banner
-from ferenda.lib import catalog
+from ferenda.lib import catalog, datasets
 from ferenda.lib.lagrum import sfs_parser
 from ferenda.lib.page import Site
 from ferenda.lib.pdftext import Para
@@ -2296,3 +2296,30 @@ def test_a_repeal_target_the_second_column_split_is_still_read():
     assert _uris(extract_metadata("", raw, parser, fs="fffs",
                                   repaired=repaired)["upphaver"]) == \
         ["https://lagen.nu/fffs/2011:37"]
+
+
+def test_a_reversed_lopnummer_year_reference_is_read_for_that_series_only():
+    # Migrationsverket numbers its föreskrifter "N/YYYY". MIGRFS 2013:1 repeals
+    # "Migrationsverkets föreskrift (19/2010)", which is MIGRFS 2010:19, and ten
+    # repeal notices named their target in no other way. The form is read only
+    # for a series whose series.json row declares it, so the exception does not
+    # spread to the 100-odd samlingar that cite a föreskrift the usual way.
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    title = ("%s föreskrifter om upphävande av Migrationsverkets "
+             "föreskrift (19/2010) med bemyndigande för Sveriges ambassad i "
+             "Islamabad att bevilja uppehållstillstånd för studier")
+    assert datasets.load_fs_series()["migrfs"]["number_form"] == "lopnummer/arsutgava"
+    assert _uris(extract_metadata("", title % "Migrationsverkets", parser,
+                                  fs="migrfs")["upphaver"]) == \
+        ["https://lagen.nu/migrfs/2010:19"]
+    # the same sentence under a series that declares no number_form
+    assert "number_form" not in datasets.load_fs_series()["msbfs"]
+    assert _uris(extract_metadata("", title % "Myndighetens", parser,
+                                  fs="msbfs")["upphaver"]) == []
+    # and an EU act is cited the same way, which is why the pattern is guarded
+    # even for Migrationsverket: MSBFS 2018:3 says "prestandadeklaration
+    # upprättad enligt EU-förordning (305/2011)"
+    eu = ("Migrationsverkets föreskrifter om upphävande av föreskrifter om "
+          "cisterner vars egenskaper framgår av prestandadeklaration upprättad "
+          "enligt EU-förordning (305/2011)")
+    assert _uris(extract_metadata("", eu, parser, fs="migrfs")["upphaver"]) == []
