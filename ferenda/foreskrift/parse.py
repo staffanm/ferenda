@@ -423,6 +423,48 @@ RE_TITLE_DESIGNATION = re.compile(
 # not: "föreskrift om övertagande av uppgiften enligt 7 a §
 # förvaltningsprocesslagen (1971:291)" (KVVFS 2005:7) describes a regulation
 # and names an act.
+# Whose samling a bare number belongs to when the sentence names an agency.
+# A repeal often cites a regulation by agency and bare number, with no
+# designation: EIFS 2012:4 repeals "Närings- och teknikutvecklingsverkets
+# föreskrifter och allmänna råd (1995:1)", which is NUTFS 1995:1 and not the
+# eifs/1995:1 the document's own samling would give. Each series.json title
+# opens with its agency's possessive, so the name in the sentence is matched
+# against those.
+#
+# Three guards, each measured against a real sentence the looser rule got wrong:
+#
+#   * the possessive stands immediately before the type word, and the number
+#     immediately after it. "Boverkets föreskrifter till 19 § lagen (1988:786)"
+#     (RFFS 1993:8) and "Skatteverkets föreskrifter om säkerhet enligt lagen
+#     (1994:1563)" (RSFS 1997:5) put an *act* in the brackets;
+#   * no designation stands between them. HSLF-FS 2026:27 prints
+#     "Socialstyrelsens föreskrifter HSLF-FS (2023:33)", whose number is the
+#     printed samling's, not Socialstyrelsen's own;
+#   * the name owns one samling. "Riksarkivets" opens the title of both RA-FS
+#     and RA-MS, and RA-FS is the general series while RA-MS is specific to one
+#     agency, so a bare "Riksarkivets föreskrifter (2019:12)" in an RA-FS
+#     document is that same series. An ambiguous name therefore keeps the
+#     document's own samling, which is what it already answered.
+#
+# Corpus-wide this corrects EIFS 2012:4 -> nutfs/1995:1, TRVFS 2015:3 ->
+# vvfs/2001:118, eight ÅFS documents -> raafs, and SNFS 1993:7 -> sjofs/1985:24.
+RE_NAMED_OWN_REF = re.compile(
+    r"([A-ZÅÄÖ][\w\-]*(?:\s+(?:och|för)?\s*[\wåäöA-ZÅÄÖ\-]+){0,4}s)\s+"
+    r"(?:föreskrift(?:en|er(?:na)?)(?:\s+och\s+allmänna\s+råd)?|kungörelsen?)"
+    r"\s*\((\d{4}):(\d+)\)")
+
+
+def _series_by_possessive():
+    """{agency possessive: {fs, …}} off each series title's opening words."""
+    owners: dict[str, set[str]] = {}
+    for fs, row in _FS_SERIES.items():
+        m = re.match(r"(.*?s)\s+(?:författningssamling|myndighetsspecifika)",
+                     row.get("title") or "")
+        if m:
+            owners.setdefault(m.group(1), set()).add(fs)
+    return owners
+
+
 RE_BARE_OWN_REF = re.compile(
     r"(?:föreskrift(?:en|er(?:na)?)(?:\s+och\s+allmänna\s+råd)?|kungörelsen?)"
     r"[^()]*\((\d{4}):(\d+)\)")
@@ -944,8 +986,14 @@ def _repeal_targets(target, fs):
         # series (RE_BARE_OWN_REF), as it does in an ändring title -- or its
         # predecessor when the year predates the series (LIVSFS 2014:4 repeals
         # "föreskrifter (1993:21)": SLVFS, since LIVSFS began in 2002)
-        uris |= {regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
-                 for y, n in RE_BARE_OWN_REF.findall(target)}
+        named = {(m.group(2), m.group(3)): m.group(1)
+                 for m in RE_NAMED_OWN_REF.finditer(target)}
+        for y, n in RE_BARE_OWN_REF.findall(target):
+            owners = _SERIES_BY_POSSESSIVE.get(named.get((y, n)) or "", {fs})
+            # an ambiguous name, or one this document's own series answers,
+            # keeps the document's own samling
+            owner = fs if len(owners) != 1 else next(iter(owners))
+            uris.add(regulation_uri(_series_for_year(owner, int(y)), y, str(int(n))))
         number_form = _FS_SERIES.get(fs, {}).get("number_form")
         assert number_form in NUMBER_FORMS, \
             "%s: series.json number_form %r is not one of %s" % (
@@ -1773,6 +1821,8 @@ def masthead_amendments(masthead, fs, base_ars, base_lop):
 
 
 _FS_SERIES = datasets.load_fs_series()
+#: {agency possessive: {fs, …}}, for :data:`RE_NAMED_OWN_REF`
+_SERIES_BY_POSSESSIVE = _series_by_possessive()
 
 
 def _ref_uri(designation, year, lopnummer):

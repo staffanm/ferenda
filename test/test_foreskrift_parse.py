@@ -17,6 +17,7 @@ from ferenda.foreskrift.parse import (
     _dedupe_bemyndigande,
     _ingress_start,
     _iso,
+    _repeal_targets,
     amendment_uri,
     andrar_target,
     classify,
@@ -2439,3 +2440,50 @@ def test_a_repeal_item_ends_at_andring_unless_a_new_agency_is_named():
         "(SKSFS 2010:2) och allmänna råd om ändring i Skogsstyrelsens "
         "föreskrifter och allmänna råd (SKSFS 1993:2) till skogsvårdslagen",
         "sksfs") == ["https://lagen.nu/sksfs/2010:2"]
+
+
+def test_a_bare_reference_goes_to_the_samling_the_sentence_names():
+    # A repeal often cites a regulation by agency and bare number, with no
+    # designation. EIFS 2012:4 repeals "Närings- och teknikutvecklingsverkets
+    # föreskrifter och allmänna råd (1995:1)", which is NUTFS 1995:1 -- the
+    # document's own samling gave eifs/1995:1, which has never existed.
+    assert _repeal_targets(
+        "upphävs Närings- och teknikutvecklingsverkets föreskrifter och "
+        "allmänna råd (1995:1) om mätning", "eifs") == {
+            "https://lagen.nu/nutfs/1995:1"}
+    assert _repeal_targets(
+        "upphävs Vägverkets föreskrifter (2001:118) om vägmärken", "trvfs") == {
+            "https://lagen.nu/vvfs/2001:118"}
+    assert _repeal_targets(
+        "upphävs Sjöfartsverkets kungörelse (1985:24) om brandskydd", "snfs") == {
+            "https://lagen.nu/sjofs/1985:24"}
+    # no name, so the document's own samling answers, as it always has
+    assert _repeal_targets("upphävs föreskrifterna (1993:21) om dricksvatten",
+                           "livsfs") == {"https://lagen.nu/slvfs/1993:21"}
+
+
+def test_a_named_bare_reference_is_refused_where_the_brackets_hold_something_else():
+    # Three shapes the name alone would get wrong, each a real sentence.
+    # An act in the brackets, twice:
+    assert _repeal_targets("tillämpas Boverkets föreskrifter till 19 § lagen "
+                           "(1988:786) om bostadsbidrag", "rffs") == {
+                               "https://lagen.nu/rffs/1988:786"}
+    assert _repeal_targets("Skatteverkets föreskrifter om säkerhet enligt lagen "
+                           "(1994:1563) om tobaksskatt", "rsfs") == {
+                               "https://lagen.nu/rsfs/1994:1563"}
+    # a printed designation, whose samling owns the number rather than the
+    # agency named beside it
+    assert _repeal_targets("Socialstyrelsens föreskrifter HSLF-FS (2023:33) om "
+                           "uppgiftsskyldighet", "hslffs") == {
+                               "https://lagen.nu/hslffs/2023:33"}
+
+
+def test_an_agency_that_owns_two_samlingar_keeps_the_documents_own():
+    # "Riksarkivets" opens the title of both RA-FS and RA-MS. RA-FS is the
+    # general series and RA-MS is specific to one agency, so a bare
+    # "Riksarkivets föreskrifter (2019:12)" in an RA-FS document is that same
+    # series. The name cannot decide, so the document's own samling does.
+    named = "upphävs Riksarkivets föreskrifter (2019:12) om gallring"
+    assert _repeal_targets(named, "rafs") == {"https://lagen.nu/rafs/2019:12"}
+    assert _repeal_targets(named, "rams") == {"https://lagen.nu/rams/2019:12"}
+    assert fp._SERIES_BY_POSSESSIVE["Riksarkivets"] == {"rafs", "rams"}
