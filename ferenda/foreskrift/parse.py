@@ -189,7 +189,7 @@ ERSATTER_WINDOW = 1800      # longest real clause seen is SJVFS 2021:48's ~1 500
 # never reached (RFS 2002:9).
 RE_ERSATTER_END = re.compile(
     r"(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])"
-    r"|\n\s*\n|_{5,}")
+    r"|\n\s*\n|[_–]{5,}")
 
 
 def ersatter_clauses(text):
@@ -236,7 +236,7 @@ RE_UPPHAVS_BEFORE = re.compile(
 # the last paragraf of the body, whose "23 §" then reads as a repeal of a
 # provision and drops the regulation the clause names (RIFS 2018:2)
 RE_SENTENCE_START = re.compile(r"(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])"
-                               r"|_{5,}")
+                               r"|[_–]{5,}")
 # a repeal of a *provision* names one before the regulation: "att 17 § verkets
 # föreskrifter (LIVSFS 2005:20) … ska upphöra att gälla" (LIVSFS 2011:8),
 # "bilaga 2 till …", "övergångsbestämmelserna till …" -- the regulation stays
@@ -298,7 +298,7 @@ RE_UPPHOR_LIST = re.compile(
     # den 15 september 2008.\nRikspolisstyrelsens allmänna råd (RPSFS
     # 2000:13) om …", RPSFS 2008:8)
     r"(?::|nämligen|enligt\s+följande\.|\.\s*\n)\s*(.{0,12000}?)"
-    r"(?=\n\s*\n|Dessa\s+föreskrifter\s+träder|_{5,}|$)", re.DOTALL | re.I)
+    r"(?=\n\s*\n|Dessa\s+föreskrifter\s+träder|[_–]{5,}|$)", re.DOTALL | re.I)
 RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-zåäö][.)]|[−•–-])\s)")
 # the enumerated passive: "Genom författningen upphävs 1. Statens jordbruksverks
 # föreskrifter (SJVFS 1999:102) om …, 2. … (SJVFS 2002:98) om …" (SJVFS 2021:48,
@@ -653,7 +653,7 @@ def _split_bullets(block):
 RE_ALLMANNA_RAD = re.compile(r"^Allmänn[at]\s+råd(?:\s+till\s+.+)?$", re.IGNORECASE)
 # the rule of underscores a föreskrift draws above its closing block, and the
 # sentence boundary the closing clause starts after
-RE_SLUTRULE = re.compile(r"_{5,}")
+RE_SLUTRULE = re.compile(r"[_–]{5,}")
 RE_SENTENCE_END = re.compile(r"[.!?]\s+")
 
 
