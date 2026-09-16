@@ -1102,7 +1102,12 @@ def extract_metadata(text, declaration, parser, fs=None, repaired=None):
     upphaver = {}
     for target, around in clauses:
         datum = repeal_date(around)
-        for uri in _repeal_targets(target, fs):
+        uris = _repeal_targets(target, fs)
+        if not uris and re.search(r"\banges\s+i\s+bilaga", target, re.I) and fs:
+            bilaga = re.split(r"\bBilaga\s+till\b", text, flags=re.I)
+            if len(bilaga) > 1:
+                uris = _repeal_targets(bilaga[-1], fs)
+        for uri in uris:
             if upphaver.get(uri) is None:
                 upphaver[uri] = datum
     meta["upphaver"] = [[uri, upphaver[uri]] for uri in sorted(upphaver)]
