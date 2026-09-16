@@ -46,12 +46,14 @@ from collections import defaultdict
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, util
+from ..lib.errors import UpstreamChanged
 from ..lib.harvest import Skip, write_record
 from ..lib.net import BROWSER_UA, is_not_found, request
 from ..lib.util import basefile_slug as slug
@@ -2301,61 +2303,160 @@ TSFS = Agency(
 
 
 # --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # TRVFS (Trafikverket) -- the register is a standalone ASP.NET app
 # (trvfs.ea.trafikverket.se/TRVFS) reached by POSTing the "Sök författnings-
 # samling" form (Ar=Alla) for the whole collection (~670 rows, grund +
 # ändring). Each row links a DocumentHistory family page; enumerate keeps the
 # Grundföreskrift rows, bespoke trv_resolve fetches the family page and
 # downloads its single grundföreskrift PDF (no konsoliderad versions are
-# published) while recording the Ändringsförfattningar as references. The
-# register hosts Trafikverkets föreskrifter and its predecessors Vägverket
-# (VVFS) and Banverket -- the fs is routed off the DocumentHistory id's prefix
-# (bare number = TRVFS; VVFS-prefixed = vvfs). Entries whose id carries a
-# TSFS/SFS prefix are Transportstyrelsen's own samling (harvested separately)
-# or statutes, and are skipped.
+# published) while recording the Ändringsförfattningar as references.
+#
+# The register holds four agencies' samlingar: Trafikverket's own TRVFS and
+# those of the predecessors it absorbed on 2010-04-01 -- Vägverket (VVFS),
+# Trafiksäkerhetsverket (TSVFS, which Vägverket had absorbed in 1993) and
+# Banverket (BVFS). The document *id* does not say which: Trafikverket's app
+# mints a bare "1981-22" for a predecessor document too, so routing off the id
+# prefix filed 103 of 142 harvested documents under trvfs while their own
+# masthead prints VVFS or TSVFS. trvfs/1981:22 is "TSVFS 1981:22 REGLER OM
+# KLASSIFICERING", and its artifact recorded it as repealing tsvfs/1981:22 --
+# itself, under the samling it actually belongs to.
+#
+# What the register does print, in the row below the id, is the issuing agency,
+# and an agency publishes only into its own samling. `trv_designation` reads it
+# in three steps, checked against the masthead of all 142 stored PDFs with zero
+# disagreements:
+#
+#   1. the Rubrik opens with the issuer -- "Trafiksäkerhetsverkets regler
+#      (1981:22) om klassificering" (102 of the 140 bare-numbered
+#      Grundföreskrift rows);
+#   2. a "Bekantgörande i andra hand" opens with its own word, and names the
+#      samling it announces into: "... som upphäver en författning i Vägverkets
+#      författningssamling" (33 rows);
+#   3. neither, so the Ikraftträdande date decides. Trafikverket opened on
+#      2010-04-01, so an earlier document is Vägverket's (5 rows: four central
+#      government förordningar published into VVFS, "Förordning med särskilda
+#      bestämmelser om förarbehörighet ..." = VVFS 1996:1, and one Vägverket
+#      repeal of a Trafiksäkerhetsverket allmänt råd).
+#
+# The date cannot do the whole job, which is why it is the last step: Vägverket
+# and Trafiksäkerhetsverket issued side by side until 1993, and VVFS 1986:1 sits
+# among eight TSVFS of 1981-1992. Step 1 anchors at the *start* of the Rubrik
+# for the same reason -- "Upphävande av Trafiksäkerhetsverkets allmänna råd ..."
+# (2003:76) names TSV and prints VVFS 2003:76 on its masthead. One amendment
+# still comes out wrong: 1985:94's Rubrik names no issuer, so step 3 gives VVFS
+# where the truth is TSVFS. Reading the samling off the parenthesised target
+# instead fixes that one and breaks 2004:144, so it is a net zero.
+#
+# A family page prints a number and a date for each Ändringsförfattning and no
+# title at all, so the listing is the only place those can be routed from: the
+# whole register's id -> designation map rides down on ``DocRef.extra["series"]``
+# for trv_resolve to stamp each amendment reference with. Stamping the base
+# document's own samling on them instead spelled 86 of 88 wrong, including
+# "TRVFS 2006:36" for a Vägverket amendment of a Trafiksäkerhetsverket rule.
+#
+# Entries whose id carries a TSFS/SFS prefix are Transportstyrelsen's own
+# samling (harvested separately) or statutes, and are skipped.
 # --------------------------------------------------------------------------
 
 TRV_POST = {"Dokumentbeteckning": "", "Celexnummer": "", "Ikrafttradandefrom": "",
             "Ikrafttradandetom": "", "Titel": "", "Hastforeskrift": "false",
             "Upphavda": "false", "Ar": "Alla"}
-RE_TRV_ID = re.compile(r"/DocumentHistory/([A-Za-zÅÄÖ]*)\s*(\d{4})-(\d+)$", re.IGNORECASE)
+RE_TRV_ID = re.compile(r"/DocumentHistory/([A-Za-zÅÄÖ]*)(?:\s|%20)*(\d{4})-+(\d+)$",
+                       re.IGNORECASE)
 # fs codes on the register that are not Trafikverket's to store (own samlingar)
 TRV_SKIP_PREFIX = {"TSFS", "SFS"}
+# the agencies that have published into this register, and the samling each
+# one's own documents carry
+TRV_ISSUER_FS = {"Trafikverket": "TRVFS", "Vägverket": "VVFS",
+                 "Trafiksäkerhetsverket": "TSVFS", "Banverket": "BVFS"}
+# longest name first, so "Trafikverket" cannot shadow "Trafiksäkerhetsverket"
+_TRV_ISSUERS = "|".join(sorted(TRV_ISSUER_FS, key=len, reverse=True))
+RE_TRV_ISSUER = re.compile(r"(%s)s\b" % _TRV_ISSUERS)
+RE_TRV_SAMLING = re.compile(r"\bi (%s)s författningssamling" % _TRV_ISSUERS)
+RE_TRV_IKRAFT = re.compile(r"Ikraftträdande\s+(\d{4}-\d{2}-\d{2})")
+# the day Trafikverket opened, so nothing in force before it is a TRVFS
+TRV_OPENED = "2010-04-01"
+
+
+def trv_id(href):
+    """The register's own id for the document a link names, split:
+    ``/DocumentHistory/VVFS2010-38`` -> ``("VVFS", "2010", "38")``, ``/1981-22``
+    -> ``("", "1981", "22")``. None when the href names no document.
+
+    The listing and a family page link the same document by this id, so
+    ``"%s%s:%s" % trv_id(href)`` keys the listing's samling map from the one to
+    the other. 95 of the register's 669 links percent-encode the space after the
+    designation ("TRVTFS%20 2012-3"), and one repeats the separator
+    ("TSFS%20 2012--74"): reading only the unencoded form dropped 3 TRVTFS
+    Grundföreskrift rows and left 15 amendment references unrouted."""
+    m = RE_TRV_ID.search(href)
+    return m and ((m.group(1) or "").upper(), m.group(2), str(int(m.group(3))))
+
+
+def trv_row(tr):
+    """One register row's Rubrik and Ikraftträdande date. The listing is a flat
+    run of one-cell ``<tr>``: the id, then the title, then the date. Every one of
+    the 669 rows prints both, so a row that prints neither is a changed page."""
+    cells = [x.get_text(" ", strip=True) for x in tr.find_next_siblings("tr")[:3]]
+    date = next((m.group(1) for m in map(RE_TRV_IKRAFT.search, cells) if m), None)
+    if not cells or not cells[0] or not date or RE_TRV_IKRAFT.search(cells[0]):
+        raise UpstreamChanged("TRVFS register row %r prints no Rubrik or no "
+                              "Ikraftträdande date" % tr.get_text(" ", strip=True))
+    return cells[0], date
+
+
+def trv_designation(prefix, title, ikrafttradande):
+    """The författningssamling designation one register row's document carries:
+    its id prefix when the id has one, else the agency its Rubrik names, else
+    the samling its Ikraftträdande date puts it in."""
+    if prefix:
+        return prefix
+    issuer = RE_TRV_ISSUER.match(title) or RE_TRV_SAMLING.search(title)
+    if issuer:
+        return TRV_ISSUER_FS[issuer.group(1)]
+    return "TRVFS" if ikrafttradande >= TRV_OPENED else "VVFS"
 
 
 def trv_enumerate(session, agency):
-    """One DocRef per Grundföreskrift in Trafikverkets register, fs routed off
-    the DocumentHistory id prefix (bare = TRVFS, else the predecessor samling)."""
+    """One DocRef per Grundföreskrift in Trafikverkets register, each filed under
+    the samling its own row names, with the whole register's id -> designation
+    map on ``extra["series"]`` for :func:`trv_resolve`."""
     soup = BeautifulSoup(
         request(session, "POST", agency.index_url, data=TRV_POST).text, "html.parser")
+    rows = [(util.href(a), a.find_parent("tr"), trv_id(util.href(a)))
+            for a in soup.select('a[href*="/DocumentHistory/"]')]
+    series = {"%s%s:%s" % ident: trv_designation(ident[0], *trv_row(tr))
+              for _href, tr, ident in rows if tr and ident}
     seen = set()
-    for a in soup.select('a[href*="/DocumentHistory/"]'):
-        tr = a.find_parent("tr")
-        if not tr or "Grundföreskrift" not in tr.get_text():
+    for href, tr, ident in rows:
+        if not tr or not ident or "Grundföreskrift" not in tr.get_text():
             continue
-        href = util.href(a)
-        m = RE_TRV_ID.search(href)
-        if not m:
+        designation = series["%s%s:%s" % ident]
+        if designation in TRV_SKIP_PREFIX:
             continue
-        prefix = (m.group(1) or "TRVFS").upper()
-        if prefix in TRV_SKIP_PREFIX:
-            continue
-        arsutgava, lopnummer = m.group(2), str(int(m.group(3)))
-        doc_fs = util.fold_swedish(prefix).lower()
-        basefile = "%s/%s:%s" % (doc_fs, arsutgava, lopnummer)
+        # the two ids the register gives one document (a bare "2010-38" beside
+        # "VVFS2010-38") now fold onto one basefile, which `seen` keeps once
+        basefile = "%s/%s:%s" % (harvest.series_slug(designation), ident[1], ident[2])
         if basefile in seen:
             continue
         seen.add(basefile)
-        yield DocRef(basefile=basefile, fs=doc_fs,
-                     identifier="%s %s:%s" % (prefix, arsutgava, lopnummer),
-                     url=harvest.absolute(agency.base_url, href))
+        yield DocRef(basefile=basefile, fs=basefile.split("/", 1)[0],
+                     identifier="%s %s:%s" % (designation, ident[1], ident[2]),
+                     url=harvest.absolute(agency.base_url, href),
+                     extra={"series": series})
 
 
 def trv_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
     """Fetch a DocumentHistory family page: download the grundföreskrift PDF and
     record its Ändringsförfattningar as amendment references (Trafikverket
-    publishes no konsoliderad versions)."""
+    publishes no konsoliderad versions).
+
+    An amendment is designated from the listing's ``extra["series"]`` map, not
+    from the base regulation's samling: a base outlives the agency that issued
+    it, so VVFS 2006:36 amends TSVFS 1981:22."""
     fs = ref.fs or agency.fs
+    series = ref.extra.get("series", {})
     landing = request(session, "GET", ref.url).text
     soup = BeautifulSoup(landing, "html.parser")
     # the family page is a table of label/value <td> pairs; the title sits in the
@@ -2364,11 +2465,23 @@ def trv_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=Non
                   if td.get_text(strip=True) == "Rubrik"), None)
     cell = label.find_next_sibling("td") if label else None
     title = cell.get_text(" ", strip=True) if cell else None
-    amendments = [{"identifier": "%s %s" % (fs.upper(), am.get_text(strip=True)),
-                   "url": harvest.absolute(agency.base_url, am["href"])}
-                  for am in soup.select('a[href*="/DocumentHistory/"]')]
-    files = {"regulation": None, "consolidation": [], "amendment": amendments,
-             "memo": [], "attachment": []}
+    # A family page prints a number and a date for each Ändringsförfattning and
+    # no title at all, so its samling is the one the listing gave that id. An
+    # amendment the listing does not carry (the harvest POSTs Upphavda=false)
+    # keeps its own id prefix, and a bare unlisted id the base's samling.
+    amendments: list[dict[str, str]] = []
+    for am in soup.select('a[href*="/DocumentHistory/"]'):
+        ident = trv_id(am["href"])
+        if not ident:
+            continue
+        prefix, arsutgava, lopnummer = ident
+        amendments.append(
+            {"identifier": "%s %s:%s"
+                           % (series.get("%s%s:%s" % ident) or prefix or fs.upper(),
+                              arsutgava, lopnummer),
+             "url": harvest.absolute(agency.base_url, am["href"])})
+    files: dict[str, Any] = {"regulation": None, "consolidation": [],
+                             "amendment": amendments, "memo": [], "attachment": []}
     pdf = soup.select_one('a[href*="/TRVFS/pdf/"][href$=".pdf"]')
     if pdf:
         url = harvest.absolute(agency.base_url, pdf["href"])

@@ -27,6 +27,7 @@ from ferenda.foreskrift.harvest import (
 # otherwise shadow the imported function
 from ferenda.foreskrift.harvest import ref as _ref
 from ferenda.foreskrift.parse import extract_publisher
+from ferenda.lib import datasets, lagrum
 from ferenda.lib.harvest import guarded_enumerate, write_record
 from ferenda.lib.util import record_path
 
@@ -982,7 +983,6 @@ def test_every_registered_samling_cites_itself_the_way_it_is_printed():
     # for the 40-odd samlingar whose slug is their designation and wrong for
     # the ones carrying a Swedish vowel: ELSÄK-FS was cited as "ELSAKFS".
     from ferenda.foreskrift.model import printed_designation
-    from ferenda.lib import datasets
     for fs, row in datasets.load_fs_series().items():
         designation = row.get("designation")
         if not designation:
@@ -1332,3 +1332,130 @@ def test_uhrfs_attaches_a_konsoliderad_version_to_the_base_it_names(monkeypatch)
     assert [r.basefile for r in refs] == ["uhrfs/2015:3"]
     assert [c["url"] for c in refs[0].extra["consolidations"]] == [
         "https://www.uhr.se/globalassets/uhrfs/konsoliderad-version-2013_1--2023_2.pdf"]
+
+
+def test_trv_designation_reads_the_issuing_agency_not_the_id():
+    # The register's bare ids say nothing about the samling, so the Rubrik's own
+    # issuer decides, then the date. Every string here is a live register row.
+    row = agencies.trv_designation
+    # 1. the Rubrik opens with the issuing agency
+    assert row("", "Trafiksäkerhetsverkets regler (1981:22) om klassificering",
+               "1981-06-01") == "TSVFS"
+    assert row("", "Vägverkets föreskrifter (1986:1) om färjning vid allmän färjled",
+               "1986-04-01") == "VVFS"
+    # ... which beats the date: 2010:38 took effect the day Trafikverket opened
+    assert row("", "Vägverkets föreskrifter om Bärighetsklasser i Hallands län",
+               "2010-04-01") == "VVFS"
+    # 2. a bekantgörande opens with its own word and names the samling it
+    #    announces into
+    assert row("", "Bekantgörande i andra hand av författning som upphäver en "
+                   "författning i Vägverkets författningssamling", "2009-07-01") == "VVFS"
+    # 3. neither, so Trafikverket's opening date decides. VVFS 1996:1 is a
+    #    central government förordning published into Vägverkets samling
+    assert row("", "Förordning med särskilda bestämmelser om förarbehörighet",
+               "1996-02-01") == "VVFS"
+    assert row("", "Förordning om något", "2011-01-01") == "TRVFS"
+    # step 1 anchors at the start, so a repeal naming another agency's råd stays
+    # with the agency that issued it (VVFS 2003:76 on its own masthead)
+    assert row("", "Upphävande av Trafiksäkerhetsverkets allmänna råd om uppsikt "
+                   "över övningskörning med motorcykel (15-04)", "2003-10-01") == "VVFS"
+    # an id that carries its own prefix needs none of it
+    assert row("VVFS", "Vägverkets föreskrifter om Bärighetsklasser", "2010-04-01") == "VVFS"
+
+
+def test_trv_id_reads_the_percent_encoded_and_doubled_separators():
+    assert agencies.trv_id("/TRVFS/Home/DocumentHistory/1981-22") == ("", "1981", "22")
+    assert agencies.trv_id("/TRVFS/Home/DocumentHistory/VVFS2010-38") \
+        == ("VVFS", "2010", "38")
+    # 95 of the register's 669 links percent-encode the space, and one repeats
+    # the separator; reading only the unencoded form dropped them all
+    assert agencies.trv_id("/TRVFS/Home/DocumentHistory/TRVTFS%202012-3") \
+        == ("TRVTFS", "2012", "3")
+    assert agencies.trv_id("/TRVFS/Home/DocumentHistory/TSFS%202012--74") \
+        == ("TSFS", "2012", "74")
+    assert agencies.trv_id("/TRVFS/Home/Index") is None
+
+
+def _trv_row(href, kind, rubrik, ikraft):
+    return ('<tr><td><a href="%s">x</a> %s</td></tr>'
+            '<tr><td>%s</td></tr><tr><td>Ikraftträdande %s</td></tr>'
+            % (href, kind, rubrik, ikraft))
+
+
+def test_trv_enumerate_files_each_row_under_the_samling_its_rubrik_names(monkeypatch):
+    # Routing off the DocumentHistory id put every bare-numbered row under
+    # trvfs: 93 of the 142 harvested documents print VVFS on their own masthead
+    # and 9 print TSVFS, and Trafikverket did not exist before 2010-04-01.
+    page = "<table>" + "".join([
+        _trv_row("/TRVFS/Home/DocumentHistory/1981-22", "Grundföreskrift",
+                 "Trafiksäkerhetsverkets regler (1981:22) om klassificering", "1981-06-01"),
+        _trv_row("/TRVFS/Home/DocumentHistory/1986-1", "Grundföreskrift",
+                 "Vägverkets föreskrifter (1986:1) om färjning", "1986-04-01"),
+        _trv_row("/TRVFS/Home/DocumentHistory/2006-36", "Ändringsföreskrift",
+                 "Vägverkets föreskrifter om ändring i Trafiksäkerhetsverkets regler",
+                 "2006-09-01"),
+        _trv_row("/TRVFS/Home/DocumentHistory/2010-3", "Grundföreskrift",
+                 "Trafikverkets föreskrifter om vägmärken", "2010-06-01"),
+        _trv_row("/TRVFS/Home/DocumentHistory/VVFS2010-38", "Grundföreskrift",
+                 "Vägverkets föreskrifter om Bärighetsklasser", "2010-04-01"),
+        _trv_row("/TRVFS/Home/DocumentHistory/TRVTFS%202012-3", "Grundföreskrift",
+                 "Trafikverkets tekniska föreskrifter om broar", "2012-04-01"),
+        _trv_row("/TRVFS/Home/DocumentHistory/TSFS%202021-107", "Grundföreskrift",
+                 "Transportstyrelsens föreskrifter om något", "2021-12-01")]) + "</table>"
+    monkeypatch.setattr(agencies, "request", lambda *a, **kw: SimpleNamespace(text=page))
+    refs = list(agencies.TRVFS.enumerate(None, agencies.TRVFS))
+    assert [(r.basefile, r.identifier, r.fs) for r in refs] == [
+        ("tsvfs/1981:22", "TSVFS 1981:22", "tsvfs"),
+        ("vvfs/1986:1", "VVFS 1986:1", "vvfs"),
+        ("trvfs/2010:3", "TRVFS 2010:3", "trvfs"),
+        ("vvfs/2010:38", "VVFS 2010:38", "vvfs"),
+        ("trvtfs/2012:3", "TRVTFS 2012:3", "trvtfs")]
+    # Transportstyrelsen's own samling is harvested separately
+    assert not any(r.basefile.startswith("tsfs/") for r in refs)
+    # the whole listing's samling map rides along for trv_resolve, amendment
+    # rows included -- VVFS 2006:36 amends a Trafiksäkerhetsverket rule
+    assert refs[0].extra["series"]["2006:36"] == "VVFS"
+    assert refs[0].extra["series"]["1981:22"] == "TSVFS"
+
+
+def test_trv_resolve_designates_each_amendment_from_the_listing(tmp_path, monkeypatch):
+    # A family page prints a number and a date per Ändringsförfattning and no
+    # title, so only the listing can say which samling each belongs to. Stamping
+    # the base regulation's samling on them spelled 86 of the corpus's 88
+    # references wrong, and a percent-encoded id doubled the designation
+    # ("TRVFS TSFS 2021:106").
+    family = ('<table><tr><td>Rubrik</td>'
+              '<td>Trafiksäkerhetsverkets regler om klassificering</td></tr></table>'
+              '<a href="/TRVFS/Home/DocumentHistory/1983-31">1983:31</a>'
+              '<a href="/TRVFS/Home/DocumentHistory/2006-36">2006:36</a>'
+              '<a href="/TRVFS/Home/DocumentHistory/TSFS%202021-107">TSFS 2021:107</a>'
+              '<a href="/TRVFS/Home/DocumentHistory/9999-1">9999:1</a>'
+              '<a href="/TRVFS/pdf/1981nr022.pdf">Visa PDF format</a>')
+
+    class _R:
+        text = family
+        content = b"%PDF-1.4 body"
+
+    monkeypatch.setattr(agencies, "request", lambda *a, **kw: _R())
+    monkeypatch.setattr(agencies.time, "sleep", lambda _seconds: None)
+    ref = DocRef(basefile="tsvfs/1981:22", identifier="TSVFS 1981:22", fs="tsvfs",
+                 url="https://trvfs.ea.trafikverket.se/TRVFS/Home/DocumentHistory/1981-22",
+                 extra={"series": {"1983:31": "TSVFS", "2006:36": "VVFS",
+                                   "TSFS2021:107": "TSFS"}})
+    record = agencies.trv_resolve(None, agencies.TRVFS, ref, str(tmp_path), delay=0)
+    assert [a["identifier"] for a in record["files"]["amendment"]] == [
+        "TSVFS 1983:31", "VVFS 2006:36", "TSFS 2021:107",
+        "TSVFS 9999:1"]          # not in the listing and bare: the base's samling
+    assert record["fs"] == "tsvfs"
+    assert (tmp_path / "tsvfs" / "tsvfs-1981-22-regulation.pdf").exists()
+
+
+def test_tsvfs_is_a_registered_series_so_its_citations_resolve():
+    # The corpus holds 103 distinct tsvfs citation targets that resolved to
+    # nothing, minted by the parser off the repeal clauses of the very documents
+    # that belong there: trvfs/1981:22 "repealed" tsvfs/1981:22, itself.
+    series = datasets.load_fs_series()
+    assert series["tsvfs"]["designation"] == "TSVFS"
+    assert series["tsvfs"]["successor"] == "vvfs"     # Vägverket took over in 1993
+    assert lagrum.FS_SLUG["TSVFS"] == "tsvfs"
+    assert lagrum.FS_SLUG["TRVTFS"] == "trvtfs"
