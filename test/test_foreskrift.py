@@ -1293,3 +1293,21 @@ def test_fi_enumerate_routes_the_bankinspektionen_act_off_the_rows_own_words(mon
     assert [(r.basefile, r.identifier, r.fs) for r in refs] == [
         ("bffs/1991:15", "BFFS 1991:15", "bffs"),
         ("fffs/2013:9", "FFFS 2013:9", None)]
+
+
+def test_archive_links_ignores_the_documents_a_listing_hangs():
+    # a repealing föreskrift's own title reads like the archive's link
+    # ("Föreskrifter om upphävande av …"). Three such PDFs on UHR's in-force
+    # page filled ARCHIVE_MAX and pushed out the "Upphävda föreskrifter"
+    # listing, which is the only place 35 UHRFS designations are published.
+    agency = harvest.Agency(fs="uhrfs", name="UHR", publisher="UHR",
+                            base_url="https://www.uhr.se",
+                            index_url="https://www.uhr.se/list")
+    soup = BeautifulSoup(
+        '<a href="/globalassets/uhrfs/uhrfs-2023-6.pdf">Föreskrifter om upphävande av …</a>'
+        '<a href="/globalassets/uhrfs/uhrfs-2023-5.pdf">Förordning om upphävande av …</a>'
+        '<a href="/globalassets/uhrfs/uhrfs-2019-3.pdf">Föreskrifter om upphävande av …</a>'
+        '<a href="/forfattningssamling/upphavda-foreskrifter/">Upphävda föreskrifter</a>',
+        "html.parser")
+    assert harvest.archive_links(soup, agency) == [
+        "https://www.uhr.se/forfattningssamling/upphavda-foreskrifter/"]

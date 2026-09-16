@@ -801,6 +801,15 @@ RE_ARCHIVE_LINK = re.compile(
     r"|äldre\s+(?:föreskrifter|regler|författningar)|historiska\s+föreskrifter", re.I)
 #: at most this many archive pages are followed from one listing
 ARCHIVE_MAX = 3
+# An archive is a listing, so an anchor that names a document file is never one.
+# The words that name the archive are the words a repealing föreskrift prints as
+# its own title: UHR's in-force page hangs four such PDFs ("Föreskrifter om
+# upphävande av …" for UHRFS 2019:3, 2023:5 and 2023:6, and a
+# "Konsekvensutredning om förslag att upphäva …"), and the first three filled
+# ARCHIVE_MAX. The "Upphävda föreskrifter" listing below them -- 35 designations,
+# none of them in the corpus -- never entered the queue, and index_soups spent
+# three requests fetching those PDFs and parsing them as HTML.
+RE_DOCUMENT_HREF = re.compile(r"\.(?:pdf|docx?|rtf|odt|xlsx?)$", re.I)
 
 # The query parameter a paged listing takes its page number in ("?page=N",
 # MCF's "?sortOrder=…&selectedpage=N"). The archive of repealed regulations is
@@ -821,8 +830,9 @@ def archive_links(soup, agency):
     params only names it once someone has noticed it is missing, and for
     thirteen scopes nobody had. Bounded to `ARCHIVE_MAX` pages on the agency's
     own host, and read with the scope's own ``link_select`` -- an archive page
-    is the same listing with older rows. ``params["no_archive"]`` opts out for
-    an agency whose "upphävda" link is prose rather than a listing.
+    is the same listing with older rows. A link to a document file is not one
+    (:data:`RE_DOCUMENT_HREF`), and ``params["no_archive"]`` opts out for an
+    agency whose "upphävda" link is prose rather than a listing.
 
     **A full walk reaches these pages; an incremental run does not.** The
     archive is queued behind the in-force listing, and
@@ -841,6 +851,8 @@ def archive_links(soup, agency):
         if not RE_ARCHIVE_LINK.search(a.get_text(" ", strip=True)):
             continue
         url = absolute(agency.base_url, a["href"])
+        if RE_DOCUMENT_HREF.search(filename(url)):
+            continue                   # a repealing föreskrift, not the archive
         if host in url and url not in out:
             out.append(url)
     return out[:ARCHIVE_MAX]
