@@ -27,7 +27,7 @@ from ferenda.foreskrift.harvest import (
 # otherwise shadow the imported function
 from ferenda.foreskrift.harvest import ref as _ref
 from ferenda.foreskrift.parse import extract_publisher
-from ferenda.lib import datasets, lagrum
+from ferenda.lib import compress, datasets, lagrum
 from ferenda.lib.harvest import guarded_enumerate, write_record
 from ferenda.lib.util import record_path
 
@@ -1459,3 +1459,47 @@ def test_tsvfs_is_a_registered_series_so_its_citations_resolve():
     assert series["tsvfs"]["successor"] == "vvfs"     # Vägverket took over in 1993
     assert lagrum.FS_SLUG["TSVFS"] == "tsvfs"
     assert lagrum.FS_SLUG["TRVTFS"] == "trvtfs"
+
+
+def test_kvfs_keeps_a_konsoliderad_version_the_page_no_longer_links(tmp_path, monkeypatch):
+    # We publish the consolidated version at a regulation's own url when we have
+    # one, and the publisher is under no duty to serve it for ever:
+    # Kriminalvården unlisted all eleven FARK consolidations, which now answer
+    # only at the urls our own records remember. A re-resolve fetches the
+    # as-published text the landing page hangs and keeps the consolidation
+    # beside it, under its own name -- a consolidation is a different version
+    # and never shares the base text's file name.
+    root = tmp_path
+    (root / "kvfs").mkdir()
+    (root / "kvfs" / "kvfs-2011-1-consolidation-0.pdf").write_bytes(b"%PDF-1.4 konsoliderad")
+    write_record(record_path(str(root), "kvfs", "kvfs/2011:1"), {
+        "fs": "kvfs", "basefile": "kvfs/2011:1", "identifier": "KVFS 2011:1",
+        "url": "https://www.kriminalvarden.se/old/",
+        "files": {"regulation": None,
+                  "consolidation": [{"name": "kvfs-2011-1-consolidation-0.pdf",
+                                     "url": "https://www.kriminalvarden.se/globalassets/"
+                                            "dokument/foreskrifter-konsoliderade/"
+                                            "kvfs-2011_1-fark-fangelse-konsoliderad-version.pdf"}],
+                  "amendment": [], "memo": [], "attachment": []}})
+
+    class _R:
+        text = ('<div class="regulationPage">'
+                '<a href="/globalassets/dokument/foreskrifter/'
+                'kvfs-20111---kriminalvardens-foreskrifter-for-fangelse.pdf">Ladda ner</a>'
+                '</div>')
+        content = b"%PDF-1.4 as published"
+
+    monkeypatch.setattr(harvest, "request", lambda *a, **kw: _R())
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    ref = DocRef(basefile="kvfs/2011:1", identifier="KVFS 2011:1",
+                 url="https://www.kriminalvarden.se/.../kvfs-20111--fark-fangelse/")
+    record = agencies.kvfs_resolve(None, agencies.REGISTRY["kvfs"], ref, str(root), delay=0)
+    assert record["files"]["regulation"]["name"] == "kvfs-2011-1-regulation.pdf"
+    assert [c["name"] for c in record["files"]["consolidation"]] == [
+        "kvfs-2011-1-consolidation-0.pdf"]
+    # and the two versions are two files, never one
+    assert (root / "kvfs" / "kvfs-2011-1-regulation.pdf").read_bytes() \
+        != (root / "kvfs" / "kvfs-2011-1-consolidation-0.pdf").read_bytes()
+    # the carry-forward survives re-reading the record from disk
+    stored = json.loads(compress.read_text(record_path(str(root), "kvfs", "kvfs/2011:1")))
+    assert len(stored["files"]["consolidation"]) == 1

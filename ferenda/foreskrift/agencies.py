@@ -757,20 +757,140 @@ DVFS = Agency(
             "classify": classify_href},
 )
 
-# indexed + DIRECT. The förteckning links each in-force FARK straight to its PDF
-# under /globalassets/dokument/foreskrifter[-konsoliderade]/; the anchor text
-# carries the "(KVFS YYYY:N, FARK …)" designation. Most links are the
-# konsoliderad version (the in-force text) -- the register publishes no separate
-# family page, so resolve_direct stores each linked PDF as the base text. The
-# selector excludes the regelförteckning under /regelverk/.
+# --------------------------------------------------------------------------
+# KVFS (Kriminalvården) -- two listings, because neither is the samling on its
+# own.
+#
+# The förteckning used to link each in-force FARK family straight to its
+# konsoliderad PDF under /globalassets/dokument/foreskrifter-konsoliderade/,
+# with the "(KVFS YYYY:N, FARK …)" designation in the anchor text, and that is
+# the text a reader wants at the family's own url -- a FARK is cited and read
+# as the consolidated regulation, the way an SFS lag is. So the förteckning is
+# read first and wins wherever it still names a file.
+#
+# As of 2026-09-16 it names none. The page hangs one PDF, the regelförteckning
+# the selector excludes, and the eleven konsoliderade files our own records
+# point at are linked from nowhere on the site -- not the förteckning, not the
+# sitemap, not the family's own landing page -- though the urls we already hold
+# still serve them. The agency's listing of the whole
+# samling moved to /foreskrifter-och-allmanna-rad/foreskrifter-i-nummerordning/
+# and is a Blazor Server component: the page's HTML carries one
+# `<!--Blazor:…-->` marker and an empty `div.contentArea`, and "Visa fler" adds
+# ten rows at a time over a SignalR socket. No page parameter, no JSON
+# endpoint, nothing an HTTP enumerator can read. The site's sitemap.xml names
+# every row's landing page instead -- 119 of them, one per document, each an
+# ordinary HTML page hanging that document's own as-published PDF. Reading both
+# is what the samling needs: the förteckning for whatever in-force text it
+# still names, the sitemap for the 39 amendments and repeal notices it does not
+# link at all, each under its own url.
+# --------------------------------------------------------------------------
+
+#: A landing page's slug names its document: "kvfs-202414---fark-fangelse" is
+#: KVFS 2024:14 and "kvvfs-19903" is KVVFS 1990:3. The first four digits are the
+#: årsutgåva, the rest the löpnummer, with no separator between the two.
+RE_KVFS_LANDING = re.compile(r"/(kvfs|kvvfs)-(\d{4})(\d+)[-/]", re.IGNORECASE)
+
+
+def classify_kvfs(a, fs, base_ars, base_lop):
+    """Kriminalvårdens landing pages hang exactly one PDF, under a "Ladda ner"
+    link whose text says nothing about the file. The page's own heading is the
+    document's identity, so that file is its text -- unless the *name* states
+    another KVFS number: the page for KVFS 2008:16 links
+    kvfs-200818---…-kvfs-200632.pdf, which is KVFS 2008:18's text, and storing
+    it would publish 2008:18's words as 2008:16. Dropped, the record carries no
+    regulation and parse records a skip -- a visible gap, not a wrong document.
+
+    Nothing else is readable from these names. KVFS 2019:5's file is
+    andringsforeskrift-fark-fangelse-2019_5.pdf and KVFS 2026:14's is
+    kvfs-2026_-14-andring-fark-uo_slutlig.pdf, which states no number the slug
+    regex can read; both are the document's own as-published text."""
+    m = harvest.RE_SLUG_NUMBER.search(harvest.filename(a.get("href", "")).lower())
+    if m and (m.group(1), str(int(m.group(2)))) != (base_ars, base_lop):
+        return None
+    return ("regulation", base_ars, base_lop)
+
+
+def kvfs_enumerate(session, agency):
+    """The förteckning's twelve konsoliderade FARK texts, then one landing
+    DocRef per further document the site's sitemap names, newest first.
+
+    The förteckning comes first and wins: a family's own url serves the
+    consolidated text a reader is looking for, and the landing page beneath it
+    serves only the as-published original."""
+    seen: set = set()
+    refs = []
+    for item in harvest.index_soups(session, agency, urls=[agency.index_url]):
+        if isinstance(item, harvest.Skip):
+            yield item
+            continue
+        for a in item[1].select(agency.params["link_select"]):
+            text = a.get_text(" ", strip=True)
+            docref = harvest.ref(agency, text, a.get("href", ""), seen,
+                                 title=text, direct=True)
+            if docref:
+                refs.append(docref)
+    for url in re.findall(r"<loc>\s*(.*?)\s*</loc>",
+                          request(session, "GET",
+                                  agency.params["sitemap_url"]).text):
+        m = RE_KVFS_LANDING.search(url[len(agency.params["samling_url"]):]) \
+            if url.startswith(agency.params["samling_url"]) else None
+        if not m:
+            continue        # the six subject index pages, which name no document
+        fs = m.group(1).lower()
+        basefile = "%s/%s:%d" % (fs, m.group(2), int(m.group(3)))
+        if basefile in seen:
+            continue        # the förteckning already gave this family its text
+        seen.add(basefile)
+        refs.append(DocRef(basefile=basefile, fs=(fs if fs != agency.fs else None),
+                           identifier="%s %s:%d" % (fs.upper(), m.group(2),
+                                                    int(m.group(3))),
+                           url=url))
+    assert refs, "kriminalvarden.se lists no föreskrift on either page"
+    yield from harvest.newest_first(refs)
+
+
+def kvfs_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
+    """A förteckning row carries its PDF url already; a sitemap row is a landing
+    page to read it off. Which one a DocRef is says which resolver it takes.
+
+    A konsoliderad version already stored is kept, whether or not the page still
+    links it. It is the best text of that regulation we have, and the publisher
+    is under no duty to serve it for ever: Kriminalvården unlisted all eleven of
+    its FARK consolidations, which now answer only at the urls our own records
+    remember. They keep their own file name -- a consolidation is a different
+    version from the as-published text and never shares its name."""
+    path = record_path(root, ref.fs or agency.fs, ref.basefile)
+    held = json.loads(compress.read_text(path)) if compress.exists(path) else {}
+    kept = [c for c in (held.get("files") or {}).get("consolidation", [])
+            if compress.exists(Path(root) / (ref.fs or agency.fs) / c["name"])]
+    resolve = resolve_direct if ref.extra.get("regulation_url") else resolve_landing
+    record = resolve(session, agency, ref, root, delay, log=log, rejects=rejects)
+    for c in kept:
+        if not any(e["url"] == c["url"] for e in record["files"]["consolidation"]):
+            record["files"]["consolidation"].append(c)
+    if kept:
+        write_record(path, record)
+    return record
+
+
 KVFS = Agency(
     fs="kvfs", name="Kriminalvården", publisher="Kriminalvården",
     base_url="https://www.kriminalvarden.se",
     index_url="https://www.kriminalvarden.se/om-oss/styrning-och-uppfoljning/"
               "kriminalvardens-foreskrifter/",
-    enumerate=indexed_enumerate, resolve=resolve_direct,
+    enumerate=kvfs_enumerate, resolve=kvfs_resolve,
+    # the selector excludes the regelförteckning under /regelverk/
     params={"link_select": 'a[href*="/globalassets/dokument/foreskrifter"][href$=".pdf"]',
-            "direct": True},
+            "direct": True,
+            "sitemap_url": "https://www.kriminalvarden.se/"
+                           "sitemap_kriminalvarden.se.xml",
+            "samling_url": "https://www.kriminalvarden.se/om-oss/"
+                           "styrning-och-uppfoljning/foreskrifter-och-allmanna-rad/"
+                           "kriminalvardens-forfattningssamling/",
+            # the one PDF a landing page hangs, and nothing the chrome around it
+            # may add later
+            "pdf_select": 'div.regulationPage a[href$=".pdf"]',
+            "classify": classify_kvfs},
 )
 
 # indexed + DIRECT. A Sitevision document listing whose rows link each
