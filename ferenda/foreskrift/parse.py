@@ -269,7 +269,7 @@ def _repeal_object(segment, whole=False, tail=False):
         segment = RE_FOOTNOTE_LINE.split(segment)[-1 if tail else 0]
     kept = []
     for i, item in enumerate(RE_UPPHOR_ITEM.split(segment)):
-        item = RE_ANDRING.split(item)[0]
+        item = cut_at_andring(item)
         first = RE_FS_REF.search(item) or RE_BARE_OWN_REF.search(item)
         if first and RE_PROVISION.search(item[:first.start()]):
             continue
@@ -350,6 +350,54 @@ RE_FS_REF = RE_DESIGNATION
 # only right after a "föreskrifter…"/"allmänna råd…" word (an SFS parenthesis
 # like "förordningen (2001:512)" must never mint a föreskrift target).
 RE_ANDRING = re.compile(r"ändring(?:ar)?\s+(?:i|av)\b", re.IGNORECASE)
+# Where "om ändring i" ends a repeal item, and where it opens the next one.
+# A repeal list is cut at the first "ändring i" so that repealing an amendment
+# leaves its base alone: in "(KVFS 2007:6) om ändring i … (KVFS 2006:26)" the
+# words follow the target's own number and open *its* title, and the base named
+# after them stays in force. The same words can instead introduce the next item
+# -- EIFS 2013:7 repeals two regulations, and the second arrives as "och
+# Energimarknadsinspektionens föreskrifter om ändring i …" -- and cutting there
+# lost it.
+#
+# The closing bracket tells them apart. Words that follow a regulation's own
+# number in brackets belong to that regulation; with no number before them they
+# open a new one. Over the whole corpus this changes three repeal lists and
+# loses no target anywhere: EIFS 2013:7 gains eifs/2011:5, SKOLFS 2005:20 gains
+# skolfs/1996:2 and SÄIFS 1998:7 gains säifs/1997:2.
+#: an agency's possessive -- a capitalised word ending in s. What stands between
+#: a designation and "ändring i" decides which document the verb belongs to, and
+#: a new agency is what introduces a new one.
+RE_POSSESSIVE = re.compile(r"\b[A-ZÅÄÖ][\wåäöÅÄÖ-]*s\b")
+
+
+def cut_at_andring(item):
+    """`item` up to the "ändring i" that ends it, or whole when none does.
+
+    A repeal list is cut at "ändring i" so that repealing an amendment leaves
+    its base alone: in "(KVFS 2007:6) om ändring i … (KVFS 2006:26)" the words
+    follow the target's own number and open *its* title, and the base named
+    after them stays in force. The same words can instead introduce the next
+    item, and then cutting loses it -- EIFS 2013:7 repeals two regulations and
+    the second arrives as "och Energimarknadsinspektionens föreskrifter om
+    ändring i …".
+
+    What separates them is whether a new agency is named. The verb belongs to
+    the designation last printed unless another agency's possessive stands
+    between the two, which is what opens a new item. Reading the gap's *length*
+    instead does not work: "(SKSFS 2010:2) och allmänna råd om ändring i" is
+    three words and one document, "(10/2015) med ändring i" is one word and one
+    document, and the EIFS gap is five words and two.
+
+    A verb that stands before every designation in the item is an
+    ändringsförfattning describing itself and names no target of its own, so it
+    ends the item too: PMFS 2016:19 repeals RPSFS 2009:2 and prints "föreskrifter
+    om ändring i Rikspolisstyrelsens föreskrifter … (FAP 490-1, RPSFS 2007:5)",
+    whose 2007:5 is the base that stays in force."""
+    for m in RE_ANDRING.finditer(item):
+        bracket = item.rfind(")", 0, m.start())
+        if bracket < 0 or not RE_POSSESSIVE.search(item[bracket:m.start()]):
+            return item[:m.start()]
+    return item
 # The other way a document declares it amends another: the amending enacting
 # formula, "föreskriver … i fråga om <författning>" against a grundförfattning's
 # "föreskriver följande". It is the only declaration an Omtryck carries whose
@@ -999,7 +1047,7 @@ def extract_metadata(text, declaration, parser, fs=None, repaired=None):
     # the noun form in the declaration (masthead + harvest title), cut the same
     # way: "upphävande av X (HSLF-FS 2019:43) om ändring i Y (HSLF-FS 2019:32)"
     # repeals the amendment X, and Y stays in force
-    clauses += [(RE_ANDRING.split(m.group(1))[0],
+    clauses += [(cut_at_andring(m.group(1)),
                  m.group(0) + " " + decl[m.end():m.end() + REPEAL_DATE_WINDOW])
                 for decl in ([declaration, repaired] if repaired else [declaration])
                 for m in RE_UPPHAVANDE.finditer(decl)]

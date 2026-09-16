@@ -2401,3 +2401,41 @@ def test_the_printed_stop_is_read_before_the_standing_masthead_sentence():
          Block("paragraf", "1 § Dessa föreskrifter gäller.", 1, num="1")], 1) == \
         ("Arbetsmiljöverkets föreskrifter och allmänna råd om användning av "
          "motorkedjesågar och röjsågar")
+
+
+def test_a_repeal_item_ends_at_andring_unless_a_new_agency_is_named():
+    # A repeal list is cut at "ändring i" so that repealing an amendment leaves
+    # its base alone -- but the same words can introduce the next item instead,
+    # and cutting there loses it. What separates the two is whether another
+    # agency's possessive stands between the designation and the verb. The
+    # gap's length does not: SKSFS 2012:2's is three words and one document,
+    # MIGRFS 2019:8's is one word and one document, EIFS 2013:7's is five words
+    # and two.
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+
+    def repeals(declaration, fs):
+        return _uris(extract_metadata("", declaration, parser, fs=fs)["upphaver"])
+
+    # a new agency is named, so the verb opens the next item
+    assert repeals(
+        "Föreskrifter om upphävande av Energimarknadsinspektionens föreskrifter "
+        "(EIFS 2010:2) om elleverantörers skyldighet och "
+        "Energimarknadsinspektionens föreskrifter om ändring i (EIFS 2011:5) "
+        "om mätning", "eifs") == ["https://lagen.nu/eifs/2010:2",
+                                  "https://lagen.nu/eifs/2011:5"]
+    # none is, so the verb belongs to the designation last printed and the base
+    # named after it stays in force -- three gap shapes, one document each
+    assert repeals(
+        "Föreskrifter om upphävande av Kriminalvårdens föreskrifter (KVFS 2007:6) "
+        "om ändring i Kriminalvårdens föreskrifter (KVFS 2006:26) om fängelse",
+        "kvfs") == ["https://lagen.nu/kvfs/2007:6"]
+    assert repeals(
+        "Migrationsverkets föreskrifter om upphävande av Migrationsverkets "
+        "föreskrift (10/2015) med ändring i Migrationsverkets föreskrift "
+        "(11/2014) om försörjningskravet", "migrfs") == [
+            "https://lagen.nu/migrfs/2015:10"]
+    assert repeals(
+        "Föreskrifter om upphävande av Skogsstyrelsens föreskrifter "
+        "(SKSFS 2010:2) och allmänna råd om ändring i Skogsstyrelsens "
+        "föreskrifter och allmänna råd (SKSFS 1993:2) till skogsvårdslagen",
+        "sksfs") == ["https://lagen.nu/sksfs/2010:2"]
