@@ -1195,6 +1195,72 @@ def test_extract_failure_does_not_log_submitted_text(client, monkeypatch, caplog
     assert not ledger.exists()
 
 
+def test_citations_metadata_catalog_lists_datasets(client):
+    r = client.get("/api/v1/citations/metadata")
+    assert r.status_code == 200
+    data = r.json()
+    assert "datasets" in data
+    ids = {d["id"] for d in data["datasets"]}
+    assert "sfs/namedlaws" in ids
+    assert "eurlex/namedacts" in ids
+    assert "eurlex/casenames" in ids
+    assert "hudoc/casenames" in ids
+    assert "dv/namedcases" in ids
+    for entry in data["datasets"]:
+        assert entry["source"] and entry["name"]
+        assert entry["bytes"] > 0
+        assert entry["etag"].startswith('"') and entry["etag"].endswith('"')
+        assert entry["url"] == f"/api/v1/citations/metadata/{entry['source']}/{entry['name']}"
+
+
+def test_citations_metadata_individual_dataset(client):
+    # sfs/namedlaws
+    r = client.get("/api/v1/citations/metadata/sfs/namedlaws")
+    assert r.status_code == 200
+    etag = r.headers["etag"]
+    assert "avtalslagen" in r.text
+    assert "public" in r.headers["cache-control"]
+
+    # 304 Not Modified
+    r304 = client.get("/api/v1/citations/metadata/sfs/namedlaws", headers={"if-none-match": etag})
+    assert r304.status_code == 304
+    assert not r304.content
+
+    # unknown dataset returns 404
+    r404 = client.get("/api/v1/citations/metadata/unknown/dataset")
+    assert r404.status_code == 404
+
+
+def test_citations_metadata_echr_casenames_trimming(client):
+    # untrimmed authoritative dataset by default
+    r_full = client.get("/api/v1/citations/metadata/hudoc/casenames")
+    assert r_full.status_code == 200
+    data_full = r_full.json()
+    assert "cases" in data_full and "appnos" in data_full
+    assert "osman|united kingdom|" in data_full["cases"]
+    assert "23452/94" in data_full["appnos"]
+    assert "x|austria|" in data_full["cases"]
+
+    # optional trimming via ?trim=true
+    r_trimmed = client.get("/api/v1/citations/metadata/hudoc/casenames?trim=true")
+    assert r_trimmed.status_code == 200
+    data_trimmed = r_trimmed.json()
+    # Osman is preserved
+    assert "osman|united kingdom|" in data_trimmed["cases"]
+    assert "23452/94" in data_trimmed["appnos"]
+    # Single-letter anonymous applicant is dropped
+    assert "x|austria|" not in data_trimmed["cases"]
+    assert len(data_full["cases"]) > len(data_trimmed["cases"])
+
+
+def test_citations_metadata_brotli_compression(client):
+    # Requesting Brotli compression
+    r = client.get("/api/v1/citations/metadata/sfs/namedlaws", headers={"accept-encoding": "br"})
+    assert r.status_code == 200
+    assert r.headers.get("content-encoding") == "br"
+    assert "avtalslagen" in r.text
+
+
 def test_resolve_requires_a_built_catalog(client, tmp_path):
     # the fixture's own override replaces get_con outright, bypassing its
     # catalog_ready() check -- pop it so the real dependency (and its 503) runs

@@ -84,6 +84,7 @@ from . import (
     reads,
 )
 from . import mcp as mcp_server
+from .compression import CompressionMiddleware
 from .db import get_con
 
 DUMPS = config.DATA / "dumps"
@@ -170,9 +171,10 @@ app = FastAPI(
 # which is why that app carries a same-origin gate of its own: CORS only stops
 # a cross-origin browser from *reading* a response, and half the internal
 # surface is a GET whose body is nobody else's business.
+app.add_middleware(CompressionMiddleware, minimum_size=500)
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["GET", "POST"], allow_headers=["*"],
-                   expose_headers=["ETag"])
+                   expose_headers=["ETag", "Content-Encoding"])
 
 app.include_router(citations.router)
 
