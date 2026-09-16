@@ -1935,50 +1935,81 @@ SISFS = Agency(
 
 
 # --------------------------------------------------------------------------
-# UHRFS (Universitets- och högskolerådet) -- the "gällande föreskrifter i
-# löpnummerordning" page hangs the PDFs directly. A bespoke enumerate is needed:
-# the link text names the *amended base* ("Föreskrifter om ändring i … (UHRFS
-# 2024:2)"), so the generic direct ref would key an amendment by the wrong
-# number -- the amendment's own number lives only in the filename (uhrfs-2026-4-…
-# .pdf). Companion PDFs (konsekvensutredning/promemoria/rättelse/förteckning)
-# carry a uhrfs number in their filename too, so they are dropped by link text.
-# No HSVFS predecessor appears on the in-force page. Each PDF is its own document
-# (flat, like LMFS -- amendments list as their own bases, no consolidation).
+# UHRFS (Universitets- och högskolerådet) -- three listings, all hanging their
+# PDFs directly: "gällande föreskrifter i löpnummerordning", the "upphävda
+# föreskrifter" archive it links (35 designations), and "konsoliderade
+# föreskrifter", which is named in params because `harvest.archive_links` does
+# not follow it -- a konsoliderad version is the in-force text, not a repealed
+# document. A bespoke enumerate is needed: the link text names the *amended
+# base* ("Föreskrifter om ändring i … (UHRFS 2024:2)"), so the generic direct
+# ref would key an amendment by the wrong number -- the amendment's own number
+# lives only in the filename (uhrfs-2026-4-….pdf). Companion PDFs
+# (konsekvensutredning/promemoria/rättelse/förteckning) carry a uhrfs number in
+# their filename too, so they are dropped by link text. No HSVFS predecessor
+# appears on any of the three pages. Each PDF is its own document (flat, like
+# LMFS -- amendments list as their own bases), plus the konsoliderad version of
+# the base it names.
 # --------------------------------------------------------------------------
 
 RE_UHRFS_FILE = re.compile(r"uhrfs[-_](\d{4})[-_](\d{1,3})", re.IGNORECASE)
 RE_UHRFS_SKIP = re.compile(r"Konsekvensutredning|Promemoria|Rättelse|Förteckning|Remiss")
+# All 13 konsoliderad rows name their base in the same words: "Föreskrifter om
+# högskoleprovet, konsoliderad version av UHRFS 2015:3 till och med UHRFS
+# 2023:3". The filename cannot be read instead -- three carry no uhrfs slug at
+# all ("konsoliderad-version-2013_1--2023_2.pdf"), and the rest slug the base,
+# so RE_UHRFS_FILE would file the konsoliderad text of UHRFS 2019:1 as that
+# föreskrift's own text.
+RE_UHRFS_KONSOLIDERAD = re.compile(
+    r"konsoliderad\s+version\s+av\s+UHRFS\s*(\d{4}):\s*(\d+)", re.IGNORECASE)
 
 
 def uhrfs_enumerate(session, agency):
     """One DocRef per UHRFS PDF, keyed by the number in its filename slug (the
-    link text names the amended base, not the file's own number).
+    link text names the amended base, not the file's own number), carrying the
+    konsoliderad version of that base.
 
-    Both listings are read: the in-force one and the archive of repealed
-    föreskrifter it links, whose 35 designations include every target our three
-    self-repeal notices name.
+    All three listings are read: the in-force one, the archive of repealed
+    föreskrifter it links -- whose 35 designations include every target our
+    three self-repeal notices name -- and the konsoliderade page from params,
+    which holds 10 of the 13 consolidations (the other 3 are in the archive,
+    their bases being repealed).
 
-    A full walk (a first harvest or ``--force``) reaches that page; an
-    incremental run stops in the in-force listing before the queue gets to it
-    (:func:`harvest.archive_links`)."""
-    seen = set()
-
-    def page_refs(soup):
-        for a in soup.select('a[href*="uhrfs"][href$=".pdf"]'):
-            href = util.href(a)
+    The refs are collected before any is yielded: a consolidation is listed on
+    a later page than the base it belongs to, and inside the archive on a later
+    row, so a ref already handed to the walk can no longer take one. Yielding
+    them :func:`harvest.newest_first` is then what the incremental walk's date
+    watermark needs."""
+    seen: set = set()
+    refs: list = []
+    consolidations: dict = {}
+    for item in harvest.index_soups(
+            session, agency,
+            urls=[agency.index_url, agency.params["konsoliderade_url"]]):
+        if isinstance(item, harvest.Skip):
+            yield item
+            continue
+        for a in item[1].select('a[href*="uhrfs"][href$=".pdf"]'):
             text = a.get_text(" ", strip=True)
+            url = harvest.absolute(agency.base_url, util.href(a))
+            konsoliderad = RE_UHRFS_KONSOLIDERAD.search(text)
+            if konsoliderad:
+                consolidations.setdefault(
+                    "%s/%s:%d" % (agency.fs, konsoliderad.group(1),
+                                  int(konsoliderad.group(2))), []).append({"url": url})
+                continue
             if RE_UHRFS_SKIP.search(text):
                 continue
-            m = RE_UHRFS_FILE.search(harvest.filename(href))
+            m = RE_UHRFS_FILE.search(harvest.filename(url))
             if not m:
                 continue
-            year, lop = m.group(1), str(int(m.group(2)))
-            docref = direct_docref(agency, agency.fs, year, lop,
-                                   harvest.absolute(agency.base_url, href), seen, title=text)
+            docref = direct_docref(agency, agency.fs, m.group(1), str(int(m.group(2))),
+                                   url, seen, title=text)
             if docref:
-                yield docref
-
-    return harvest.index_refs(session, agency, page_refs)
+                refs.append(docref)
+    for docref in harvest.newest_first(refs):
+        if docref.basefile in consolidations:
+            docref.extra["consolidations"] = consolidations[docref.basefile]
+        yield docref
 
 
 UHRFS = Agency(
@@ -1989,6 +2020,10 @@ UHRFS = Agency(
               "Universitets--och-hogskoleradets-forfattningssamling/"
               "gallande-foreskrifter-i-lopnummerordning/",
     enumerate=uhrfs_enumerate, resolve=resolve_direct,
+    params={"konsoliderade_url":
+            "https://www.uhr.se/publikationer/lagar-och-regler-for-hogre-utbildning/"
+            "Universitets--och-hogskoleradets-forfattningssamling/"
+            "konsoliderade-foreskrifter/"},
 )
 
 # indexed + DIRECT. A small static page of direct PDF links with clean

@@ -1066,7 +1066,8 @@ def test_uhrfs_enumerate_reads_the_upphavda_archive(monkeypatch):
             '<a href="/f/uhrfs-2026-4-om-x.pdf">Föreskrifter om ändring</a>'
             '<a href="/upphavda/">Upphävda föreskrifter</a>',
         "https://www.uhr.se/upphavda/":
-            '<a href="/f/uhrfs-2013-2-om-omradesbehorigheter.pdf">Områdesbehörigheter</a>'})
+            '<a href="/f/uhrfs-2013-2-om-omradesbehorigheter.pdf">Områdesbehörigheter</a>',
+        agencies.UHRFS.params["konsoliderade_url"]: "<p>inga</p>"})
     refs = list(agencies.uhrfs_enumerate(None, agencies.UHRFS))
     assert [r.basefile for r in refs] == ["uhrfs/2026:4", "uhrfs/2013:2"]
 
@@ -1311,3 +1312,23 @@ def test_archive_links_ignores_the_documents_a_listing_hangs():
         "html.parser")
     assert harvest.archive_links(soup, agency) == [
         "https://www.uhr.se/forfattningssamling/upphavda-foreskrifter/"]
+
+
+def test_uhrfs_attaches_a_konsoliderad_version_to_the_base_it_names(monkeypatch):
+    # A konsoliderad row names its base in words -- "…, konsoliderad version av
+    # UHRFS 2013:1 till och med UHRFS 2023:2" -- and its filename either carries
+    # no number at all or slugs the base, so reading the filename would store
+    # the konsoliderad text of one föreskrift as another's own.
+    _pages(monkeypatch, {
+        agencies.UHRFS.index_url:
+            '<a href="/globalassets/uhrfs/uhrfs-2015-3-om-hogskoleprovet.pdf">'
+            'Högskoleprovet</a>',
+        agencies.UHRFS.params["konsoliderade_url"]:
+            '<a href="/globalassets/uhrfs/konsoliderad-version-2013_1--2023_2.pdf">'
+            'Föreskrifter om '
+            'grundläggande behörighet, konsoliderad version av UHRFS 2015:3 till '
+            'och med UHRFS 2023:3</a>'})
+    refs = list(agencies.uhrfs_enumerate(None, agencies.UHRFS))
+    assert [r.basefile for r in refs] == ["uhrfs/2015:3"]
+    assert [c["url"] for c in refs[0].extra["consolidations"]] == [
+        "https://www.uhr.se/globalassets/uhrfs/konsoliderad-version-2013_1--2023_2.pdf"]
