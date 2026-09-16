@@ -1276,18 +1276,20 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # leaves it orphaned in front of the title ("Statens skolverks" +
     # "Skolverkets föreskrifter om …")
     r"(?:[A-ZÅÄÖ][\wåäöÅÄÖ-]*(?:\s+[\wåäöÅÄÖ-]+){0,3}\s+)?författningssamling\w*"
-    r"|ISSN\s*[\d\s-]{4,}|Utgivare:\s*|Utkom\s+från\s+trycket"
+    r"|ISSN\s*[\d\s-]{4,}|(?:Ansvarig\s+)?Utgivare:\s*(?:[^,\n]{1,60},|[A-ZÅÄÖ][a-zåäö]+\s+[A-ZÅÄÖ][a-zåäö]+)?|\d?\s*Utkom\s+från\s+trycket"
     # the agency's own contact block, which several samlingar print in the
     # masthead's second column ("Box 7821, 103 97 Stockholm, Sverige, www.fi.se")
     r"|\bwww\.[\w.-]+|\bBox\s+\d+|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö]+,?"
-    r"|\bTfn\b[\s\d-]*|\bSverige\b,?"
-    r"|Publicerings?datum|Publicerade?\s+den|\b[A-ZÅÄÖ]{2,}(?:-| )?FS\b|\b\d{4}:\d+\b"
+    r"|\bTfn\b[\s\d-]*|\bSverige,"
+    r"|Publicerings?datum|Publicerade?(?:\s+den)?|\b[A-ZÅÄÖ]{2,}(?:-| )?FS\b|\b\d{4}:\d+\b"
+    r"|\bxx\b|\d{2}xx\b"
     # the second column's ISO date ("Utkom från trycket 1998-01-26", the old
     # Livsmedelsverket masthead), which lands mid-title like the "den …" form
     r"|\b\d{4}-\d{2}-\d{2}\b"
     # Jordbruksverket's register code ("Saknr K 72:1") and its "Omtryck" stamp,
     # printed beside the title and landing mid-sentence like the dates
     r"|\bSaknr\s+[A-ZÅÄÖ]\s*\d+(?::\d+)?|\bOmtryck\b"
+    r"|\bSFH\b(?:\s+\d+(?:\.\d+)+)?"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?|\bnr\s+\d+"
     % "|".join(MONTHS), re.IGNORECASE)
 # a word the removal left doubled ("Kriminalvårdens
@@ -1303,7 +1305,7 @@ RE_TITLE_PARENS = re.compile(r"\([^()]{0,80}\)")
 # same column drops in there too ("(UFS Omtryck 2020:1)", UFS 2023:1, whose
 # designation then named no regulation and lost the document its ändrar target)
 RE_MASTHEAD_COLUMN = re.compile(
-    r"Utkom\s+från\s+trycket|Publicerings?datum|Publicerade?\s+den|\bOmtryck\b"
+    r"Utkom\s+från\s+trycket|Publicerings?datum|Publicerade?(?:\s+den)?|\bOmtryck\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?" % "|".join(MONTHS),
     re.IGNORECASE)
 # where the title stops: its own semicolon, or the clause that follows it --
@@ -1320,7 +1322,8 @@ RE_MASTHEAD_COLUMN = re.compile(
 # class ate a lower-case word that belonged to the title ("… anskaffning av
 # utrustning i gymnasieskolan", SKOLFS 1992:1) -- 3 of the same 1,200.
 RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b"
-                          r"|(?-i:\s[A-ZÅÄÖ][\wåäöÅÄÖ-]+)?\s*\bföreskriver\d{0,2}\b",
+                          r"|(?-i:\s[A-ZÅÄÖ][\wåäöÅÄÖ-]+)?\s*\bföreskriver\d{0,2}\b"
+                          r"|\bÄndring\s+införd\b",
                           re.IGNORECASE)
 # the footnote marker the masthead sets on the title's last word, which the
 # extraction glues to it ("… för statistikändamål1", UFS 2023:1)
@@ -1408,15 +1411,32 @@ def running_furniture(blocks):
 
     A run that names what the document *is* is never furniture: several
     layouts repeat the title as the running header, and removing it would take
-    the title with it. Longest first, so removing a short run cannot break a
-    longer one apart."""
+    the title with it. A run that is part of a title sentence -- a subject
+    fragment that the page repeats as a running header -- is protected too:
+    SSMFS repeats "bäringskikare, pejlkompasser och riktmedel" on every page,
+    which is the title's own subject split across blocks. Longest first, so
+    removing a short run cannot break a longer one apart."""
+    title_sentences = set()
+    for b in blocks:
+        run = " ".join((b.text or "").split())
+        if RE_TITLE_TYPE.search(run) and b.page == 1:
+            title_sentences.add(run)
     pages = {}
     for b in blocks:
         run = " ".join((b.text or "").split())
         if run and len(run) <= FURNITURE_MAX and b.page is not None \
                 and not RE_TITLE_TYPE.search(run):
             pages.setdefault(run, set()).add(b.page)
-    return sorted((run for run, seen in pages.items() if len(seen) > 1),
+
+    def _is_title_fragment(run):
+        if len(run) < 15 or not re.search(r"[a-zåäö]{3,}", run):
+            return False
+        if RE_DESIGNATION.search(run):
+            return False
+        return any(run in ts for ts in title_sentences)
+
+    return sorted((run for run, seen in pages.items()
+                    if len(seen) > 1 and not _is_title_fragment(run)),
                   key=len, reverse=True)
 
 
@@ -1488,7 +1508,7 @@ def clean_title(raw, identifier):
     return t if len(probe) >= 8 else None
 
 
-TITLE_MAX = 300      # a subject longer than this is extraction running on
+TITLE_MAX = 320      # a subject longer than this is extraction running on
 #: the earliest offset in a harvest title where the decision clause may cut it
 #: -- a floor on the cut in :func:`clean_title`, not a test of what a title is.
 #: A row whose clause stands earlier than this prints no title before it, and
@@ -1577,11 +1597,9 @@ def _agency_possessive(before):
 # genuinely opens the way it continues ("Föreskrifter om föreskrifter…") would
 # be truncated. Every real case runs to 40+ characters.
 UNDOUBLE_MIN = 20
-#: how much of the masthead can stand between the two printings. The utgivare
-#: line is what lands there: "Utgivare: Ulf Yngvesson" names no agency after
-#: the comma, so RE_MASTHEAD_BOILERPLATE removes the label and leaves the
-#: person's name between the two copies (22 of Strålsäkerhetsmyndighetens 47
-#: documents, whose title was then published twice over or not at all).
+#: how much of the masthead can stand between the two printings.
+#: RE_MASTHEAD_BOILERPLATE now consumes the person name after "Utgivare:", but
+#: other standing text can land between the two copies.
 UNDOUBLE_GAP = 40
 
 
@@ -1664,6 +1682,12 @@ def clean_masthead(blocks, start):
         _repair_ocr_text(masthead)))))
 
 
+RE_BEKANTGORANDE = re.compile(
+    r"[Bb]ekantgörande\b[^.;]*?\bförfattningssamling\w*"
+    r"(?:\s+ska\s+utgå)?",
+    re.DOTALL)
+
+
 def title_from_masthead(blocks, start):
     """The document's own title, read from the printed masthead -- '<Agency>s
     föreskrifter om …' up to the semicolon or the beslutade clause -- or None
@@ -1683,6 +1707,10 @@ def title_from_masthead(blocks, start):
     föreskrifter och allmänna råd"), and that sentence stands before the title.
     Admitting it in one pass published it instead of the title for 50 documents
     that already read correctly."""
+    raw = join_wrapped(normalise(" ".join(_full_text(blocks[:start]).split())))
+    bek = RE_BEKANTGORANDE.search(raw)
+    if bek:
+        return RE_TITLE_FOOTNOTE.sub("", " ".join(bek.group().split()))
     masthead = clean_masthead(blocks, start)
     return (_masthead_title(masthead, printed_stop=True)
             or _masthead_title(masthead, printed_stop=False))

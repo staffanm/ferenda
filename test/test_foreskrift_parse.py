@@ -2487,3 +2487,33 @@ def test_an_agency_that_owns_two_samlingar_keeps_the_documents_own():
     assert _repeal_targets(named, "rafs") == {"https://lagen.nu/rafs/2019:12"}
     assert _repeal_targets(named, "rams") == {"https://lagen.nu/rams/2019:12"}
     assert fp._SERIES_BY_POSSESSIVE["Riksarkivets"] == {"rafs", "rams"}
+
+
+def test_title_whose_semicolon_stands_past_the_old_300_char_window():
+    blocks = [
+        Block("rubrik", "Tullverkets författningssamling", 1),
+        Block("stycke", "ISSN 0346-5810", 1),
+        Block("stycke", "Utgivare: Rättschefen Karin Erlingsson, Tullverket", 1),
+        Block("stycke",
+              "Inspektionen för strategiska produkters föreskrifter "
+              "om ett generellt tillstånd gällande utförsel av krigsmateriel och "
+              "lämnande av tekniskt bistånd till en viss mottagare i ett land "
+              "inom Europeiska ekonomiska samarbetsområdet (EES) för "
+              "demonstration, utvärdering, utställning, underhåll eller reparation "
+              "samt efter underhåll, reparation eller demonstration i "
+              "Sverige; TFS 2021:2 Utkom från trycket den 31 maj 2021 "
+              "beslutade den 20 maj 2021.", 1),
+        Block("stycke",
+              "Inspektionen för strategiska produkter föreskriver med stöd av "
+              "2 b § förordningen (1992:1303) om krigsmateriel följande.", 1),
+        Block("paragraf", "1 § Dessa föreskrifter gäller.", 1, num="1"),
+    ]
+    _, separated = fp._body_start(blocks)
+    assert separated
+    assert title_from_masthead(blocks, fp._body_start(blocks)[0]) == (
+        "Inspektionen för strategiska produkters föreskrifter "
+        "om ett generellt tillstånd gällande utförsel av krigsmateriel och "
+        "lämnande av tekniskt bistånd till en viss mottagare i ett land "
+        "inom Europeiska ekonomiska samarbetsområdet (EES) för "
+        "demonstration, utvärdering, utställning, underhåll eller reparation "
+        "samt efter underhåll, reparation eller demonstration i Sverige")
