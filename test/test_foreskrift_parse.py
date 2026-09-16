@@ -31,7 +31,7 @@ from ferenda.foreskrift.render import _andrad_genom, _konsoliderad_banner
 from ferenda.lib import catalog, datasets
 from ferenda.lib.lagrum import sfs_parser
 from ferenda.lib.page import Site
-from ferenda.lib.pdftext import Para
+from ferenda.lib.pdftext import Line, Para
 from ferenda.lib.text import node_text, runs_text
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------
@@ -2323,3 +2323,81 @@ def test_a_reversed_lopnummer_year_reference_is_read_for_that_series_only():
           "cisterner vars egenskaper framgår av prestandadeklaration upprättad "
           "enligt EU-förordning (305/2011)")
     assert _uris(extract_metadata("", eu, parser, fs="migrfs")["upphaver"]) == []
+
+
+def _line(text):
+    return Line(text, top=0, bold=False, lead_bold=False, italic=False)
+
+
+def test_a_text_layer_that_is_only_a_stamp_is_read_as_no_text(monkeypatch):
+    # MSB republishes its predecessors' regulations as copier scans with an
+    # "[UPPHÄVD]" stamp laid over the image, and the stamp is the PDF's only
+    # text object. The layer is not empty, so the OCR fallback never fired and
+    # 28 documents published the stamp as their whole body.
+    stamp = [(n, [_line("VD ]"), _line("[ UPPHÄ")]) for n in range(1, 7)]
+    calls = []
+
+    def fake(path, patch_key=None, hidden=False):
+        calls.append((str(path), hidden))
+        return [(1, [_line("Myndighetens föreskrifter om buller")])] \
+            if str(path).endswith(".ocr.pdf") else stamp
+
+    monkeypatch.setattr(fp, "pdf_pages", fake)
+    monkeypatch.setattr(fp, "ocr_pdf", lambda path, lang: path + ".ocr.pdf")
+    assert fp._pages("scan.pdf")[0][1][0].text == "Myndighetens föreskrifter om buller"
+    # a page of its own text is the document's, however short
+    real = [(1, [_line("Myndighetens föreskrifter om buller")]),
+            (2, [_line("2 § Dessa föreskrifter gäller.")])]
+    monkeypatch.setattr(fp, "pdf_pages",
+                        lambda path, patch_key=None, hidden=False: real)
+    assert fp._pages("text.pdf") == real
+
+
+def test_a_masthead_title_may_end_at_its_own_sentence_end():
+    # AFS 1993:2 and 94 other documents print a whole title and neither a
+    # semicolon nor a decision clause. Requiring the printed stop published
+    # none of them.
+    blocks = [Block("rubrik", "Statens räddningsverks författningssamling", 1),
+              Block("rubrik", "Statens räddningsverks föreskrifter om ackreditering "
+                              "av organ för kontroll av tankar. Utkom från trycket.", 1),
+              Block("paragraf", "1 § Dessa föreskrifter gäller tankar.", 1, num="1")]
+    assert title_from_masthead(blocks, 2) == \
+        ("Statens räddningsverks föreskrifter om ackreditering av organ för "
+         "kontroll av tankar")
+
+
+def test_a_title_that_ends_at_nothing_at_all_is_not_published():
+    # With no ending the masthead simply runs on to TITLE_MAX: AFS 1993:2's own
+    # title came out twice, the second copy truncated mid-word at 333
+    # characters. 37 of the 67 documents the weaker ending reaches end that way.
+    runon = ("Arbetarskyddsstyrelsens kungörelse om skydd mot skada genom fall "
+             + "samt vidare text som aldrig stannar " * 8)
+    assert fp._masthead_title(runon, printed_stop=False) is None
+    assert fp._masthead_title(runon, printed_stop=True) is None
+
+
+def test_the_printed_stop_is_read_before_the_standing_masthead_sentence():
+    # Arbetsmiljöverket prints "I (AFS) publiceras myndighetens föreskrifter och
+    # allmänna råd." above the title, and that standing sentence carries a type
+    # word and its own sentence end. Admitting the weaker ending in one pass
+    # published it instead of the title for 50 documents that already read
+    # correctly. Both spans are AFS 2012:1's own, as `clean_masthead` leaves
+    # them; 752 characters of the agency's order-and-price matter stand between
+    # them there, which is why the filler has to outrun TITLE_MAX.
+    masthead = ("I (AFS) publiceras myndighetens föreskrifter och allmänna råd. "
+                "Föreskrifter är bindande regler. "
+                + "Beställningsadress Arbetsmiljöverket Telefon 010-730 90 00. " * 14
+                + "Arbetsmiljöverkets föreskrifter och allmänna råd om användning "
+                "av motorkedjesågar och röjsågar; beslutade den 14 februari 2012.")
+    assert fp._masthead_title(masthead, printed_stop=True) == \
+        ("Arbetsmiljöverkets föreskrifter och allmänna råd om användning av "
+         "motorkedjesågar och röjsågar")
+    # the weaker ending alone stops at the standing sentence instead, which is
+    # why the pass that admits it runs second
+    assert fp._masthead_title(masthead, printed_stop=False) == \
+        "myndighetens föreskrifter och allmänna råd"
+    assert title_from_masthead(
+        [Block("rubrik", masthead, 1),
+         Block("paragraf", "1 § Dessa föreskrifter gäller.", 1, num="1")], 1) == \
+        ("Arbetsmiljöverkets föreskrifter och allmänna råd om användning av "
+         "motorkedjesågar och röjsågar")

@@ -50,6 +50,7 @@ from ..lib.pdftext import (
     RE_PARA_MARK,
     Para,
     ocr_pdf,
+    only_furniture,
     page_paragraphs,
     pdf_pages,
     ruled_footnotes,
@@ -1223,6 +1224,14 @@ RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b"
 # the footnote marker the masthead sets on the title's last word, which the
 # extraction glues to it ("… för statistikändamål1", UFS 2023:1)
 RE_TITLE_FOOTNOTE = re.compile(r"(?<=[^\W\d_])\d{1,2}$")
+# Where a masthead title ends when the page prints no stop at all. 63 documents
+# carry a whole title and neither a semicolon nor a decision clause -- every
+# Arbetarskyddsstyrelsens kungörelse, and Swedac's konsoliderade texter, whose
+# masthead runs "… om EEG-märkning av flaskor som tjänar som mätbehållare
+# (STAFS 2011:7). Ändring införd t.o.m. …". Requiring the stop published none
+# of them. A sentence end is the weaker boundary, used only where the stop is
+# missing, so a title that prints its own stop still ends there.
+RE_TITLE_SENTENCE_END = re.compile(r"\.\s")
 # A type word and a preposition are the whole title where the masthead's copy
 # was cut short before the subject ("Strålsäkerhetsmyndighetens föreskrifter
 # om", SSMFS 2012:2, whose subject the page sets on the lines below and
@@ -1563,17 +1572,49 @@ def title_from_masthead(blocks, start):
     the first blocks *past* `_body_start`, where the title has already been left
     behind, so it found one only for the föreskrifter whose body happens to
     repeat it. It is read through :func:`clean_masthead`, which is what puts the
-    title's own sentence back together."""
+    title's own sentence back together.
+
+    Read in two passes. The first takes only a title the page stops itself --
+    at a semicolon or a decision clause. The second admits the weaker ending, a
+    sentence end, and answers for the documents that print a whole title and no
+    stop at all. Second, not first: a masthead often carries a standing
+    sentence with a type word in it ("I (SOSFS) publiceras myndighetens
+    föreskrifter och allmänna råd"), and that sentence stands before the title.
+    Admitting it in one pass published it instead of the title for 50 documents
+    that already read correctly."""
     masthead = clean_masthead(blocks, start)
+    return (_masthead_title(masthead, printed_stop=True)
+            or _masthead_title(masthead, printed_stop=False))
+
+
+def _masthead_title(masthead, *, printed_stop):
+    """The first title in `masthead`, cut where the masthead ends it.
+
+    `printed_stop` chooses which ending counts: the document's own stop -- a
+    semicolon or a decision clause -- or, with it false, the weaker sentence
+    end as well. Either way an ending is required. A title cut at neither is
+    not a title the page printed: the masthead simply ran on to `TITLE_MAX`,
+    which published AFS 1993:2's own title twice and truncated the second copy
+    mid-word, at 333 characters. 37 of the 67 documents the weaker ending
+    reaches end that way, and rejecting them keeps 30 -- SJÖFS 2005:25's
+    "Sjöfartsverkets föreskrifter och allmänna råd om skyddsanordningar och
+    skyddsåtgärder på fartyg" among them.
+
+    The printed stop is read first even in the second pass: SSMFS 2012:2's
+    masthead keeps only "Strålsäkerhetsmyndighetens föreskrifter om", and
+    cutting at the sentence end instead ran that dangling phrase straight into
+    the enacting clause."""
     for word in RE_TITLE_TYPE.finditer(masthead):
         head = _agency_possessive(masthead[:word.start()].rstrip())
         rest = masthead[word.end():word.end() + TITLE_MAX]
-        stop = RE_TITLE_END.search(rest)
-        title = (masthead[head:word.end()]
-                 + (rest[:stop.start()] if stop else rest)).strip(" ;,.-")
+        stop = RE_TITLE_END.search(rest) or (
+            None if printed_stop else RE_TITLE_SENTENCE_END.search(rest))
+        if not stop:
+            continue
+        title = (masthead[head:word.end()] + rest[:stop.start()]).strip(" ;,.-")
         # a bare type word with no subject is the samling's own name or a
         # running header, not this document's title
-        if stop and len(title) > len(word.group()) + 4:
+        if len(title) > len(word.group()) + 4:
             title = RE_TITLE_FOOTNOTE.sub("", undouble(" ".join(title.split())))
             if _states_a_subject(title):
                 return title
@@ -1585,12 +1626,15 @@ def _pages(path, patch_key=None):
     layer is empty, from the hidden one: a scanned föreskrift (SLVFS 1996-2000,
     188 documents) carries its text only as an invisible OCR layer behind the
     page image, which pdftohtml drops unless asked for hidden text. A scan with
-    no text layer at all (LIVSFS 2002:49, six documents) is OCRed first."""
+    no text layer at all (LIVSFS 2002:49, six documents) is OCRed first, and so
+    is one whose layer is only a stamp -- MSB republishes its predecessors'
+    regulations as copier scans with "[UPPHÄVD]" laid over the image, and that
+    stamp is the PDF's only text object (:func:`lib.pdftext.only_furniture`)."""
     pages = list(pdf_pages(path, patch_key))
-    if any(lines for _pageno, lines in pages):
+    if any(lines for _pageno, lines in pages) and not only_furniture(pages):
         return pages
     pages = list(pdf_pages(path, patch_key, hidden=True))
-    if any(lines for _pageno, lines in pages):
+    if any(lines for _pageno, lines in pages) and not only_furniture(pages):
         return pages
     return list(pdf_pages(ocr_pdf(path, "swe"), patch_key, hidden=True))
 
