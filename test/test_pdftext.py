@@ -1368,3 +1368,41 @@ def test_a_th_row_renders_header_cells():
         "<tr><th>Begrepp</th><th>Betydelse</th></tr>"
     assert _render_rad(body, site, "u", False) == \
         "<tr><td>personal</td><td>egna anställda</td></tr>"
+
+
+# --- a text layer that is only a stamp ---------------------------------------
+
+def test_only_furniture_tells_a_stamp_from_the_document():
+    # MSB lays "[UPPHÄVD]" over the copier image of a repealed regulation and
+    # the ICC prints a court stamp on every page; in both the stamp is the
+    # PDF's only text object, so the layer is not empty and the OCR route was
+    # never reached. A document of its own prints something on one page that it
+    # does not print on the next.
+    stamp = [(n, [_line("VD ]", 40), _line("[ UPPHÄ", 60)]) for n in range(1, 7)]
+    assert pdftext.only_furniture(stamp)
+    real = [(1, [_line("Myndighetens föreskrifter om buller", 40)]),
+            (2, [_line("2 § Dessa föreskrifter gäller.", 40)])]
+    assert not pdftext.only_furniture(real)
+    # a running header over pages that also carry their own text is furniture,
+    # but the layer is still the document's
+    headed = [(1, [_line("MSBFS", 20), _line("1 § Tillämpningsområde.", 40)]),
+              (2, [_line("MSBFS", 20), _line("2 § Undantag.", 40)])]
+    assert not pdftext.only_furniture(headed)
+    # one page has nothing to repeat against
+    assert not pdftext.only_furniture([(1, [_line("[ UPPHÄVD ]", 40)])])
+
+
+def test_pages_with_ocr_ocrs_a_layer_that_is_only_a_stamp(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_pdf_pages(path, patch_key=None, hidden=False):
+        calls.append(str(path))
+        if str(path).endswith(".ocr.pdf"):
+            return [(1, [_line("Beslut i ärendet", 40)])]
+        return [(n, [_line("[ UPPHÄVD ]", 40)]) for n in (1, 2, 3)]
+
+    monkeypatch.setattr(pdftext, "pdf_pages", fake_pdf_pages)
+    monkeypatch.setattr(pdftext, "ocr_pdf", lambda path, lang: str(path) + ".ocr.pdf")
+    pages = pdftext.pages_with_ocr(str(tmp_path / "scan.pdf"))
+    assert [l.text for _no, lines in pages for l in lines] == ["Beslut i ärendet"]
+    assert calls[-1].endswith(".ocr.pdf")

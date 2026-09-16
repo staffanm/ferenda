@@ -25,6 +25,7 @@ The Swedish-legal markers a chapter/§ begins with (``RE_KAP_MARK`` /
 its own paragraph) and the classifiers reuse them.
 """
 
+import collections
 import hashlib
 import os
 import re
@@ -505,6 +506,28 @@ def pdf_figures(pdf_path, patch_key=None):
     return out
 
 
+def only_furniture(pages):
+    """Whether a text layer carries nothing but what every page repeats.
+
+    A registrator can stamp a scan -- MSB lays "[UPPHÄVD]" over the copier
+    image of a repealed regulation, the ICC prints a court stamp on every page
+    -- and that stamp is then the PDF's only text object, the document itself
+    only pixels. The layer is not empty, so an emptiness test passes it through
+    and the OCR route is never reached. A document of its own always prints
+    something on one page that it does not print on the next, so a multi-page
+    layer with no line of its own is not the document.
+
+    Judged on lines, like the emptiness test it stands beside."""
+    if len(pages) < 2:
+        return False
+    runs = [{" ".join(line.text.split()) for line in lines} - {""}
+            for _pageno, lines in pages]
+    seen = collections.Counter()
+    for page in runs:
+        seen.update(page)
+    return not any(seen[run] == 1 for page in runs for run in page)
+
+
 def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
     """(pageno, [Line]) per page, OCR'ing first when the PDF has no readable
     text.
@@ -517,7 +540,8 @@ def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
 
     Emptiness is judged on *lines*, before `page_paragraphs`: a PDF that
     genuinely holds only a letterhead would OCR pointlessly if judged on the
-    paragraphs left after stripping, and OCR is the expensive path.
+    paragraphs left after stripping, and OCR is the expensive path. A layer
+    that holds only a stamp counts as empty too (:func:`only_furniture`).
 
     Shared by the three corpora that read pages this way and meet the same pair
     of failures: remissvar, the Konkurrensverket diarium's scanned decisions,
@@ -547,7 +571,7 @@ def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
             raise
         pdf_path = repair_pdf(pdf_path)
         pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
-    if any(lines for _pageno, lines in pages):
+    if any(lines for _pageno, lines in pages) and not only_furniture(pages):
         return pages
     return list(pdf_pages(str(ocr_pdf(pdf_path, lang)), patch_key, hidden=True))
 
