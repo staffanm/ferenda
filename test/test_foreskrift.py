@@ -1461,6 +1461,44 @@ def test_tsvfs_is_a_registered_series_so_its_citations_resolve():
     assert lagrum.FS_SLUG["TRVTFS"] == "trvtfs"
 
 
+def test_migrfs_enumerate_reads_the_row_whose_number_is_lopnummer_first(monkeypatch):
+    # Migrationsverket numbered its föreskrifter "N/YYYY", the lopnummer before
+    # the arsutgava, and its listing still publishes one such row. The harvest
+    # skipped it, so the corpus's only MIGRFS 2011:5 is a legacy import whose
+    # url the site now answers with 404.
+    def fake_request(_session, _method, _url, **_kw):
+        return SimpleNamespace(text=(
+            '<a href="/download/18.7e7ff7f6/1784096582691/MIGRFS_2026_11.pdf">'
+            'MIGRFS 2026:11 pdf, 17.4 kB, öppnas i nytt fönster.</a>'
+            '<a href="/download/18.2cd2e409/1738586325042/migrfs052011.pdf">'
+            'MIGRFS 5/2011 pdf, 22.9 kB, öppnas i nytt fönster.</a>'))
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    refs = list(harvest.indexed_enumerate(None, REGISTRY["migrfs"]))
+    assert [r.basefile for r in refs] == ["migrfs/2026:11", "migrfs/2011:5"]
+    assert refs[1].identifier == "MIGRFS 2011:5"
+    assert refs[1].extra["regulation_url"].endswith("/migrfs052011.pdf")
+
+
+def test_a_lopnummer_first_number_is_read_only_where_the_series_declares_it():
+    # The reversed form is read for a series whose series.json row declares
+    # `number_form` -- migrfs alone -- the same guard parse applies to a citation
+    # in that form. Under any other series the same row names no number the
+    # harvest can read, and the listing drops it rather than minting 2005:11.
+    assert "migrfs" in harvest.LOPNUMMER_FIRST
+    assert "msbfs" not in harvest.LOPNUMMER_FIRST
+    text, href = "%s 5/2011 pdf, 22.9 kB", "/download/18.2cd2e409/%s052011.pdf"
+
+    def read(fs):
+        agency = harvest.Agency(fs=fs, name=fs, publisher=fs,
+                                base_url="https://e", index_url="https://e/list")
+        return harvest.ref(agency, text % fs.upper(), href % fs, set(), direct=True)
+
+    assert read("migrfs").basefile == "migrfs/2011:5"
+    assert read("msbfs") is None
+
+
 def test_kvfs_keeps_a_konsoliderad_version_the_page_no_longer_links(tmp_path, monkeypatch):
     # We publish the consolidated version at a regulation's own url when we have
     # one, and the publisher is under no duty to serve it for ever:

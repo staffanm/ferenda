@@ -1002,16 +1002,23 @@ KFS = Agency(
 
 # indexed + DIRECT. A static "föreskrifter" page lists the in-force MIGRFS texts
 # as direct /download/<node>/MIGRFS_YYYY_N.pdf links; the number comes from the
-# "MIGRFS YYYY:N" link text. One legacy row uses the old N/YYYY numbering
-# ("MIGRFS 5/2011" -> migrfs052011.pdf) that the generic parser can't read as a
-# year:lopnummer, so it is skipped (skip_re).
+# "MIGRFS YYYY:N" link text. One row keeps the old numbering ("MIGRFS 5/2011" ->
+# migrfs052011.pdf), which `harvest.ref` reads because series.json declares
+# migrfs's `number_form` (harvest.LOPNUMMER_FIRST); it used to be skipped.
+#
+# The page's other pointer is a "Förteckning" register published as an .xlsx. It
+# names 195 designations, 85 of them documents we do not hold -- and the site
+# serves none of those 85. Sitevision addresses a file by node id alone, every
+# delisted node answers 404 (including nodes for documents we *do* hold, such as
+# MIGRFS 2013:1), and the site's own search index holds exactly the 30 MIGRFS
+# files this page links. The register names no url of its own, so no enumerate,
+# selector or spreadsheet reader can recover them from the publisher (#75).
 MIGRFS = Agency(
     fs="migrfs", name="Migrationsverket", publisher="Migrationsverket",
     base_url="https://www.migrationsverket.se",
     index_url="https://www.migrationsverket.se/om-migrationsverket/styrning-och-uppfoljning/foreskrifter.html",
     enumerate=indexed_enumerate, resolve=resolve_direct,
-    params={"link_select": 'a[href*="migrfs" i][href$=".pdf"]', "direct": True,
-            "skip_re": r"\d+/\d{4}"},
+    params={"link_select": 'a[href*="migrfs" i][href$=".pdf"]', "direct": True},
 )
 
 

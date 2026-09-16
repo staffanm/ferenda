@@ -179,6 +179,16 @@ RE_DESIGNATION = re.compile(r"\b(%s)\s*(\d{4}):(\d+)" % FS_PREFIX)
 RE_FILE_DESIGNATION = re.compile(
     r"(%s)[ _-]*(\d{4})[:._ -](\d{1,3})(?:\D|$)" % FS_PREFIX)
 
+# The series whose printed number puts the lopnummer before the arsutgava:
+# Migrationsverket's "MIGRFS 5/2011" is MIGRFS 2011:5, and its listing still
+# publishes one such row. Which series print it that way is declared in
+# series.json (`number_form`) -- the same row `parse._repeal_targets` reads for
+# a citation in that form -- so the spelling stays one agency's invention
+# instead of widening the shared designation pattern for every scope.
+LOPNUMMER_FIRST = {fs for fs, row in datasets.load_fs_series().items()
+                   if row.get("number_form") == "lopnummer/arsutgava"}
+RE_LOPNUMMER_FIRST = re.compile(r"\b(%s)\s*(\d{1,3})\s*/\s*(\d{4})\b" % FS_PREFIX)
+
 # What tells a listing row that the designation beside it is *another*
 # document's: an ändringsförfattning and a repeal both name their target in
 # their own title. The first designation after one of these belongs to that
@@ -709,6 +719,11 @@ def ref(agency, ident_text, href, seen, title=None, direct=False):
     and is dropped before any of that: it is the catalogue, and its filename's
     date reads as a number ("...2021-01.pdf" was harvested as KOVFS 2021:1)."""
     ident_text = normalise(ident_text or "")
+    if agency.fs in LOPNUMMER_FIRST:
+        # rewritten into the ordinary form before anything reads it, so one
+        # designation reader serves both spellings and the row's own words
+        # still decide which designation is the row's own (`own_designation`)
+        ident_text = RE_LOPNUMMER_FIRST.sub(r"\1 \3:\2", ident_text)
     if RE_FORTECKNING_ROW.search(ident_text):
         return None
     own = own_designation(ident_text)
