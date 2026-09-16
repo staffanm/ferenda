@@ -737,12 +737,38 @@ def test_resolve_landing_rejects_and_counts_non_pdf(tmp_path, monkeypatch):
     assert not (tmp_path / "fffs" / "fffs-2013-10-regulation.pdf").exists()
 
 
-class _PdfResp:
-    """A landing page whose every PDF link serves a real PDF body."""
-    content = b"%PDF-1.4 body"
+class _Resp:
+    def __init__(self, text, content):
+        self.text, self.content = text, content
 
-    def __init__(self, text):
-        self.text = text
+
+def _pdf_site(page, landing="https://e/landing"):
+    """A fake ``request`` for a landing page whose every PDF link serves a real
+    PDF body. The landing response carries HTML bytes and the document links
+    carry PDF bytes, because `resolve_landing` sniffs its own response and reads
+    PDF bytes there as the document itself."""
+    return lambda _session, _method, url, **_kw: (
+        _Resp(page, page.encode()) if url == landing
+        else _Resp("", b"%PDF-1.4 body"))
+
+
+def test_resolve_landing_stores_a_row_that_links_the_pdf_itself(
+        tmp_path, monkeypatch):
+    # Energimyndigheten's archive rows link ".../foreskrifter/2005_10.pdf"
+    # where a landing page is expected. Decoding those bytes as HTML found no
+    # anchor, so the record stored an empty `regulation` slot and 21 stemfs and
+    # 4 nutfs documents got no text at all.
+    monkeypatch.setattr(harvest, "request",
+                        lambda *a, **kw: _Resp("", b"%PDF-1.4 body"))
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+    agency = harvest.Agency(fs="stemfs", name="EM", publisher="Energimyndigheten",
+                            base_url="https://e", index_url="https://e/list")
+    ref = DocRef(basefile="stemfs/2005:10", identifier="STEMFS 2005:10",
+                 url="https://e/foreskrifter/2005_10.pdf")
+    record = harvest.resolve_landing(None, agency, ref, str(tmp_path), delay=0)
+    assert record["files"]["regulation"]["url"] == \
+        "https://e/foreskrifter/2005_10.pdf"
+    assert (tmp_path / "stemfs" / "stemfs-2005-10-regulation.pdf").exists()
 
 
 def test_resolve_landing_lets_a_second_anchor_classify_the_same_href(
@@ -753,7 +779,7 @@ def test_resolve_landing_lets_a_second_anchor_classify_the_same_href(
     # regulations unfetched.
     page = ('<a href="/d/HVMFS-2017-20-ev.pdf">Ursprunglig utgåva pdf, 1.2 MB.</a>'
             '<a href="/d/HVMFS-2017-20-ev.pdf">HVMFS 2017:20 pdf, 1.2 MB.</a>')
-    monkeypatch.setattr(harvest, "request", lambda *a, **kw: _PdfResp(page))
+    monkeypatch.setattr(harvest, "request", _pdf_site(page))
     monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
     agency = harvest.Agency(fs="hvmfs", name="HaV", publisher="HaV",
                             base_url="https://e", index_url="https://e/list",
@@ -771,7 +797,7 @@ def test_resolve_landing_keeps_the_first_regulation_and_files_the_rest(
     # the last bilaga as the law.
     page = ('<a href="/d/scb-fs-2016-7.pdf">Statistiska centralbyråns föreskrifter</a>'
             '<a href="/d/scb-fs-2016-7-variabelforteckning.pdf">Variabelförteckning</a>')
-    monkeypatch.setattr(harvest, "request", lambda *a, **kw: _PdfResp(page))
+    monkeypatch.setattr(harvest, "request", _pdf_site(page))
     monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
     agency = harvest.Agency(fs="scbfs", name="SCB", publisher="SCB",
                             base_url="https://e", index_url="https://e/list",

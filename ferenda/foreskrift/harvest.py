@@ -565,10 +565,26 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
         bilagor, Arbetsmiljöverkets rättelsesidor -- and is recorded as an
         attachment reference instead of overwriting the law.
 
+    A listing row that links the document itself, where a landing page is
+    expected, is stored as that document rather than scraped for links.
+
     Returns the stored record (also written to disk)."""
     fs = ref.fs or agency.fs     # the document's own samling (see DocRef.fs)
     arsutgava, lopnummer = ref.basefile.split("/", 1)[1].split(":")
-    landing = request(session, "GET", ref.url).text
+    response = request(session, "GET", ref.url)
+    if document_extension(response.content) == ".pdf":
+        # Energimyndigheten's archive rows point straight at the PDF
+        # (".../om-oss/foreskrifter/2005_10.pdf"). Decoding those bytes as HTML
+        # finds no anchor, so the record used to store an empty `regulation`
+        # slot and the document got no text at all -- 21 stemfs and 4 nutfs
+        # records. Sniff the bytes, not the URL: the served content type is not
+        # evidence (see `fetch_pdf`), and a document store can serve a PDF from
+        # an extensionless URL.
+        record = save_single_pdf_record(root, agency, ref, ref.url,
+                                        response.content)
+        time.sleep(delay)
+        return record
+    landing = response.text
     soup = BeautifulSoup(landing, "html.parser")
     classify = agency.params.get("classify", classify_file)
     download_roles = agency.params.get("download_roles", DOWNLOAD_ROLES)
