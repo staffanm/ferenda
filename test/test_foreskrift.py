@@ -1541,3 +1541,40 @@ def test_kvfs_keeps_a_konsoliderad_version_the_page_no_longer_links(tmp_path, mo
     # the carry-forward survives re-reading the record from disk
     stored = json.loads(compress.read_text(record_path(str(root), "kvfs", "kvfs/2011:1")))
     assert len(stored["files"]["consolidation"]) == 1
+
+
+def test_eifs_enumerate_reads_the_upphavda_archives_download_rows(monkeypatch):
+    # Ei's three category listings link one shared archive, and its rows link
+    # the PDF itself where a landing page is expected -- so the landing selector
+    # read 1 anchor on a page of 122. EIFS 2022:7, the föreskrift that repealed
+    # the EIFS 2019:1 we hold, is published nowhere else, and 32 designations
+    # sat behind that one page. Two rows are Ei's own slips and must not become
+    # documents: "STEMS 2006:3" is a misprint for STEMFS 2006:3, and
+    # "STEMFS 2006:6" links STEMFS 2006:5's file.
+    _pages(monkeypatch, {
+        agencies.EIFS.index_url:
+            '<a href="/om-oss/publikationer/publikationer/foreskrifter-el/2026/'
+            'foreskrift-eifs-202610">EIFS 2026:10</a>'
+            '<a href="/om-oss/lagar-och-regler/foreskrifter/upphavda-foreskrifter">'
+            'Upphävda föreskrifter</a>',
+        agencies.EIFS.params["index_urls"][1]: "<p>inga</p>",
+        agencies.EIFS.params["index_urls"][2]: "<p>inga</p>",
+        "https://ei.se/om-oss/lagar-och-regler/foreskrifter/upphavda-foreskrifter":
+            '<a href="/download/18.5b/1608639227176/EIFS-2019-1-om-insamling.pdf">'
+            'EIFS 2019:1 pdf, 76.1 kB.</a>'
+            '<a href="/download/18.23/1669384129429/'
+            'EIFS-2022-7-om-upphavande-av-EIFS-2019-1.pdf">EIFS 2022:7 pdf, 94.2 kB.</a>'
+            '<a href="/download/18.5b/1608639242630/STEMFS-2006-3-om-redovisning.pdf">'
+            'STEMS 2006:3 pdf, 74.9 kB.</a>'
+            '<a href="/download/18.43/1610627600890/STEMFS-2006-5-om-natkoncession.pdf">'
+            'STEMFS 2006:6 pdf, 63.4 kB.</a>'})
+    refs = list(harvest.indexed_enumerate(None, agencies.EIFS))
+    assert [(r.basefile, r.url) for r in refs] == [
+        ("eifs/2026:10",
+         "https://ei.se/om-oss/publikationer/publikationer/foreskrifter-el/2026/"
+         "foreskrift-eifs-202610"),
+        ("eifs/2019:1",
+         "https://ei.se/download/18.5b/1608639227176/EIFS-2019-1-om-insamling.pdf"),
+        ("eifs/2022:7",
+         "https://ei.se/download/18.23/1669384129429/"
+         "EIFS-2022-7-om-upphavande-av-EIFS-2019-1.pdf")]

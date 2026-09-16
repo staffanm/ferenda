@@ -576,6 +576,25 @@ RPSFS = Agency(
 # landing + filename-classify. The base text's landing link carries only the
 # title (no designation), so files are classified by their PDF filename
 # (EIFS-YYYY-N-…, …-konsoliderad, …-om-ändring-…), not the link text.
+#
+# All three pages link one shared archive, "Upphävda föreskrifter", which
+# `archive_links` already queues -- but its rows link the /download/ PDF itself
+# where a landing page is expected, so the landing selector read 1 anchor on a
+# page of 122 and the archive delivered nothing for its one request. The
+# selector therefore takes a PDF href as well, and `resolve_landing` sniffs
+# those bytes and stores the response as the document. That page is the only
+# place 32 EIFS designations are published, among them the four föreskrifter
+# that repealed the EIFS 2019:1, 2019:2, 2019:4 and 2019:5 we already hold --
+# EIFS 2022:7, 2022:8, 2022:9 and 2023:1 (#51). It also carries the STEMFS and
+# NUTFS regulations Ei took the nätverksamhet föreskrifter over from, which the
+# printed designation keeps under their own samling.
+#
+# skip_re drops the two rows Ei itself gets wrong. "STEMS 2006:3" is a misprint
+# for STEMFS 2006:3 -- the row's own description cell and its file both spell it
+# out -- and `series_slug` would answer the misprint with a samling no agency
+# ever issued. "STEMFS 2006:6" links STEMFS 2006:5's file, whose masthead reads
+# "STEMFS 2006:5"; storing it would publish one regulation's text under
+# another's number.
 EIFS = Agency(
     fs="eifs", name="Energimarknadsinspektionen", publisher="Energimarknadsinspektionen",
     base_url="https://ei.se",
@@ -585,8 +604,10 @@ EIFS = Agency(
                 "https://ei.se/om-oss/lagar-och-regler/foreskrifter/foreskrifter---el",
                 "https://ei.se/om-oss/lagar-och-regler/foreskrifter/foreskrifter---fjarrvarme-och-fjarrkyla",
                 "https://ei.se/om-oss/lagar-och-regler/foreskrifter/foreskrifter---naturgas"],
-            "link_select": 'a[href*="/publikationer/foreskrifter-"]',
+            "link_select": 'a[href*="/publikationer/foreskrifter-"], '
+                           'a[href*="/download/"][href$=".pdf"]',
             "pdf_select": 'a[href*="/download/"][href$=".pdf"]',
+            "skip_re": r"\bSTEMS \d|\bSTEMFS 2006:6\b",
             "classify": classify_href},
 )
 
