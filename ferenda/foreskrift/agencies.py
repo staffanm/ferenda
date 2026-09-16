@@ -2014,9 +2014,13 @@ MYHFS = Agency(
 # so every grundförfattning/allmänna-råd post is a base regardless of issuer.
 # --------------------------------------------------------------------------
 
+RE_REPEAL_NOTICE = re.compile(
+    r"^(?:F[öo]reskrifter|F[öo]rordning)\s+om\s+upph[äa]vande\b", re.I)
+
+
 def skolfs_enumerate(session, agency):
-    """One DocRef per base SKOLFS regulation, its consolidation + amendments
-    attached, from Skolverket's register API (the whole corpus, walked per year)."""
+    """One DocRef per SKOLFS regulation — base, allmänna råd, and repeal notice —
+    from Skolverket's register API (the whole corpus, walked per year)."""
     api = agency.params["api_url"]
     hits = []
     for year in request(session, "GET", api + "/statute/years", parse_json=True):
@@ -2025,9 +2029,12 @@ def skolfs_enumerate(session, agency):
         time.sleep(0.3)
     amendments: dict[str, list] = {}
     consolidated = set()
+    repeal_notices = []
     for h in hits:
         if h["documentType"] == "ANDRINGSFORFATTNING":
             amendments.setdefault(h["baseSkolfsNumber"], []).append(h["skolfsNumber"])
+            if RE_REPEAL_NOTICE.match((h.get("statuteTitle") or "").strip()):
+                repeal_notices.append(h)
         elif h["documentType"] == "SENASTE_LYDELSE":
             consolidated.add(h["baseSkolfsNumber"])
     seen = set()
@@ -2051,6 +2058,21 @@ def skolfs_enumerate(session, agency):
                    "amendments": [{"identifier": "%s %s" % (agency.fs.upper(), a),
                                    "url": "%s/document/ANDRINGSFORFATTNING/%s/pdf" % (api, a)}
                                   for a in amendments.get(num, [])],
+                   "title": h["statuteTitle"], "source_url": agency.index_url})
+    for h in repeal_notices:
+        num = h["skolfsNumber"]
+        year, lop = num.split(":")
+        basefile = "%s/%s:%s" % (agency.fs, year, str(int(lop)))
+        if basefile in seen:
+            continue
+        seen.add(basefile)
+        pdf = "%s/document/%s/%s/pdf" % (api, h["documentType"], num)
+        yield DocRef(
+            basefile=basefile,
+            identifier="%s %s:%s" % (agency.fs.upper(), year, str(int(lop))),
+            url=pdf, title=h["statuteTitle"],
+            extra={"regulation_url": pdf, "consolidations": [],
+                   "amendments": [],
                    "title": h["statuteTitle"], "source_url": agency.index_url})
 
 
