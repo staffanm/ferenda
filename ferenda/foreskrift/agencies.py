@@ -2756,13 +2756,11 @@ RE_FKFS_DOC = re.compile(r'\{"nummer":"[^"]*".*?"samling":[^{}]*\}')
 
 
 def fkfs_enumerate(session, agency):
-    """One DocRef per base regulation from FKFS's embedded register corpus."""
+    """One DocRef per regulation from FKFS's embedded register corpus."""
     corpus = html.unescape(request(session, "GET", agency.index_url).text)
     seen = set()
     for obj in RE_FKFS_DOC.findall(corpus):
         d = json.loads(obj)
-        if d["isChangeDocument"]:
-            continue
         fs = d["forfattningssamling"].lower()          # "fkfs" or "rffs"
         lop = str(int(d["lopnummer"]))
         basefile = "%s/%s:%s" % (fs, d["arsutgava"], lop)
