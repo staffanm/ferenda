@@ -837,6 +837,25 @@ hinken och en per ankare som en hänvisning kan peka på (`K12P52`, `32.1`,
 - Indexet byggs av `relate` (`lib/rangeindex.py`, filen `range-index.bin` bredvid
   katalogen). Utan filen svarar routen 503.
 
+### `GET /api/v1/packs/{pack_id}` — dokumentpaket för integritetsläge
+
+En klient som inte vill avslöja vilket enskilt dokument den hämtar laddar ned
+grova statiska dokumentpaket i artefakt-JSON:
+
+- `core`: de 250 mest citerade dokumenten i corpuset (lagar, fördrag, EU-akter).
+- `sfs/{decade}s`: författningar per decennium (t.ex. `sfs/1990s`).
+- `celex/1`: EU:s grundfördrag i ett paket.
+- `celex/{sector}/{year}`: sekundärrätt (`celex/3/2016`) eller rättspraxis
+  (`celex/6/2019`) per år.
+- `dom/{court}/{5yr_block}`: domar i 5-årsblock (t.ex. `dom/nja/2020-2024`,
+  `dom/echr/2020-2024`).
+- `{kind}/{year}`: förarbeten per år (t.ex. `prop/1997`, `sou/1997`, `ds/2024`).
+
+Svaret är `application/json` med strukturen `{"pack": "<pack_id>", "documents":
+{"<uri>": { ...artefakt... }}}`. Svaren lagras och serveras förkomprimerade med
+Brotli (`Content-Encoding: br`). Klienten slår upp bestämmelser direkt via
+nod-ID:n i dokumentträdet.
+
 ### `GET /api/v1/ohttp-keys`, `POST /api/v1/ohttp-gateway` — Oblivious HTTP
 
 En klient som inte får visa vem som frågar skickar sin förfrågan genom ett

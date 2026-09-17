@@ -610,6 +610,16 @@ sampled references, 2026-09-17), and a HUDOC judgment mints one id per block
 (51,671 in `dom/echr/001-178082`), which would set the size of every answer.
 After a change to `pinpoints`, run `lagen <source> relate --force`.
 
+`lib/packs.py` builds and caches document packs behind `GET /api/v1/packs/{pack_id}`
+for Slopcheck privacy mode: coarse bundles of legal documents in their native
+JSON artifact format. Packs are partitioned deterministically: `core` (the top
+250 cited documents globally), `sfs/{decade}s`, `celex/1` (treaties),
+`celex/{sector}/{year}` (secondary legislation or case law),
+`dom/{court}/{5yr_block}`, and `{kind}/{year}` for förarbeten. Packs are
+assembled from `catalog.sqlite` and the artifact files on disk, and cached as
+Brotli-compressed `.json.br` files under `cache/packs/`. Clients parse the JSON
+directly and locate provisions via their node IDs.
+
 `api/ohttp.py` is the Oblivious HTTP gateway (RFC 9458): `GET /api/v1/ohttp-keys`
 and `POST /api/v1/ohttp-gateway`. It opens the sealed request with `pyhpke`,
 decodes the known-length Binary HTTP request (RFC 9292), and runs it against the

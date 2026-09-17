@@ -597,6 +597,27 @@ sha256("https://lagen.nu/celex/32016R0679#32.1") = b69f7810…  -> article 32.1:
 - `503` means the index is not built. `422` means the prefix is not 3 lower-case
   hex characters.
 
+### Document packs for privacy mode — `GET /api/v1/packs/{pack_id}`
+
+A client that must not reveal which document it fetches downloads static
+bundles of documents in their native JSON artifact format.
+
+- `core`: the 250 most cited legal instruments across all sources (statutes,
+  treaties, EU regulations, and directives).
+- `sfs/{decade}s`: statutes by decade (e.g. `sfs/1990s`).
+- `celex/1`: all EU primary treaties in one pack.
+- `celex/{sector}/{year}`: secondary legislation (`celex/3/2016`) or court
+  rulings (`celex/6/2019`) by year.
+- `dom/{court}/{5yr_block}`: court decisions in 5-year blocks (e.g.
+  `dom/nja/2020-2024`, `dom/echr/2020-2024`).
+- `{kind}/{year}`: preparatory works by year (e.g. `prop/1997`, `sou/1997`,
+  `ds/2024`).
+
+The response is `application/json`:
+`{"pack": "<pack_id>", "documents": {"<uri>": { ...artifact... }}}`.
+Responses are stored and served precompressed with Brotli (`Content-Encoding: br`).
+Clients resolve pinpoints directly via node IDs in the document AST.
+
 ### Oblivious HTTP — `GET /api/v1/ohttp-keys`, `POST /api/v1/ohttp-gateway`
 
 A client that must not show this server who asks sends its request through an
@@ -652,6 +673,7 @@ request and the relay's address.
 | a document as PDF | `GET /api/v1/pdf?path=…` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
 | check a citation without showing which | `GET /api/v1/range/{prefix}` |
+| fetch a bundle of documents in private | `GET /api/v1/packs/{pack_id}` |
 | ask without showing who asks | `POST /api/v1/ohttp-gateway` with a key from `GET /api/v1/ohttp-keys` |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 

@@ -64,6 +64,7 @@ from ..lib import (
     history,
     layout,
     mdtext,
+    packs,
     pathgraph,
     pins,
     rangeindex,
@@ -1990,6 +1991,56 @@ def range_endpoint(prefix: str = PathParam(
     entries = rangeindex.fill(number, *rangeindex.bucket(layout.CATALOG, number))
     return Response("".join(e.hex() + "\n" for e in entries), media_type="text/plain",
                     headers={"Cache-Control": "public, max-age=3600, no-transform"})
+
+
+@app.get("/api/v1/packs/{pack_id:path}", response_class=Response, tags=["privacy"],
+         summary="A static bundle of documents for privacy mode",
+         responses={200: {"content": {"application/json": {}}}})
+def pack_endpoint(
+    request: Request,
+    pack_id: str = PathParam(
+        ..., description="pack identifier (core, sfs/1990s, celex/3/2016, dom/nja/2020-2024, prop/1997, sou/1997)",
+    ),
+):
+    """A bundle of legal documents in their native JSON artifact format, for
+    checking or analyzing citations without disclosing which specific document is queried.
+
+    The client maps its citation to a deterministic pack identifier (such as
+    `core`, `sfs/1990s`, `celex/3/2016`, `dom/nja/2020-2024`, `prop/1997`, or
+    `sou/1997`) and retrieves the pack. The response is a JSON object mapping
+    document URIs to their full artifact dict.
+
+    Stored and served as a precompressed Brotli `.json.br` file. A client accepting
+    Brotli receives the file directly with `Content-Encoding: br`."""
+    if not packs.SAFE_PACK_ID.match(pack_id):
+        raise HTTPException(400, "invalid pack id")
+    cached = packs.pack_path(pack_id, layout.PACKS_CACHE)
+    if not cached.exists() and not layout.CATALOG.exists():
+        raise HTTPException(503, "catalog not built -- run relate")
+    pack_file = packs.get_cached_pack(layout.CATALOG, layout.DATA, layout.PACKS_CACHE, pack_id)
+    if pack_file is None:
+        raise HTTPException(404, f"pack not found: {pack_id}")
+
+    accepts = request.headers.get("accept-encoding", "")
+    if "br" in accepts:
+        return FileResponse(
+            pack_file,
+            media_type="application/json",
+            headers={
+                "Content-Encoding": "br",
+                "Vary": "Accept-Encoding",
+                "Cache-Control": "public, max-age=86400",
+            },
+        )
+    raw = compress.decompress_bytes(pack_file.read_bytes(), "br")
+    return Response(
+        raw,
+        media_type="application/json",
+        headers={
+            "Vary": "Accept-Encoding",
+            "Cache-Control": "public, max-age=86400",
+        },
+    )
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"],

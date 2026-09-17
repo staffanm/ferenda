@@ -52,6 +52,10 @@ def gateway(keyfile):
     def stand_in(prefix: str, request: Request):
         return {"prefix": prefix, "headers": sorted(request.headers.keys())}
 
+    @app.get("/api/v1/packs/core")
+    def pack_stand_in(request: Request):
+        return {"pack": "core", "headers": sorted(request.headers.keys())}
+
     @app.get("/api/v1/document")
     def outside():
         return {"reached": True}
@@ -164,8 +168,17 @@ def test_a_mutating_method_is_refused_inside_the_seal(gateway):
 
 
 def test_a_missing_inner_resource_is_a_sealed_404(gateway):
-    status, _, _, _ = _ask(gateway, b"GET", b"/api/v1/packs/core")
+    status, _, _, _ = _ask(gateway, b"GET", b"/api/v1/packs/missing")
     assert status == 404
+
+
+def test_pack_served_through_gateway_passes_accept_encoding(gateway):
+    status, _, content, _ = _ask(gateway, b"GET", b"/api/v1/packs/core", headers=[
+        (b"accept", b"application/json"), (b"accept-encoding", b"br")])
+    assert status == 200
+    res = json.loads(content)
+    assert res["pack"] == "core"
+    assert res["headers"] == ["accept", "accept-encoding", "host"]
 
 
 def test_outer_errors(gateway):

@@ -14,9 +14,10 @@ context.
 Only `INNER_PATH` is served. Dispatching in process passes around everything
 nginx enforces in front of the app (rate limits, the facsimile render gate), so
 the gateway serves the two routes built for it and nothing else. The inner
-request carries no header of the client's except `Accept`, and asks for no
-compression: a compressed body's length follows its content, which is what the
-fixed-size range answer exists to hide.
+request carries no header of the client's except `Accept` (and `Accept-Encoding`
+for `/api/v1/packs/…`, so a pack travels compressed). For `/api/v1/range/…`,
+compression is never used: a compressed body's length follows its content,
+which is what the fixed-size range answer exists to hide.
 
 An error the relay may see (bad media type, unknown key, a blob that does not
 open) is an ordinary HTTP status. An error in the inner request (a path outside
@@ -217,12 +218,15 @@ def seal_response(message, enc, context, nonce=None):
 # the gateway
 # --------------------------------------------------------------------------
 
-async def _dispatch(app, method, path, accept):
+async def _dispatch(app, method, path, accept, encodings=()):
     """Run one request against `app` in process: ``(status, headers, body)``."""
+    headers = [(b"host", b"lagen.nu")] + [(b"accept", v) for v in accept]
+    if encodings:
+        headers.extend([(b"accept-encoding", v) for v in encodings])
     scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
              "method": method, "scheme": "https", "path": path,
              "raw_path": path.encode("ascii"), "query_string": b"",
-             "headers": [(b"host", b"lagen.nu")] + [(b"accept", v) for v in accept],
+             "headers": headers,
              "client": None, "server": ("lagen.nu", 443)}
     request = [{"type": "http.request", "body": b"", "more_body": False}]
     status, headers, body = None, [], bytearray()
@@ -281,8 +285,9 @@ async def ohttp_gateway(request: Request):
     elif not INNER_PATH.match(path):
         inner = _refusal(403, "the gateway serves /api/v1/range/ and /api/v1/packs/")
     else:
-        inner = await _dispatch(request.app, method, path,
-                                [v for name, v in headers if name.lower() == b"accept"])
+        accepts = [v for name, v in headers if name.lower() == b"accept"]
+        encodings = [v for name, v in headers if name.lower() == b"accept-encoding"] if path.startswith("/api/v1/packs/") else []
+        inner = await _dispatch(request.app, method, path, accepts, encodings)
     return Response(seal_response(encode_response(*inner), enc, context),
                     media_type="message/ohttp-res",
                     headers={"Cache-Control": "no-store"})
