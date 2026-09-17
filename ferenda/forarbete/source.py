@@ -383,6 +383,7 @@ SOURCES: tuple[Source, ...] = (Source("forarbete", fa_list, {
    render=render.render,
    intermediate=(fa_intermediate, "pdftohtml XML"),
    artifacts=functools.partial(layout.artifacts, "forarbete"),
+   pinpoints=r"sid\d+",    # a förarbete is cited by printed page only
    relate_cross=fa_relate_cross,
    cross_code=(HERE / "genomforande.py", HERE / "fk.py"),
    # the genomförande/fk .ann layers the cross-passes pin

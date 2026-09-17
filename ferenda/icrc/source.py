@@ -25,6 +25,7 @@ SOURCES: tuple[Source, ...] = (simple_source(
     "icrc", download, parse.parse, layout.ICRC_DOWNLOADED, ICRC_CODE,
     render=render.render,
     artifacts=functools.partial(layout.artifacts, "icrc"),
+    pinpoints=".+",
     inputs=record_inputs("icrc", functools.partial(download.record_path,
                                                    layout.ICRC_DOWNLOADED)),
     origin=origin(download.SITE),

@@ -30,7 +30,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from .. import config
-from . import begrepp, catalog_rows, compress, courtids, labels, text, util
+from . import begrepp, catalog_rows, compress, courtids, labels, rangeindex, text, util
 from .markdown import begrepp_uri
 from .util import BASE, local
 
@@ -98,6 +98,12 @@ CREATE TABLE IF NOT EXISTS citation_alias (
     PRIMARY KEY (alias, uri)
 );
 CREATE INDEX IF NOT EXISTS idx_citation_alias_uri ON citation_alias(uri);
+CREATE TABLE IF NOT EXISTS range_anchors (
+    uri    TEXT PRIMARY KEY,    -- the document
+    hashes BLOB NOT NULL        -- one 8-byte hash per citable anchor, sorted and
+                                -- concatenated (lib/rangeindex.anchor_hashes);
+                                -- folded into range-index.bin after relate
+);
 CREATE TABLE IF NOT EXISTS concept_alias (
     variant   TEXT PRIMARY KEY,     -- an inflected/variant begrepp uri
     canonical TEXT NOT NULL         -- the concept it folds onto (lib.begrepp)
@@ -1140,11 +1146,12 @@ def _drop_document(con, uri):
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
     con.execute("DELETE FROM definitions WHERE from_uri = ?", (uri,))
     con.execute("DELETE FROM directive_correspondence WHERE new_uri = ?", (uri,))
+    con.execute("DELETE FROM range_anchors WHERE uri = ?", (uri,))
     con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
 
 
-def _index_document(con, art, path, source):
+def _index_document(con, art, path, source, pinpoints=None):
     """(Re)write one document's rows: its documents row and outbound links,
     replacing any prior version keyed by the same uri."""
     uri = art["uri"]
@@ -1171,6 +1178,11 @@ def _index_document(con, art, path, source):
         [(uri, e["newArticle"], e["oldLaw"], e["oldArticle"],
           e.get("newPinpoint"), e.get("oldPinpoint"))
          for e in art.get("correspondence") or []])
+    # the provisions a citation to this document can name, hashed for the
+    # range index -- here for the same reason as the lineage above: the
+    # artifact is open, and the row is incremental with the links beside it
+    con.execute("INSERT OR REPLACE INTO range_anchors VALUES (?, ?)",
+                (uri, rangeindex.anchor_hashes(art, pinpoints)))
     row = catalog_rows.document_row(art, path, source)        # (uri, source, kind, label, title, path)
     lb = labels.document_labels(source, art)
     # a treaty's artifact title is the bare CELEX (no extractable heading); the
@@ -1284,7 +1296,8 @@ def content_hashes(paths):
 
 
 def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
-            data_root=None, exclusive=False, stats=None, digests=None):
+            data_root=None, exclusive=False, stats=None, digests=None,
+            pinpoints=None):
     """Sync one source's rows in the catalog to its artifacts on disk.
     Incremental by content hash: an artifact whose bytes are unchanged since the
     last relate is left in place (not re-parsed); new/changed ones are
@@ -1304,6 +1317,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     new one re-extracts the document. `stats` is ``{str(path): (size,
     mtime_ns)}`` for every artifact when the caller has just stat'd them
     (cmd_relate's fingerprint pass); left unset, both are done here, serially.
+    `pinpoints` is the source's `stage.Source.pinpoints`, for the range index.
 
     Returns (documents, links, changed): the source's row + link totals after the
     sync, and how many documents were (re)written this run."""
@@ -1376,7 +1390,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
             art = json.loads(compress.read_bytes(path))
             if prev and prev[0] != art["uri"]:   # uri moved under this path
                 _drop_document(con, prev[0])
-            _index_document(con, art, key, source)
+            _index_document(con, art, key, source, pinpoints)
             con.execute("UPDATE documents SET content_hash = ?, art_size = ?, "
                         "art_mtime_ns = ? WHERE uri = ?",
                         (digest, size, mtime_ns, art["uri"]))

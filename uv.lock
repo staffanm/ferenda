@@ -519,6 +519,7 @@ dependencies = [
     { name = "opensearch-py" },
     { name = "pillow" },
     { name = "playwright" },
+    { name = "pyhpke" },
     { name = "python-dotenv" },
     { name = "rdflib" },
     { name = "requests" },
@@ -573,6 +574,7 @@ requires-dist = [
     { name = "pip-audit", marker = "extra == 'dev'" },
     { name = "playwright", specifier = ">=1.60,<1.61" },
     { name = "psutil", marker = "extra == 'dev'" },
+    { name = "pyhpke", specifier = ">=0.6.5" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "rdflib" },
@@ -1555,6 +1557,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991, upload-time = "2026-03-29T13:29:33.898Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
+]
+
+[[package]]
+name = "pyhpke"
+version = "0.6.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bd/81/692a67c409e0a81423941791f875313e7ebcf1493180363eec8051acc767/pyhpke-0.6.5.tar.gz", hash = "sha256:8dac22eb143cd83b8066213b8ad0ecc9d5326ef41f930197197f3bbb5c99cb93", size = 1639080, upload-time = "2026-07-16T04:22:59.589Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/31/2a0edff785b15d700199fed77186b3d070724cafd02fccfffb187e450d83/pyhpke-0.6.5-py3-none-any.whl", hash = "sha256:e8d794724e43053fe04e8971be55033225d6da904effc748b303cece763a3f3c", size = 24435, upload-time = "2026-07-16T04:22:57.832Z" },
 ]
 
 [[package]]

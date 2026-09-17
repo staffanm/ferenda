@@ -192,14 +192,18 @@ def _id_nodes(node):
     a consolidated statute's superseded base text instead of the lydelse
     actually shown. That invariant now has one place to be forgotten rather
     than three."""
+    return (n for n in _nodes(node) if n.get("id"))
+
+
+def _nodes(node):
+    """Every dict in a body subtree, in document order, at any depth."""
     if isinstance(node, dict):
-        if node.get("id"):
-            yield node
+        yield node
         for value in node.values():
-            yield from _id_nodes(value)
+            yield from _nodes(value)
     elif isinstance(node, list):
         for item in node:
-            yield from _id_nodes(item)
+            yield from _nodes(item)
 
 
 def body_id_nodes(art):
@@ -218,6 +222,33 @@ def fragment_ids(art):
     Shares `body_sections` and the `_id_nodes` walk with `fragment_texts` and
     `fragment_text`; that walk's docstring states the invariant."""
     return {node["id"] for node in body_id_nodes(art)}
+
+
+def citable_anchors(art):
+    """Every fragment a citation to this document can name, read off the
+    presented body -- the set `lib.rangeindex` publishes, so a client can tell
+    "12 kap. 52 §" from a provision the statute does not have.
+
+    Three grammars, all field-driven: a node's minted ``id`` (K1P2, a14.3.1); an
+    EU act's sub-article anchors (`25.1`, `recital-83`), which the artifact does
+    not stamp and `eu_structure.anchored_blocks` derives; and the printed page a
+    node sits on (``page`` -> `sid39`, what "prop. 1997/98:45 s. 39" names). A
+    page inside a bilaga that restarts its own count is left out: the renderer
+    anchors it `bilaga…-sid…`, and no citation grammar produces that.
+
+    What a renderer mints for navigation only -- an SFS change-act marker
+    (`L2007:1419`), a generated heading anchor -- is not here: nothing cites
+    it."""
+    anchors = set()
+    for section in body_sections(art):
+        for node in _nodes(section):
+            if node.get("id"):
+                anchors.add(node["id"])
+            if node.get("page") and not node.get("bilaga"):
+                anchors.add("sid%d" % node["page"])
+        if isinstance(section, list):
+            anchors.update(anchor for anchor, _ in eu_structure.anchored_blocks(section))
+    return anchors
 
 
 # Node types whose own ``text`` runs are a HEADING rather than body text, so a

@@ -802,6 +802,7 @@ SOURCES: tuple[Source, ...] = (Source("sfs", sfs_list, {
    render=render.render,
    intermediate=(sfs_intermediate, "plain text"),
    artifacts=functools.partial(layout.artifacts, "sfs"),
+   pinpoints=".+",
    extra_pages=sfs_extra_pages, relate_cross=sfs_relate_cross,
    cross_code=(HERE / "register.py", HERE / "correspond.py"), layers=sfs_layers,
    # ai-correspond, table-correspond and history-as-git are added here by

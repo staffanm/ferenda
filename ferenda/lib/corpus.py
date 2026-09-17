@@ -43,6 +43,7 @@ from . import (
     labels,
     layout,
     pathgraph,
+    rangeindex,
     render,
     runlog,
     search,
@@ -88,7 +89,8 @@ RELATE_CODE = (PKG / "lib" / "catalog.py", PKG / "lib" / "catalog_rows.py",
                PKG / "lib" / "begrepp.py",
                PKG / "lib" / "text.py", PKG / "lib" / "markdown.py",
                PKG / "lib" / "labels.py",
-               PKG / "lib" / "eu_structure.py", PKG / "lib" / "pinpoint.py")
+               PKG / "lib" / "eu_structure.py", PKG / "lib" / "pinpoint.py",
+               PKG / "lib" / "rangeindex.py")
 # index reads the catalog rows (source signature, inbound-count ranking) it
 # denormalises onto the search units, so a change to catalog.py re-stales it too.
 INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py",
@@ -332,7 +334,8 @@ def cmd_relate(sources, names, force=None, jobs=1):
                 data_root=DATA, exclusive=full_rebuild,
                 stats={p: (size, mtime_ns) for p, size, mtime_ns in records},
                 digests=lambda stale, name=name: pooled_content_hashes(
-                    stale, jobs, "relate %s" % name))
+                    stale, jobs, "relate %s" % name),
+                pinpoints=source.pinpoints)
             freshness._emit_segment("relate", name, time.perf_counter() - t0, total=docs,
                           ran=changed, status="ok")
             freshness.record_step(store, "relate", name, wm, RELATE_CODE)
@@ -469,6 +472,15 @@ def cmd_relate(sources, names, force=None, jobs=1):
         n, m = pathgraph.write_sidecar(layout.CATALOG)
         print("relate: path graph sidecar written -- %d documents, %d edges "
               "(%.1fs)" % (n, m, time.perf_counter() - t0))
+        # ... and the /api/v1/range index, for the same reason: one bucket is
+        # one contiguous read of the sidecar, ~100 scattered rows of the catalog
+        t0 = time.perf_counter()
+        con = catalog.connect_ro(layout.CATALOG)
+        docs, entries, capacity = rangeindex.write_sidecar(con, layout.CATALOG)
+        con.close()
+        print("relate: range index sidecar written -- %d documents, %d entries, "
+              "largest bucket %d (%.1fs)"
+              % (docs, entries, capacity, time.perf_counter() - t0))
     if dirty:
         freshness.save_fingerprints(store)
     print("catalog: %s" % layout.CATALOG)

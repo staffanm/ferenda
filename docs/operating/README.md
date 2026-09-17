@@ -136,6 +136,7 @@ editors:                             # hand-curated; there is no self-signup
 | `compress_quality` | `FERENDA_COMPRESS_QUALITY` | `11` |
 | `editor_secret` | `EDITOR_SECRET` | unset (editing + `/ops` disabled) |
 | `cookie_secure` | `EDITOR_COOKIE_SECURE` | `true` |
+| `ohttp_keys_file` | `OHTTP_KEYS_FILE` | unset (the Oblivious HTTP gateway answers 404) |
 | `editors` | — (config only) | `{}` |
 
 A present-but-invalid value raises `ConfigError` at startup rather than
@@ -174,6 +175,28 @@ after an edit. The interval does not grow automatically each year.
 Resolver responses use ETags and require cache revalidation.
 An affected cached answer changes when the new rules change its body.
 See [`ferenda/api/README.md`](../../ferenda/api/README.md) for the response contract.
+
+### Oblivious HTTP gateway keys
+
+`POST /api/v1/ohttp-gateway` opens sealed requests with the private keys in the
+file that `ohttp_keys_file` names. Make the file, or add a key to it:
+
+```sh
+.venv/bin/python -m ferenda.api.ohttp keygen /path/to/ohttp-keys.json
+```
+
+The command puts the new key first and keeps the old keys. The file mode is
+0600. The service reads the file one time, so restart it after each change.
+
+To rotate a key:
+
+1. Run `keygen`. Restart the service. `GET /api/v1/ohttp-keys` now lists the
+   new key first.
+2. Wait 72 hours. A client can use a cached key list for 24 hours.
+3. Remove the old entry from the file. Restart the service.
+
+Let the reverse proxy pass `POST` with `Content-Type: message/ohttp-req` to the
+app, and keep the request and response bodies out of its logs.
 
 ### Content repo (wiki + site + patches)
 

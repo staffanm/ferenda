@@ -35,6 +35,7 @@ from typing import Literal
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Path as PathParam
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (
     FileResponse,
@@ -65,6 +66,7 @@ from ..lib import (
     mdtext,
     pathgraph,
     pins,
+    rangeindex,
     search,
     util,
 )
@@ -76,6 +78,7 @@ from . import (
     errors,
     facsimiles,
     internal,
+    ohttp,
     ops,
     paths,
     pdf,
@@ -130,6 +133,14 @@ TAGS = [
     {"name": "document",
      "description": "One document: its parsed body, its citations in both "
                     "directions, its versions, and its pages as images or PDF."},
+    {"name": "privacy",
+     "description": "Check a citation without saying which one: the client "
+                    "fetches a bucket of hashes and looks for its citation "
+                    "in the answer itself."},
+    {"name": "ohttp",
+     "description": "The Oblivious HTTP gateway (RFC 9458): a client sends a "
+                    "sealed request through a relay, so this server never "
+                    "sees who asked."},
 ]
 
 @asynccontextmanager
@@ -177,6 +188,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    expose_headers=["ETag", "Content-Encoding"])
 
 app.include_router(citations.router)
+app.include_router(ohttp.router)
 
 
 # No Referrer-Policy here. The prod vhost already sets it at server scope
@@ -1944,6 +1956,40 @@ def sfs_graphic_endpoint(
         catalog.uri_local(uri), node,
         facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI,
         may_render=auth.from_own_page(request))
+
+
+@app.get("/api/v1/range/{prefix}", response_class=Response, tags=["privacy"],
+         summary="The hashes of ~100 documents and their provisions",
+         responses={200: {"content": {"text/plain": {}}}})
+def range_endpoint(prefix: str = PathParam(
+        ..., pattern="^[0-9a-f]{%d}$" % rangeindex.PREFIX_HEX,
+        description="the first %d hex characters of sha256(document uri)"
+                    % rangeindex.PREFIX_HEX)):
+    """Whether the corpus holds a document, and a provision of it, answered
+    without learning which one was asked for.
+
+    The client hashes the citation's **document** uri -- the fragment removed,
+    the uri exactly as this API writes it, no case folding -- and sends the
+    first three hex characters of the SHA-256. The answer is every hash the
+    corpus holds for the documents that share them, one per line: the first 16
+    hex characters of `sha256(uri)` for each document, and of
+    `sha256(uri + "#" + anchor)` for each provision a citation to it can name
+    (`K12P52`, `32.1`, `sid39`).
+
+    The document is held when its own hash is in the answer, and the provision
+    is one it has *as it reads today* when the provision's hash is there too.
+    An older wording's provisions are not in the index.
+
+    Every answer has the same number of lines: a short bucket is made up with
+    entries that look like the others, so an answer's length names no bucket. A
+    made-up entry matches a real citation with probability 2^-64. The answer is
+    marked `no-transform` and is never compressed, for the same reason."""
+    if not rangeindex.sidecar_path(layout.CATALOG).exists():
+        raise HTTPException(503, "range index not built -- run relate")
+    number = int(prefix, 16)
+    entries = rangeindex.fill(number, *rangeindex.bucket(layout.CATALOG, number))
+    return Response("".join(e.hex() + "\n" for e in entries), media_type="text/plain",
+                    headers={"Cache-Control": "public, max-age=3600, no-transform"})
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"],

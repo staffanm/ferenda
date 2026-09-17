@@ -150,6 +150,14 @@ class Source:
     artifacts: Callable[[], list[Path]] | None = None
     searchable: bool = True               # False: relate the source but hold no
                                           # search units for it (kommentar, lawreview)
+    # which of a document's anchors a citation can name, as a regex the whole
+    # anchor must match -- what /api/v1/range publishes beside the document
+    # itself (lib/rangeindex). None: nothing cites into this source's documents,
+    # so only the documents are published. It is a claim about the citation
+    # grammar, not about the artifact: a HUDOC judgment mints an id per block
+    # (51,671 in one case) and no citation names one. After changing it, run
+    # `lagen <source> relate --force`.
+    pinpoints: str | None = None
     # rows for pages generate renders that have no catalog row of their own
     # (sfs/eurlex lydelser, föreskrift /grund); the argument is the run's
     # `only` set of artifact paths, or None for the whole source
@@ -324,7 +332,7 @@ def parse_stage(name, parse_fn, root, *, inputs, code):
 
 
 def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
-                   notes, dry_label, render, artifacts):
+                   notes, dry_label, render, artifacts, pinpoints=None):
     """A source whose whole chain is the common shape: one bulk
     ``sync(root, full=, only=, limit=, delay=)`` over a publisher's own list of
     instruments, and a parse that reads the stored record(s) into an artifact in
@@ -350,7 +358,7 @@ def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
                   {"parse": parse_stage(name, parse_fn, root,
                                          inputs=inputs, code=code)},
                   harvest=harvest, origin=origin, notes=notes,
-                  render=render, artifacts=artifacts)
+                  render=render, artifacts=artifacts, pinpoints=pinpoints)
 
 
 # run-wide options, set once in main() (kept off the recursion signature)

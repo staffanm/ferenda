@@ -820,6 +820,44 @@ Listar NDJSON-dumparna (se nedan).
 ]
 ```
 
+### `GET /api/v1/range/{prefix}` — kontrollera en hänvisning utan att visa vilken
+
+Klienten tar bort fragmentet ur hänvisningens uri och räknar
+`sha256(dokument-uri)`. De tre första hextecknen är `prefix`. Svaret är
+`text/plain` med en post per rad, 16 hextecken per post: en post per dokument i
+hinken och en per ankare som en hänvisning kan peka på (`K12P52`, `32.1`,
+`sid39`).
+
+- Dokumentet finns om de 16 första hextecknen av `sha256(dokument-uri)` finns i
+  svaret. Bestämmelsen finns om de 16 första av `sha256(hela uri:n)` finns där.
+- Uri:n hashas exakt som API:et skriver den. Ändra inte skiftläge.
+- Alla svar har lika många rader och komprimeras aldrig. Svarets längd visar
+  därför inte vilken hink det gäller.
+- Indexet beskriver dokumenten som de lyder i dag.
+- Indexet byggs av `relate` (`lib/rangeindex.py`, filen `range-index.bin` bredvid
+  katalogen). Utan filen svarar routen 503.
+
+### `GET /api/v1/ohttp-keys`, `POST /api/v1/ohttp-gateway` — Oblivious HTTP
+
+En klient som inte får visa vem som frågar skickar sin förfrågan genom ett
+relä (RFC 9458). Reläet ser klientens adress och ett förseglat meddelande.
+Servern ser förfrågan och reläets adress.
+
+- `ohttp-keys` svarar med `application/ohttp-keys`: varje nyckelkonfiguration
+  med sin längd i två byte framför, nyaste nyckeln först.
+- `ohttp-gateway` tar `message/ohttp-req` och svarar `message/ohttp-res`.
+  Innehållet är en Binary HTTP-förfrågan (RFC 9292) med känd längd.
+- Gatewayen kör förfrågan mot samma app i processen. Den öppnar aldrig en
+  socket.
+- Den serverar bara `GET` och `HEAD` av `/api/v1/range/…` och
+  `/api/v1/packs/…`. Bara `Accept` följer med till routen.
+- Ett fel i den inre förfrågan (403, 405, 404) skickas förseglat i ett yttre
+  200. Reläet ser då inte skillnad på träff och miss.
+
+Utan `ohttp_keys_file` i config.yml svarar båda 404. Skapa en nyckel med
+`python -m ferenda.api.ohttp keygen <fil>`. Se
+[`docs/operating/README.md`](../../docs/operating/README.md) för nyckelbyte.
+
 ---
 
 ## MCP-server (`/mcp`)

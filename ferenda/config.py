@@ -366,6 +366,19 @@ def resolve_editor_secret(doc):
     return secret
 
 
+def resolve_ohttp_keys_file(doc):
+    """The file holding the Oblivious HTTP gateway's private keys
+    (api/ohttp.py), minted by ``python -m ferenda.api.ohttp keygen``. Unset
+    (``None``) disables the gateway: `/api/v1/ohttp-keys` and
+    `/api/v1/ohttp-gateway` answer 404. A path rather than the key itself, for
+    the reason ``EDITOR_SECRET_FILE`` exists: a rotation keeps two keys, and
+    neither belongs in the environment of every process in the container.
+    Precedence: the ``OHTTP_KEYS_FILE`` environment variable, then the
+    ``ohttp_keys_file`` key in config.yml, else ``None``."""
+    path = _resolve_str(doc, "ohttp_keys_file", "OHTTP_KEYS_FILE", None)
+    return None if path is None else Path(path).expanduser()
+
+
 def resolve_cookie_secure(doc):
     """Whether the editor session cookie (api/auth.py) carries the ``Secure``
     flag. Default on: the prod deploy is https-only, so the cookie should never
@@ -466,6 +479,7 @@ LLM_BATCH_CHARS = resolve_llm_batch_chars(_doc)
 VISION_MODEL = resolve_vision_model(_doc)
 EDITOR_SECRET = resolve_editor_secret(_doc)
 EDITORS = resolve_editors(_doc)
+OHTTP_KEYS_FILE = resolve_ohttp_keys_file(_doc)
 COMPRESS = resolve_compress(_doc)
 COMPRESS_QUALITY = resolve_compress_quality(_doc)
 COOKIE_SECURE = resolve_cookie_secure(_doc)

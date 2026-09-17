@@ -235,6 +235,7 @@ SOURCES: tuple[Source, ...] = (Source("foreskrift", foreskrift_list, {
     render=render.render,
     intermediate=(foreskrift_intermediate, "pdftohtml XML"),
     artifacts=functools.partial(layout.artifacts, "foreskrift"),
+    pinpoints=".+",
     extra_pages=foreskrift_extra_pages,
     # the ai-hierarki layers (regleringshierarki rows on the rail)
     layers=lambda: sorted(annstore.tree("foreskrift").rglob("*.ann")),

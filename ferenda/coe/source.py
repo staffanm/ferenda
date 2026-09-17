@@ -36,6 +36,7 @@ def coe_inputs(basefile):
 SOURCES: tuple[Source, ...] = (simple_source(
     "coe", download, parse.parse, layout.COE_DOWNLOADED, COE_CODE,
     render=render.render, artifacts=functools.partial(layout.artifacts, "coe"),
+    pinpoints=".+",
     inputs=coe_inputs, origin=origin(download.FULL_LIST),
     dry_label="all Treaty Office instruments",
     notes="download flags: --only <CETS-number>, --limit N\n"

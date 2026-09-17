@@ -585,6 +585,42 @@ standalone SFS number as context for a later “samma lag” reference.
 Extraction clears all thread-local parser text and learned context on success
 and failure. Its error boundary logs only exception types and code locations.
 
+`lib/rangeindex.py` is the range index behind `GET /api/v1/range/{prefix}`: a
+client checks a citation against a bucket of hashes, so the server does not
+learn which citation. The bucket is the first 3 hex characters of
+`sha256(document uri)`; an entry is the first 8 bytes of `sha256(uri)` for the
+document and of `sha256(uri#anchor)` for each anchor a citation can name. The
+prefix comes from the document uri, so a document and its provisions share one
+bucket and one request answers for both. Relate writes one `range_anchors` row
+per document in `catalog._index_document`. After relate, `write_sidecar` writes
+`range-index.bin` beside the catalog, and the route reads one bucket from it
+with three small reads. `fill` makes every answer the size of the largest
+bucket, with stand-in entries that are fixed per bucket. The route marks the
+answer `no-transform`, and `api/compression.py` does not compress such an
+answer: a compressed length follows the content.
+
+Which anchors a citation can name has two parts. `text.citable_anchors(art)`
+reads them off the presented body: node ids, the EU sub-article anchors from
+`eu_structure.anchored_blocks`, and `sid<N>` for each printed page outside a
+bilaga. `stage.Source.pinpoints` is each source's own regex over those anchors.
+It is `".+"` for sfs, eurlex, coe, icrc, untc and foreskrift, `sid\d+` for
+forarbete, and unset for the others, whose documents are published without
+anchors. The citation grammar emits fragments for those sources only (20,000
+sampled references, 2026-09-17), and a HUDOC judgment mints one id per block
+(51,671 in `dom/echr/001-178082`), which would set the size of every answer.
+After a change to `pinpoints`, run `lagen <source> relate --force`.
+
+`api/ohttp.py` is the Oblivious HTTP gateway (RFC 9458): `GET /api/v1/ohttp-keys`
+and `POST /api/v1/ohttp-gateway`. It opens the sealed request with `pyhpke`,
+decodes the known-length Binary HTTP request (RFC 9292), and runs it against the
+same ASGI app in process, so an inner request cannot reach another host. It
+serves `INNER_PATH` only (`/api/v1/range/`, `/api/v1/packs/`), because in-process
+dispatch passes around the rate limits and the facsimile render gate in nginx.
+Only the inner `Accept` header reaches the route, and no `Accept-Encoding`: a
+compressed length follows the content. An inner refusal travels sealed in an
+outer 200. `test/test_ohttp.py` proves the cryptography byte for byte against
+the example in RFC 9458 appendix A. Keys come from `config.OHTTP_KEYS_FILE`.
+
 **Top-level**: `build.py` is the `lagen` CLI and the one place that composes across sources. Each source declares itself in its own `ferenda/<package>/source.py`, exposing a `SOURCES` tuple; `build.py` imports the nineteen modules, fills `lib/stage.py`'s `SOURCES` in the order `lagen all <verb>` walks the corpus in, and stamps each source's `registration`. What is left is the argument parsing and dispatch, the editor's post-commit rebuild (`rebuild_after_commit`/`reparse_one`), the aggregate-page callable it hands `corpus.cmd_generate`, and the handful of *cross-source* actions no single source may hold — `sfs ai-correspond`, `sfs table-correspond` and `sfs history-as-git` all read a proposition, which is förarbete's job, so they live here and are hung on sfs's registration as data. The verbs it dispatches to live in `lib/corpus.py`, the freshness engine in `lib/freshness.py`. `main`'s `finally` (so a crash or Ctrl-C still reaches it) prints `_print_failure_summary` whenever the run's `ok` flag or `freshness.RUN_ERRORS` says it exited non-zero -- which step(s) failed and, where the detail exists (`errors.json`, keyed by run id), the per-basefile message, since a `lagen all rebuild` scrolls the actual failure off screen long before the run's last line and the exit code alone does not say why. `config.py` resolves the optional `config.yml` — the corpus
 roots (`data_root`, `catalog_root`, `wiki_root` — `catalog_root`
 decouples `catalog.sqlite` from `data_root` so the latency-sensitive SQLite

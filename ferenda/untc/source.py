@@ -23,6 +23,7 @@ SOURCES: tuple[Source, ...] = (simple_source(
     "untc", download, parse.parse, layout.UNTC_DOWNLOADED, UNTC_CODE,
     render=render.render,
     artifacts=functools.partial(layout.artifacts, "untc"),
+    pinpoints=".+",
     inputs=record_inputs("untc", functools.partial(download.page_path,
                                                    layout.UNTC_DOWNLOADED),
                          extra=(HERE / "data" / "treaties.json",)),

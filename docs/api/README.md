@@ -560,6 +560,73 @@ compact two-column layout and omits context; `download=1` serves it as an
 attachment. A full statute with all its context takes minutes to lay out, so
 expect a slow response on a big document.
 
+### Check a citation in private — `GET /api/v1/range/{prefix}`
+
+`/resolve` and `/document` show the server which citation a client checks. This
+route answers the same question, "does the corpus hold this document and this
+provision", and the server learns only one bucket of 4,096.
+
+1. Remove the fragment from the citation uri. Keep the uri exactly as this API
+   writes it. Do not change the case: `bet/1980/81:KU25` and
+   `bet/1980/81:ku25` are two documents.
+2. `prefix` = the first 3 hex characters of `sha256(document uri)`.
+3. `GET /api/v1/range/{prefix}`. The answer is `text/plain`, one entry per line,
+   sorted. Each entry is 16 hex characters.
+4. The document is held if the first 16 hex characters of
+   `sha256(document uri)` are in the answer.
+5. The provision is in the document if the first 16 hex characters of
+   `sha256(full uri with fragment)` are in the answer.
+
+```
+sha256("https://lagen.nu/celex/32016R0679")      = 4b030d0f…  -> GET /api/v1/range/4b0
+                                                    the document: look for 4b030d0f85b50e90
+sha256("https://lagen.nu/celex/32016R0679#32.1") = b69f7810…  -> article 32.1: look for b69f7810d6903ad2
+```
+
+- The index holds the documents as they read today. A provision that only an
+  older wording had is not in it.
+- The anchors are those a citation can name: `K12P52`, `P3a`, `32.1`,
+  `recital-83`, `A6P1`, and `sid39` for page 39 of a förarbete. Documents of
+  sources that no citation grammar points into (court decisions, for example)
+  are in the index without anchors.
+- Every answer has the same number of lines. A short bucket gets stand-in
+  entries, which are the same on each request. A stand-in matches a real
+  citation with a probability of 2^-64.
+- The answer has `Cache-Control: no-transform` and is never compressed, so its
+  length is the same for every bucket.
+- `503` means the index is not built. `422` means the prefix is not 3 lower-case
+  hex characters.
+
+### Oblivious HTTP — `GET /api/v1/ohttp-keys`, `POST /api/v1/ohttp-gateway`
+
+A client that must not show this server who asks sends its request through an
+Oblivious HTTP relay ([RFC 9458](https://www.rfc-editor.org/rfc/rfc9458)). The
+relay sees the client's address and a sealed request. This server sees the
+request and the relay's address.
+
+- `GET /api/v1/ohttp-keys` answers `application/ohttp-keys`: each key
+  configuration with a 2-byte length before it, newest key first. The suite is
+  DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM. A client can cache the
+  answer for one day.
+- `POST /api/v1/ohttp-gateway` takes `message/ohttp-req` and answers
+  `message/ohttp-res`. The inner message is a known-length Binary HTTP request
+  ([RFC 9292](https://www.rfc-editor.org/rfc/rfc9292)).
+- The gateway serves `GET` and `HEAD` of `/api/v1/range/…` and `/api/v1/packs/…`
+  only. The path can not have a query string. It sends only the inner `Accept`
+  header to the route.
+- The inner response is padded with zero bytes to a multiple of 256 bytes
+  before the gateway seals it.
+
+| Failure | Where the client sees it |
+|---|---|
+| media type is not `message/ohttp-req` | outer `415` |
+| unknown key id, other HPKE suite, request does not open, not Binary HTTP | outer `400` |
+| request larger than 8,192 bytes | outer `413` |
+| gateway not configured on this host | outer `404` |
+| inner path outside the two prefixes | sealed `403` in an outer `200` |
+| inner method is not `GET` or `HEAD` | sealed `405` in an outer `200` |
+| the route answers `404` | sealed `404` in an outer `200` |
+
 ### Endpoint → task map
 
 | I want to… | Endpoint |
@@ -584,6 +651,8 @@ expect a slow response on a big document.
 | shortest chain between two documents | `GET /api/v1/path?from=…&to=…` |
 | a document as PDF | `GET /api/v1/pdf?path=…` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
+| check a citation without showing which | `GET /api/v1/range/{prefix}` |
+| ask without showing who asks | `POST /api/v1/ohttp-gateway` with a key from `GET /api/v1/ohttp-keys` |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 
 ### What this API does not answer yet

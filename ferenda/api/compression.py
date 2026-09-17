@@ -6,7 +6,25 @@ from starlette.middleware.gzip import GZipResponder, IdentityResponder
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 
-class BrotliResponder(IdentityResponder):
+class NoTransform(IdentityResponder):
+    """Leave a response marked ``Cache-Control: no-transform`` as it is.
+
+    A compressed body's length follows its content. /api/v1/range pads every
+    answer to one length so that the length names no bucket, and compressing
+    the answer would put the difference back."""
+
+    async def send_with_compression(self, message):
+        await super().send_with_compression(message)
+        if message["type"] == "http.response.start" and "no-transform" in Headers(
+                raw=message["headers"]).get("cache-control", ""):
+            self.content_encoding_set = True
+
+
+class GzipResponder(NoTransform, GZipResponder):
+    pass
+
+
+class BrotliResponder(NoTransform):
     """ASGI responder that streams response chunks through Brotli compression."""
 
     content_encoding = "br"
@@ -45,7 +63,7 @@ class CompressionMiddleware:
         if "br" in accept:
             responder = BrotliResponder(self.app, self.minimum_size, quality=self.quality)
         elif "gzip" in accept:
-            responder = GZipResponder(self.app, self.minimum_size)
+            responder = GzipResponder(self.app, self.minimum_size)
         else:
             responder = IdentityResponder(self.app, self.minimum_size)
 
