@@ -1018,9 +1018,18 @@ def paginated_enumerate(session, agency):
     row_select = agency.params["row_select"]
     seen = set()
 
+    row_title = agency.params.get("row_title")
+
     def page_refs(soup):
         for a in soup.select(row_select):
-            docref = ref(agency, a.get_text(" ", strip=True), a.get("href", ""), seen)
+            text = a.get_text(" ", strip=True)
+            # a scope whose PDF masthead cannot yield the title carries it in
+            # the listing row instead: Strålsäkerhetsmyndigheten's English
+            # translations print an all-English masthead the Swedish
+            # `RE_TITLE_TYPE` never matches, and the row anchor is the one place
+            # their title is in text (#93).
+            docref = ref(agency, text, a.get("href", ""), seen,
+                         title=text if row_title else None)
             if docref:
                 yield docref
 

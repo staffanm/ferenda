@@ -657,6 +657,35 @@ def test_paginated_enumerate_pages_the_archive_with_the_listings_own_parameter(
     assert "https://e/upphavda/?selectedpage=1" in asked
 
 
+def test_paginated_enumerate_carries_the_row_text_as_title_when_configured(monkeypatch):
+    # SSMFS's English translations print an all-English masthead the parser's
+    # Swedish title patterns never match, so the listing row is their only title
+    # source (#93). `row_title` makes the enumerate carry the anchor text into
+    # the DocRef title; without it the title stays None (the default).
+    def fake_request(_session, _method, url, **_kw):
+        if "selectedpage=1" not in url:
+            return SimpleNamespace(text="")
+        return SimpleNamespace(text=(
+            '<a class="row" href="/r/">SSMFS 2008:21 The Swedish Radiation '
+            'Safety Authority regulations concerning safety</a>'))
+
+    monkeypatch.setattr(harvest, "request", fake_request)
+    monkeypatch.setattr(harvest.time, "sleep", lambda _s: None)
+
+    def agency(row_title):
+        return harvest.Agency(
+            fs="ssmfs", name="SSM", publisher="SSM", base_url="https://e",
+            index_url="https://e/list", enumerate=harvest.paginated_enumerate,
+            params={"page_url": "https://e/?selectedpage={page}", "row_select": "a.row",
+                    **({"row_title": True} if row_title else {})})
+
+    row = "SSMFS 2008:21 The Swedish Radiation Safety Authority regulations concerning safety"
+    with_title = list(harvest.paginated_enumerate(None, agency(True)))
+    assert [(r.basefile, r.title) for r in with_title] == [("ssmfs/2008:21", row)]
+    without = list(harvest.paginated_enumerate(None, agency(False)))
+    assert [(r.basefile, r.title) for r in without] == [("ssmfs/2008:21", None)]
+
+
 def test_paginated_enumerate_ends_where_a_page_names_no_new_row(monkeypatch):
     # a listing that ignores its page parameter serves page 1 forever, and a
     # view whose rows have run out serves its last page again -- the same

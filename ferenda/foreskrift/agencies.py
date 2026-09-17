@@ -178,6 +178,9 @@ SSMFS = Agency(
         "row_select": "ul.search-result li.search-item div.search-content h3 a",
         "pdf_select": "div.meta li.file-link a[href]",
         "classify": classify_file,
+        # the English translations print an all-English masthead the parser's
+        # Swedish title patterns never match, so the row anchor is their title
+        "row_title": True,
     },
 )
 

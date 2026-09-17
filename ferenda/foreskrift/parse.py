@@ -1280,6 +1280,10 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # the agency's own contact block, which several samlingar print in the
     # masthead's second column ("Box 7821, 103 97 Stockholm, Sverige, www.fi.se")
     r"|\bwww\.[\w.-]+|\bBox\s+\d+|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö]+,?"
+    # Finansinspektionen's subscription line, "Prenumerera även/också per
+    # e-post på www.fi.se." -- the www token above removes only its address,
+    # leaving "Prenumerera … på" glued to the front of the title (FFFS 2001:8)
+    r"|\bPrenumerera\b[^.\n]*?\bp[åa]\b"
     r"|\bTfn\b[\s\d-]*|\bSverige,"
     r"|Publicerings?datum|Publicerade?(?:\s+den)?|\b[A-ZÅÄÖ]{2,}(?:-| )?FS\b|\b\d{4}:\d+\b"
     r"|\bxx\b|\d{2}xx\b"
@@ -1290,6 +1294,13 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # printed beside the title and landing mid-sentence like the dates
     r"|\bSaknr\s+[A-ZÅÄÖ]\s*\d+(?::\d+)?|\bOmtryck\b"
     r"|\bSFH\b(?:\s+\d+(?:\.\d+)+)?"
+    # Polisen's margin reference code ("FAP 206-2", "FAP 000-0"), printed on
+    # page 1 only so `running_furniture` (which needs a run across pages) never
+    # sees it, spliced into the middle of 17 RPSFS titles -- and inside a word
+    # in four ("Dokumentation av stråldo- FAP 206-2 ser"), which rejoins once
+    # the code is gone. Keyed on the literal "FAP" and the code's own nnn-n
+    # shape, so a real "EN 1090-1" in a title is untouched.
+    r"|\bFAP\s+\d{3}-\d\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?|\bnr\s+\d+"
     % "|".join(MONTHS), re.IGNORECASE)
 # a word the removal left doubled ("Kriminalvårdens
@@ -1376,6 +1387,9 @@ RE_ROW_TITLE_END = re.compile(r";|\b(?:beslutad|beslutat)\w*\s+den\s+\d",
 RE_TITLE_BOILERPLATE = re.compile(
     r"\b(?:grundförfattning|ändringsförfattning|konsoliderad(?:\s+version)?|"
     r"öppnas|nytt\s+fönster)\b", re.IGNORECASE)
+# a version label a listing appends to the title ("… (ursprunglig version)")
+RE_VERSION_LABEL = re.compile(
+    r"\s*\((?:ursprunglig|konsoliderad|senaste)\s+version\)\s*$", re.IGNORECASE)
 
 
 # A word the printed page broke across lines, rejoined by the extraction with
@@ -1492,6 +1506,10 @@ def clean_title(raw, identifier):
     text, which is file chrome rather than a title (F7). None sends the
     caller to the PDF's own rubric (title_from_body)."""
     t = join_wrapped(normalise(RE_TITLE_CHROME.sub("", raw or ""))).strip()
+    # a version label the listing appends to the title text, not part of it:
+    # Strålsäkerhetsmyndigheten's rows read "… som innehåller tritium
+    # (ursprunglig version)" / "(konsoliderad version)"
+    t = RE_VERSION_LABEL.sub("", t).strip()
     # the listing's other columns, where the row runs them into the title cell
     # ("… uppdragsverksamhet Beslutade den 24 november 2025. Träder i kraft
     # den 1 januari 2026.", KBVFS 2025:1): a title ends where the decision
@@ -1710,7 +1728,15 @@ def title_from_masthead(blocks, start):
     raw = join_wrapped(normalise(" ".join(_full_text(blocks[:start]).split())))
     bek = RE_BEKANTGORANDE.search(raw)
     if bek:
-        return RE_TITLE_FOOTNOTE.sub("", " ".join(bek.group().split()))
+        # the Bekantgörande phrase is read from the raw masthead, not
+        # `clean_masthead`, because the samling name is part of the title
+        # ("… en författning i Sjöfartsverkets författningssamling") and the
+        # cleanup removes it. So the two furniture kinds the second column
+        # splices into the phrase are removed here instead: the document's own
+        # designation (SJÖFS 2016:4, mid-phrase) and the "Utkom från trycket"
+        # date column (SJÖFS 2024:7), never the samling name.
+        phrase = RE_DESIGNATION.sub(" ", RE_MASTHEAD_COLUMN.sub(" ", bek.group()))
+        return RE_TITLE_FOOTNOTE.sub("", " ".join(phrase.split()))
     masthead = clean_masthead(blocks, start)
     return (_masthead_title(masthead, printed_stop=True)
             or _masthead_title(masthead, printed_stop=False))

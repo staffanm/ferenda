@@ -2517,3 +2517,46 @@ def test_title_whose_semicolon_stands_past_the_old_300_char_window():
         "inom Europeiska ekonomiska samarbetsområdet (EES) för "
         "demonstration, utvärdering, utställning, underhåll eller reparation "
         "samt efter underhåll, reparation eller demonstration i Sverige")
+
+
+def test_bekantgorande_title_drops_the_second_column_furniture():
+    # SJÖFS 2024:7: the second column splices the own designation and "Utkom
+    # från trycket" into the Bekantgörande phrase; the samling name stays (#90).
+    blocks = [Block("stycke", "Sjöfartsverkets författningssamling SJÖFS 2024:7", 1),
+              Block("stycke", "Bekantgörande av författning som upphäver en Utkom "
+                    "från trycket författning i Sjöfartsverkets författningssamling", 1)]
+    assert title_from_masthead(blocks, len(blocks)) == (
+        "Bekantgörande av författning som upphäver en författning "
+        "i Sjöfartsverkets författningssamling")
+    # SJÖFS 2016:4: the own designation lands *inside* the phrase; removing it
+    # (RE_DESIGNATION, the second remover) must not take the samling name with it
+    blocks = [Block("stycke", "Bekantgörande som ändrar en författning i SJÖFS "
+                    "2016:4 Sjöfartsverkets författningssamling", 1)]
+    assert title_from_masthead(blocks, len(blocks)) == (
+        "Bekantgörande som ändrar en författning i "
+        "Sjöfartsverkets författningssamling")
+
+
+def test_masthead_boilerplate_removes_the_fi_subscription_line():
+    # FFFS: "Prenumerera även per e-post på www.fi.se" — the www token alone
+    # left "Prenumerera … på" glued to the title (#53).
+    out = fp.RE_MASTHEAD_BOILERPLATE.sub(
+        "", "Prenumerera även per e-post på Finansinspektionens allmänna råd")
+    assert " ".join(out.split()) == "Finansinspektionens allmänna råd"
+
+
+def test_masthead_boilerplate_removes_the_fap_margin_code_not_a_real_code():
+    # Polisen's "FAP nnn-n" splices into RPSFS titles, sometimes mid-word (#86);
+    # a real "EN 1090-1" in a title stays.
+    assert "FAP" not in fp.RE_MASTHEAD_BOILERPLATE.sub(
+        "", "Dokumentation av stråldo- FAP 206-2 ser")
+    assert "EN 1090-1" in fp.RE_MASTHEAD_BOILERPLATE.sub(
+        "", "utrustning enligt EN 1090-1 för bärverk")
+
+
+def test_clean_title_strips_a_listing_version_label():
+    # Strålsäkerhetsmyndighetens rows append "(ursprunglig version)" (#93).
+    assert clean_title(
+        "SSMFS 2012:2 Strålsäkerhetsmyndighetens föreskrifter om riktmedel "
+        "(ursprunglig version)", "SSMFS 2012:2") == (
+        "Strålsäkerhetsmyndighetens föreskrifter om riktmedel")
