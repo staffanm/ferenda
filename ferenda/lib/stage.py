@@ -358,6 +358,12 @@ def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
 class RunOptions:
     dry_run: bool = False
     force: bool = False
+    deep: bool = False           # harvest: walk the whole listing past the
+                                 # incremental stop, fetching only what is
+                                 # missing -- lib.harvest.walk's `deep` mode (not
+                                 # `full`, which also re-resolves on-disk docs).
+                                 # foreskrift exposes it as `--deep`; forarbete
+                                 # reaches the same mode through its `--force`
     verbose: bool = False   # -v: stream per-step progress to stderr (the long
                             # ai-* vision passes otherwise run silent for minutes)
     no_deps: bool = False

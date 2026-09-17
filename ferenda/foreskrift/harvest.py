@@ -1054,8 +1054,8 @@ def json_enumerate(session, agency):
 # per-agency wiring onto the shared download engine (lib.harvest.walk)
 # --------------------------------------------------------------------------
 
-def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=print,
-            reporter=None):
+def harvest(agency, root, full=False, deep=False, only=None, limit=None, delay=0.5,
+            log=print, reporter=None):
     """Download one agency onto :func:`lib.harvest.walk`.
 
     `reporter` overrides the live progress sink: the sequential path lets
@@ -1068,21 +1068,24 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
     interrupted run). Once caught up, later runs go incremental: enumeration is
     newest-first, so the walk stops at the first document already on disk that
     falls past the watermark's date boundary (or after a run of consecutive
-    already-downloaded items). ``only`` (a basefile) fetches just that one.
-    Returns ``(seen, new)``."""
+    already-downloaded items). ``deep`` (``--deep``) walks the whole listing past
+    that stop but re-resolves nothing -- it reaches an agency's upphävda archive,
+    queued after the in-force listing, without re-fetching the corpus the way
+    ``full`` does. ``only`` (a basefile) fetches just that one. Returns
+    ``(seen, new)``."""
     if agency.browser:
         assert not agency.http2 and agency.headers is None and agency.user_agent is None, \
             "%s browser transport cannot also configure an HTTP session" % agency.fs
         with CamoufoxBrowser(Path(root) / agency.fs / ".browser-profile",
                              pace=agency.browser_pace) as session:
-            return _harvest_session(agency, root, session, full, only, limit, delay,
-                                    log, reporter)
+            return _harvest_session(agency, root, session, full, deep, only, limit,
+                                    delay, log, reporter)
     session = (make_http2_session if agency.http2 else make_session)(
         agency.user_agent or USER_AGENT)
     if agency.headers:
         session.headers.update(agency.headers)
-    return _harvest_session(agency, root, session, full, only, limit, delay, log,
-                            reporter)
+    return _harvest_session(agency, root, session, full, deep, only, limit, delay,
+                            log, reporter)
 
 
 # sanity trip: a routine incremental agency harvest finishes in minutes; one
@@ -1118,7 +1121,7 @@ def item_key(agency, root, ref):
                    date=f"{year}-12-31")
 
 
-def _harvest_session(agency, root, session, full, only, limit, delay, log,
+def _harvest_session(agency, root, session, full, deep, only, limit, delay, log,
                      reporter=None):
     """Run the shared walk over an already-selected HTTP or browser transport."""
     # Records are filed by samling, but a *walk* is one publisher's listing, so
@@ -1142,10 +1145,10 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
     rejects: list[str] = []
 
     # arm the sanity trip on incremental runs only (walk exempts backfills
-    # itself, but the session deadline must not cut a legitimate first/--full
-    # harvest short); the deadline bounds a single blocked fetch, the walk
+    # itself, but the session deadline must not cut a legitimate first/--full/
+    # --deep harvest short); the deadline bounds a single blocked fetch, the walk
     # budget stops the loop cleanly between items
-    if only is None and not full and watermark.last_harvest is not None:
+    if only is None and not full and not deep and watermark.last_harvest is not None:
         set_deadline(session, time.monotonic() + INCREMENTAL_BUDGET)
 
     def resolve(ref):
@@ -1154,7 +1157,7 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
 
     result = walk(agency.enumerate(session, agency), resolve=resolve,
                   item_key=lambda ref: item_key(agency, root, ref),
-                  watermark=watermark, full=full, only=only,
+                  watermark=watermark, full=full, deep=deep, only=only,
                   limit=limit, budget=INCREMENTAL_BUDGET, scope=scope,
                   log=log, reporter=reporter)
 

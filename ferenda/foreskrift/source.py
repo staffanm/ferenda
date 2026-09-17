@@ -65,7 +65,7 @@ def foreskrift_harvest(scopes):
                           example="lagen foreskrift download fffs "
                                   "--only fffs/2013:10",
                           label="every non-browser scope", report=False,
-                          jobs=protocol.RUN.jobs)
+                          jobs=protocol.RUN.jobs, deep=protocol.RUN.deep)
 
 
 def foreskrift_browser_download(_basefiles):
@@ -82,7 +82,8 @@ def foreskrift_browser_download(_basefiles):
     util.harvest_start("foreskrift browser-download",
                        "the Camoufox agency sites (%s)" % ", ".join(scopes))
     download.sync(str(layout.FORESKRIFT_DOWNLOADED), scopes=scopes,
-                             full=protocol.RUN.force, only=protocol.RUN.only, jobs=1)
+                             full=protocol.RUN.force, deep=protocol.RUN.deep,
+                             only=protocol.RUN.only, jobs=1)
 
 
 def foreskrift_reap(basefiles):

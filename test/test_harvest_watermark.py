@@ -144,7 +144,7 @@ def test_dirty_disables_consecutive_but_keeps_date_conclusive(tmp_path):
 
 # --- the shared download walk (lib.harvest.walk) ----------------------------
 
-def _run_walk(tmp_path, items, dates, on_disk, resolve, *, full=False,
+def _run_walk(tmp_path, items, dates, on_disk, resolve, *, full=False, deep=False,
               limit=None, only=None, budget=None, lookahead=3, safety_days=14):
     """Drive walk() over an in-memory model. `items` is the enumeration (basefile
     strings, optionally with Skip records); `dates`/`on_disk` back item_key."""
@@ -153,8 +153,8 @@ def _run_walk(tmp_path, items, dates, on_disk, resolve, *, full=False,
     return walk(items, resolve=resolve,
                 item_key=lambda bf: ItemKey(basefile=bf, is_downloaded=bf in on_disk,
                                             date=dates[bf]),
-                watermark=wm, full=full, only=only, limit=limit, budget=budget,
-                scope="fs", log=lambda *a: None)
+                watermark=wm, full=full, deep=deep, only=only, limit=limit,
+                budget=budget, scope="fs", log=lambda *a: None)
 
 
 def test_walk_backfill_fetches_all_and_completes_clean(tmp_path):
@@ -225,6 +225,29 @@ def test_walk_clean_watermark_stops_and_would_strand(tmp_path):
 
     _run_walk(tmp_path, list(bfs), dates, on_disk, resolve, lookahead=3)
     assert stranded not in fetched          # stopped above it after 3 consecutive
+
+
+def test_walk_deep_reaches_past_the_stop_without_refetching(tmp_path):
+    # --deep (issue #110): a document added below the incremental stop -- an
+    # agency's upphävda archive, queued after its in-force listing -- is reached
+    # and fetched, and the on-disk documents above it are NOT re-resolved (which
+    # is what separates --deep from --force/full).
+    bfs = ["fs/2026:%d" % n for n in range(8, 0, -1)]
+    dates = {bf: "2026-06-30" for bf in bfs}
+    stranded = bfs[4]
+    on_disk = set(bfs) - {stranded}
+    HarvestWatermark(tmp_path / "wm.json", lookahead_limit=3).save("2026-06-30")
+    fetched = []
+
+    def resolve(bf):
+        fetched.append(bf)
+        on_disk.add(bf)
+        return True
+
+    result = _run_walk(tmp_path, list(bfs), dates, on_disk, resolve, deep=True,
+                       lookahead=3)
+    assert fetched == [stranded] and result.new == 1   # only the missing one
+    assert HarvestWatermark(tmp_path / "wm.json").dirty is False
 
 
 def test_walk_zero_items_run_is_not_a_clean_completion(tmp_path):

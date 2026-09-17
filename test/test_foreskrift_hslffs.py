@@ -702,7 +702,7 @@ def test_each_scope_keeps_its_own_watermark(tmp_path, monkeypatch):
         (tmp_path / "hslffs" / (".watermark-%s.json" % scope)).write_text(
             json.dumps({"last_harvest": "2026-01-01"}))
         harvest._harvest_session(REGISTRY[scope], str(tmp_path),
-                                 types.SimpleNamespace(), False, None, None,
+                                 types.SimpleNamespace(), False, False, None, None,
                                  0.0, lambda _m: None)
     assert calls == ["hslffs-sos", "hslffs-ivo"]
     # a samling one agency owns keeps the unsuffixed name it already has on disk

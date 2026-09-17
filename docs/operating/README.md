@@ -738,14 +738,28 @@ Removing this cron line does not just skip one month's refresh — it makes
 every future addition to an agency's repealed-regulations archive invisible
 to the corpus.
 
-This is one case of a general gap. `lib.harvest.walk` already has a `deep`
-mode: it walks a whole listing but fetches only what is missing. No CLI flag
-reaches that mode outside forarbete, whose own `--force` is wired to it.
-Eight watermark-gated sources could use the same flag — avg, coe, dv,
-foreskrift, hudoc, icc, icj, icrc. Guidance, lawreview and rs need nothing:
-their `walk_records` calls pass `watermark=None`. Tracked as
+`--deep` (issue #110) is the lighter instrument for the same reach. It also
+walks the whole listing past the incremental stop, so it still queues and
+reaches the archive, but it does not re-resolve documents already on disk
+(`ferenda/lib/harvest.py`, `walk`: `if (key.is_downloaded or key.provisional)
+and not full: continue`). `--force` walks the whole listing *and*
+re-resolves every on-disk document — a network fetch for the whole corpus,
+not just the missing archive entries. `full` implies `deep` in `walk`, so
+`--force` still reaches the archive; `--deep` is `--force` without the
+re-fetch of what is already held. Whether to move the monthly cron line from
+`--force` to `--deep` is an operational decision, not made here.
+
+Exposing `deep` for foreskrift is one case of a general gap. `lib.harvest.walk`
+has had a `deep` mode for a while: it walks a whole listing but fetches only
+what is missing. Until now no CLI flag reached that mode outside forarbete,
+whose own `--force` is wired to it. foreskrift now exposes it as `--deep`
+(`ferenda/build.py`, threaded through `foreskrift/source.py` and
+`foreskrift/harvest.py` to `lib.harvest.walk(deep=True)`). Seven
+watermark-gated sources still have no CLI path to it — avg, coe, dv, hudoc,
+icc, icj, icrc. Guidance, lawreview and rs need nothing: their `walk_records`
+calls pass `watermark=None`. Tracked as
 [issue #110](https://github.com/staffanm/ferenda/issues/110); the monthly
-`--force` line above is the interim fix, for foreskrift alone.
+`--force` line above still runs the heavier sweep until the cron is changed.
 
 ### The facsimile render gate
 

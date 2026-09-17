@@ -34,7 +34,7 @@ def default_scopes():
     return [scope for scope in REGISTRY if not REGISTRY[scope].browser]
 
 
-def _one(scope, root, full, only, delay, log, reporter):
+def _one(scope, root, full, deep, only, delay, log, reporter):
     """Harvest a single scope, returning (scope, (seen, new)). Closed/static
     författningssamlingar (no live downloader) are a no-op."""
     agency = REGISTRY[scope]
@@ -42,11 +42,11 @@ def _one(scope, root, full, only, delay, log, reporter):
         log("foreskrift %s: no live downloader -- a closed series, its "
             "documents already in the corpus" % scope)
         return scope, (0, 0)
-    return scope, harvest.harvest(agency, root, full=full, only=only, delay=delay,
-                                  log=log, reporter=reporter)
+    return scope, harvest.harvest(agency, root, full=full, deep=deep, only=only,
+                                  delay=delay, log=log, reporter=reporter)
 
 
-def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print, jobs=1):
+def sync(root, scopes=None, full=False, deep=False, only=None, delay=0.5, log=print, jobs=1):
     """Download the named scopes (default all in the registry), printing each
     one's own summary line as it finishes. Returns {scope: (seen, new)}.
 
@@ -64,7 +64,7 @@ def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print, jobs=1)
         # parallel run reports through NullReporter and writes into `into`; the
         # sequential path gets the real Reporter and prints as it goes
         parallel = jobs > 1 and not only and len(scopelist) > 1
-        return _one(scope, root, full, only, delay, into,
+        return _one(scope, root, full, deep, only, delay, into,
                     quiet if parallel else Reporter())[1]
 
     return harvest_lib.fan_out(
