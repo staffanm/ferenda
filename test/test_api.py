@@ -315,6 +315,80 @@ def test_document_unknown_uri_404(client):
     assert r.status_code == 404
 
 
+def test_document_resolves_a_konsolidering_version(client, tmp_path, monkeypatch):
+    # /document/versions hands out each version's own uri; /document resolves
+    # that uri to the version's artifact. A version is not a catalog row, so it
+    # is read straight from the archive tree (layout.sfs_version_artifact), not
+    # looked up in the catalog -- which is why the uri 404'd here before.
+    monkeypatch.setattr(layout, "SFS_ARTIFACT", tmp_path / "sfs-artifact")
+    art_path = layout.sfs_version_artifact("2009:400", "2013:513")
+    art_path.parent.mkdir(parents=True)
+    compress.write_json(art_path, {
+        "uri": "https://lagen.nu/2009:400/konsolidering/2013:513",
+        "version": "2013:513", "source_url": "https://example/osl-2013",
+        "metadata": {"properties": {
+            "dcterms:identifier": "SFS 2009:400 i lydelse enligt SFS 2013:513",
+            "dcterms:title": "Offentlighets- och sekretesslag (2009:400)"}},
+        "structure": [{"type": "paragraf", "id": "K1P1",
+                       "text": ["Denna lag innehåller bestämmelser."]}]})
+
+    uri = "https://lagen.nu/2009:400/konsolidering/2013:513"
+    body = client.get("/api/v1/document", params={"uri": uri}).json()
+    assert body["uri"] == uri
+    assert body["source"] == "sfs"
+    assert body["label"] == "SFS 2009:400 i lydelse enligt SFS 2013:513"
+    assert body["title"] == "Offentlighets- och sekretesslag (2009:400)"
+    assert body["inbound_count"] == 0                  # a version indexes nothing
+    assert body["source_url"] == "https://example/osl-2013"
+    assert body["artifact"]["version"] == "2013:513"
+
+    # the reading-text face resolves the same uri
+    md = client.get("/api/v1/document",
+                    params={"uri": uri, "format": "md"}).json()
+    assert "artifact" not in md
+    assert md["markdown"].startswith("# Offentlighets- och sekretesslag")
+
+    # a konsolidering uri with no archived artifact 404s (points at /versions)
+    missing = client.get("/api/v1/document", params={
+        "uri": "https://lagen.nu/2009:400/konsolidering/1999:1"})
+    assert missing.status_code == 404
+
+    # a malformed version id is a 400, not a silent read of a crafted path
+    bad = client.get("/api/v1/document", params={
+        "uri": "https://lagen.nu/2009:400/konsolidering/notanid"})
+    assert bad.status_code == 400
+
+
+def test_document_resolves_a_eurlex_konsolidering_version(client, tmp_path,
+                                                          monkeypatch):
+    # the eurlex half of the same code path: a /celex/<id>/konsolidering/<date>
+    # uri routes through _versioned_document -> eurlex_version_artifact, its
+    # version id the ISO consolidation date rather than an SFS number
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact-root")
+    art_path = layout.eurlex_version_artifact("32014R0910", "2024-05-20")
+    art_path.parent.mkdir(parents=True)
+    compress.write_json(art_path, {
+        "uri": "https://lagen.nu/celex/32014R0910/konsolidering/2024-05-20",
+        "version": "2024-05-20",
+        "metadata": {"properties": {
+            "dcterms:identifier": "32014R0910 konsoliderad 2024-05-20",
+            "dcterms:title": "eIDAS-förordningen"}},
+        "structure": [{"type": "article", "id": "32", "text": ["Artikel 32."]}]})
+
+    uri = "https://lagen.nu/celex/32014R0910/konsolidering/2024-05-20"
+    body = client.get("/api/v1/document", params={"uri": uri}).json()
+    assert body["uri"] == uri
+    assert body["source"] == "eurlex"
+    assert body["title"] == "eIDAS-förordningen"
+    assert body["inbound_count"] == 0
+    assert body["artifact"]["version"] == "2024-05-20"
+
+    # an ISO date that is not zero-padded is not a version id -> 400
+    bad = client.get("/api/v1/document", params={
+        "uri": "https://lagen.nu/celex/32014R0910/konsolidering/2024-5-20"})
+    assert bad.status_code == 400
+
+
 def test_inbound_is_the_citation_graph(client):
     r = client.get("/api/v1/document/inbound",
                    params={"uri": "https://lagen.nu/1962:700#K3P1"})

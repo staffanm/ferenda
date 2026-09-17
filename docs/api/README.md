@@ -346,7 +346,10 @@ acts only) — a document's archived historical consolidations (*lydelser*),
 oldest first, current excluded. `404` if the uri isn't a statute or an EU act.
 A statute's `version` is the SFS number of the last amendment folded in; an EU
 act's is the ISO date its consolidated wording (CONSLEG) began to apply, which
-is also its `ikraft`.
+is also its `ikraft`. Each entry's `uri` resolves at
+`GET /api/v1/document?uri=…` (and `&format=md`), which returns that version's
+own artifact — a version is not a catalog document, so its `inbound_count` is 0
+and no other route indexes it.
 
 ```jsonc
 // VersionList
@@ -500,6 +503,7 @@ expect a slow response on a big document.
 | which citers weigh most? | `GET /api/v1/document/inbound?uri=…&source=dv&sort=citations` |
 | what does this cite? | `GET /api/v1/document/outbound?uri=…` |
 | version history | `GET /api/v1/document/versions?uri=…` |
+| read one version | `GET /api/v1/document?uri=…/konsolidering/…` |
 | diff two versions | `GET /api/v1/document/diff?uri=…&from=…&to=…` (HTML) |
 | page facsimile (PNG) | `GET /api/v1/facsimile?uri=…&sid=N` |
 | a statute's omitted graphic (PNG) | `GET /api/v1/sfs-graphic?uri=…&node=…` |
@@ -512,7 +516,7 @@ expect a slow response on a big document.
 
 ### What this API does not answer yet
 
-A client that reads documents to a person needs six things this API cannot
+A client that reads documents to a person needs five things this API cannot
 supply. They are written down here so a consumer stops looking for the route,
 and so each gap keeps its shape beside the endpoints. The list comes from
 building [paraTEXT](../../paratext/README.md) against this surface.
@@ -525,10 +529,6 @@ building [paraTEXT](../../paratext/README.md) against this surface.
   proposition's `kommentarer` list. None has a route. The nearest answer a
   client can reach is `/document/inbound?source=kommentar`, which names the
   citing document but not the prose written under the provision.
-- **The text of an older lydelse.** `/document/versions` lists a statute's
-  archived consolidations and `/document/diff` compares two of them, but no
-  route returns a version's own artifact. A client can show what changed
-  between two wordings. It cannot show the older wording as a document.
 - **A most-cited listing.** `/search` ranks by `inbound_count` under
   `sort=citations`, but it requires a query, and `/documents` orders by uri with
   no sort parameter. So "the 25 most-referenced statutes", which the site's own
