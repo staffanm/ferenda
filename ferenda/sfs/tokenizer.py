@@ -39,16 +39,16 @@ re_SectionRevoked = re.compile(
     r"^(\d+ ?\w?) \xa7[ \.]([Hh]ar upphävts|[Nn]y beteckning (\d+ ?\w?) \xa7) "
     r"genom ([Ff]örordning|[Ll]ag) \([\d\:\. s]+\)\.$").match
 re_RevokeDate = re.compile(
-    r"/(?:Rubriken u|Kapitlet u|U)pphör att gälla U:(\d+)-(\d+)-(\d+)"
+    r"/(?:Rubriken [Uu]|Kapitlet [Uu]|[Uu])pphör att gälla U:(\d+)-(\d+)-(\d+)"
     r"(?: genom lag \(\d{4}:\d+\).|)/")
 re_RevokeAuthorization = re.compile(
-    r"/(?:Kapitlet u|U)pphör att gälla U:(den dag (?:som |)regeringen bestämmer)"
+    r"/(?:Rubriken [Uu]|Kapitlet [Uu]|[Uu])pphör att gälla U:([Dd]en dag (?:som |)regeringen bestämmer)"
     r"(?: genom lag \(\d{4}:\d+\).|)/")
 re_EntryIntoForceDate = re.compile(
-    r"/(?:Rubriken t||Kapitlet t|T)räder i kraft I:(\d+)-(\d+)-(\d+)"
+    r"/(?:Rubriken [Tt]|Kapitlet [Tt]|[Tt])räder i kraft I:(\d+)-(\d+)-(\d+)"
     r"(?: genom lag \(\d{4}:\d+\).|)/")
 re_EntryIntoForceAuthorization = re.compile(
-    r"/(?:Kapitlet t|T)räder i kraft I:(den dag (?:som |)regeringen bestämmer)"
+    r"/(?:Rubriken [Tt]|Kapitlet [Tt]|[Tt])räder i kraft I:([Dd]en dag (?:som |)regeringen bestämmer)"
     r"(?: genom lag \(\d{4}:\d+\).|)/")
 re_dehyphenate = re.compile(r"\b- (?!(och|eller))").sub
 

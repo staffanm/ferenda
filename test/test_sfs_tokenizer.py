@@ -2,10 +2,23 @@
 tokenizer-internal edge cases that the fixture-driven test_sfs_parse.py
 oracle doesn't exercise well (end-of-data lookahead, in-body TOC faking)."""
 
+import json
+from pathlib import Path
+
+import brotli
+
 from ferenda.sfs import parse_sfs_source
+from ferenda.sfs.assembler import assemble
 from ferenda.sfs.model import Paragraf
+from ferenda.sfs.nf import to_normalform
 from ferenda.sfs.reader import TextReader
-from ferenda.sfs.tokenizer import OpenAvdelning, OpenKapitel, Tokenizer
+from ferenda.sfs.tokenizer import (
+    OpenAvdelning,
+    OpenKapitel,
+    OpenParagraf,
+    Tokenizer,
+    andrings_datum,
+)
 
 BASEFILE = "9999:998"
 
@@ -152,3 +165,88 @@ def test_a_paragraf_glued_to_the_line_above_still_opens():
 
     walk(doc)
     assert got == ["13 d", "13 e", "14"]
+
+
+def test_rubriken_temporal_authorization_markers():
+    """Verify that andrings_datum recognizes Rubriken upphör and träder
+    with 'den dag (som) regeringen bestämmer' directives."""
+    line1 = "/Rubriken upphör att gälla U:den dag som regeringen bestämmer/ 26 kap. Om fängelse"
+    stripped1, upphor1, ikraft1 = andrings_datum(line1)
+    assert stripped1 == "26 kap. Om fängelse"
+    assert upphor1 == "den dag som regeringen bestämmer"
+    assert ikraft1 is None
+
+    line2 = "/Rubriken träder i kraft I:den dag som regeringen bestämmer/ 26 kap. Om den tillämpliga straffskalan"
+    stripped2, upphor2, ikraft2 = andrings_datum(line2)
+    assert stripped2 == "26 kap. Om den tillämpliga straffskalan"
+    assert upphor2 is None
+    assert ikraft2 == "den dag som regeringen bestämmer"
+
+    # Paragraf line with erroneous 'Rubriken upphör' marker
+    line3 = "1 § /Rubriken upphör att gälla U:den dag som regeringen bestämmer/"
+    stripped3, upphor3, ikraft3 = andrings_datum(line3)
+    assert stripped3 == "1 §"
+    assert upphor3 == "den dag som regeringen bestämmer"
+    assert ikraft3 is None
+
+
+def test_chapter_heading_variant_authorization():
+    """Verify chapter heading change with authorization directive correctly
+    emits events and mints chapter and paragraph IDs."""
+    text = """/Rubriken upphör att gälla U:den dag som regeringen bestämmer/
+26 kap. Om fängelse
+
+/Rubriken träder i kraft I:den dag som regeringen bestämmer/
+26 kap. Om den tillämpliga straffskalan
+
+1 § /Rubriken upphör att gälla U:den dag som regeringen bestämmer/
+Fängelse döms ut på viss tid.
+
+1 § /Träder i kraft I:den dag som regeringen bestämmer/
+Fängelse döms ut på viss tid. Lag (2026:1654).
+
+2 § Fängelse får användas.
+"""
+    events = _events(text)
+    assert len([e for e in events if isinstance(e, OpenKapitel)]) == 2
+    assert len([e for e in events if isinstance(e, OpenParagraf)]) == 3
+
+    reader = TextReader(text)
+    reader.autostrip = True
+    doc = assemble(Tokenizer(reader, "1962:700"))
+    nf = to_normalform(doc, "1962:700")
+    k26 = [n for n in nf["structure"] if n.get("ordinal") == "26" and n.get("id") == "K26"]
+    assert len(k26) == 1
+    p_ids = [c.get("id") for c in k26[0]["children"] if c.get("type") == "paragraf"]
+    assert p_ids == ["K26P1", None, "K26P2"]
+
+
+def test_sfs_1962_700_kapitel_26_recognized():
+    """Verify that 26 kap in 1962:700 (Brottsbalken) is recognized and paragraphs
+    receive pinpoint IDs (K26P1, K26P2, K26P2a)."""
+    p = Path("site/data/downloaded/sfs/1962/700.json.br")
+    if not p.exists():
+        return
+    with open(p, "rb") as f:
+        data = json.loads(brotli.decompress(f.read()).decode("utf-8"))
+    txt = data["fulltext"]["forfattningstext"].replace("\r", "")
+    reader = TextReader(txt)
+    reader.autostrip = True
+    doc = assemble(Tokenizer(reader, "1962:700"))
+    nf = to_normalform(doc, "1962:700")
+
+    k26_nodes = []
+
+    def find_k26(nodes):
+        for n in nodes:
+            if n.get("type") == "kapitel" and n.get("ordinal") == "26" and n.get("id") == "K26":
+                k26_nodes.append(n)
+            find_k26(n.get("children", []))
+
+    find_k26(nf["structure"])
+    assert len(k26_nodes) == 1
+    p_ids = [c.get("id") for c in k26_nodes[0]["children"] if c.get("type") == "paragraf"]
+    assert "K26P1" in p_ids
+    assert "K26P2" in p_ids
+    assert "K26P2a" in p_ids
+

@@ -425,7 +425,7 @@ class IdMinter:
         self.suppress_temporal = suppress_temporal
         self.minted = set()
 
-    def mint(self, pairs, node):
+    def mint(self, pairs, node, in_force=None):
         """pairs is the ordered (letter, ordinal-fragment) prefix chain,
         or None if an ancestor was suppressed. Returns a fragment id or
         None (suppressed)."""
@@ -442,8 +442,9 @@ class IdMinter:
         fragment = "".join(letter + frag for letter, frag in skipped)
         if fragment in self.minted:
             return None
+        effective = in_force if in_force is not None else in_effect(node, self.now)
         if (self.suppress_temporal and isinstance(node, TEMPORAL)
-                and not in_effect(node, self.now)):
+                and not effective):
             return None
         self.minted.add(fragment)
         return fragment
@@ -571,9 +572,17 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None,
                             "children": kids})
             case Kapitel():
                 sub = extend(pairs, "K", ordfrag(node.ordinal))
-                node_id = proj.minter.mint(sub, node)
+                empty_variant = (not node.children and any(
+                    isinstance(s, Kapitel) and s.ordinal == node.ordinal and s.children
+                    for s in children))
+                pred = next((s for s in children if isinstance(s, Kapitel)
+                             and s.ordinal == node.ordinal and not s.children), None)
+                is_in_force = _in_force(node, proj.minter) or (
+                    pred is not None and _in_force(pred, proj.minter))
+                node_id = None if empty_variant else proj.minter.mint(
+                    sub, node, in_force=is_in_force)
                 ctx = node_id or frag
-                clive = live and _in_force(node, proj.minter)
+                clive = live and is_in_force
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=clive)]
                 kids += project_children(node.children, sub if node_id else None,
                                          proj, ctx, clive, satt_av=gov,
