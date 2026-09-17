@@ -106,7 +106,15 @@ def row_designation(text, arsutgava, lopnummer):
 # + every amendment), resolved by the shared resolve_landing (text-classified).
 # --------------------------------------------------------------------------
 
-RE_FI_BASE = re.compile(r"/sok-fffs/(\d{4})/(\d{4})(\d+)/?$")
+# the base detail URL fuses year+lopnummer, either bare (/sok-fffs/2024/20245/)
+# or behind an "fffs-" slug (/sok-fffs/2024/fffs-202420/). Anchored to the year
+# segment and the path end, so an amendment nested under a base slug
+# (.../<base-slug>/fffs-20257/) never matches -- its number sits one segment too
+# deep (#53).
+RE_FI_BASE = re.compile(r"/sok-fffs/(\d{4})/(?:fffs-)?(\d{4})(\d+)/?$")
+# a base whose detail URL is a title slug carrying no number
+# (.../om-valutavaxling.../) prints its number only as a bare "YYYY:N" link.
+RE_FI_BARE_LINK = re.compile(r"^\s*(\d{4}):(\d+)\s*$")
 
 
 def fi_enumerate(session, agency):
@@ -114,24 +122,42 @@ def fi_enumerate(session, agency):
 
     The number comes from the detail URL, the only clean number on the row; the
     samling from the designation the row prints for that number, so the
-    Bankinspektionen act the förteckning still carries stays BFFS."""
+    Bankinspektionen act the förteckning still carries stays BFFS.
+
+    A base whose detail URL is a title slug (FFFS 2023:22's
+    .../om-valutavaxling.../) carries no number there and is reached in a second
+    pass by its bare-number "YYYY:N" link. That pass routes to FFFS and fires
+    only for a number the first pass did not place -- every predecessor-series
+    act (BFFS) uses a numeric detail URL and so is placed there, never here."""
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
+    numbers = set()
     for a in soup.find_all("a", href=True):
-        href = util.href(a)
-        m = RE_FI_BASE.search(href)
+        m = RE_FI_BASE.search(util.href(a))
         if not m:
             continue
         arsutgava, lopnummer = m.group(1), str(int(m.group(3)))
         designation = row_designation(a.get_text(" ", strip=True), arsutgava, lopnummer)
         fs = harvest.series_slug(designation) if designation else agency.fs
         basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
+        numbers.add("%s:%s" % (arsutgava, lopnummer))
         if basefile in seen:
             continue
         seen.add(basefile)
         yield DocRef(basefile=basefile, fs=fs if fs != agency.fs else None,
                      identifier="%s %s:%s" % (designation or agency.fs.upper(),
                                               arsutgava, lopnummer),
+                     url=harvest.absolute(agency.base_url, a["href"]))
+    for a in soup.find_all("a", href=True):
+        m = RE_FI_BARE_LINK.match(a.get_text(" ", strip=True))
+        if not m or "/sok-fffs/" not in util.href(a):
+            continue
+        arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
+        if "%s:%s" % (arsutgava, lopnummer) in numbers:
+            continue
+        numbers.add("%s:%s" % (arsutgava, lopnummer))
+        yield DocRef(basefile="%s/%s:%s" % (agency.fs, arsutgava, lopnummer),
+                     identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
                      url=harvest.absolute(agency.base_url, a["href"]))
 
 
@@ -161,7 +187,11 @@ NFS = Agency(
     index_url="https://www.naturvardsverket.se/lagar-och-regler/foreskrifter-och-allmanna-rad/",
     enumerate=json_enumerate, resolve=resolve_landing,
     params={
-        "api_url": "https://www.naturvardsverket.se/api/naturvardsverket/regulation/search/?s=500&id=7925&lang=sv",
+        # RevokedDate defaults to `valid` (215 in-force); `all` returns the
+        # whole 439 including the 224 revoked, so the upphävda archive and the
+        # repealers that mark our held documents repealed are enumerated too
+        # (#80). One call, `p=1` is the facet query's own required page cursor.
+        "api_url": "https://www.naturvardsverket.se/api/naturvardsverket/regulation/search/?facets=RevokedDate:all&p=1&s=500&id=7925&lang=sv",
         "unwrap": "searchModel",
         "id_field": "nfsText", "url_field": "url", "title_field": "heading",
         # filenames come both hyphenated (nfs-2014-29.pdf) and underscored /
@@ -990,10 +1020,15 @@ def ffs_enumerate(session, agency):
             # the listing carries a konsoliderad text and a rättelseblad under
             # the document's own number, and `ref` keeps whichever row comes
             # first -- which stored the konsoliderad text as FFS 2019:3 and the
-            # rättelse as FFS 2021:2 instead of the law. Every variant row in
-            # the listing has a plain row for the same number, so dropping it
-            # loses nothing.
-            if RE_FFS_VARIANT.search(name):
+            # rättelse as FFS 2021:2 instead of the law. The rättelse row names
+            # itself ("FFS 2021:2 rättelse"), but the konsoliderad row is named
+            # only "FFS 2019:03" -- its marker is in the filename
+            # (ffs-2019-03-konsoliderad.pdf) -- so both name and filename are
+            # read. Every variant row in the listing has a plain row for the
+            # same number (measured: 0 of 131 numbers are variant-only), so
+            # dropping it loses nothing.
+            if RE_FFS_VARIANT.search(name) \
+                    or RE_FFS_VARIANT.search(harvest.filename(doc.get("url", ""))):
                 continue
             docref = harvest.ref(agency, name, doc.get("url", ""), seen,
                                  title=doc.get("preamble"), direct=True)

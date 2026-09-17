@@ -1578,3 +1578,57 @@ def test_eifs_enumerate_reads_the_upphavda_archives_download_rows(monkeypatch):
         ("eifs/2022:7",
          "https://ei.se/download/18.23/1669384129429/"
          "EIFS-2022-7-om-upphavande-av-EIFS-2019-1.pdf")]
+
+
+def test_ffs_enumerate_drops_a_konsoliderad_row_named_only_in_its_filename(monkeypatch):
+    """FFS lists a konsoliderad text under the base's own number. The rättelse
+    names itself ("FFS 2021:2 rättelse"), but the konsoliderad row is named only
+    "FFS 2019:03" -- its marker is in the filename -- and `ref` keeps whichever
+    row comes first, so the konsoliderad won unless the filename is read too
+    (#48). The plain "FFS 2019:3" row must be the one kept."""
+    rows = {"documentInfo": [
+        {"name": "FFS 2019:03", "preamble": "FFS 2019:03 om officersutbildning",
+         "url": "https://e/ffs-2019-03-konsoliderad.pdf"},
+        {"name": "FFS 2019:3", "preamble": "FFS 2019:3 om officersutbildning",
+         "url": "https://e/ffs-2019-3.pdf"},
+    ]}
+    monkeypatch.setattr(agencies, "request", lambda *_a, **_kw: rows)
+    refs = [r for r in agencies.ffs_enumerate(None, REGISTRY["ffs"])
+            if r.basefile == "ffs/2019:3"]
+    assert len(refs) == 1
+    assert refs[0].extra["regulation_url"].endswith("/ffs-2019-3.pdf")
+
+
+def test_fi_enumerate_reaches_slug_urls_and_bare_number_links(monkeypatch):
+    """FI links a base by a numeric detail URL, an "fffs-<fused>" slug, or -- for
+    a title-slug page carrying no number -- a bare "YYYY:N" link (#53). The
+    bare-number pass routes to FFFS and fires only for a number no detail URL
+    placed, so a predecessor Bankinspektionen act (numeric URL, "BFFS" in its
+    row) stays BFFS and mints no FFFS twin. An amendment nested under a base
+    slug is not itself a base."""
+    html = (
+        '<a href="/sok-fffs/2020/20205/">Finansinspektionens föreskrifter om x</a>'
+        '<a href="/sok-fffs/2024/fffs-202420/">Föreskrifter om rapportering</a>'
+        '<a href="/sok-fffs/2023/om-valutavaxling/">Finansinspektionens '
+        'föreskrifter och allmänna råd om viss verksamhet</a>'
+        '<a href="/sok-fffs/2023/om-valutavaxling/">2023:22</a>'
+        '<a href="/sok-fffs/2023/om-valutavaxling/fffs-20257/">Föreskrifter om '
+        'ändring i (FFFS 2023:22)</a>'
+        '<a href="/sok-fffs/1991/199115/">Bankinspektionens föreskrifter '
+        '(BFFS 1991:15) om bankrörelse</a>')
+    monkeypatch.setattr(agencies, "request",
+                        lambda *_a, **_kw: SimpleNamespace(text=html))
+    refs = {(r.identifier, r.basefile) for r in agencies.fi_enumerate(None, REGISTRY["fffs"])}
+    assert ("FFFS 2020:5", "fffs/2020:5") in refs
+    assert ("FFFS 2024:20", "fffs/2024:20") in refs      # the fffs-<fused> slug
+    assert ("FFFS 2023:22", "fffs/2023:22") in refs      # the bare-number link
+    assert ("BFFS 1991:15", "bffs/1991:15") in refs      # predecessor stays BFFS
+    assert not any(b == "fffs/2025:7" for _i, b in refs)  # the nested amendment
+    assert not any(b == "fffs/1991:15" for _i, b in refs)  # no FFFS twin of BFFS
+
+
+def test_nfs_api_url_requests_all_revoked_documents():
+    """The NFS register defaults to in-force only (215 of 439). The harvest must
+    request the whole set, so the upphävda archive and the repealers that mark
+    our held documents repealed are enumerated too (#80)."""
+    assert "RevokedDate:all" in REGISTRY["nfs"].params["api_url"]
