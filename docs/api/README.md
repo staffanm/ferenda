@@ -29,6 +29,12 @@ One uvicorn process serves both the static site and the API; the API lives under
 `/api/v1`. Because the site and API share an origin, the site calls the API with
 relative URLs — there is no separate API host to configure.
 
+Two standalone one-page apps read this API from a browser and show what it
+gives a third party: **paraGRAF** (github.com/staffanm/para-graf) draws the
+citation graph, and **paraTEXT** (`paratext/` in this repo) searches, browses
+and reads documents. Both log every request they make, with a link to the raw
+JSON answer.
+
 - **Base path:** `/api/v1`. Corpus reads use GET. Citation extraction uses POST with a JSON body.
 - **CORS:** open to any origin for GET and POST, including JSON preflight requests.
 - **Interactive docs:** `GET /docs` (Swagger UI), `GET /openapi.json` (OpenAPI 3
@@ -412,7 +418,10 @@ acts only) — a document's archived historical consolidations (*lydelser*),
 oldest first, current excluded. `404` if the uri isn't a statute or an EU act.
 A statute's `version` is the SFS number of the last amendment folded in; an EU
 act's is the ISO date its consolidated wording (CONSLEG) began to apply, which
-is also its `ikraft`.
+is also its `ikraft`. Each entry's `uri` resolves at
+`GET /api/v1/document?uri=…` (and `&format=md`), which returns that version's
+own artifact — a version is not a catalog document, so its `inbound_count` is 0
+and no other route indexes it.
 
 ```jsonc
 // VersionList
@@ -566,6 +575,7 @@ expect a slow response on a big document.
 | which citers weigh most? | `GET /api/v1/document/inbound?uri=…&source=dv&sort=citations` |
 | what does this cite? | `GET /api/v1/document/outbound?uri=…` |
 | version history | `GET /api/v1/document/versions?uri=…` |
+| read one version | `GET /api/v1/document?uri=…/konsolidering/…` |
 | diff two versions | `GET /api/v1/document/diff?uri=…&from=…&to=…` (HTML) |
 | page facsimile (PNG) | `GET /api/v1/facsimile?uri=…&sid=N` |
 | a statute's omitted graphic (PNG) | `GET /api/v1/sfs-graphic?uri=…&node=…` |
@@ -575,6 +585,43 @@ expect a slow response on a big document.
 | a document as PDF | `GET /api/v1/pdf?path=…` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
 | machine schema | `GET /openapi.json`, `GET /docs` |
+
+### What this API does not answer yet
+
+A client that reads documents to a person needs five things this API cannot
+supply. They are written down here so a consumer stops looking for the route,
+and so each gap keeps its shape beside the endpoints. The list comes from
+building [paraTEXT](../../paratext/README.md) against this surface.
+
+- **The editorial layers under a provision.** The site's context rail shows
+  författningskommentar per paragraf, lagen.nu's own commentary, remissvar,
+  curated external links, the directive-to-paragraf transposition and the
+  old-to-new paragraf map. Each is assembled server-side from a catalog table
+  (`genomforande`, `correspondence`), an `.ann` sidecar, or an index over every
+  proposition's `kommentarer` list. None has a route. The nearest answer a
+  client can reach is `/document/inbound?source=kommentar`, which names the
+  citing document but not the prose written under the provision.
+- **A most-cited listing.** `/search` ranks by `inbound_count` under
+  `sort=citations`, but it requires a query, and `/documents` orders by uri with
+  no sort parameter. So "the 25 most-referenced statutes", which the site's own
+  frontpage prints, cannot be rebuilt from this API.
+- **What a citing document says.** An inbound row carries the citer's name, date
+  and own citation count, which is enough to rank it, but none of its text. A
+  prose line per citer costs one `/document/outbound` call per row, which a list
+  of fifty citers cannot afford. A `snippet` stamped at relate and served on the
+  row would close this, the same way `inbound_count` already rides each row.
+- **Browse for the sources with no facet scheme.** `/facets` and `/browse`
+  answer 404 for lawreview (20 930 documents) and kommentar (324), because
+  neither has an entry in `facets.SCHEMES`. Both are searchable, so their
+  documents are reachable, but they cannot be enumerated by bucket the way every
+  other source can. Note that a wildcard is not a way around this: `/search?q=*`
+  matches nothing, because the query runs through `simple_query_string` with
+  `default_operator=and`.
+- **Two asymmetries in the citation routes.** An inbound row states the printed
+  `page` its citation sits on; an outbound row does not. And `predicate`
+  separates the typed relations (`rpubl:bemyndigande`, `rpubl:andrar`,
+  `rpubl:upphaver`) but is not a query parameter on either route, so a client
+  filters the returned rows itself.
 
 ---
 

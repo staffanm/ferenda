@@ -1,0 +1,13 @@
+# paraTEXT -- static files behind nginx. The app has no backend of its own:
+# the browser talks straight to https://lagen.nu/api/v1/ (CORS is open
+# there). Put a reverse proxy with TLS in front of port 8097, or change the
+# mapping to whatever the host's proxy expects.
+services:
+  paratext:
+    image: nginx:1.27-alpine
+    container_name: paratext
+    restart: unless-stopped
+    ports:
+      - "8097:80"
+    volumes:
+      - ./site:/usr/share/nginx/html:ro

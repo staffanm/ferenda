@@ -1049,9 +1049,33 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     links -- for consumers that want a reading text (a human, an LLM, a RAG
     chunker) rather than the tree. The envelope and metadata stay JSON.
 
+    A ``…/konsolidering/<version>`` uri -- an archived historical lydelse from
+    /api/v1/document/versions -- resolves here too, to that version's own
+    artifact (SFS statutes and EU acts). A version is not a catalog document:
+    it carries no citations, so `inbound_count` is 0 and no other route
+    indexes it. Use /api/v1/document/diff to see what changed between two.
+
     The same object comes back per line in the bulk dumps, so a consumer
     reprocessing the whole corpus should take the dumps and never call this
     endpoint in a loop. See docs/api/README.md for the per-source shapes."""
+    version = _version_of(uri)
+    if version is not None:
+        source, basefile, version_id = version
+        art = _version_artifact(source, basefile, version_id)
+        props = art["metadata"]["properties"]
+        label = props["dcterms:identifier"]     # an invariant of a version artifact
+        title = props.get("dcterms:title") or label
+        # a version is not a catalog row: read straight from the archive tree,
+        # with inbound_count 0 (versions index no citations) and its naming
+        # taken from the artifact's own metadata
+        if format == "md":
+            return MarkdownDocument(
+                uri=art["uri"], source=source, kind=None, label=label,
+                title=title, inbound_count=0, source_url=art.get("source_url"),
+                markdown=mdtext.document_markdown(art, title=title or label))
+        return Document(
+            uri=art["uri"], source=source, kind=None, label=label, title=title,
+            inbound_count=0, source_url=art.get("source_url"), artifact=art)
     data = db.or_404(reads.document(con, uri), uri)
     if format == "md":
         art = data.pop("artifact")
@@ -1084,6 +1108,24 @@ def _versioned_document(uri):
         return "sfs", local
     raise HTTPException(404, "%r is not a statute or EU-act uri -- only "
                              "those carry versions" % uri)
+
+
+def _version_of(uri):
+    """(source, basefile, version) for a historical-consolidation uri
+    (``…/konsolidering/<version>``), or None for any other uri. A None sends
+    /document on to its normal catalog lookup. The archived lydelser that
+    /document/versions hands out carry these uris.
+
+    The version segment is the slugged id from the uri. It feeds
+    `layout.version_artifact` unchanged: that path rule slugs spaces itself, so
+    the slug and the raw id reach the same file. The base uri goes through
+    `_versioned_document`, so a konsolidering tail on a non-versioned base 404s
+    like the version endpoints do."""
+    base, sep, version = uri.partition("/konsolidering/")
+    if not sep or not version or "/" in version:
+        return None
+    source, basefile = _versioned_document(base)
+    return source, basefile, version
 
 
 def _validate_version_id(source, version):
