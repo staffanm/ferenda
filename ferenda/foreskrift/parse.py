@@ -1275,8 +1275,8 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # the samling's own name, possessive included: dropping only the head word
     # leaves it orphaned in front of the title ("Statens skolverks" +
     # "Skolverkets föreskrifter om …")
-    r"(?:[A-ZÅÄÖ][\wåäöÅÄÖ-]*(?:\s+[\wåäöÅÄÖ-]+){0,3}\s+)?författningssamling\w*"
-    r"|ISSN\s*[\d\s-]{4,}|(?:Ansvarig\s+)?Utgivare:\s*(?:[^,\n]{1,60},|[A-ZÅÄÖ][a-zåäö]+\s+[A-ZÅÄÖ][a-zåäö]+)?|\d?\s*Utkom\s+från\s+trycket"
+    r"(?:(?-i:[A-ZÅÄÖ])[\wåäöÅÄÖ-]*(?:\s+[\wåäöÅÄÖ-]+){0,3}\s+)?författningssamling\w*"
+    r"|ISSN\s*[\d\s-]{4,}[0-9Xx]\b|(?:Ansvarig\s+)?Utgivare:\s*(?:[^,\n]{1,60},|[A-ZÅÄÖ][a-zåäö]+\s+[A-ZÅÄÖ][a-zåäö]+)?|\d?\s*Utkom\s+från\s+trycket"
     # the agency's own contact block, which several samlingar print in the
     # masthead's second column ("Box 7821, 103 97 Stockholm, Sverige, www.fi.se")
     r"|\bwww\.[\w.-]+|\bBox\s+\d+|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö]+,?"
@@ -1339,6 +1339,10 @@ RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b"
 # the footnote marker the masthead sets on the title's last word, which the
 # extraction glues to it ("… för statistikändamål1", UFS 2023:1)
 RE_TITLE_FOOTNOTE = re.compile(r"(?<=[^\W\d_])\d{1,2}$")
+# a footnote marker landing after a type word and before "och" / "om" ("föreskrifter 1 och allmänna råd")
+RE_TITLE_STRAY_FOOTNOTE = re.compile(
+    r"\b(föreskrifter|föreskrift|allmänna\s+råd|allmänt\s+råd)\s+\d{1,2}\s+(?=och\b|om\b)",
+    re.IGNORECASE)
 # Where a masthead title ends when the page prints no stop at all. 63 documents
 # carry a whole title and neither a semicolon nor a decision clause -- every
 # Arbetarskyddsstyrelsens kungörelse, and Swedac's konsoliderade texter, whose
@@ -1402,6 +1406,8 @@ RE_VERSION_LABEL = re.compile(
 # the designation beside it: KKVFS 2020:3's "före- skrifter (2020:2)" matched
 # no amendment target.
 RE_WRAP_HYPHEN = re.compile(r"(\w)-\s+(?!och\b|eller\b|samt\b)([a-zåäö])")
+# font-extraction artifact in some PDFs where "fi"/"fl" ligatures carry an extra space
+RE_LIGATURE_SPLIT = re.compile(r"\b(fi|fl)\s+([a-zåäö]{3,})")
 #: a running header is a line, not a sentence
 FURNITURE_MAX = 60
 
@@ -1409,7 +1415,9 @@ FURNITURE_MAX = 60
 def join_wrapped(text):
     """`text` with the line-break hyphens closed, the masthead's counterpart of
     the body's line-by-line rejoining."""
-    return RE_WRAP_HYPHEN.sub(r"\1\2", text or "")
+    if not text:
+        return ""
+    return RE_LIGATURE_SPLIT.sub(r"\1\2", RE_WRAP_HYPHEN.sub(r"\1\2", text))
 
 
 def running_furniture(blocks):
@@ -1770,7 +1778,8 @@ def _masthead_title(masthead, *, printed_stop):
         # a bare type word with no subject is the samling's own name or a
         # running header, not this document's title
         if len(title) > len(word.group()) + 4:
-            title = RE_TITLE_FOOTNOTE.sub("", undouble(" ".join(title.split())))
+            title = RE_TITLE_STRAY_FOOTNOTE.sub(
+                r"\1 ", RE_TITLE_FOOTNOTE.sub("", undouble(" ".join(title.split()))))
             if _states_a_subject(title):
                 return title
     return None
@@ -1826,7 +1835,12 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     blocks, notes = parse_body(_pages(path, patch_key), identifier)
     _repair_ocr(blocks)
     start, separated = _body_start(blocks)
-    masthead = _repair_ocr_text(_full_text(blocks[:start]))
+    m_blocks = blocks[:start]
+    # when a document has cover pages before the official masthead:
+    m_page = next((b.page for b in m_blocks if RE_MASTHEAD_LINE.search(b.text)), 1)
+    if m_page > 1:
+        m_blocks = [b for b in m_blocks if b.page >= m_page]
+    masthead = _repair_ocr_text(_full_text(m_blocks))
     # the notes are read for metadata with the body: the "Jfr … direktiv" clause
     # that names what a föreskrift genomför is *printed as* a page-foot note, so
     # a scan of the blocks alone would lose the very relation it exists to find
@@ -1834,7 +1848,7 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
                                                        + [text for _mark, text in notes])),
                             role_declaration(masthead, harvest_title), parser,
                             fs=fs,
-                            repaired=role_declaration(clean_masthead(blocks, start),
+                            repaired=role_declaration(clean_masthead(m_blocks, len(m_blocks)),
                                                       harvest_title))
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
@@ -1846,7 +1860,7 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     # blocks[:0], which could only ever yield None. A document whose *first*
     # block is the boundary separates an empty masthead on purpose, and reading
     # its whole body for a title would take a heading out of the operative text.
-    meta["title"] = title_from_masthead(blocks, start if separated else len(blocks))
+    meta["title"] = title_from_masthead(m_blocks, len(m_blocks) if separated else len(blocks))
     ingress = _ingress_start(blocks, start)
     body = ([Block("ingress", "", blocks[ingress].page,
                    children=blocks[ingress:start])] if ingress < start else []) \

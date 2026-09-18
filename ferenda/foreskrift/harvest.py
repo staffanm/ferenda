@@ -375,6 +375,10 @@ def classify_file(a, fs, base_ars, base_lop):
     if RE_ATTACHMENT.search(words):
         return ("attachment", ars, lop)
     if ars is None:
+        m = RE_SLUG_NUMBER.search(filename(a.get("href", "")))
+        if m:
+            ars, lop = m.group(1), str(int(m.group(2)))
+    if ars is None:
         return None
     return (("regulation" if (ars, lop) == (base_ars, base_lop) else "amendment"), ars, lop)
 

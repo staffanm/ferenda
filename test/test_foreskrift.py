@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import requests
 from bs4 import BeautifulSoup
 
-from ferenda.foreskrift import agencies, download, harvest
+from ferenda.foreskrift import agencies, download, harvest, parse
 from ferenda.foreskrift.agencies import REGISTRY, SJVFS
 from ferenda.foreskrift.harvest import (
     DocRef,
@@ -547,6 +547,12 @@ def test_livsfs_resolve_falls_back_to_the_index_pdf_without_a_landing_page(monke
     assert agencies.livsfs_resolve(None, agency, base, "/r") == \
         ("landing", "https://www.livsmedelsverket.se/om-oss/lagstiftning1/gallande-lagstiftning/livsfs-20144/")
     assert calls[0][0] == "HEAD"
+
+
+def test_livsfs_index_urls_handles_2018_slug():
+    urls = REGISTRY["livsfs"].params["index_urls"]
+    assert any("foreskrifter-i-nummerordning-20172/" in u for u in urls)
+    assert not any("foreskrifter-i-nummerordning-2018/" in u for u in urls)
 
 
 def test_reap_finds_a_direct_series_leftover_by_its_regulation_pdf(tmp_path):
@@ -1254,11 +1260,25 @@ def test_afs_iaf_and_myh_enumerate_read_their_archive_of_repealed_regulations(mo
     _pages(monkeypatch, {
         agencies.MYHFS.index_url:
             '<a href="https://assets.myh.se/docs/myhfs-2026-5.pdf">MYHFS 2026:5</a>'
+            '<a href="https://assets.myh.se/docs/myhfs-digitless.pdf">Föreskrifter MYHFS-nummer 2024:1</a>'
             '<a href="/lag-och-ratt/upphavda-foreskrifter-och-allmanna-rad">Upphävda</a>',
         "https://www.myh.se/lag-och-ratt/upphavda-foreskrifter-och-allmanna-rad":
             '<a href="https://assets.myh.se/docs/myhfs-2014-1.pdf">MYHFS 2014:1</a>'})
     assert [r.identifier for r in agencies.myh_enumerate(None, agencies.MYHFS)] == [
-        "MYHFS 2026:5", "MYHFS 2014:1"]
+        "MYHFS 2026:5", "MYHFS 2024:1", "MYHFS 2014:1"]
+
+
+def test_stemfs_link_select_includes_amendment_column():
+    soup = BeautifulSoup(
+        '<div class="fake-tr">'
+        '  <div class="fake-td" data-headline="Nummer"><a href="/p1">STEMFS 2018:4</a></div>'
+        '  <div class="fake-td" data-headline="Ändrad/konsoliderad">'
+        '    <a href="/p2">STEMFS 2021:4</a>'
+        '  </div>'
+        '</div>', 'html.parser')
+    selector = REGISTRY["stemfs"].params["link_select"]
+    links = [a.get_text(strip=True) for a in soup.select(selector)]
+    assert links == ["STEMFS 2018:4", "STEMFS 2021:4"]
 
 
 def test_ts_classify_reads_every_separator_transportstyrelsen_prints():
@@ -1661,3 +1681,61 @@ def test_nfs_api_url_requests_all_revoked_documents():
     request the whole set, so the upphävda archive and the repealers that mark
     our held documents repealed are enumerated too (#80)."""
     assert "RevokedDate:all" in REGISTRY["nfs"].params["api_url"]
+
+
+def test_agvfs_index_urls_has_page_2():
+    assert len(REGISTRY["agvfs"].params["index_urls"]) == 2
+    assert any("page=2" in u for u in REGISTRY["agvfs"].params["index_urls"])
+
+
+def test_csnfs_enumerate_includes_repeal_notices(monkeypatch):
+    html = (
+        '<h2>Fulltext - omställningsstudiestöd</h2>'
+        '<a href="/download/18.a/2022_5.pdf">CSNFS 2022:5 Fulltext Pdf</a>'
+        '<h2>Tryckta versioner utgivna 2025</h2>'
+        '<a href="/download/18.b/2025_6.pdf">2025:6 Föreskrifter om upphävande av '
+        'Centrala studiestödsnämndens föreskrifter (CSNFS 2017:1) Pdf</a>'
+        '<a href="/download/18.c/2025_1.pdf">2025:1 Ändring i föreskrifter Pdf</a>'
+    )
+    monkeypatch.setattr(agencies, "request",
+                        lambda _s, _m, _u, **_kw: SimpleNamespace(text=html))
+    refs = list(REGISTRY["csnfs"].enumerate(None, REGISTRY["csnfs"]))
+    assert [r.basefile for r in refs] == ["csnfs/2022:5", "csnfs/2025:6"]
+
+
+def test_bolfs_amend_id_handles_single_and_double_pairs():
+    assert agencies._bolfs_amend_id("bolfs-2022-2.pdf") == "BOLFS 2022:2"
+    assert agencies._bolfs_amend_id("bolfs-2024-1.pdf") == "BOLFS 2024:1"
+    assert agencies._bolfs_amend_id("bolfs_2004_4_2006_3.pdf") == "BOLFS 2006:3"
+    assert agencies._bolfs_amend_id("unrelated.pdf") is None
+
+
+def test_hvmfs_enumerate_includes_nfs_repeal_document(monkeypatch):
+    html = (
+        '<a href="/foreskrifter/register-fisk.html">Fiskefartygs tillträde till hamnar (HVMFS 2017:8)</a>'
+        '<a href="/foreskrifter/register-upphav.html">Upphävande av Naturvårdsverkets föreskrifter '
+        '(NFS 2008:16) och allmänna råd om bidrag och ersättningar för viltskador</a>'
+    )
+    monkeypatch.setattr(agencies, "request",
+                        lambda _s, _m, _u, **_kw: SimpleNamespace(text=html))
+    refs = list(REGISTRY["hvmfs"].enumerate(None, REGISTRY["hvmfs"]))
+    assert [r.basefile for r in refs] == ["hvmfs/2017:8", "hvmfs/2022:19"]
+
+
+def test_classify_file_falls_back_to_filename_slug_number():
+    soup = BeautifulSoup('<a href="/download/HVMFS%202017-8-ev.pdf">2017:8 pdf</a>', "html.parser")
+    a = soup.find("a")
+    res = harvest.classify_file(a, "hvmfs", "2017", "8")
+    assert res == ("regulation", "2017", "8")
+
+
+def test_join_wrapped_repairs_split_fi_ligature():
+    assert parse.join_wrapped("aktiebolagsregistret och fi lialregistret samt") == \
+        "aktiebolagsregistret och filialregistret samt"
+
+
+def test_masthead_title_removes_stray_footnote_digit():
+    title = "Havs- och vattenmyndighetens föreskrifter 1 och allmänna råd om badvatten"
+    assert parse.RE_TITLE_STRAY_FOOTNOTE.sub(r"\1 ", title) == \
+        "Havs- och vattenmyndighetens föreskrifter och allmänna råd om badvatten"
+
