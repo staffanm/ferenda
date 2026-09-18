@@ -27,7 +27,7 @@ from collections import deque
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 from ..lib import compress
 from ..lib.errors import UpstreamChanged
@@ -40,6 +40,25 @@ from .harvest import DocRef, newest_first
 # the identifying heading's designation, either series. Printed in parentheses
 # after the type words, the way a föreskrift's own title always prints it.
 RE_DESIGNATION = re.compile(r"\b(ESVFA|STKFA)\s+(\d{4}):(\d+)\b")
+
+# the outer heading the page prints over a chapter of its own text. Two shapes
+# carry one: `h2.ea-kapitel` is a chapter ("2 kap. Allmänna bestämmelser om
+# årsredovisning"), a plain h2 is the rubrik between two chapters ("Förordningens
+# tillämpningsområde"). The typed section under it repeats the heading with a
+# scope suffix ("… – föreskrifter till 2 kap. 1 § förordningen"), which is why
+# the outer one is what the regulation prints -- the inner one is the repeat.
+RE_EA_KAPITEL = re.compile(r"^\d+\s+kap\.")
+# a typed section whose heading is only its type word ("Föreskrifter", "Allmänna
+# råd") states no topic of its own; the content opens straight into its rubriker
+RE_BARE_TYPE_HEADING = re.compile(
+    r"^(?:Föreskrifter|Allmänna\s+råd)(?:\s+till\s+förordningen)?\s*$",
+    re.IGNORECASE)
+# where the page's publication history starts. Everything after this outer
+# heading is the amendment register (the h3 per amending författning) and the
+# amendment ledger, not text of the regulation -- the typed sections that
+# survive it (the cutoff section, the bilagor) are what `_parse_ea` reads as
+# amendment evidence, and they keep their own headings for that
+RE_EA_OVERGANG = re.compile(r"^Övergångsbestämmelser")
 
 # the issuing agency per samling. Not read from `agencies.SAMLINGAR`: that module
 # imports this one to build the STKFA row, so reading it back here would be a
@@ -68,6 +87,113 @@ def ea_links(html, url, index_url):
     return links
 
 
+def _drop_bare_type_headings(section):
+    """Remove the section's headings that are only their type word ("Föreskrifter",
+    "Allmänna råd", optionally "till förordningen"): they state no topic of
+    their own, and the content opens straight into the section's own rubriker.
+    """
+    heading = section.find(["h2", "h3", "h4"])
+    while heading is not None:
+        text = " ".join(heading.get_text(" ", strip=True).split())
+        if not RE_BARE_TYPE_HEADING.match(text):
+            break
+        heading.extract()
+        heading = section.find(["h2", "h3", "h4"])
+
+
+def _drop_repeated_heading(section, outer, next_outer):
+    """Remove the typed section's first heading when it repeats a heading the
+    page already prints around it, after the bare type word is dropped
+    (:func:`_drop_bare_type_headings`).
+
+    Two repeats occur in the markup. A chapter-marker heading ("1 kap. …") is
+    the outer chapter heading's repeat when the page prints that same heading
+    again as the next outer element (`next_outer`) -- the ingress section's
+    shape -- and no outer heading follows it when the chapter lives in the
+    section alone, which is why the equality is required. The scope-suffixed
+    heading ("Kompensation – föreskrifter till 4 § förordningen") keeps its
+    topic in the outer heading that opened it (`outer`). In each case the
+    section's content opens at the place the kept heading stands, so the drop
+    loses no boundary.
+    """
+    _drop_bare_type_headings(section)
+    heading = section.find(["h2", "h3", "h4"])
+    if heading is None:
+        return
+    text = " ".join(heading.get_text(" ", strip=True).split())
+    if RE_EA_KAPITEL.match(text) and next_outer and text == next_outer:
+        heading.extract()
+        return
+    if outer is None:
+        return
+    if text.startswith(outer):
+        rest = text[len(outer):].lstrip()
+        if not rest or rest[0] in ("\u2013", "-"):
+            heading.extract()
+
+
+def page_sections(box):
+    """The text an EA leaf page carries, as an ordered list of section fragments.
+
+    The walk is over the page's own top level, in document order. A typed
+    section (``div.foreskrifter`` / ``div.allmanna-rad``) is kept, its repeated
+    heading removed (:func:`_drop_repeated_heading`, or the bare type word alone
+    after the Övergångsbestämmelser heading, where the section's heading is the
+    amendment evidence). The outer headings are
+    text of the regulation the page prints, so each is kept wrapped in a
+    heading-only ``div.foreskrifter`` -- the shape ``_parse_ea`` reads as a
+    rubrik block (a chapter marker stays a chapter, the way a PDF's sets it).
+    Everything else the page hangs at its top level is dropped: the bare
+    ``p``/``ul``/``ol`` runs between the headings are Forum's mirror of the
+    förordning the föreskrifter advise on, which is the underlying act's text
+    and not the regulation's, and the ``h3`` years after the Övergångsbestämmelser
+    heading are the amendment register its typed sections already carry.
+
+    ``box.find("body")`` is the live page's shape: Forum embeds the regelverk
+    document as its own ``<html><body>`` inside the page shell, and the flat
+    synthetic pages the tests write have no such wrapper.
+    """
+    content = box.find("body") or box
+    elements = [el for el in content.children
+                if not isinstance(el, NavigableString)]
+    sections, outer, in_overgang, title_seen = [], None, False, False
+    for i, el in enumerate(elements):
+        if el.name in ("p", "ul", "ol"):
+            continue
+        if el.name in ("h2", "h3", "h4"):
+            if in_overgang:
+                continue
+            text = " ".join(el.get_text(" ", strip=True).split())
+            if not title_seen and RE_DESIGNATION.search(text):
+                title_seen = True
+                continue                      # the page's own title heading
+            if RE_EA_OVERGANG.match(text):
+                in_overgang = True
+                continue                      # the publication history opens here
+            outer = text
+            sections.append('<div class="foreskrifter">%s</div>' % el)
+            continue
+        assert el.name == "div", (
+            "unknown top-level element <%s class=%r> on a regelverk page"
+            % (el.name, el.get("class")))
+        assert el.get("class") and set(el["class"]) & {
+            "foreskrifter", "allmanna-rad"}, (
+            "an untyped top-level %s on a regelverk page: %s"
+            % (el.get("class"), el.get_text(" ", strip=True)[:60]))
+        if not in_overgang:
+            next_el = elements[i + 1] if i + 1 < len(elements) else None
+            next_outer = (" ".join(next_el.get_text(" ", strip=True).split())
+                          if next_el is not None
+                          and next_el.name in ("h2", "h3", "h4") else None)
+            _drop_repeated_heading(el, outer, next_outer)
+        else:
+            # the amendment evidence lives in these sections' headings, so only
+            # the bare type word is dropped
+            _drop_bare_type_headings(el)
+        sections.append(str(el))
+    return sections
+
+
 def parse_page(html, url):
     """One EA page -> the :class:`DocRef` for the regulation it carries, or None
     where it carries none (the root and its five section pages hang no
@@ -86,7 +212,7 @@ def parse_page(html, url):
             break
     else:
         return None
-    sections = [str(s) for s in box.select("div.foreskrifter, div.allmanna-rad")]
+    sections = page_sections(box)
     if not sections:
         raise UpstreamChanged(
             "%s names %s but hangs no föreskrift section" % (url, m.group(0)))

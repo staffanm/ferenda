@@ -1,11 +1,17 @@
 """STKFA/ESVFA: the EA-regelverket tree walk, and its typed HTML as a body.
 
-Both fixtures are trimmed live captures (2026-09-13):
+Both fixtures are trimmed live captures (2026-09-18), in the page's own shape:
+the page shell, the regelverk document embedded as its own ``<body>``, and
+inside it the page's top level in order -- the title heading, the typed
+``div.foreskrifter`` / ``div.allmanna-rad`` sections, the outer chapter and
+rubrik headings the page prints over them, and the bare ``p`` runs in between,
+which are Forum's mirror of the förordning the föreskrifter advise on.
 ``statskontoret-ea-index.html`` is the root's own anchors, and
-``statskontoret-ea-page.html`` is eight of the 245 sections of
-``/ea-regelverket/redovisning/arsredovisning-och-budgetunderlag/`` -- the page
-that carries ESVFA 2022:1 -- with the Övergångsbestämmelser section that names
-the amendments folded in.
+``statskontoret-ea-page.html`` is the leaf page that carries ESVFA 2022:1
+(``/ea-regelverket/redovisning/arsredovisning-och-budgetunderlag/``);
+``statskontoret-ea-page-kompensation.html`` is the leaf page that carries
+ESVFA 2022:7, whose sections repeat the page's own outer headings with a
+scope suffix.
 """
 
 import types
@@ -61,6 +67,22 @@ def walk(pages=None):
                           PAGE: "statskontoret-ea-page.html"})
     agency = REGISTRY["stkfa"]
     return list(statskontoret.enumerate_regulations(session, agency)), session
+
+
+# a second leaf, served under a made-up tree path: the page that carries
+# ESVFA 2022:7, whose sections repeat the page's own outer headings
+PAGE2 = INDEX + "redovisning/avdrag-mervardesskatt/"
+
+
+def parsed_of(tmp_path, fixture):
+    pages = {INDEX: '<html><body><a href="%s">s</a></body></html>'
+             % PAGE2[len(INDEX):],
+             PAGE2: fixture}
+    refs, _ = walk(pages)
+    [ref] = refs
+    record = statskontoret.resolve(None, REGISTRY["stkfa"], ref, tmp_path,
+                                   delay=0)
+    return parse.parse_record(record, str(tmp_path))
 
 
 # --------------------------------------------------------------------------
@@ -198,6 +220,23 @@ def nodes(items):
         yield from nodes(item.get("children", []))
 
 
+def chapter_name(chapter):
+    # a chapter's title is carried by its first rubrik child, the way the
+    # chapter-marker heading lands; a chapter opened by a marker of its own
+    # also keeps that marker as its first rubrik
+    if chapter.get("text"):
+        return chapter["text"][0]
+    [first] = chapter["children"][:1]
+    assert first["type"] == "rubrik"
+    return first["text"][0]
+
+
+# a heading that says no topic of its own: the type word, with or without the
+# "till förordningen" suffix the page prints
+BARE_TYPE = {"föreskrifter", "föreskrifter till förordningen",
+             "allmänna råd", "allmänna råd till förordningen"}
+
+
 def test_the_page_parses_as_the_regulations_consolidated_text(tmp_path):
     reg = parsed(tmp_path)
     assert reg.structure == []          # no separately published as-enacted text
@@ -205,6 +244,74 @@ def test_the_page_parses_as_the_regulations_consolidated_text(tmp_path):
     kinds = {n["type"] for n in nodes(cons.structure)}
     assert {"kapitel", "paragraf", "allmanna_rad"} <= kinds
     assert any(n["type"] == "paragraf" and n.get("ordinal") == "1"
+               for n in nodes(cons.structure))
+
+
+# --------------------------------------------------------------------------
+# the page's own headings, kept and de-duplicated
+# --------------------------------------------------------------------------
+
+def test_the_pages_outer_headings_are_text_of_the_regulation(tmp_path):
+    # the page prints each chapter as its own heading, over the typed sections
+    # that carry it. A parser that kept only the typed sections dropped every
+    # chapter the regulation's text has no section of its own for -- the page
+    # is the document, and its outer headings are the document's words.
+    reg = parsed(tmp_path)
+    [cons] = reg.consolidations
+    chapters = {chapter_name(c) for c in cons.structure
+                if c["type"] == "kapitel"}
+    assert "1 kap. Inledande bestämmelser" in chapters
+    assert "2 kap. Allmänna bestämmelser om årsredovisning" in chapters
+    assert "9 kap. Budgetunderlag och underlag för fördjupad prövning" in chapters
+    rubriker = {n["text"][0] for n in nodes(cons.structure)
+                if n["type"] == "rubrik"}
+    assert "Förordningens tillämpningsområde" in rubriker
+    assert "Årsredovisningens avlämnande" in rubriker
+
+
+def test_the_mirrored_forordning_text_is_not_the_regulations(tmp_path):
+    # between the page's headings, Forum prints the förordning the
+    # föreskrifter advise on, as bare paragraphs. That is the underlying
+    # act's text: keeping it published the act twice, once as the agency's
+    # own words.
+    reg = parsed(tmp_path)
+    [cons] = reg.consolidations
+    text = " ".join(str(n["text"][0])
+                    for n in nodes(cons.structure) if n.get("text"))
+    assert "gäller för myndigheter som lyder omedelbart under regeringen" \
+        not in text
+    assert "skall senast den 22 februari" not in text
+
+
+def test_a_bare_type_word_is_not_published_as_a_heading(tmp_path):
+    # the page wraps groups of provisions in sections whose heading is only
+    # the type word, "Föreskrifter". Published, that word stood as a rubrik
+    # over the provisions -- a heading that says what every one of them is.
+    for fixture in ("statskontoret-ea-page.html",
+                    "statskontoret-ea-page-kompensation.html"):
+        reg = parsed_of(tmp_path, fixture)
+        [cons] = reg.consolidations
+        rubriker = {n["text"][0] for n in nodes(cons.structure)
+                    if n["type"] == "rubrik"}
+        assert not {t for t in rubriker
+                    if t.rstrip(".").lower() in BARE_TYPE}
+
+
+def test_an_outer_heading_is_not_repeated_by_the_section_under_it(tmp_path):
+    # the typed section repeats the outer heading over it with a scope suffix
+    # ("Kompensation – föreskrifter till 4 § förordningen" under the page's
+    # own "Kompensation"). The outer heading is kept, so the repeat must not
+    # stand too: once published, the regulation had two Kompensation headings
+    # and no Tillämpningsområde of its own.
+    reg = parsed_of(tmp_path, "statskontoret-ea-page-kompensation.html")
+    [cons] = reg.consolidations
+    rubriker = [n["text"][0] for n in nodes(cons.structure)
+                if n["type"] == "rubrik"]
+    assert rubriker.count("Kompensation") == 1
+    assert "Tillämpningsområde" in rubriker
+    assert not any(t.startswith("Kompensation –") for t in rubriker)
+    # the de-duplicated section still carries its provisions
+    assert any(n["type"] == "paragraf" and n.get("ordinal") == "6"
                for n in nodes(cons.structure))
 
 
