@@ -620,6 +620,11 @@ Clients resolve pinpoints directly via node IDs in the document AST.
 
 ### Oblivious HTTP — `GET /api/v1/ohttp-keys`, `POST /api/v1/ohttp-gateway`
 
+> [!NOTE]
+> These endpoints are disabled in the API because a usable OHTTP relay is
+> missing. The implementation code remains in `ferenda/api/ohttp.py`, but it is
+> untested in the real world. The supported API does not advertise them.
+
 A client that must not show this server who asks sends its request through an
 Oblivious HTTP relay ([RFC 9458](https://www.rfc-editor.org/rfc/rfc9458)). The
 relay sees the client's address and a sealed request. This server sees the
@@ -674,7 +679,6 @@ request and the relay's address.
 | bulk download | `GET /api/v1/dumps` + static fetch |
 | check a citation without showing which | `GET /api/v1/range/{prefix}` |
 | fetch a bundle of documents in private | `GET /api/v1/packs/{pack_id}` |
-| ask without showing who asks | `POST /api/v1/ohttp-gateway` with a key from `GET /api/v1/ohttp-keys` |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 
 ### What this API does not answer yet

@@ -79,7 +79,6 @@ from . import (
     errors,
     facsimiles,
     internal,
-    ohttp,
     ops,
     paths,
     pdf,
@@ -138,10 +137,6 @@ TAGS = [
      "description": "Check a citation without saying which one: the client "
                     "fetches a bucket of hashes and looks for its citation "
                     "in the answer itself."},
-    {"name": "ohttp",
-     "description": "The Oblivious HTTP gateway (RFC 9458): a client sends a "
-                    "sealed request through a relay, so this server never "
-                    "sees who asked."},
 ]
 
 @asynccontextmanager
@@ -189,7 +184,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    expose_headers=["ETag", "Content-Encoding"])
 
 app.include_router(citations.router)
-app.include_router(ohttp.router)
+# OHTTP endpoints (ferenda/api/ohttp.py) are disabled for lack of a usable
+# OHTTP relay. The endpoints remain unadvertised in the supported API and
+# untested in the real world.
 
 
 # No Referrer-Policy here. The prod vhost already sets it at server scope

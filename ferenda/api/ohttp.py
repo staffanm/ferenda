@@ -1,6 +1,10 @@
 """The Oblivious HTTP gateway (RFC 9458): `/api/v1/ohttp-keys` and
 `/api/v1/ohttp-gateway`.
 
+NOTE: These endpoints are currently disabled in the API (not mounted in
+`ferenda.api.app`) due to the lack of a usable OHTTP relay. The code is
+preserved here, but it is untested in the real world.
+
 A client that must not show us which citation it checks sends its request
 through a relay. The relay sees the client's address and an opaque blob; we see
 the request and the relay's address. Neither sees both.
@@ -50,6 +54,8 @@ from pyhpke import AEADId, CipherSuite, KDFId, KEMId, OpenError
 
 from .. import config
 
+# The endpoints below are implemented per RFC 9458, but disabled in the
+# supported API and untested in the real world (no usable OHTTP relay).
 router = APIRouter(prefix="/api/v1", tags=["ohttp"])
 
 # the one suite we publish: DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM
@@ -109,7 +115,10 @@ def key_config(key_id, public):
 def ohttp_keys():
     """The key configurations a client seals its requests to, as
     `application/ohttp-keys` (RFC 9458 section 3.2): each configuration
-    prefixed with its 2-byte length, newest key first."""
+    prefixed with its 2-byte length, newest key first.
+
+    Untested in the real world.
+    """
     body = b"".join(len(cfg).to_bytes(2) + cfg
                     for cfg in (key_config(key_id, public)
                                 for key_id, (_, public) in _keys().items()))
@@ -265,7 +274,10 @@ async def ohttp_gateway(request: Request):
     The inner request must be a GET or HEAD of `/api/v1/range/…` or
     `/api/v1/packs/…`. Anything else is refused *inside* the sealed response,
     with the status the route itself would have used (403, 405), so the relay
-    learns nothing from the outer 200."""
+    learns nothing from the outer 200.
+
+    Untested in the real world.
+    """
     _keys()                        # 404 before anything else when unconfigured
     if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() \
             != "message/ohttp-req":

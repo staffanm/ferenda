@@ -194,10 +194,18 @@ def test_outer_errors(gateway):
     assert _post(gateway, _seal(b"\x01\x40\xc8")[0]).status_code == 400
 
 
-def test_unconfigured_gateway_is_absent(monkeypatch):
+def test_gateway_endpoints_disabled_in_app(keyfile):
+    client = TestClient(api.app)
+    assert client.get("/api/v1/ohttp-keys").status_code == 404
+    assert _post(client, b"x").status_code == 404
+
+
+def test_unconfigured_gateway_yields_404(monkeypatch):
     monkeypatch.setattr(config, "OHTTP_KEYS_FILE", None)
     ohttp._keys.cache_clear()
-    client = TestClient(api.app)
+    app = FastAPI()
+    app.include_router(ohttp.router)
+    client = TestClient(app)
     assert client.get("/api/v1/ohttp-keys").status_code == 404
     assert _post(client, b"x").status_code == 404
 

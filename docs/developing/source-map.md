@@ -621,7 +621,9 @@ Brotli-compressed `.json.br` files under `cache/packs/`. Clients parse the JSON
 directly and locate provisions via their node IDs.
 
 `api/ohttp.py` is the Oblivious HTTP gateway (RFC 9458): `GET /api/v1/ohttp-keys`
-and `POST /api/v1/ohttp-gateway`. It opens the sealed request with `pyhpke`,
+and `POST /api/v1/ohttp-gateway`. These endpoints are disabled in the API
+for lack of a usable OHTTP relay and remain untested in the real world.
+It opens the sealed request with `pyhpke`,
 decodes the known-length Binary HTTP request (RFC 9292), and runs it against the
 same ASGI app in process, so an inner request cannot reach another host. It
 serves `INNER_PATH` only (`/api/v1/range/`, `/api/v1/packs/`), because in-process

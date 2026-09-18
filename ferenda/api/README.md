@@ -858,6 +858,11 @@ nod-ID:n i dokumentträdet.
 
 ### `GET /api/v1/ohttp-keys`, `POST /api/v1/ohttp-gateway` — Oblivious HTTP
 
+> [!NOTE]
+> Dessa ändpunkter är för närvarande inaktiverade i API:t i brist på ett
+> användbart OHTTP-relä. Koden finns kvar i `ferenda/api/ohttp.py`, men är
+> oprövad i verklig drift och annonseras inte i det stödda API:t.
+
 En klient som inte får visa vem som frågar skickar sin förfrågan genom ett
 relä (RFC 9458). Reläet ser klientens adress och ett förseglat meddelande.
 Servern ser förfrågan och reläets adress.

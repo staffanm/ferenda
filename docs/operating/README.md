@@ -178,6 +178,8 @@ See [`ferenda/api/README.md`](../../ferenda/api/README.md) for the response cont
 
 ### Oblivious HTTP gateway keys
 
+The Oblivious HTTP endpoints are currently disabled in the API for lack of a
+usable OHTTP relay, and remain untested in the real world. If enabled,
 `POST /api/v1/ohttp-gateway` opens sealed requests with the private keys in the
 file that `ohttp_keys_file` names. Make the file, or add a key to it:
 
