@@ -1,7 +1,8 @@
 """Statskontoret's STKFA and the predecessor ESVFA it took over from ESV.
 
-Both series are published as one current *EA-regelverket* on
-forum.statskontoret.se, and not as PDFs at all: a small tree of pages under
+This source reads both series as one current *EA-regelverket* on
+forum.statskontoret.se rather than from their separately published PDFs: a
+small tree under
 ``/ea-regelverket/``, one leaf page per förordning, each carrying that
 förordning's föreskrifter and allmänna råd as typed HTML sections
 (``div.foreskrifter`` / ``div.allmanna-rad``, 245 of them on the largest page).
@@ -40,6 +41,8 @@ from .harvest import DocRef, newest_first
 # the identifying heading's designation, either series. Printed in parentheses
 # after the type words, the way a föreskrift's own title always prints it.
 RE_DESIGNATION = re.compile(r"\b(ESVFA|STKFA)\s+(\d{4}):(\d+)\b")
+RE_KAPITEL = re.compile(r"^\d+\s*(?:[a-z]\s*)?kap\.", re.I)
+RE_OVERGANG = re.compile(r"^Övergångsbestämmelser")
 
 # the issuing agency per samling. Not read from `agencies.SAMLINGAR`: that module
 # imports this one to build the STKFA row, so reading it back here would be a
@@ -51,6 +54,45 @@ PUBLISHERS = {"esvfa": "Ekonomistyrningsverket", "stkfa": "Statskontoret"}
 # it. The live tree is 19 anchors off the root (2026-09), so this is two orders
 # of headroom and no kind of routine limit.
 PAGE_LIMIT = 500
+
+
+def _standalone_sections(title_heading):
+    """The rule blocks and the shared Forum headings they need.
+
+    Forum interleaves a förordning with its föreskrifter. A heading such as
+    ``2 kap. Allmänna bestämmelser`` is therefore a sibling of both texts, not
+    part of ``div.foreskrifter``. Keep it when that section contains rules, but
+    keep the förordning's own paragraphs out.
+
+    An inner heading that starts with the shared heading already carries the
+    standalone form (``Kompensation – föreskrifter till …``). The generic
+    ``Föreskrifter`` needs no shared subject heading unless its next heading is
+    a chapter marker; ESVFA 2022:1 uses that shape for chapter 11.
+    """
+    out, pending = [], None
+    for element in title_heading.parent.find_all(recursive=False):
+        classes = element.get("class", [])
+        if element.name == "h2" and "ea-kapitel" in classes:
+            pending = element
+            continue
+        if not (element.name == "div"
+                and any(c in classes for c in ("foreskrifter", "allmanna-rad"))):
+            continue
+        headings = element.find_all(["h2", "h3", "h4"])
+        first = " ".join(headings[0].get_text(" ", strip=True).split()) \
+            if headings else ""
+        if pending is not None and not RE_OVERGANG.match(first):
+            outer = " ".join(pending.get_text(" ", strip=True).split())
+            generic_before_chapter = (first == "Föreskrifter"
+                                      and any(RE_KAPITEL.match(
+                                          " ".join(h.get_text(" ", strip=True).split()))
+                                              for h in headings[1:]))
+            if (RE_KAPITEL.match(outer) or generic_before_chapter
+                    or not (first == "Föreskrifter" or first.startswith(outer))):
+                out.append(str(pending))
+        pending = None
+        out.append(str(element))
+    return out
 
 
 def ea_links(html, url, index_url):
@@ -86,7 +128,7 @@ def parse_page(html, url):
             break
     else:
         return None
-    sections = [str(s) for s in box.select("div.foreskrifter, div.allmanna-rad")]
+    sections = _standalone_sections(heading)
     if not sections:
         raise UpstreamChanged(
             "%s names %s but hangs no föreskrift section" % (url, m.group(0)))
@@ -129,8 +171,8 @@ def enumerate_regulations(session, agency):
 
 def resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
     """Store the page's typed sections as the regulation's current consolidated
-    text. The page is the consolidation and carries no separately published
-    as-enacted text, so the record hangs no ``regulation`` file -- the shape
+    text. This source does not collect the separately published as-enacted PDF,
+    so the record hangs no ``regulation`` file -- the shape
     ``parse_record`` already reads for an agency that publishes only a
     consolidated version.
 

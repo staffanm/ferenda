@@ -2071,8 +2071,9 @@ def _parse_ea(box, identifier, fs, base_ars, base_lop, parser):
     """An EA-regelverket page's typed sections -> the same (structure, footnotes,
     konsolideradTom, amendment triples) contract as :func:`parse_consolidation`.
 
-    Statskontoret publishes STKFA and ESVFA as a website and not as PDFs, so the
-    page *is* the consolidated regulation (:mod:`statskontoret`). Its text is
+    This source reads STKFA and ESVFA from Statskontoret's website rather than
+    its separately published PDFs, so the page is the consolidated regulation
+    (:mod:`statskontoret`). Its text is
     already typed -- ``div.foreskrifter`` is binding, ``div.allmanna-rad`` is the
     advisory text under the provision it explains -- which is the one
     distinction `_group_allmanna_rad` has to infer from type size in a PDF.
@@ -2081,7 +2082,38 @@ def _parse_ea(box, identifier, fs, base_ars, base_lop, parser):
     section, one ``h3`` per amending författning, which is the same evidence a
     konsoliderad PDF's masthead gives (:func:`masthead_amendments`)."""
     blocks, amendments = [], []
-    for section in box.select(EA_SECTIONS):
+    current_chapter = None
+    current_chapter_text = None
+    seen_headings = set()
+
+    def append_section(section_blocks):
+        nonlocal current_chapter, current_chapter_text, seen_headings
+        for block in section_blocks:
+            if block.kind == "kapitel":
+                if block.num == current_chapter:
+                    if block.text == current_chapter_text:
+                        continue
+                    block = Block(
+                        "rubrik", RE_KAP_MARK.sub("", block.text, count=1).strip(),
+                        block.page, size=block.size)
+                else:
+                    current_chapter = block.num
+                    current_chapter_text = block.text
+                    seen_headings.clear()
+            if block.kind == "rubrik":
+                if block.text == "Föreskrifter" or block.text in seen_headings:
+                    continue
+                seen_headings.add(block.text)
+            blocks.append(block)
+
+    for section in box.find_all(recursive=False):
+        if section.name == "h2" and "ea-kapitel" in section.get("class", []):
+            text = " ".join(section.get_text(" ", strip=True).split())
+            append_section(classify([Para(text, bold=True, size=3)], None))
+            continue
+        if section.name != "div" or not any(
+                c in section.get("class", []) for c in ("foreskrifter", "allmanna-rad")):
+            continue
         heading = section.find(["h2", "h3", "h4"])
         if heading is not None and RE_EA_OVERGANG.match(
                 " ".join(heading.get_text(" ", strip=True).split())):
@@ -2092,7 +2124,7 @@ def _parse_ea(box, identifier, fs, base_ars, base_lop, parser):
         if not section_blocks:
             continue
         if "allmanna-rad" not in section.get("class", []):
-            blocks.extend(section_blocks)
+            append_section(section_blocks)
             continue
         # the råd's own heading names the provision it explains ("Allmänna råd
         # till 1 kap. 1 § förordningen"), which is what links the two

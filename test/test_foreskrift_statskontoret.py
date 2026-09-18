@@ -185,8 +185,8 @@ def test_a_changed_page_timestamp_restages_a_stored_record(tmp_path):
 # the page as a body
 # --------------------------------------------------------------------------
 
-def parsed(tmp_path):
-    refs, _ = walk()
+def parsed(tmp_path, fixture="statskontoret-ea-page.html"):
+    refs, _ = walk({INDEX: fixture})
     record = statskontoret.resolve(None, REGISTRY["stkfa"], refs[0], tmp_path,
                                    delay=0)
     return parse.parse_record(record, str(tmp_path))
@@ -206,6 +206,48 @@ def test_the_page_parses_as_the_regulations_consolidated_text(tmp_path):
     assert {"kapitel", "paragraf", "allmanna_rad"} <= kinds
     assert any(n["type"] == "paragraf" and n.get("ordinal") == "1"
                for n in nodes(cons.structure))
+
+
+def test_shared_forum_chapter_headings_make_the_text_standalone(tmp_path):
+    reg = parsed(tmp_path)
+    [cons] = reg.consolidations
+    chapters = [n for n in cons.structure if n["type"] == "kapitel"]
+
+    assert [n["ordinal"] for n in chapters] == [str(n) for n in range(1, 12)]
+    assert [str(n["children"][0]["text"][0]) for n in chapters] == [
+        "1 kap. Inledande bestämmelser",
+        "2 kap. Allmänna bestämmelser om årsredovisning",
+        "3 kap. Resultatredovisning",
+        "4 kap. Resultaträkning och balansräkning",
+        "5 kap. Värderingsregler",
+        "6 kap. Anslagsredovisning och finansieringsanalys",
+        "7 kap. Tilläggsupplysningar",
+        "8 kap. Delårsrapport",
+        "9 kap. Budgetunderlag och underlag för fördjupad prövning",
+        "10 kap. Särskilda bestämmelser för affärsverken",
+        "11 kap. Tillämpningsföreskrifter",
+    ]
+    assert not any("Förordningens egen text" in str(n.get("text", ""))
+                   for n in nodes(cons.structure))
+    assert any(n["type"] == "rubrik" and n.get("text") == ["Undantag"]
+               for n in nodes(chapters[-1]["children"]))
+    assert not any(n["type"] == "rubrik" and n.get("text") == ["Föreskrifter"]
+                   for n in nodes(cons.structure))
+
+
+def test_shared_subject_heading_survives_without_forum_duplicates(tmp_path):
+    reg = parsed(tmp_path, "statskontoret-ea-compensation.html")
+    [cons] = reg.consolidations
+    headings = [str(n["text"][0]) for n in nodes(cons.structure)
+                if n["type"] == "rubrik"]
+
+    assert "Tillämpningsområde" in headings
+    assert headings.count("Kompensation – föreskrifter till 4 § förordningen") == 1
+    assert "Undantag" in headings
+    assert "Föreskrifter" not in headings
+    assert "Tillämpningsföreskrifter" not in headings
+    assert not any("Förordningens egen text" in str(n.get("text", ""))
+                   for n in nodes(cons.structure))
 
 
 def test_an_allmanna_rad_section_keeps_its_own_heading(tmp_path):
