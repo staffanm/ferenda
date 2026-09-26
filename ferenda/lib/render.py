@@ -116,6 +116,7 @@ def _feed_index_groups(con):
                {"rpubl_rattsfallspublikation": bucket["key"]})
               for bucket in tree["buckets"]]
     dv.append((feeds.BY_ALIAS["dv"].title, "dv", {}))
+    dv.append((feeds.BY_ALIAS["kkvdomar"].title, "kkvdomar", {}))
     groups.append(("Rättsfall", dv))
 
     fa = [(_all_label(bucket), "forarbeten", {"rdf_type": "type/" + bucket["key"]})
@@ -252,7 +253,8 @@ def render_document(art, source, site, renderers):
 # /dom/, lagen.nu's grammar; every other source browses under its own name.
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
-SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg", "rs",
+SOURCE_ORDER = ("sfs", "dv", "kkvdomar", "hudoc", "forarbete", "foreskrift",
+                "avg", "rs",
                 "eurlex", "guidance", "coe", "icrc", "untc",
                 "icc", "icj", "begrepp")
 # the reader-facing source names, defined once in `facets` (which this module

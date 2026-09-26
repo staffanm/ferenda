@@ -153,12 +153,13 @@ def _con():
 # reject valid kinds the host sees in results.
 Source = Literal["sfs", "dv", "hudoc", "forarbete", "foreskrift", "eurlex",
                  "coe", "avg", "rs", "guidance", "kommentar", "begrepp",
-                 "icc", "icj", "icrc", "untc"]
+                 "icc", "icj", "icrc", "untc", "kkvdomar"]
 SourceArg = Annotated[Source | None, Field(
     description="Begränsar till en del av källsamlingen. Utelämna när flera "
     "slags rättskällor kan vara relevanta -- ett felaktigt filter döljer "
     "relevanta källor. Värden: sfs (svenska lagar och förordningar), dv "
-    "(svenska domstolsavgöranden), forarbete (propositioner, SOU, Ds, "
+    "(svenska domstolsavgöranden), kkvdomar (kammarrätternas avgöranden i "
+    "upphandlingsmål), forarbete (propositioner, SOU, Ds, "
     "kommittédirektiv m.m.), foreskrift (myndigheters författningssamlingar), "
     "eurlex (EU-rättsakter och EU-domstolens avgöranden), hudoc "
     "(Europadomstolen), coe (Europarådets konventioner och protokoll), avg "
@@ -174,7 +175,7 @@ KindArg = Annotated[str | None, Field(
     "regulation/directive/judgment/opinion/decision (eurlex), "
     "judgment/decision (hudoc), treaty/protocol (coe), en "
     "författningssamlingskod som fffs eller nfs (foreskrift), "
-    "jo/kkv/jk/arn/imy (avg), en myndighetskod som skv, fk eller migr (rs), "
+    "jo/kkv/jk/arn/imy (avg), kst/kgg/kjo/ksu (kkvdomar), en myndighetskod som skv, fk eller migr (rs), "
     "riktlinjer/rekommendationer/wp (edpb), dom/beslut (icj), "
     "kommentar, begrepp. Utelämna om dokumenttypen inte är känd -- den står "
     "som `kind` på varje träff, vilket är det säkra sättet att få den rätt.")]

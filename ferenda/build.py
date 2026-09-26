@@ -63,6 +63,7 @@ from .hudoc import source as hudoc_source
 from .icc import source as icc_source
 from .icj import source as icj_source
 from .icrc import source as icrc_source
+from .kkvdomar import source as kkvdomar_source
 from .lawreview import source as lawreview_source
 from .lib import (
     aireport,
@@ -101,7 +102,8 @@ from .wiki import source as wiki_source
 for _module in (sfs_source, dv_source, forarbete_source, eurlex_source,
                 hudoc_source, coe_source, icrc_source, untc_source, icc_source,
                 icj_source, foreskrift_source, avg_source, guidance_source,
-                lawreview_source, rs_source, remisser_source, wiki_source,
+                lawreview_source, rs_source, kkvdomar_source, remisser_source,
+                wiki_source,
                 site_source, stats_source):
     for _source in _module.SOURCES:
         # the index step of an unsearched source fingerprints the module that

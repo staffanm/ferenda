@@ -45,6 +45,7 @@ class Dataset:
 DATASETS = (
     Dataset("sfs", "sfs", "Alla författningar"),
     Dataset("dv", "dv", "Samtliga rättsfall"),
+    Dataset("kkvdomar", "kkvdomar", "Samtliga upphandlingsmål"),
     Dataset("forarbeten", "forarbete", "Samtliga förarbeten"),
     Dataset("myndfs", "foreskrift", "Samtliga föreskrifter"),
     Dataset("myndprax", "avg", "Samtliga dokument"),

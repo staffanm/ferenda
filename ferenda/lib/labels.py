@@ -488,6 +488,14 @@ def _icc(art):
     return Labels(short_id, title, title, md.get("documentNumber") or short_id)
 
 
+def _kkvdomar(art):
+    # the court and the målnummer, the way a decision without a referat is
+    # cited ("Kammarrätten i Stockholm mål nr 6426-25"); the official title is
+    # the ärendemening the database gives it, which is what the case is about
+    ident = art.get("identifier") or _local(art["uri"])
+    return Labels(ident, "", art.get("title") or ident, ident)
+
+
 def _icj(art):
     # the eyebrow is the case's General List number as the Court cites it
     # ("ICJ 70"), not the decision's filename stem: the page is one decision in
@@ -506,6 +514,7 @@ _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "lawreview": _lawreview,
              "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
              "untc": _untc, "icc": _icc, "icj": _icj, "begrepp": _begrepp,
+             "kkvdomar": _kkvdomar,
              "kommentar": _kommentar}
 
 

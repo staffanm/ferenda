@@ -59,7 +59,7 @@ SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
               "rs": "rs", "guidance": "guidance", "lawreview": "lawreview",
               "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
-              "icc": "icc", "icj": "icj",
+              "icc": "icc", "icj": "icj", "kkvdomar": "kkvdomar",
               "remisser": "remisser", "kommentar": "kommentar",
               "begrepp": "begrepp", "site": "site", "stats": "stats"}
 
@@ -80,7 +80,7 @@ def artifact_dir(source: str) -> Path:
 CATALOGUED_SOURCES = ("sfs", "dv", "forarbete", "kommentar", "begrepp",
                       "eurlex", "foreskrift", "avg", "rs", "guidance",
                       "lawreview", "hudoc", "coe", "icrc", "untc", "icc",
-                      "icj")
+                      "icj", "kkvdomar")
 
 
 # raw roots -- the download writers put their structure under these
@@ -101,6 +101,7 @@ ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:A
 UNTC_DOWNLOADED = DOWNLOADED / "untc"               # <UNTS-no>.{html,text.html|pdf} (status page + authentic text)
 ICC_DOWNLOADED = DOWNLOADED / "icc"                 # <doc-number>.{json,pdf} (Legal Tools record + PDF)
 ICJ_DOWNLOADED = DOWNLOADED / "icj"                 # <decision-stem>.{json,pdf} (index row + Reports PDF)
+KKVDOMAR_DOWNLOADED = DOWNLOADED / "kkvdomar"       # <court>/<slug>.{json,pdf} (case page + decision PDF)
 
 # remisser's ärende records + answer PDFs share one download tree (see remisser_arende)
 REMISSER_DOWNLOADED = DOWNLOADED / "remisser"
@@ -197,10 +198,11 @@ def _relpath_foreskrift(basefile):
 
 
 def _relpath_org(basefile):
-    """avg, rs and lawreview: "jo/2340-2025", "jk/2024/8082" -- and, for rs, the
-    agency's own ställningstagande number: "fk/2025:01", "kfm/1-23-VER"; for
-    lawreview, the journal's issue coordinates: "svjt/2026-104",
-    "jp/2025-01-03"."""
+    """avg, rs, lawreview and kkvdomar: "jo/2340-2025", "jk/2024/8082" -- and,
+    for rs, the agency's own ställningstagande number: "fk/2025:01",
+    "kfm/1-23-VER"; for lawreview, the journal's issue coordinates:
+    "svjt/2026-104", "jp/2025-01-03"; for kkvdomar, the court, the målnummer
+    and the date: "kst/6426-25/2026-03-12"."""
     org, rest = basefile.split("/", 1)
     return Path(org) / rest.replace("/", "-").replace(":", "-")
 
@@ -246,6 +248,7 @@ _RELPATH = {"sfs": _relpath_sfs, "dv": _relpath_dv,
             "forarbete": _relpath_forarbete, "eurlex": _relpath_eurlex,
             "foreskrift": _relpath_foreskrift, "avg": _relpath_org,
             "rs": _relpath_org, "lawreview": _relpath_org,
+            "kkvdomar": _relpath_org,
             "guidance": _relpath_verbatim, "hudoc": _relpath_verbatim,
             "coe": _relpath_verbatim, "icrc": _relpath_verbatim,
             "untc": _relpath_verbatim, "icc": _relpath_verbatim,

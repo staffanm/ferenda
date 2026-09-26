@@ -1,0 +1,88 @@
+
+<HTML>
+<HEAD>
+<TITLE></TITLE>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+<LINK rel="stylesheet" type="text/css" href="lista.css">
+<SCRIPT language="JavaScript">
+function hitlist(intPage)
+{
+  document.frmSearch.showpage.value=intPage;
+  document.frmSearch.submit();
+}
+</SCRIPT>
+
+<SCRIPT LANGUAGE="VBScript">
+<!--
+
+
+
+function check_date(Date_String)
+	
+	if len(Date_String.Value) <> 0 then
+		retur = date_unformat(Date_String.Value)
+		if not IsDate(retur) Then
+			Date_String.Focus
+			Date_String.Select			
+			
+			exit function
+			
+		End if
+		Date_String.Value = Retur
+	End if
+End function
+
+Function date_unformat(date_string)
+    Dim nSize
+    On Error Resume Next
+    nSize = Len(date_string)
+	If nSize <> 0 Then
+		Select Case nSize
+		    Case 6
+		        date_string = Mid(date_string, 1, 2) & "-" & Mid(date_string, 3, 2) & "-" & Mid(date_string, 5, 2)
+		    Case 8
+		        If Mid(date_string, 5, 1) <> "-" Then
+		            If Mid(date_string, 3, 1) <> "-" Then
+		                date_string = Mid(date_string, 1, 4) & "-" & Mid(date_string, 5, 2) & "-" & Mid(date_string, 7, 2)
+		            End If
+		        End If
+		     Case 10
+		        If Mid(date_string, 5, 1) <> "-" Then
+		            date_string = ""
+		        End If
+		    Case Else
+		        date_string = ""
+		End Select
+        nSize = Len(Month(date_string))
+        If nSize = 1 Then
+            result = Year(date_string) & "-0" & Month(date_string)
+        Else
+            result = Year(date_string) & "-" & Month(date_string)
+        End If
+        nSize = Len(Day(date_string))
+        If nSize = 1 Then
+            result = result & "-0" & Day(date_string)
+        Else
+            result = result & "-" & Day(date_string)
+        End If
+        date_unformat = result
+    Else
+        date_unformat = ""
+    End If
+	
+End Function
+-->
+</Script>
+
+
+
+
+</HEAD>
+<!--<BODY   onload="document.frmArende.btnBack.focus()">-->
+<Form>
+
+
+<Form name="frmArende"><Input name="btnBack" type="button" value="" class="noone"></Form><Form method="POST" name="frmSearch" action="/domar/domar.asp"><Table align="center" class="" border="0" cellspacing="0" cellpadding="3" width="850" bgcolor="#FFFFFF"><tr><td align="left"><img src="bilder/logo.gif" border="0"></TD></tr><Tr><TD><H1>Domstolsdatabas</H1></td></tr><Tr><TD>Här kan du söka bland domstolsavgöranden inom offentlig upphandling från förvaltningsrätter, kammarrätter och Högsta förvaltningsdomstolen.</td></tr><Tr><TD></td></tr><TR><TD>Observera att beslutsdatum i sökformuläret måste anges i formatet åååå-mm-dd (inklusive bindestrecken mellan år-månad-dag).</TD></TR></table><Table align="center" class="tabellram" border="0" cellspacing="0" cellpadding="3" width="850" bgcolor="#ffffff"><tr><td class="rubrik" colspan="4">Sökning domstolsavgöranden</TD></TR><tr><td class="listaSok">Instans</TD><td class="listaSok">Domstol</TD></TR><TR><TD width="20%"><Select name="inInstans" onchange="frmSearch.submit()" class="sokruta"><Option value="0">- Välj instans - </Option><Option value="1">Länsrätt</Option><Option selected  value="2">Kammarrätt</Option><Option value="3">Högsta förvaltningsdomstolen</Option><Option value="6">EU-domstolen</Option><Option value="11">Förvaltningsrätt</Option><Option value="12">Övriga domstolar</Option></Select></TD><TD width="20%"><Select name="inDomstol" onchange=""   class="sokruta"><Option value="0">- Välj domstol - </Option><Option value="25">Kammarrätten i Göteborg</Option><Option value="27">Kammarrätten i Jönköping</Option><Option value="24">Kammarrätten i Stockholm</Option><Option value="26">Kammarrätten i Sundsvall</Option></Select></TD></TR><tr><td class="listaSok">Ärendetyp</TD><td class="listaSok">Domslut</TD></TR><TR><TD width="20%"><Select name="inArendetyp" onchange=""  class="sokruta"><Option value="0">- Välj ärendetyp - </Option><Option value="1">Överprövning av upphandling</Option><Option value="3">Övrigt</Option><Option value="6">Överprövning av avtals giltighet</Option><Option value="7">Upphandlingsskadeavgift</Option><Option value="8">Valfrihetssystem</Option><Option value="9">Tillsynsbeslut</Option></Select></TD><TD width="20%"><Select name="inDomslut" onchange=""  class="sokruta" ><Option value="0">- Välj domslut - </Option><Option  value="6">Övrigt</Option><Option  value="7">Avskrivning</Option><Option  value="8">Avslag på ansökan</Option><Option  value="9">Göra om upphandling</Option><Option  value="10">Rätta upphandling</Option><Option  value="11">Ej prövningstillstånd</Option><Option  value="12">Avvisning</Option><Option  value="13">Ogiltigförklara avtal</Option><Option  value="14">Ej angivet</Option><Option  value="15">Betala upphandlingsskadeavgift</Option><Option  value="16">Upphäva beslut om avbrytande</Option><Option  value="17">Återförvisning till lägre instans</Option><Option  value="18">Beviljande av prövningstillstånd</Option><Option  value="19">Överlämnande till behörig domstol</Option><Option  value="20">Avslag på överklagande</Option><Option  value="21">Rättelse - valfrihetssystem</Option></Select></TD></TR><TR><TD class="listaSok">Målnummer</TD><TD class="listaSok">Ärendemening</TD></TR><TR><TD><Input type="text" name="InArendeNr" 	 class="sokruta" value=""></TD><TD><Input type="text" name="InArendemening" class="sokruta" value=""></TD></TR><TR><TD class="listaSok">Leverantör/Sökande</TD><TD class="listaSok">UM/UE (Upphandlande myndighet/enhet)</TD></TR><TR><TD><Input type="text" name="InSokande" 	 class="sokruta" value=""></TD><TD><Input type="text" name="InMotpart"	 class="sokruta" value=""></TD></TR><TR><TD class="listaSok">Beslutsdatum from</TD><TD class="listaSok">Beslutsdatum tom</TD></TR><TR><td><Input type="text" name="beslutsdatumfrom" class="sokrutasmall"  onblur="check_date(beslutsdatumfrom)" value=""></TD><td><Input type="text" name="beslutsdatumtom" class="sokrutasmall"   onblur="check_date(beslutsdatumtom)" value=""></TD></TR><TR><TD class="listaSok">Visa endast de med beslutsfil</TD><TD class="listaSok">Visa endast de med referatfil</TD></TR><TR><TD class="listaSok" width="20%"><Input  type ="checkbox" name="bfil"></TD><TD class="listaSok" width="20%"><Input  type ="checkbox" name="rfil"></TD></TR><TR><TD colspan="2" align="right"><Input type="Submit" name="action" Value="Sök"><Input type="submit" name="action" value="Rensa"></TD></TR></table><br><Table align="center" class="tblborder" cellspacing="0" cellpadding="3" width="850"><TR><Td class="listagrey">Målnr</TD><Td class="listagrey">Domstol</TD><Td class="listagrey">Ärendemening</TD><Td class="listagrey">Beslutsdatum</TD><Td class="listagrey">Leverantör/Sökande</TD><Td class="listagrey">UM/UE</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49275>1885-26</A></TD><TD class="lista" valign="top">Kammarrätten i Sundsvall</TD><TD class="lista" valign="top">Upphandling</TD><TD class="lista" valign="top">2026-08-31</TD><TD class="lista" valign="top">Åke Werners Åkeri AB</TD><TD class="lista" valign="top">Bräcke kommun</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49256>2111-26</A></TD><TD class="lista" valign="top">Kammarrätten i Sundsvall</TD><TD class="lista" valign="top">Upphandling av koncessioner; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-27</TD><TD class="lista" valign="top">Gästrike-Dala Sotarn AB</TD><TD class="lista" valign="top">Brandkåren Norra Dalarna</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49254>5067-26 5074-26 5075-26 5077-5119-26</A></TD><TD class="lista" valign="top">Kammarrätten i Göteborg</TD><TD class="lista" valign="top">Överprövning av offentlig upphandling; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-27</TD><TD class="lista" valign="top">Villa Lindö Behandlingshem i Kalmar AB</TD><TD class="lista" valign="top">Se bilaga A</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49255>5144-26 5145-5189-26</A></TD><TD class="lista" valign="top">Kammarrätten i Göteborg</TD><TD class="lista" valign="top">Överprövning av offentlig upphandling; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-27</TD><TD class="lista" valign="top">Solgläntans behandlingshem i Kramfors AB</TD><TD class="lista" valign="top">Se bilaga A</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49246>5325-26</A></TD><TD class="lista" valign="top">Kammarrätten i Göteborg</TD><TD class="lista" valign="top">Överprövning av offentlig upphandling; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-26</TD><TD class="lista" valign="top">Gryning Vård AB</TD><TD class="lista" valign="top">Nämnden för Intraservice i Göteborgs kommun</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49249>1798-26</A></TD><TD class="lista" valign="top">Kammarrätten i Sundsvall</TD><TD class="lista" valign="top">Offentlig upphandling; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-26</TD><TD class="lista" valign="top">BN Måleri & Golv Aktiebolag</TD><TD class="lista" valign="top">Örnsköldsviks kommun</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49235>1548-26</A></TD><TD class="lista" valign="top">Kammarrätten i Sundsvall</TD><TD class="lista" valign="top">Offentlig upphandling</TD><TD class="lista" valign="top">2026-08-25</TD><TD class="lista" valign="top">NYAB Infrastruktur AB</TD><TD class="lista" valign="top">Trafikverket</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49232>5749-26</A></TD><TD class="lista" valign="top">Kammarrätten i Stockholm</TD><TD class="lista" valign="top">Offentlig upphandling; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-25</TD><TD class="lista" valign="top">Ressel Rederi AB</TD><TD class="lista" valign="top">Trafiknämnden i Region Stockholm</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49228>5616-26</A></TD><TD class="lista" valign="top">Kammarrätten i Stockholm</TD><TD class="lista" valign="top">Offentlig upphandling; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-24</TD><TD class="lista" valign="top">MedInfra Nordics AB</TD><TD class="lista" valign="top">Region Stockholm</TD></TR><TR><TD class="lista" valign="Top" ><a href=arende.asp?id=49224>5269-26</A></TD><TD class="lista" valign="top">Kammarrätten i Stockholm</TD><TD class="lista" valign="top">Offentlig upphandling; fråga om prövningstillstånd</TD><TD class="lista" valign="top">2026-08-21</TD><TD class="lista" valign="top">Patrick Blinned El Comfort AB</TD><TD class="lista" valign="top">Sollentuna Kommunfastigheter AB</TD></TR><TR><td colspan="7" class="lista">Visar sida&nbsp;<b>1</b> av <b>384</b>. Träffarna:&nbsp; <b>1</b> - <b>10</b> av <b>3835</b>&nbsp;<br><br>[&nbsp;<a href="javascript:hitlist(1)"><B>1</B></A>&nbsp;<a href="javascript:hitlist(2)">2</A>&nbsp;<a href="javascript:hitlist(3)">3</A>&nbsp;<a href="javascript:hitlist(4)">4</A>&nbsp;<a href="javascript:hitlist(5)">5</A>&nbsp;<a href="javascript:hitlist(6)">6</A>&nbsp;<a href="javascript:hitlist(7)">7</A>&nbsp;<a href="javascript:hitlist(8)">8</A>&nbsp;<a href="javascript:hitlist(9)">9</A>&nbsp;<a href="javascript:hitlist(10)">10</A>&nbsp;<a href="javascript:hitlist(11)">11</A>&nbsp;...&nbsp;<a href="javascript:hitlist(384)">384</A>&nbsp;&nbsp;]</TD></TR><input type="hidden" name="showpage" ></Table></FORM>
+
+</BODY>
+</HTML>

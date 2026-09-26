@@ -773,6 +773,15 @@ SCHEMES = {
                                 "sentence-review": "Straffomprövning"})),
         _Level("År", _dated_year, _by_year_desc),
     ],
+    "kkvdomar": [
+        _Level("Domstol", _catalog_kind, kind_axis=True,
+              order=_curated(["kst", "kgg", "kjo", "ksu"]),
+              labels=({"kst": "Kammarrätten i Stockholm",
+                       "kgg": "Kammarrätten i Göteborg",
+                       "kjo": "Kammarrätten i Jönköping",
+                       "ksu": "Kammarrätten i Sundsvall"})),
+        _Level("År", _dated_year, _by_year_desc),
+    ],
     "dv": [
         _Level("Domstol", _dv_court, _curated(list(DV_COURTS)),
               labels=(DV_COURTS)),
@@ -838,6 +847,7 @@ SOURCE_LABELS = {
     "sfs": "Författningar", "dv": "Rättsfall", "forarbete": "Förarbeten",
     "foreskrift": "Myndighetsföreskrifter", "avg": "Myndighetsavgöranden",
     "rs": "Rättsliga ställningstaganden", "eurlex": "EU-rättsakter",
+    "kkvdomar": "Upphandlingsmål",
     # the EU-rätt browse selector names the source `render.GUIDANCE_AXIS_LABEL`
     # instead: a heading over every body's series cannot call them riktlinjer
     "guidance": "EU-vägledning",
@@ -1326,7 +1336,7 @@ def browse_view(con, source):
 # silently pooling it would make a flow view lie about what cites what.
 FLOW_GROUPS = {
     "sfs": "Författningar", "forarbete": "Förarbeten", "dv": "Rättsfall",
-    "foreskrift": "Föreskrifter", "avg": "Myndighetsavgöranden",
+    "kkvdomar": "Rättsfall", "foreskrift": "Föreskrifter", "avg": "Myndighetsavgöranden",
     "rs": "Ställningstaganden", "kommentar": "Lagkommentarer",
     "begrepp": "Begrepp", "guidance": "EU-vägledning",
     "lawreview": "Tidskriftsartiklar",

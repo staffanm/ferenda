@@ -530,7 +530,8 @@ def describe_citer(from_uri, anchor, label, title, source):
 
 # The inbound rail's accordion rows, in display order. Ranking lives in
 # RAIL_SECTION_ORDER, keyed by these same slugs.
-INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "avg", "rs", "guidance",
+INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "kkvdomar", "avg", "rs",
+                 "guidance",
                  "lawreview", "hudoc", "icc", "icj", "eu-caselaw", "eu-forslag",
                  "eurlex", "coe", "icrc", "untc", "begrepp")
 
@@ -542,14 +543,17 @@ INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "avg", "rs", "guidance"
 # pseudo-sources it splits into (INBOUND_KIND_GROUPS) carry names no source
 # label covers; and the tidskriftsartikel group names the citing document --
 # "Artiklar" -- rather than the corpus it is mined from (the source label
-# "Tidskriftsartiklar"). Every group not listed here takes the source's own
-# name unchanged.
+# "Tidskriftsartiklar"). The kammarrätt group names the court that decided
+# rather than the subject ("Upphandlingsmål"), because it sits beside the
+# Rättsfall group and a reader tells the two apart by instance. Every group not
+# listed here takes the source's own name unchanged.
 _INBOUND_LABEL = {"sfs": "Lagrumshänvisningar hit",
                   "eurlex": "EU-rätt",
                   "icrc": "Humanitärrättsliga fördrag",
                   "eu-caselaw": "EU-domstolens praxis",
                   "eu-forslag": "Generaladvokatens förslag till avgörande",
-                  "lawreview": "Artiklar"}
+                  "lawreview": "Artiklar",
+                  "kkvdomar": "Kammarrättsdomar"}
 
 INBOUND_GROUPS = [(slug, _INBOUND_LABEL.get(slug) or facets.SOURCE_LABELS[slug])
                   for slug in INBOUND_ORDER]
@@ -1096,9 +1100,10 @@ def _inbound_groups(site, uris, exclude_from=(), exclude_before=None,
     for slug, items in bucket.items():
         if slug == "forarbete":
             items.sort(key=lambda r: forarb_sort_key(r[4], r[5], r[1]))
-        elif slug in CASELAW_GROUPS:
+        elif slug in CASELAW_GROUPS or slug == "kkvdomar":
             # case law reads newest-first, the order eu_caselaw_margin already
-            # uses: these citers are named by case number ("C-136/17"), which
+            # uses: these citers are named by case number ("C-136/17",
+            # "Kammarrätten i Stockholm mål nr 6426-25"), which
             # sorts alphabetically into an order that means nothing. Undated
             # citers trail their dated peers; the label breaks ties so two runs
             # over an unchanged corpus emit the same page.
@@ -1179,7 +1184,8 @@ class RailSection:
 # the first section present opens; the rest stay one click away (C3). A key not
 # listed here (a source with no assigned rank) sorts last, by label.
 RAIL_SECTION_ORDER = (
-    "kommentar", "fk", "dv", "avg", "rs", "hudoc", "icc", "icj", "eu-caselaw",
+    "kommentar", "fk", "dv", "kkvdomar", "avg", "rs", "hudoc", "icc", "icj",
+    "eu-caselaw",
     "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
     "eurlex", "guidance", "lawreview", "coe", "icrc", "untc", "begrepp",

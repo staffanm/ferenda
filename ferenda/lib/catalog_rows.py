@@ -143,6 +143,7 @@ _LABELLED_KIND = {
     "guidance": lambda art, lb: art.get("serie") or art["utgivare"],
     "lawreview": lambda art, lb: art["journal"],       # the journal (svjt/jp)
     "coe": lambda art, lb: art.get("doctype", "treaty"),
+    "kkvdomar": lambda art, lb: art["court"].lower(),  # the kammarrätt (kst/…)
 }
 
 
@@ -336,6 +337,9 @@ def _document_description(art, source):
     short_title alone."""
     if source == "dv":
         return art.get("metadata", {}).get("sammanfattning")
+    if source == "kkvdomar":
+        # Konkurrensverkets kortreferat, where it wrote one
+        return art.get("kortreferat")
     if source == "eurlex" and art.get("doctype") in eu_structure.CASELAW:
         # the Court's own subject line: the keywords that head a judgment
         # ("Begäran om förhandsavgörande – Skydd för enskilda personer … –
@@ -528,6 +532,10 @@ def _document_snippet(art, source):
     else."""
     if source == "dv" and (described := _document_description(art, source)):
         return described
+    if source == "kkvdomar":
+        # what the court decided: the body opens on the party block, whose
+        # first prose is a company name and its organisationsnummer
+        return cut_snippet(art.get("domslut") or "") or first_prose(art)
     if source in ("sfs", "foreskrift"):
         return _paragraf_prose(art) or first_prose(art)
     if source == "hudoc":
