@@ -77,10 +77,10 @@ Coding conventions worth internalising:
 Realized in the `ferenda/` package:
 
 1. **Vertical source pipelines** (`sfs/`, `dv/`, `forarbete/`, `eurlex/`,
-   `foreskrift/`, `avg/`, `rs/`, `remisser/`, `guidance/`, `lawreview/`,
-   `wiki/`, `hudoc/`, `coe/`, `icrc/`, `untc/`, `icc/`, `icj/`, `site/`,
-   `stats/`) — each owns its full chain (download → parse → typed model → JSON
-   artifact) and its own model.
+   `foreskrift/`, `avg/`, `rs/`, `kkvdomar/`, `remisser/`, `guidance/`,
+   `lawreview/`, `wiki/`, `hudoc/`, `coe/`, `icrc/`, `untc/`, `icc/`, `icj/`,
+   `site/`, `stats/`) — each owns its full chain (download → parse → typed
+   model → JSON artifact) and its own model.
 2. **Horizontal libraries** (`lib/`) — genuinely cross-source machinery: the
    citation engine (`lagrum.py`), catalog, search, render, layout, resolve,
    facets, the incremental build driver, etc.
@@ -472,7 +472,9 @@ Write, in a new `ferenda/<source>/` package:
    source's is `lib/pdftext.pdf_intermediate`); apply the patch at the parser's
    intermediate choke point (`patch.apply`, or pass `patch_key=` to
    `lib/pdftext.pdf_pages` for a PDF body); and fold `_patch_input(source, bf)`
-   into the source's freshness `inputs`. See *Patch files* in §3.
+   into the source's freshness `inputs`. A `stage.simple_source` registration
+   takes the same field as its own `intermediate=` kwarg (`kkvdomar` does this
+   for its decision PDFs). See *Patch files* in §3.
 
 Then run `lagen x download && lagen x parse && lagen x relate && lagen x
 generate` and check `lagen x status`.

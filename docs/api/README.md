@@ -274,7 +274,7 @@ query). Filter by `source` and/or `kind`. `limit` default 100 (1–1000), `offse
 
 **`GET /api/v1/facets`** — ordered navigation buckets with counts (no leaf
 documents); a lightweight navigator. `source` (required, a faceted source:
-`sfs`/`dv`/`hudoc`/`forarbete`/`foreskrift`/`eurlex`/`coe`/`avg`/`begrepp`). Not
+`sfs`/`dv`/`hudoc`/`forarbete`/`foreskrift`/`eurlex`/`coe`/`avg`/`begrepp`/`kkvdomar`). Not
 every source is faceted; an unfaceted one is a `404`. Returns a
 `FacetTree`: `{ source, levels[], default[], buckets[] }` where each bucket is
 `{ key, label, slug, count, children?, documents? }`.

@@ -15,6 +15,7 @@ Implemented verticals include **SFS** (statutes), **DV** (court decisions),
   agencies and bodies),
   **lawreview** (journal articles from nine journals — svjt, jp, ft, nmt,
   njel, siplr, urt, euar, lod — mined for the references they make),
+  **kkvdomar** (kammarrätternas avgöranden in public-procurement cases),
   **remisser** (consultation responses), and **wiki**
   (begrepp/definitions).
 
@@ -27,7 +28,7 @@ commands. Keep them current when architecture or source status changes.
 
 Three layers, realized in the `ferenda/` package:
 
-1. **Vertical source pipelines** (`ferenda/{sfs,dv,hudoc,coe,icrc,untc,icc,icj,eurlex,guidance,lawreview,forarbete,foreskrift,avg,rs,remisser,wiki}/`)
+1. **Vertical source pipelines** (`ferenda/{sfs,dv,hudoc,coe,icrc,untc,icc,icj,eurlex,guidance,lawreview,forarbete,foreskrift,avg,rs,kkvdomar,remisser,wiki}/`)
    — each owns its full chain (download → parse → typed model → JSON
    artifact) and its *own* document model.
 2. **Horizontal libraries** (`ferenda/lib/`) — genuinely cross-source
@@ -92,7 +93,7 @@ Stop-hook ruff/ty/layer checks). The essentials:
 - Subject is `scope: short lowercase summary`, no trailing period.
 - `scope` is a vertical (`sfs`, `dv`, `hudoc`, `coe`, `icrc`, `untc`, `icc`,
   `icj`, `eurlex`, `guidance`, `lawreview`, `forarbete`, `foreskrift`, `avg`,
-  `rs`, `remisser`, `wiki`) or a
+  `rs`, `kkvdomar`, `remisser`, `wiki`) or a
   layer/concern (`lib`, `build`, `render`, `api`, `search`, `catalog`,
   `structure`, `golden`, `docs`, `chore`).
 - Keep the subject to one line; use `,`/`;`/`—` to separate clauses when a

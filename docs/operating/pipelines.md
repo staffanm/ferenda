@@ -244,6 +244,29 @@ whatever is already stored — while a weekly run costs the register plus the
 handful of documents that moved. Its documents are stored as `.html`, not
 `.pdf`: Skatteverket publishes the ställningstagande *as* a web page.
 
+**kkvdomar — kammarrätternas avgöranden in public-procurement cases** (operates
+on `site/data/{downloaded,artifact}/kkvdomar/`):
+
+```sh
+uv run python -m ferenda.build kkvdomar download   # incremental, watermark-gated (60-day lookahead)
+uv run python -m ferenda.build kkvdomar parse       # incremental, like every source
+uv run python -m ferenda.build kkvdomar download --only kst/6426-25/2026-03-12   # one decision
+uv run python -m ferenda.build kkvdomar download --force   # walk the whole listing (Konkurrensverkets domstolsdatabas), 2016 on
+```
+
+Identity is `<court>/<målnummer>/<date>` (`kst/6426-25/2026-03-12`), so
+`--only` names that. A decision can reach the database up to 55 days after
+its own date, so a routine incremental run keeps walking 60 days past the
+last harvest before it trusts it has caught up; `--force` re-walks and
+re-fetches the whole listing.
+
+The download also walks the database's HFD listing, and it reads the appealed
+kammarrätt decision off every HFD decision that dv holds as a referat or a
+notis. Parse leaves those kammarrätt decisions out: the HFD referat is the
+page a reader finds. So `kkvdomar download` needs dv's case-number snapshot
+(`lagen dv casenumbers`) on the data root, and a kammarrätt decision drops
+out at the first kkvdomar download after dv publishes the referat.
+
 **guidance — EU-organens vägledningar, 12 utgivare** (operates on
 `site/data/{downloaded,artifact}/guidance/`):
 

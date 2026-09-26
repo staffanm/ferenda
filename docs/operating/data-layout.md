@@ -22,6 +22,10 @@ site/data/downloaded/avg/imy/dok/             # IMY decision PDFs, by asset name
 site/data/downloaded/avg/kkv/dok/             # KKV decision documents, by diarium file name (pdf/htm/docx)
 site/data/downloaded/rs/{fk,migr,kfm,imy,fi,kkv}/  # per-ställningstagande records + their PDFs
 site/data/downloaded/rs/skv/                  # per-ställningstagande records + the pages that ARE the documents
+site/data/downloaded/kkvdomar/<court>/        # per-decision records (+ decision PDFs), keyed by kammarrätt slug
+site/data/downloaded/kkvdomar/hfd/            # HFD listing rows by database id (+ the PDFs of those dv publishes)
+site/data/downloaded/kkvdomar/.superseded.json  # kammarrätt decisions an HFD referat or notis supersedes
+site/data/artifact/kkvdomar/<court>/          # parsed JSON artifacts, named <målnummer>-<date>.json
 site/data/downloaded/hudoc/                   # HUDOC metadata JSON + converted full-text HTML
 site/data/downloaded/coe/                     # Treaty Office records + official English texts
 site/data/downloaded/icrc/                    # ICRC JSON:API treaty envelopes (metadata + authentic text, no PDF)

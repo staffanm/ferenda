@@ -779,10 +779,10 @@ has had a `deep` mode for a while: it walks a whole listing but fetches only
 what is missing. Until now no CLI flag reached that mode outside forarbete,
 whose own `--force` is wired to it. foreskrift now exposes it as `--deep`
 (`ferenda/build.py`, threaded through `foreskrift/source.py` and
-`foreskrift/harvest.py` to `lib.harvest.walk(deep=True)`). Seven
+`foreskrift/harvest.py` to `lib.harvest.walk(deep=True)`). Eight
 watermark-gated sources still have no CLI path to it — avg, coe, dv, hudoc,
-icc, icj, icrc. Guidance, lawreview and rs need nothing: their `walk_records`
-calls pass `watermark=None`. Tracked as
+icc, icj, icrc, kkvdomar. Guidance, lawreview and rs need nothing: their
+`walk_records` calls pass `watermark=None`. Tracked as
 [issue #110](https://github.com/staffanm/ferenda/issues/110); the monthly
 `--force` line above still runs the heavier sweep until the cron is changed.
 
