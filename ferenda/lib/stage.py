@@ -332,13 +332,15 @@ def parse_stage(name, parse_fn, root, *, inputs, code):
 
 
 def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
-                   notes, dry_label, render, artifacts, pinpoints=None):
+                   notes, dry_label, render, artifacts, pinpoints=None,
+                   intermediate=None):
     """A source whose whole chain is the common shape: one bulk
     ``sync(root, full=, only=, limit=, delay=)`` over a publisher's own list of
     instruments, and a parse that reads the stored record(s) into an artifact in
     one call. No sub-scopes, no per-document download stage, no extra actions.
 
-    `dry_label` names what a `--dry-run` would fetch. A source whose sync takes
+    `dry_label` names what a `--dry-run` would fetch. `intermediate` makes the
+    source patchable (`Source.intermediate`). A source whose sync takes
     anything beyond the shared five keeps its own registration (hudoc does, for
     its `--lang` and its two collection scopes) -- this is a shape shared by
     several sources, not a base class to bend."""
@@ -358,7 +360,8 @@ def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
                   {"parse": parse_stage(name, parse_fn, root,
                                          inputs=inputs, code=code)},
                   harvest=harvest, origin=origin, notes=notes,
-                  render=render, artifacts=artifacts, pinpoints=pinpoints)
+                  render=render, artifacts=artifacts, pinpoints=pinpoints,
+                  intermediate=intermediate)
 
 
 # run-wide options, set once in main() (kept off the recursion signature)
