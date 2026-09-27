@@ -28,5 +28,7 @@
   "ds/2014:111":  "atypisk rapport på engelska",
   "ds/2005:55":   "atypisk rapport på engelska",
 
-  "ds/2001:15":   "Rapport om tillväxtavtalen -- 13 osorterade delfiler utan sidnumrering, inga författningsförslag"
+  "ds/2001:15":   "Rapport om tillväxtavtalen -- 13 osorterade delfiler utan sidnumrering, inga författningsförslag",
+
+  "ds/1998:141":  "finns inte (serien 1998 slutar vid 71) -- den legacy-importerade sidan ds-1998141 är Ds 1998:14, numret lästes av slug:en"
 }
