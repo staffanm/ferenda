@@ -570,9 +570,12 @@ subriksmote_ref_id: SUBRIKSMOTE
 bet_no_ref_id: BETNO
 avsnitt_ref_id: AVSNITTNR
 
-sidor: sida (HYP sida_num)? ((COMMA _W | _W_AND_OR_W) sida_num (HYP sida_num)?)*
-sida: COMMA? _W SID _W sida_num
+sidor: sida (HYP sida_num | _W? foljande)? ((COMMA _W | _W_AND_OR_W) sida_num (HYP sida_num | _W? foljande)?)*
+// "s.184" is common without the space; "s. 184 f." adds page 185 and
+// "s. 184 ff." pages 185 and 186 (at least)
+sida: COMMA? _W SID _W? sida_num
 sida_num: NUMBER
+foljande: FOLJANDE
 
 PROP_PREFIX: /[Pp]rop\.|[Pp]rop(?= \d{4}\/\d)/
 BET_PREFIX: "bet."
@@ -585,6 +588,7 @@ A_PROP: /a\. prop\./
 AVSNITT: "avsnitt"
 I_KOMM: /i kommitténs betänkande/
 SID: /s\.?/
+FOLJANDE: /ff?\.(?!\w)/
 SUBRIKSMOTE: /[ABU]/
 BETNO: /[A-Za-zÅÄÖåäö]{2,3}\d+/
 CELEX: /3\d\d(?:\d\d)?L\d{4}/
@@ -2832,9 +2836,20 @@ class LagrumParser:
         not collapse to one overlapping span. The first link folds in the
         leading document text ("prop. … s. 445"); later pages link the
         bare number, the way the golden corpus draws the boundaries."""
-        pages = [s for s in node.iter_subtrees_topdown() if s.data == 'sida_num']
+        pages = [s for s in node.iter_subtrees_topdown() if s.data in ('sida_num', 'foljande')]
+        previous = None
         for i, page in enumerate(pages):
             pstart, pend = _node_span(page)
+            if page.data == 'foljande':
+                # "s. 184 f." also cites page 185; "ff." cites at least 185
+                # and 186. Links may not overlap, so each "f" links one page.
+                if previous is not None:
+                    for k in range(pend - pstart - 1):
+                        end = pend if k == pend - pstart - 2 else pstart + k + 1
+                        out.append({'_uri': '%s#sid%d' % (base, previous + k + 1),
+                                    '_span': (pstart + k, end)})
+                continue
+            previous = int(_token_text(page))
             span = (doc_start if i == 0 else pstart, pend)
             out.append({'_uri': '%s#sid%s' % (base, _token_text(page)),
                         '_span': span})

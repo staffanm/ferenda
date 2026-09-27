@@ -380,6 +380,15 @@ FORARB_PAGE_CASES = [
         ("505", "https://lagen.nu/prop/2021/22:136#sid505"),
         ("509", "https://lagen.nu/prop/2021/22:136#sid509"),
         ("511", "https://lagen.nu/prop/2021/22:136#sid511")]),
+    # "s.184" without the space, and "f." for the following page
+    ("(SOU 2016:7 s.184 f.)", None, [
+        ("SOU 2016:7 s.184", "https://lagen.nu/sou/2016:7#sid184"),
+        ("f.", "https://lagen.nu/sou/2016:7#sid185")]),
+    ("prop. 2017/18:105 s. 40 ff. och 52", None, [
+        ("prop. 2017/18:105 s. 40", "https://lagen.nu/prop/2017/18:105#sid40"),
+        ("f", "https://lagen.nu/prop/2017/18:105#sid41"),
+        ("f.", "https://lagen.nu/prop/2017/18:105#sid42"),
+        ("52", "https://lagen.nu/prop/2017/18:105#sid52")]),
     # "a. prop." (anförd proposition) resolves against the last prop seen
     ("a. prop. s. 48, 50", "https://lagen.nu/prop/2017/18:105", [
         ("a. prop. s. 48", "https://lagen.nu/prop/2017/18:105#sid48"),

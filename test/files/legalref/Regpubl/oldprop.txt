@@ -12,7 +12,10 @@ Prop. 1968 nr 91, Bihang A s. 215.
   <str>
 Kungl. Maj:ts </str>
   <Link uri="https://lagen.nu/prop/1949:212#sid164">prop. nr 212/1949, s. 164</Link>
-  <str> ff.
+  <str> </str>
+  <Link uri="https://lagen.nu/prop/1949:212#sid165">f</Link>
+  <Link uri="https://lagen.nu/prop/1949:212#sid166">f.</Link>
+  <str>
 </str>
   <Link uri="https://lagen.nu/prop/1952:187#sid103">Prop. 1952 nr 187 s. 103</Link>
   <str>
