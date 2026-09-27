@@ -23,12 +23,15 @@ from dataclasses import dataclass, field
 from ..lib.artifact import prune, scanned_nodes
 from ..lib.casenaming import verdict_uri
 
+KAMMARRATT = "Kammarrätten i "
+
 
 @dataclass
 class Block:
     kind: str            # "rubrik" | "stycke"
     text: str
     level: int = 1
+    page: int | None = None   # the PDF page it starts on (the facsimile tabs)
 
 
 @dataclass
@@ -49,6 +52,7 @@ class Avgorande:
     motpart: str | None = None          # "UM/UE", the contracting authority
     body: list[Block] = field(default_factory=list)
     domslut: str | None = None          # the text under "…S AVGÖRANDE"
+    facsimile_pdf: str | None = None    # the PDF, data_root-relative
     source_url: str | None = None       # the database's case page
     document_url: str | None = None     # the decision PDF
 
@@ -58,10 +62,20 @@ class Avgorande:
 
     @property
     def identifier(self):
-        """"Kammarrätten i Stockholm mål nr 6426-25" -- the court and the first
-        målnummer, the way a decision without a referat is cited."""
+        """"KamR Stockholm mål 6426-25" -- the court's seat and the first
+        målnummer, the short form a listing or a sidebar row has room for (the
+        page's metadata still names the court in full)."""
+        assert self.domstol.startswith(KAMMARRATT), (
+            "%r is not a kammarrätt" % self.domstol)
         more = " m.fl." if self.malnummer_lista != self.malnummer else ""
-        return "%s mål nr %s%s" % (self.domstol, self.malnummer, more)
+        return "KamR %s mål %s%s" % (self.domstol.removeprefix(KAMMARRATT),
+                                     self.malnummer, more)
+
+    def _paged(self, nodes):
+        """`scanned_nodes`' one node per block, each given its block's PDF page
+        -- what `lib.page.document_body` sets the page tabs by."""
+        return [{**node, "page": block.page} if block.page else node
+                for node, block in zip(nodes, self.body, strict=True)]
 
     def to_artifact(self, scanner):
         return prune({
@@ -82,6 +96,9 @@ class Avgorande:
                                "motpart": self.motpart}),
             "kortreferat": self.kortreferat,
             "domslut": self.domslut,
-            "structure": scanned_nodes(self.body, scanner),
+            "structure": self._paged(scanned_nodes(self.body, scanner)),
+            # the decision's own PDF, data_root-relative: the /api/v1/facsimile
+            # resolver for a dom/ uri renders its pages for the page tabs
+            "facsimile_pdf": self.facsimile_pdf,
             "source_url": self.source_url,
             "document_url": self.document_url})

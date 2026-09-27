@@ -15,13 +15,15 @@ decisions, so the tests need neither the PDFs nor OCR:
 """
 
 import json
+import types
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
 from ferenda.kkvdomar import download, parse
 from ferenda.kkvdomar.model import Avgorande, Block
-from ferenda.lib import page
+from ferenda.lib import compress, page
 from ferenda.lib.errors import SkipDocument
 from ferenda.lib.lagrum import ALL_PARSE_TYPES, sfs_parser
 
@@ -33,9 +35,10 @@ def _html(name):
 
 
 def _paragraphs(name):
-    return [[(text, bold) for text, bold in page]
-            for page in json.loads((FILES / ("%s.paragraphs.json" % name))
-                                   .read_text("utf-8"))]
+    return [[parse.Paragraph(text, bold, pageno) for text, bold in page]
+            for pageno, page in enumerate(
+                json.loads((FILES / ("%s.paragraphs.json" % name))
+                           .read_text("utf-8")), start=1)]
 
 
 def _body(name):
@@ -111,7 +114,7 @@ def test_uri_is_the_verdict_uri():
                     malnummer="3404-22", malnummer_lista="3404-3409-22",
                     avgorandedatum="2022-12-08", instans="Kammarrätt")
     assert art.uri == "https://lagen.nu/dom/kst/3404-22/2022-12-08"
-    assert art.identifier == "Kammarrätten i Stockholm mål nr 3404-22 m.fl."
+    assert art.identifier == "KamR Stockholm mål 3404-22 m.fl."
 
 
 # --------------------------------------------------------------------------
@@ -180,13 +183,13 @@ def test_two_way_party_labels():
     "FÖRVALTNINGSRÄTTEN BESLUT 3370-17 I LINKÖPING",
     "KAMMARRÄTTEN I BESLUT Sida 2 GÖTEBORG Mål nr 5256—-5259-19"])
 def test_running_header(text):
-    assert parse._drop_header([(text, False), ("Brödtext.", False)]) == [
-        ("Brödtext.", False)]
+    body = parse.Paragraph("Brödtext.", False, 2)
+    assert parse._drop_header([parse.Paragraph(text, False, 2), body]) == [body]
 
 
 def test_a_body_paragraph_opening_on_a_number_is_not_a_header():
-    page = [("2015 ref. 55). Förvaltningsrätten borde således ha hämtat in "
-             "handlingarna.", False)]
+    page = [parse.Paragraph("2015 ref. 55). Förvaltningsrätten borde således ha "
+                            "hämtat in handlingarna.", False, 3)]
     assert parse._drop_header(page) == page
 
 
@@ -257,3 +260,72 @@ def test_a_superseded_decision_is_not_parsed(tmp_path):
 
 def test_the_rail_names_the_group_by_its_court():
     assert ("kkvdomar", "Kammarrättsdomar") in page.INBOUND_GROUPS
+
+
+# --------------------------------------------------------------------------
+# refusals of prövningstillstånd, and the facsimile page tabs
+# --------------------------------------------------------------------------
+
+def test_a_refusal_is_filtered_at_the_case_page(tmp_path, monkeypatch):
+    # the outcome the case page states decides it; the PDF is never fetched
+    page = _html("arende-49275.html").replace(">Avskrivning<",
+                                                ">Ej prövningstillstånd<")
+    fetched = []
+
+    def fake(_session, _method, url, **_kw):
+        fetched.append(url)
+        return types.SimpleNamespace(content=page.encode(download.ENCODING))
+
+    monkeypatch.setattr(download, "request", fake)
+    row = _row(id="49275", domstol="Kammarrätten i Sundsvall",
+               malnummer="1885-26", beslutsdatum="2026-08-31")
+    assert download.resolve(None, tmp_path, row)
+    assert fetched == [download.CASE % "49275"]
+    record = compress.read_json(download.record_json(tmp_path,
+                                                     download.basefile(row)))
+    assert record["filtered"] == download.REFUSAL
+    assert download.list_basefiles(tmp_path) == []
+    # a later run does not fetch the case page again
+    assert not download.resolve(None, tmp_path, row)
+
+
+def test_every_block_carries_the_page_it_starts_on():
+    body, _doktyp, _kinds = _body("kjo-1747-17-2017-07-27")
+    assert body[0].page == 1
+    assert next(b for b in body if b.text == "YRKANDEN M.M.").page == 2
+    # the lower court's decision starts on page 3 of the PDF
+    assert next(b for b in body if b.text == "Bilaga").page == 3
+
+
+def test_the_artifact_carries_pages_and_its_pdf():
+    art = Avgorande(
+        court="KSU", domstol="Kammarrätten i Sundsvall", malnummer="1885-26",
+        malnummer_lista="1885-26", avgorandedatum="2026-08-31",
+        instans="Kammarrätt", facsimile_pdf="downloaded/kkvdomar/ksu/x.pdf",
+        body=[Block("rubrik", "KLAGANDE", page=1), Block("stycke", "Text.",
+                                                         page=2)],
+    ).to_artifact(sfs_parser("kkvdomar", ALL_PARSE_TYPES))
+    assert [node["page"] for node in art["structure"]] == [1, 2]
+    assert art["facsimile_pdf"] == "downloaded/kkvdomar/ksu/x.pdf"
+
+
+def test_document_body_sets_a_page_tab_where_the_page_changes(monkeypatch):
+    class Rail:
+        def __init__(self, *_args):
+            pass
+
+        def add_document(self):
+            pass
+
+    monkeypatch.setattr(page, "Rail", Rail)
+    monkeypatch.setattr(page, "render_node",
+                        lambda node, *_args: "<p>%s</p>" % node["text"][0])
+    uri = "https://lagen.nu/dom/ksu/1885-26/2026-08-31"
+    art = {"uri": uri, "structure": [
+        {"type": "stycke", "text": ["Ett."], "page": 1},
+        {"type": "stycke", "text": ["Två."], "page": 1},
+        {"type": "stycke", "text": ["Tre."], "page": 2}]}
+    html = str(page.document_body(art, None)[0])
+    assert html.count('class="sid"') == 2
+    assert html.index('id="sid2"') > html.index("Två.")
+    assert "/api/v1/facsimile?uri=%s&amp;sid=2" % quote(uri, safe="") in html

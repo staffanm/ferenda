@@ -120,8 +120,9 @@
 <section class="artikel"{{ rail_attr(rail_id) }}><h2 id="{{ anchor }}">{{ title }}</h2>{{ children }}</section>
 {%- endmacro -%}
 {#- ============================== DV walk ================================ -#}
-{%- macro dv_page_marker(pg, fax) -%}
-{#- a facsimile page button at each PDF page boundary of a parsed verdict -#}
+{%- macro page_marker(pg, fax) -%}
+{#- the page tab strip at each PDF page boundary of a document parsed from its
+    PDF (a raw verdict: dv, kkvdomar) -#}
 <span class="sid" id="sid{{ pg }}" role="tablist"><button type="button" class="sid-nr" role="tab" aria-selected="true">Sida {{ pg }}</button><button type="button" role="tab" aria-selected="false" data-fax="{{ fax }}" title="Visa sidan {{ pg }} som den trycktes"><svg class="sid-ico" viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg> Original</button></span>
 {%- endmacro -%}
 {%- macro dv_numbered_paragraph(n, body) -%}

@@ -39,7 +39,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from html import escape
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from markupsafe import Markup
 
@@ -2012,6 +2012,15 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
                                   Markup("".join(rendered)))
 
 
+def page_marker(doc_uri, pg):
+    """The page tab strip at a PDF page boundary ("Sida 3 | Original"): the
+    Original tab loads that page of the document's source PDF (faksimil.js +
+    /api/v1/facsimile). For a document parsed from its PDF whose nodes carry
+    the PDF `page` they start on -- a raw verdict, dv's or kkvdomar's."""
+    return NODES.page_marker(
+        pg, "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg))
+
+
 def document_body(art, site, key="structure"):
     """A document's body walked once into `(structure, toc, rail)`: the rendered
     HTML, the headings collected while rendering it, and the rail the walk filled
@@ -2029,8 +2038,15 @@ def document_body(art, site, key="structure"):
     themselves."""
     toc = Toc()
     rail = Rail(site, art["uri"])
-    structure = Markup("".join(render_node(node, site, art["uri"], toc, rail)
-                               for node in art.get(key, [])))
+    out, page = [], None
+    for node in art.get(key, []):
+        # a node that carries its PDF page gets the page tab strip wherever the
+        # page changes (kkvdomar); a source whose nodes carry none is unchanged
+        if node.get("page") and node["page"] != page:
+            page = node["page"]
+            out.append(page_marker(art["uri"], page))
+        out.append(render_node(node, site, art["uri"], toc, rail))
+    structure = Markup("".join(out))
     rail.add_document()
     return structure, toc, rail
 

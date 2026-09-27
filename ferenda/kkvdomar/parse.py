@@ -35,8 +35,9 @@ whether the decision is a dom or a beslut, and the text.
 """
 
 import re
+from typing import NamedTuple
 
-from ..lib import compress
+from ..lib import compress, layout
 from ..lib.errors import SkipDocument
 from ..lib.lagrum import ALL_PARSE_TYPES, sfs_parser
 from ..lib.pdftext import (
@@ -46,7 +47,7 @@ from ..lib.pdftext import (
     pages_with_ocr,
     pdf_pages,
 )
-from ..lib.util import approximate_date, normalize_space
+from ..lib.util import approximate_date, normalize_space, store_relpath
 from .download import body_path, record_json, superseded
 from .model import Avgorande, Block
 
@@ -132,32 +133,37 @@ def pages(path, patch_key):
     return read
 
 
+class Paragraph(NamedTuple):
+    text: str
+    emphasised: bool     # set in bold or in italics
+    page: int            # the PDF page it starts on, for the facsimile tabs
+
+
 def paragraphs(read):
-    """Per page, the (text, emphasised) of each paragraph, noise removed: set
-    in bold or in italics."""
+    """Per page, its paragraphs, noise removed."""
     out = []
     for pageno, lines in read:
         page = []
         for para in page_paragraphs(lines, None, pageno):
             text = normalize_space(RE_NOISE.sub(" ", para.text))
             if text:
-                page.append((text, para.bold or para.italic))
+                page.append(Paragraph(text, para.bold or para.italic, pageno))
         out.append(page)
     return out
 
 
 def _cut_footer(page):
-    for i, (text, emphasised) in enumerate(page):
-        match = RE_FOOTER.search(text)
+    for i, para in enumerate(page):
+        match = RE_FOOTER.search(para.text)
         if match:
-            kept = text[:match.start()].strip()
-            return page[:i] + ([(kept, emphasised)] if kept else [])
+            kept = para.text[:match.start()].strip()
+            return page[:i] + ([para._replace(text=kept)] if kept else [])
     return page
 
 
 def _drop_header(page):
-    for i, (text, _emphasised) in enumerate(page):
-        if not RE_HEADER.fullmatch(text):
+    for i, para in enumerate(page):
+        if not RE_HEADER.fullmatch(para.text):
             return page[i:]
     return []
 
@@ -167,13 +173,15 @@ def _drop_letterhead(page):
     letterhead in front of it as one string. On a scan the letterhead also holds
     whatever the stamps and the signature scrawl read as, and the receipt stamp
     reads into the party block beside it."""
-    for i, (text, emphasised) in enumerate(page):
-        match = RE_LABEL.search(text)
+    for i, para in enumerate(page):
+        match = RE_LABEL.search(para.text)
         if match:
-            head = " ".join(t for t, _b in page[:i]) + " " + text[:match.start()]
-            rest = [(normalize_space(RE_STAMP.sub(" ", t)), b)
-                    for t, b in [(text[match.start():], emphasised)] + page[i + 1:]]
-            return head, [(t, b) for t, b in rest if t]
+            head = (" ".join(p.text for p in page[:i]) + " "
+                    + para.text[:match.start()])
+            rest = [p._replace(text=normalize_space(RE_STAMP.sub(" ", p.text)))
+                    for p in [para._replace(text=para.text[match.start():])]
+                    + page[i + 1:]]
+            return head, [p for p in rest if p.text]
     return "", page
 
 
@@ -183,7 +191,7 @@ def segments(per_page):
     not start a document continues the one before it."""
     out: list[tuple[str, str | None, list]] = [("decision", None, [])]
     for i, page in enumerate(per_page):
-        texts = [text for text, _emphasised in page]
+        texts = [para.text for para in page]
         if i and (any(RE_ATTACHMENT.search(t) for t in texts[:3])
                   or any(RE_APPEAL_HEADING.match(t) for t in texts[:1])):
             label = next((m.group(1) for t in texts[:3]
@@ -200,7 +208,7 @@ def segments(per_page):
 
 
 def _document(document_pages):
-    """One document's pages -> (letterhead, [(text, emphasised)]) with letterhead,
+    """One document's pages -> (letterhead, [Paragraph]) with letterhead,
     running headers and footers removed, and the paragraphs a page break -- or,
     on a scan, an uneven line spacing -- split joined again.
 
@@ -208,7 +216,8 @@ def _document(document_pages):
     ones at a page break: OCR spaces lines unevenly, so a scan's paragraph
     arrives cut in two ("Förvaltningsrättens" / "avgörande står därför fast."),
     and a paragraph that opens in lower case after one that ends no sentence is
-    the second half of it."""
+    the second half of it. A joined paragraph keeps the page its first half
+    starts on, and is prose, not a subheading."""
     letterhead, paras = "", []
     for n, page in enumerate(document_pages):
         page = _cut_footer(page)
@@ -217,9 +226,15 @@ def _document(document_pages):
         else:
             page = _drop_header(page)
         paras.extend(page)
-    emphasised = {text for text, b in paras if b}
-    return letterhead, [(text, text in emphasised) for text in join_across_pages(
-        [[text] for text, _b in paras])]
+    out = []
+    for para in paras:
+        joined = (join_across_pages([[out[-1].text], [para.text]]) if out
+                  else [])
+        if len(joined) == 1:
+            out[-1] = out[-1]._replace(text=joined[0], emphasised=False)
+        else:
+            out.append(para)
+    return letterhead, out
 
 
 def _is_heading(text, emphasised):
@@ -235,14 +250,14 @@ def _is_heading(text, emphasised):
 
 def blocks(paras, shift=0):
     out = []
-    for text, emphasised in paras:
-        for i, part in enumerate(RE_LABEL.split(text)):
+    for para in paras:
+        for i, part in enumerate(RE_LABEL.split(para.text)):
             part = part.strip(" ,;")
             if not part:
                 continue
-            level = 1 if i % 2 else _is_heading(part, emphasised)
-            out.append(Block("rubrik", part, level + shift) if level
-                       else Block("stycke", part))
+            level = 1 if i % 2 else _is_heading(part, para.emphasised)
+            out.append(Block("rubrik", part, level + shift, para.page) if level
+                       else Block("stycke", part, page=para.page))
     return out
 
 
@@ -280,9 +295,10 @@ def document_blocks(per_page):
             continue
         _letterhead, paras = _document(document_pages)
         # the "Bilaga A" line itself becomes the heading
-        paras = [(t, b) for t, b in paras
-                 if not (RE_ATTACHMENT.match(t) or RE_BILAGA_LABEL.match(t))]
-        out.append(Block("rubrik", "Bilaga %s" % label if label else "Bilaga"))
+        paras = [p for p in paras
+                 if not (RE_ATTACHMENT.match(p.text) or RE_BILAGA_LABEL.match(p.text))]
+        out.append(Block("rubrik", "Bilaga %s" % label if label else "Bilaga",
+                         page=document_pages[0][0].page if document_pages[0] else None))
         out.extend(blocks(paras, shift=1))
     return out, doktyp(letterhead)
 
@@ -322,6 +338,8 @@ def parse(basefile, root):
         motpart=record.get("motpart"), body=body_blocks,
         domslut=domslut(body_blocks), source_url=record["source_url"],
         document_url=record.get("beslut_url"),
+        facsimile_pdf=(str(store_relpath(path, layout.DATA))
+                       if compress.exists(path) else None),
         # the decision's own date, so a bare law name resolves to the act in
         # force when the court wrote it
     ).to_artifact(sfs_parser("kkvdomar", ALL_PARSE_TYPES,

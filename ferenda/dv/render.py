@@ -5,7 +5,6 @@ Registered as this source's page renderer (the `render=` field of its
 `build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
-from urllib.parse import quote
 
 from markupsafe import Markup
 
@@ -19,6 +18,7 @@ from ..lib.page import (
     footnote_items,
     href,
     page_context,
+    page_marker,
     plain,
     render_node,
     render_runs,
@@ -47,14 +47,6 @@ def _dv_ruling_word(art):
     mals = art.get("malnummer") or []
     pre = (mals[0][:1].upper() if mals else "")
     return {"Ö": "beslut", "B": "dom", "T": "dom"}.get(pre, "avgörande")
-
-
-def _dv_page_marker(doc_uri, pg):
-    """A förarbete-style facsimile page button: clicking loads that page of the
-    raw verdict's source PDF (faksimil.js + /api/v1/facsimile). Emitted at each PDF
-    page boundary of a verdict parsed from its PDF."""
-    return NODES.dv_page_marker(
-        pg, "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg))
 
 
 def _dv_numbered_paragraph(node, site):
@@ -106,7 +98,7 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
         pg = n.get("page")
         if pg and pg != state["page"]:
             state["page"] = pg
-            out.append(_dv_page_marker(doc_uri, pg))
+            out.append(page_marker(doc_uri, pg))
         if t == "instans":
             c = n.get("court") or adopted.get(id(n)) or "Instans"
             anchor = toc.add(None, c, 1)

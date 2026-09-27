@@ -132,9 +132,23 @@ def body_path(root, bf):
     return pdf_path(root, bf)
 
 
+# the database's outcome for a refusal of prövningstillstånd. 2,617 of the
+# 3,803 kammarrätt decisions are one ("Kammarrätten meddelar inte
+# prövningstillstånd. Förvaltningsrättens avgörande står därför fast.") and
+# say nothing beyond that and the lagrum the court always quotes, so they are
+# filtered out as soon as the case page names the outcome: the record is kept,
+# marked, so a later run does not fetch the case page again, and the PDF is
+# never fetched.
+REFUSAL = "Ej prövningstillstånd"
+
+
 def list_basefiles(root):
-    return sorted(bf for court in sorted(DOMSTOL)
-                  for bf in compress.list_basefiles(root, court))
+    """The stored decisions this source publishes: every record except the
+    refusals of prövningstillstånd (`REFUSAL`)."""
+    return sorted(record["basefile"] for court in sorted(DOMSTOL)
+                  for path in compress.glob(Path(root) / court, "*.json")
+                  if not path.name.startswith(".")
+                  and not (record := compress.read_json(path)).get("filtered"))
 
 
 def _text(response):
@@ -243,6 +257,9 @@ def resolve(session, root, row, full=False, delay=0.3):
                                        timeout=60)))
     record = {"basefile": bf, **row, **fields,
               "source_url": CASE % row["id"]}
+    if fields.get("avgorande") == REFUSAL:
+        write_record(path, {**record, "filtered": REFUSAL})
+        return True
     if "beslut_url" in record:
         time.sleep(delay)
         # the file name holds spaces for a joined case ("5355-25 5356-25.pdf")
