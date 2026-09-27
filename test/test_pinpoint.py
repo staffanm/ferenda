@@ -114,4 +114,8 @@ def test_an_inserted_paragrafs_letter_is_written_apart_from_its_number():
     assert human_fragment("K6bP52c") == "6 b kap. 52 c §"
     # a number with no letter is untouched, and so is a stycke tail
     assert human_fragment("P52") == "52 §"
+
+
+def test_a_judgment_paragraph_reads_as_its_punkt():
+    assert human_fragment("point-98") == "punkt 98"
     assert human_fragment("K2P16S5") == "2 kap. 16 § 5 st"

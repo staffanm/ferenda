@@ -11,7 +11,7 @@ from ferenda.api.app import _validate_version_id, _versioned_document
 from ferenda.eurlex import render as eurlex_render
 from ferenda.eurlex import source
 from ferenda.eurlex.parse import parse_dir
-from ferenda.lib import catalog, compress, layout, page
+from ferenda.lib import catalog, compress, layout, page, text
 from ferenda.lib.errors import SkipDocument
 
 # a minimal base act with a preamble (spliced into every consolidated wording)
@@ -311,3 +311,17 @@ def test_rebuild_sidecars_skips_an_act_untouched_since_its_last_build(
     source.eurlex_versions_rebuild_sidecars()
     after = layout.eurlex_versions_sidecar("32014R0910").stat().st_mtime_ns
     assert after == before
+
+
+def test_a_judgment_paragraph_is_anchored_as_its_point(tmp_path, monkeypatch):
+    # "mål C-434/16, punkt 37" links celex/62016CJ0434#point-37, so the page must
+    # carry that id -- and no legislation-style ".S1" stycke alias
+    art = {"uri": "https://lagen.nu/celex/62016CJ0434", "celex": "62016CJ0434",
+           "doctype": "judgment", "title": "Nowak", "lang": "swe",
+           "structure": [{"type": "paragraph", "num": "37",
+                          "text": ["För det första avspeglar svarens innehåll."]}]}
+    html = _rendered(tmp_path, monkeypatch, art)
+    assert 'id="point-37"' in html
+    assert "point-37.S1" not in html
+    # the lookup index publishes the same anchor (lib.rangeindex)
+    assert text.citable_anchors(art) == {"point-37"}

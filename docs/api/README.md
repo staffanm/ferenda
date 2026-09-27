@@ -610,9 +610,10 @@ sha256("https://lagen.nu/celex/32016R0679#32.1") = b69f7810…  -> article 32.1:
 - The index holds the documents as they read today. A provision that only an
   older wording had is not in it.
 - The anchors are those a citation can name: `K12P52`, `P3a`, `32.1`,
-  `recital-83`, `A6P1`, and `sid39` for page 39 of a förarbete. Documents of
-  sources that no citation grammar points into (court decisions, for example)
-  are in the index without anchors.
+  `recital-83`, `A6P1`, `sid39` for page 39 of a förarbete, and `point-98` for
+  paragraph 98 of an EU judgment. Documents of sources that no citation grammar
+  points into (Swedish court decisions, for example) are in the index without
+  anchors.
 - Every answer has the same number of lines. A short bucket gets stand-in
   entries, which are the same on each request. A stand-in matches a real
   citation with a probability of 2^-64.

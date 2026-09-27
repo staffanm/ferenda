@@ -45,6 +45,8 @@ def human_fragment(frag):
         return ""
     if frag.startswith("sid"):
         return "s. " + frag[3:]
+    if frag.startswith("point-"):         # a judgment paragraph (eurlex)
+        return "punkt " + frag[6:]
     coe = re.fullmatch(
         r"A((?:\d+[A-Za-z]?|[IVXLCDM]+)(?:\.\d+)?)(?:-(\d+))?"
         r"(?:P(\d+)(?:-(\d+))?)?(?:L([a-z])(?:-(\d+))?)?", frag)

@@ -850,6 +850,10 @@ def test_a_bare_act_name_puts_the_act_in_focus():
     assert [r.uri for r in parser.parse_text(
         "den allmänna dataskyddsförordningen, även mest känt som GDPR. "
         "Syftet är betonat i artikel 1 samt under", context={})] == ["%s#1" % GDPR]
+    # also first in a sentence, where the Swedish law-name trigger fires on it
+    parser.parse_text("enligt direktiv 95/46/EG gällde", context={})
+    assert [r.uri for r in parser.parse_text(
+        "Dataskyddsförordningen gäller. Se artikel 6.", context={})] == ["%s#6" % GDPR]
     # a lower-case short alias is a word, not the acronym ("dora" is not DORA)
     parser.parse_text("enligt direktiv 95/46/EG gällde", context={})
     assert [r.uri for r in parser.parse_text(
@@ -876,6 +880,90 @@ EU_GENITIVE_CASES = [
 def test_eu_genitive_name_before_article(text, links):
     parser = _eu_parser()
     assert [(r.text, r.uri) for r in parser.parse_text(text, context={})] == links
+
+
+# a judgment's paragraphs after its case number, with the case name between
+# them or not; a range links its two ends, as a förarbete's page range does
+ECJ_POINT_CASES = [
+    ("i mål C-131/12, p. 54-59.", [
+        ("mål C-131/12, p. 54", "https://lagen.nu/celex/62012CJ0131#point-54"),
+        ("59", "https://lagen.nu/celex/62012CJ0131#point-59")]),
+    ("Mål C-434/16, Nowak. punkt. 53.", [
+        ("Mål C-434/16, Nowak. punkt. 53", "https://lagen.nu/celex/62016CJ0434#point-53")]),
+    ("mål C-582/14, Patrick Breyer mot Bundesrepublik Deutschland, p. 43.", [
+        ("mål C-582/14, Patrick Breyer mot Bundesrepublik Deutschland, p. 43",
+         "https://lagen.nu/celex/62014CJ0582#point-43")]),
+    ("mål C-136/17, GC m.fl. mot Commission nationale de l'informatique et des "
+     "libertés (CNIL), p. 57.", [
+         ("mål C-136/17, GC m.fl. mot Commission nationale de l'informatique et "
+          "des libertés (CNIL), p. 57", "https://lagen.nu/celex/62017CJ0136#point-57")]),
+    ("Mål C-434/16 Nowak p. 46 och 56.", [
+        ("Mål C-434/16 Nowak p. 46", "https://lagen.nu/celex/62016CJ0434#point-46"),
+        ("56", "https://lagen.nu/celex/62016CJ0434#point-56")]),
+    # a number in the next sentence is not a paragraph of the judgment
+    ("i mål C-131/12. Detta p. 5 är fel.", [
+        ("mål C-131/12", "https://lagen.nu/celex/62012CJ0131")]),
+]
+
+
+@pytest.mark.parametrize("text,links", ECJ_POINT_CASES,
+                         ids=[c[0] for c in ECJ_POINT_CASES])
+def test_ecj_paragraph_pinpoints(text, links):
+    parser = LagrumParser({}, basefile="x", parse_types=[EURATTSFALL])
+    refs = parser.parse_text(text, context={})
+    assert [(r.text, r.uri) for r in refs] == links
+
+
+# "art." for "artikel", and a letter after a dot ("5.1.d"), as theses write them
+EU_ABBREVIATED_CASES = [
+    ("enligt art. 4.2 GDPR", [("art. 4.2 GDPR", "%s#4.2" % GDPR)]),
+    ("enligt art 6.1.a GDPR", [("art 6.1.a GDPR", "%s#6.1.a" % GDPR)]),
+    ("enligt artikel 17.1.b GDPR", [("artikel 17.1.b GDPR", "%s#17.1.b" % GDPR)]),
+]
+
+
+@pytest.mark.parametrize("text,links", EU_ABBREVIATED_CASES,
+                         ids=[c[0] for c in EU_ABBREVIATED_CASES])
+def test_eu_abbreviated_article_and_dotted_letter(text, links):
+    parser = _eu_parser()
+    assert [(r.text, r.uri) for r in parser.parse_text(text, context={})] == links
+
+
+def test_bare_art_without_its_dot_needs_an_act_named():
+    # "art" is also a noun ("av allvarlig art"): bare, it never links
+    parser = _eu_parser()
+    parser.parse_text("enligt förordning (EU) 2016/679 gäller", context={})
+    assert parser.parse_text("brott av allvarlig art 5 gånger", context={}) == []
+    assert [r.uri for r in parser.parse_text("enligt art. 5 gäller",
+                                             context={})] == ["%s#5" % GDPR]
+
+
+def test_recitals_with_till_named_act_first_and_bare_where_opted_in():
+    parser = _eu_parser()
+    parser.parse_text("enligt förordning (EU) 2016/679 gäller", context={})
+    uris = lambda t: [r.uri for r in parser.parse_text(t, context={})]
+    assert "%s#recital-82" % GDPR in uris("enligt skäl 82 till förordningen.")
+    assert {"%s#recital-%d" % (GDPR, n) for n in (14, 26, 27)} <= set(
+        uris("se GDPR skäl 14, 26, 27."))
+    # bare: the corpus parsers leave it unlinked, the extractor opts in
+    assert uris("Under skäl 26 fastställs det") == []
+    parser.bare_recitals = True
+    assert uris("Under skäl 26 fastställs det") == ["%s#recital-26" % GDPR]
+    # a recital of another act, which the parse did not reach, is refused
+    assert uris("skäl 26 i direktiv som") == []
+
+
+@pytest.mark.parametrize("text", [
+    "den tidigare artikel 29-arbetsgruppen",
+    "den tidigare artikel 29arbetsgruppen",        # hyphen lost at a PDF line break
+    "enligt artikel 29-arbetargruppen",            # misspelt
+    "den tidigare artikel 29- arbetsgruppen",       # the line break's space kept
+    "se Art. 29 Data Protection Working Party",     # the English name
+])
+def test_the_article_29_working_party_is_not_an_article(text):
+    parser = _eu_parser()
+    parser.parse_text("enligt förordning (EU) 2016/679 gäller", context={})
+    assert parser.parse_text(text, context={}) == []
 
 
 def _eu_parser():

@@ -409,6 +409,9 @@ def citation_parser():
             abbreviations=load_abbreviations(datasets.NAMEDLAWS),
             named_acts=load_namedacts(datasets.NAMEDACTS),
             parse_types=ALL_PARSE_TYPES)
+        # submitted text discusses an act and cites its recitals bare
+        # ("Under skäl 26 …"); the corpus parsers leave those unlinked
+        parser.bare_recitals = True
     parser.reset()
     return parser
 

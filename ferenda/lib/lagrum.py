@@ -281,10 +281,11 @@ EU_RULES = r"""
 // --- EU legislation (eulag.ebnf) ---
 
 eu_ref: artikel_part _W IN _W rattsakt_part
-      | skal_part _W IN _W rattsakt_part
+      | skal_part _W (IN | TILL) _W rattsakt_part
       | skal_part _W_AND_OR_W artikel_part _W IN _W rattsakt_part
       | rattsakt_part
       | artikel_part
+      | skal_part
 
 // a recital ("skäl 108"), which is where an act states the reasoning its
 // articles enact and is cited for exactly that -- "i skäl 108 och artikel 46.1
@@ -292,7 +293,10 @@ eu_ref: artikel_part _W IN _W rattsakt_part
 // act is named or in focus: unlike an article, a bare "skäl 12" is not
 // anaphora-linked, because these documents number their own paragraphs the same
 // way and a bare number is far likelier to be one of those than a recital of
-// whatever act was last mentioned.
+// whatever act was last mentioned. The alternative is grammar all the same, so
+// a caller that reads other people's text can opt in (`bare_recitals`): a
+// thesis writes "Under skäl 26 fastställs …" about the act it discusses.
+// "skäl 82 till förordningen" is the other preposition the recitals take.
 //
 // The coordinated form is its own alternative because Swedish hangs one "i
 // <akt>" off both halves, and the recital must take the act the article names
@@ -322,7 +326,8 @@ artikel_part: (ARTIKEL | ARTIKLARNA) _W artikel_item (_asep artikel_item)*
 // anchored by its paragraph whichever stycke holds it. Without this production
 // the whole reference used to fail, losing the *article* too and degrading to an
 // act-level link.
-artikel_item: artikel_ref_id (DOT underartikel_ref_id)? (_W stycke_ref)? (_W punkt_ref_id (_asep punkt_ref_id)*)?
+// The letter also follows a dot ("5.1.d", "17.1.b"), as theses write it.
+artikel_item: artikel_ref_id (DOT underartikel_ref_id)? (_W stycke_ref)? ((_W | DOT) punkt_ref_id (_asep punkt_ref_id)*)?
 stycke_ref: stycke_ref_id _W PIECE_WORD
 stycke_ref_id: ORDINAL_WORD
 _asep: _W_AND_OR_W | HYP | COMMA _W
@@ -436,7 +441,11 @@ COLON: ":"
 # parser picks a block by the document's language.
 EU_TERMINALS = {
     "swe": r"""
-ARTIKEL.3: /[Aa]rtikel/
+// "art. 4.2" and "art 6.1.a" as well as "artikel". Without the dot "art" is
+// also a noun ("av allvarlig art"), so fmt_eu_ref refuses it where no act is
+// named (`_ABBREVIATED_ARTICLE`).
+ARTIKEL.3: /[Aa]rtikel|[Aa]rt\.?(?= \d)/
+TILL: "till"
 ARTIKLARNA.3: /[Aa]rtiklarna/
 // "skäl 108", "skälen 108 och 109", "skälet 108". Not "skäl" as the everyday
 // noun: the terminal only ever reaches the parser followed by a number, since
@@ -873,6 +882,7 @@ LAGRUM_TRIGGER_SRC = r"""
 
 EU_TRIGGER_SRC = r"""
     \b[Aa]rtik(?:el|larna)\ \d                # EU article/articles (also initial)
+  | \b[Aa]rt\.?\ \d                         # abbreviated ("art. 4.2", "art 6.1.a")
   | \b[Ss]käl(?:et|en)?\ \d                   # recital ("skäl 108")
   | \b(?:rådets|kommissionens|Europaparlamentets\ och\ rådets)\b
   | \b\d+/\d+/E(?:EG|G|U)\b                   # 95/46/EG
@@ -884,6 +894,8 @@ EU_TRIGGER_SRC = r"""
     # an act or treaty named first, in the genitive ("EU-stadgans artikel 8.1",
     # "GDPR:s artikel 17"); the EU_TREATY / EU_NAMNAKT terminals reject other words
   | (?<![\wåäöÅÄÖ-])[A-Za-zÅÄÖåäö][\wåäöÅÄÖ-]*(?::s|s)\ [Aa]rtik(?:el|larna)\ \d
+    # and an act named before its recitals ("GDPR skäl 14, 26, 27")
+  | (?<![\wåäöÅÄÖ-])[A-Za-zÅÄÖåäö][\wåäöÅÄÖ-]*\ [Ss]käl(?:et|en)?\ \d
 """
 
 # abbreviation-*first* KORTLAGRUM forms ("TF 2:3", "TF 3 §", "ÄB 10 kap.
@@ -1019,6 +1031,9 @@ EU_KEYS = ('ar', 'artikel', 'akttyp')
 # a "bare" EU article ref -- one or more article numbers with no instrument named
 # (no treaty/act/generic noun). It self-refers inside an EU act, else anaphora-
 # links the last named act (fmt_eu_ref).
+# a bare recital ("skäl 26"), linked only where the caller opts in
+# (`LagrumParser.bare_recitals`, see the skal_part comment in EU_RULES)
+BARE_RECITAL_PARTS = frozenset(('eu_ref', 'skal_part', 'skal_item', 'skal_ref_id'))
 BARE_PARTS = frozenset(('eu_ref', 'artikel_part', 'artikel_item',
                         'artikel_ref_id', 'underartikel_ref_id', 'punkt_ref_id',
                         'stycke_ref', 'stycke_ref_id'))
@@ -1223,6 +1238,22 @@ def eu_akttyp(celex):
 EU_GENERIC_AKTTYP = {"förordningen": "R", "direktivet": "L",
                      "rättsakten": None,
                      "regulation": "R", "directive": "L"}
+
+
+# The paragraphs of a judgment cited after its case number, with the case name
+# between them or not: ", p. 54-59", " Nowak p. 34–35", ", Google Spain, p. 98",
+# ", Nowak. punkt. 53", ", Patrick Breyer mot Bundesrepublik Deutschland, p. 43",
+# ", GC m.fl. mot Commission nationale … (CNIL), p. 57", " punkterna 46 och 56".
+# The name has no digit and no sentence end, so a paragraph number in the next
+# sentence is never taken; "p." and "punkt" must be lower case for the same
+# reason. A range links its two ends, as a förarbete's page range does.
+_ECJ_POINT_WORD = r"(?:p\.|pp\.|punkt(?:en|erna)?\.?|para\.?)"
+RE_ECJ_POINTS = re.compile(
+    r"(?:,?\s(?:m\.fl\.|[^\s\d.,;:()]+)(?:\s(?:m\.fl\.|[^\s\d.,;:()]+)){0,11}(?:\s\([^()\d]{1,40}\))?)?"
+    r"[.,]?\s?" + _ECJ_POINT_WORD + r"\s?(?P<points>\d+(?:\s?[-–]\s?\d+)?"
+    r"(?:(?:,\s?|\s(?:och|samt)\s)(?:" + _ECJ_POINT_WORD + r"\s?)?\d+(?:\s?[-–]\s?\d+)?)*)")
+
+RE_NUMBER = re.compile(r"\d+")
 
 
 class NoLink(Exception):
@@ -1664,6 +1695,7 @@ EU_NAMNAKT_RULES = r"""
 %extend rattsakt_part: eu_namnakt_full
 %extend eu_ref: artikel_part _W eu_namnakt_full
 %extend eu_ref: eu_namnakt GENITIVE _W artikel_part
+%extend eu_ref: eu_namnakt _W skal_part
 eu_namnakt_full: (EU_DET _W)? (EU_ADJ _W)? eu_namnakt
 eu_namnakt: EU_NAMNAKT
 EU_ADJ: "allmänna" | "allmän"
@@ -1886,7 +1918,12 @@ RE_EDPB_SELF = re.compile(
 # the same body under its full name: "artikel 29-gruppen" / "artikel
 # 29-arbetsgruppen", which is a *body*, not a reference to artikel 29
 ARTICLE29 = '29'
-RE_ARTICLE29_GROUP = re.compile(r'[-‑‐–—](?:arbets)?gruppen')
+# a PDF line break loses the hyphen or leaves a space after it ("artikel
+# 29arbetsgruppen", "artikel 29- arbetsgruppen"), "arbetargruppen" is a common
+# misspelling, and a footnote may use the English name ("Art. 29 Data
+# Protection Working Party")
+RE_ARTICLE29_GROUP = re.compile(
+    r'[-‑‐–—]?\s?(?:arbets|arbetar)?gruppen|\s(?:Data Protection )?Working Party')
 
 # A document that lists its own chapters ("Innehållet i föreskrifterna är
 # uppdelat enligt följande: 1 kap. – Allmänna bestämmelser 2 kap. – …") has its
@@ -1999,6 +2036,8 @@ class LagrumParser:
                            eu_acts if EULAGSTIFTNING in self.parse_types else (),
                            lang)
         self.trigger = build_trigger(self.parse_types, lang)
+        # link a bare "skäl N" to the act in focus (see EU_RULES)
+        self.bare_recitals = False
         self.act_mention = act_mention_pattern(eu_acts) \
             if EULAGSTIFTNING in self.parse_types and lang == "swe" else None
 
@@ -2016,6 +2055,7 @@ class LagrumParser:
         self.written = written
         self._scan_text = ""
         self._scan_base = 0
+        self._scan_extend = 0
 
     # --- scanning ---
 
@@ -2036,9 +2076,16 @@ class LagrumParser:
         text = text.translate(_SPACE_NORM)
         refs = []
         pos = 0
+        # how far bare act names have been read; a match that linked nothing
+        # stays unread, since a trigger fires inside a name too
+        # ("Dataskyddsförordningen" looks like a Swedish law's name)
+        mentions = 0
         while True:
             m = self.trigger.search(text, pos)
-            self._remember_act_mentions(text, pos, m.start() if m else len(text))
+            upto = m.start() if m else len(text)
+            if upto > mentions:
+                self._remember_act_mentions(text, mentions, upto)
+                mentions = upto
             if not m:
                 break
             tree, length = self.try_parse(text, m.start())
@@ -2049,6 +2096,7 @@ class LagrumParser:
                 # bare-article anaphora guard needs to see a coordination /
                 # other-instrument continuation that the node itself excludes)
                 self._scan_text, self._scan_base = text, base
+                self._scan_extend = 0
                 try:
                     attrlist = list(self.format_root(tree, context))
                     for attrs, (s, e) in zip(
@@ -2071,7 +2119,10 @@ class LagrumParser:
                                         orig[base + s:base + e], predicate, uri))
                 except NoLink:
                     pass
-                pos = m.start() + length
+                # a judgment's paragraphs follow its case number (`_ecj_points`)
+                pos = max(m.start() + length, self._scan_extend)
+                if refs and refs[-1].start >= base:
+                    mentions = pos
             else:
                 pos = m.start() + 1
         if self.eng:
@@ -2673,9 +2724,11 @@ class LagrumParser:
         grammar at all ("skäl 17 i direktiv 2000/31/EG" used to match just the
         directive), and losing it would cost both that link and the anaphora
         memory every later "artikel N i direktivet" depends on. Every eu_ref
-        alternative carrying a recital ends in `rattsakt_part`, so its absence
-        is a broken grammar, not a case to fall back for."""
-        return _node_span(subtree(node, 'rattsakt_part'))
+        alternative carrying a recital ends in `rattsakt_part`, or starts with
+        the act's short name ("GDPR skäl 14"), so the absence of both is a
+        broken grammar, not a case to fall back for."""
+        act = subtree(node, 'rattsakt_part', None) or subtree(node, 'eu_namnakt')
+        return _node_span(act)
 
     def _emit_act_ref(self, out, node, parts, specs, build):
         """Emit one eu_ref onto a single act: each cited recital on its own
@@ -2719,10 +2772,23 @@ class LagrumParser:
             self._emit_act_ref(out, node, parts, specs,
                                lambda pin: self._eu_celex_uri(celex, pin))
             return
+        # a bare "skäl N": the act in focus, where the caller opted in
+        if parts <= BARE_RECITAL_PARTS:
+            tail = self._scan_text[self._scan_base + _node_span(node)[1]:][:14]
+            target = self.state.self_eu_act or self.state.last_eu_act
+            if (not self.bare_recitals or not target
+                    or re.match(r"\s+(?:i|till)\s|\s*(?:,|och|eller)\s*\d", tail)):
+                raise NoLink()
+            self._emit_recitals(out, node, self._eu_celex_uri(target, remember=False))
+            return
         # the definite generic noun ("artikel N i (det) förordningen/direktivet")
         # pinpoints the act in focus; a bare "artikel N" self-refers inside an EU
         # act, else anaphora-links the last named act
         bare = parts <= BARE_PARTS
+        # "art" without its dot is also a noun, so it links only with an act named
+        if bare and any(t.type == 'ARTIKEL' and t.value.lower() == 'art'
+                        for t in _tree_tokens(node)):
+            raise NoLink()
         if 'eu_generic' in parts or bare:
             # the generic noun refers back only when no act identifier follows:
             # in "artikel 30 i förordningen (EG) nr 765/2008" the noun *names*
@@ -2958,6 +3024,21 @@ class LagrumParser:
 
     # --- EURATTSFALL (CJEU case law) ---
 
+    def _ecj_points(self, node):
+        """The judgment paragraphs cited after the case number, as (number,
+        window span) pairs: "mål C-131/12, p. 54-59", "Mål C-434/16, Nowak p.
+        34–35", "C-434/16, Nowak. punkt. 53". The paragraphs lie past the parsed
+        node, in the text `_scan_text` holds; `_scan_extend` tells parse_text
+        how far this match now reaches."""
+        end = _node_span(node)[1]
+        at = self._scan_base + end
+        m = RE_ECJ_POINTS.match(self._scan_text, at)
+        if not m:
+            return []
+        self._scan_extend = m.end()
+        return [(int(n.group(0)), (n.start() - self._scan_base, n.end() - self._scan_base))
+                for n in RE_NUMBER.finditer(self._scan_text, m.start('points'), m.end())]
+
     def fmt_ecj_ref(self, node, match, out, context):
         # the pre-1989 numbering ("Case 31/87") has no court letter: only the
         # ECJ existed, so its absence *means* the Court of Justice
@@ -2977,7 +3058,17 @@ class LagrumParser:
         # Justice judgment notice, not a General Court judgment; CW is not
         # a descriptor. See the regression cases in test_lagrum.py.
         celex = '6%s%sJ%04d' % (year, decision, int(serial))
-        out.append({'_uri': self.base + 'celex/' + celex})
+        points = self._ecj_points(node)
+        if not points:
+            out.append({'_uri': self.base + 'celex/' + celex})
+            return
+        # the first paragraph takes the case number with it, the way a
+        # förarbete's first page does; the later ones link their own number
+        for index, (number, (start, stop)) in enumerate(points):
+            if index == 0:
+                start = _node_span(node)[0]
+            out.append({'_uri': '%scelex/%s#point-%d' % (self.base, celex, number),
+                        '_span': (start, stop)})
 
     # --- MYNDIGHETSBESLUT (authority decisions) ---
 

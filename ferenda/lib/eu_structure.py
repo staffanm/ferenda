@@ -111,6 +111,7 @@ class Anchors:
         self.parag = None
         self.stycke = None        # open stycke, when past the paragraph's first
         self.points = []          # open point markers, outermost first
+        self.seen_article = False  # a judgment has none (JUDGMENT_POINT)
 
     def container(self):
         """The key a stycke of the open paragraph hangs off: the paragraph's own
@@ -124,6 +125,7 @@ class Anchors:
         the context as a side effect, so this must be called for *every* block, not
         only the anchorable ones."""
         if t == ARTICLE:
+            self.seen_article = True
             self.article, self.parag, self.stycke = bid or num, None, None
             self.points = []
             return self.article
@@ -133,6 +135,8 @@ class Anchors:
             # text is its first stycke. An *unnumbered* paragraph anchors nothing
             # -- it is prose outside the article outline (a signature block, annex
             # text); an article's real stycken arrive as `stycke` blocks
+            if not self.seen_article and (num or "").isdigit():
+                return JUDGMENT_POINT + num
             return subarticle_key(t, num, self.article, self.parag)
         if t == STYCKE:
             # a stycke closes any open point and becomes the one the points that
@@ -171,13 +175,22 @@ class Anchors:
         return None
 
 
+# A document with no articles -- a judgment -- is cited by its numbered
+# paragraphs: "mål C-131/12, punkt 98" -> `point-98` (lagrum.fmt_ecj_ref). Only
+# before any article, so an annex's numbered list after the enacting terms keeps
+# anchoring nothing.
+JUDGMENT_POINT = "point-"
+
+
 def first_stycke(t, num, key):
     """The `.S1` alias a *numbered* paragraph carries alongside its own key: its
     text is the paragraph's first stycke, so "artikel 9.2" and "artikel 9.2 första
     stycket" both name it and both must resolve (`9.2` and `9.2.S1`). Only the
     numbered form needs the alias -- an unnumbered paragraph is already keyed as
     the article's first stycke. None when the block has no second name."""
-    return stycke_key(key, "1") if t == PARAGRAPH and citable(num) and key else None
+    if not key or key.startswith(JUDGMENT_POINT):   # a judgment has no stycken
+        return None
+    return stycke_key(key, "1") if t == PARAGRAPH and citable(num) else None
 
 
 def anchored_blocks(structure, aliases=True):
