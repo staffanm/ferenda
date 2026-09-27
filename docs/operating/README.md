@@ -719,27 +719,27 @@ first, so a host-side edit is recoverable. A recent git lock file stops the
 deploy instead of being deleted; one older than an hour is removed as stale.
 
 The same push does **not** fold in data. `staffan`'s crontab does that, as
-four inlined `docker compose exec` lines:
+three inlined `docker compose exec` lines:
 
     0  0 * * *   lagen all all --ignore-code-changes   -> ~/lagen-nightly.log
-    0  5 * * 0   lagen all browser-download            -> ~/lagen-browser.log
     0 14 * * 0   lagen all compact                     -> ~/lagen-compact.log
     0  6 1 * *   lagen foreskrift download --force     -> ~/lagen-foreskrift-full.log
 
-The nightly `all all` skips the browser-shielded föreskrift agencies (skvfs,
-mtfs) and Skatteverkets ställningstaganden. `all browser-download` covers
-both on Sundays: rs and föreskrift each register the action, and the sweep
-runs them one after the other, one navigation at a time — never two
-Playwright threads at once. `all compact` runs last, after both are done —
-see §4 on `lagen all compact` and the catalog file's page layout.
+The weekly `all browser-download` line is gone: the nightly `all all` now
+includes the browser-shielded föreskrift agencies (skvfs, mtfs) and
+Skatteverkets ställningstaganden by default (`--download-browser`, on unless
+a run passes `--no-download-browser`). `rs` and `foreskrift` still run those
+scopes one at a time beside the parallel HTTP ones, never two Playwright
+threads at once. `all compact` runs last, after the nightly download/build
+finishes — see §4 on `lagen all compact` and the catalog file's page layout.
 
 Skatteverkets 2,614 ställningstaganden are one browser navigation each. The
 run paces them 20 seconds apart: at 2-second spacing the site's front refuses
 navigation 31 and keeps refusing for minutes. That is a rate rule, not a bot
-verdict — no browser gets around it. A weekly run costs the register plus
-what moved. The first run takes ~15 hours, so slice it with `--limit N` and
-let the next run resume. Nothing is stranded — a run stores a record only
-once its page is on disk.
+verdict — no browser gets around it. A caught-up nightly run costs the
+register plus what moved. The first run takes ~15 hours, so slice it with
+`--limit N` and let the next run resume. Nothing is stranded — a run stores a
+record only once its page is on disk.
 
 ### The monthly föreskrift `--force`
 

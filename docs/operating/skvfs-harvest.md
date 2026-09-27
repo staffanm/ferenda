@@ -3,9 +3,10 @@
 **Status (2026-09-06):** **live incremental SKVFS and MTFS work** through the
 ordinary `lagen foreskrift download {skvfs|mtfs}` sweep. SKVFS layers over the
 frozen SKVFS/RSFS baseline (§7g); MTFS has no frozen baseline. Their two
-`Agency.browser` flags select the Camoufox transport; every other agency keeps
-`requests`/HTTP2. F5 still blocks direct HTTP, so the working transport is
-operationally heavier than an open-data feed — but since the move to Camoufox
+`transport` fields (`lib.net.Transport(browser=True)`) select the Camoufox
+transport; every other agency keeps `requests`/HTTP2. F5 still blocks direct
+HTTP, so the working transport is operationally heavier than an open-data
+feed — but since the move to Camoufox
 (2026-09-06) it is headless, needs no system browser and no X display, and waits
 for the page rather than for a fixed settle.
 
@@ -61,9 +62,9 @@ Relevant register URLs:
 | Cookie two-step (fetch, reuse `Set-Cookie`, re-fetch) | Same challenge (cookies are not a solved token) |
 
 The `httpx2` HTTP/2 client and `requests` both **cannot run JS**, so they can
-never pass the challenge. This is why the engine's `Agency.http2` flag (which
-*did* solve KKVFS's Cloudflare-HTTP/2 wall) does **nothing** here — different
-wall class entirely.
+never pass the challenge. This is why the engine's transport's `client="httpx"`
+setting (which *did* solve KKVFS's Cloudflare-HTTP/2 wall) does **nothing**
+here — different wall class entirely.
 
 ### Headless browser (Playwright Chromium) — **worse than a dumb client**
 Isolated venv, `chromium` + `chromium_headless_shell`. Against the register:
@@ -184,12 +185,14 @@ Ranked by realism and durability.
    traffic). The allowlist path is the one to push for — bulk export doesn't
    scale for continuous updates.
 
-2. **Current nightly posture.** `Agency.browser=True` is configured only for
-   SKVFS and MTFS. `foreskrift.harvest` selects `lib.browser.CamoufoxBrowser` for
-   those two; all other agencies still select `requests` or `Agency.http2`. The
-   job requires the `camoufox` dependency plus its downloaded browser
-   (`python -m camoufox fetch`, ~1.2 GB; the Docker image does this at build
-   time). No system browser, no `DISPLAY`. Each dedicated profile lives under
+2. **Current nightly posture.** `transport=Transport(browser=True, …)` is
+   configured only for SKVFS and MTFS. `foreskrift.harvest` opens
+   `lib.browser.CamoufoxBrowser` (via `lib.net.open_transport`) for those two;
+   all other agencies still open a `requests` session, or (KKVFS) the
+   `client="httpx"` transport. The job requires the `camoufox` dependency plus
+   its downloaded browser (`python -m camoufox fetch`, ~1.2 GB; the Docker
+   image does this at build time). No system browser, no `DISPLAY`. Each
+   dedicated profile lives under
    `downloaded/foreskrift/{skvfs|mtfs}/.browser-profile/` and keeps the solved
    challenge cookie between runs.
 
@@ -205,15 +208,17 @@ Ranked by realism and durability.
 
 The sources still follow the same configured-by-data engine. `SKVFS` names
 `skvfs.enumerate_register` + `skvfs.resolve`; `MTFS` names
-`mtfs.enumerate_register` + `mtfs.resolve`; both set `browser=True`.
-`foreskrift.harvest` chooses the transport, then hands those callables to the
+`mtfs.enumerate_register` + `mtfs.resolve`; both set
+`transport=Transport(browser=True, browser_pace=…)`.
+`foreskrift.harvest` opens that transport, then hands those callables to the
 same `lib.harvest.walk`, watermark, `--only`, `--full`, error ledger and record
 layout as every HTTP agency. Browser mechanics are generic in `lib/browser.py`;
 source selectors and identity rules stay in `foreskrift/{skvfs,mtfs}.py`.
 
 If Skatteverket supplies an open feed or allowlisted endpoint, the replacement
-is therefore small: remove `browser=True` and point the enumerator/resolver at
-that channel. Keep the RSFS entry (the SKVFS register is its only source).
+is therefore small: drop the transport's `browser=True` and point the
+enumerator/resolver at that channel. Keep the RSFS entry (the SKVFS register
+is its only source).
 
 **Critical interaction — live harvest vs. the existing corpus** (verified in
 `lib/harvest.walk` + `harvest.item_key`):
@@ -237,6 +242,6 @@ that channel. Keep the RSFS entry (the SKVFS register is its only source).
 - Camoufox transport: `ferenda/lib/browser.py`
 - Shared frozen-import core (other verticals): `lib/legacy_import.py`
 - HTTP/2 transport (KKVFS precedent, wrong tool for this wall):
-  `Agency.http2`, `lib/net.make_http2_session`
+  `Transport(client="httpx")`, `lib/net.make_http2_session`
 - Regression fixtures/tests: `test/files/{skvfs,mtfs}/`,
   `test/test_foreskrift_{skvfs,mtfs}.py`

@@ -222,11 +222,11 @@ curated account it needs.
 `site/data/{downloaded,artifact}/rs/`):
 
 ```sh
-uv run python -m ferenda.build rs download          # the six HTTP agencies; or: … download fk
+uv run python -m ferenda.build rs download          # every agency, skv one at a time; or: … download fk
 uv run python -m ferenda.build rs parse             # incremental, like every source
 uv run python -m ferenda.build rs download fk --only fk/2025:01   # one statement
 uv run python -m ferenda.build rs download migr     # Lifos (RS + RK), AIA-completed TLS
-uv run python -m ferenda.build rs browser-download  # Skatteverket, weekly, browser transport
+uv run python -m ferenda.build rs download --no-download-browser  # the six HTTP agencies, skv left out
 ```
 
 Identity is the agency's own number (`rs/fk/2025:01`, `rs/kfm/1-23-VER`,
@@ -235,14 +235,15 @@ first `rs download fk` fetches all 108 PDFs, because Försäkringskassans
 Serienummer lives only in the document; later runs read the number off the
 stored records and cost one listing request.
 
-Skatteverket is the seventh agency and runs on its own command. It sits behind
-the F5/Shape challenge SKVFS sits behind, so every navigation goes through
-Camoufox one at a time, and the run is paced well under the rate the front
-tolerates. A first `rs browser-download` is 2,614 paced navigations —
-some fifteen hours, sliceable with `--limit N`, and a resumed run skips
-whatever is already stored — while a weekly run costs the register plus the
-handful of documents that moved. Its documents are stored as `.html`, not
-`.pdf`: Skatteverket publishes the ställningstagande *as* a web page.
+Skatteverket is the seventh agency and runs one at a time beside the six HTTP
+agencies (`--no-download-browser` leaves it out). It sits behind the F5/Shape
+challenge SKVFS sits behind, so every navigation goes through Camoufox one at
+a time, and the run is paced well under the rate the front tolerates. A first
+`rs download skv` is 2,614 paced navigations — some fifteen hours, sliceable
+with `--limit N`, and a resumed run skips whatever is already stored — while a
+caught-up run costs the register plus the handful of documents that moved.
+Its documents are stored as `.html`, not `.pdf`: Skatteverket publishes the
+ställningstagande *as* a web page.
 
 **kkvdomar — kammarrätternas avgöranden in public-procurement cases** (operates
 on `site/data/{downloaded,artifact}/kkvdomar/`):
