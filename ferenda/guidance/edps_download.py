@@ -72,8 +72,13 @@ from bs4 import BeautifulSoup
 from ..lib import browser
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import select_pending, stored_index, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, make_session
+from ..lib.net import (
+    BROWSER_UA_TRANSPORT,
+    Transport,
+    fetcher,
+    open_session,
+    open_transport,
+)
 from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import document_extension, english_date, href, normalize_space
 from .issuers import EDPS, LOPNUMMER_FORST, number_slug
@@ -86,6 +91,9 @@ PROFILE = ".browser-profile"
 # seconds a challenged navigation is given to become the page. A page that ran
 # out of time is retried with the next, longer one.
 TIMEOUTS = (7.0, 20.0, 30.0)
+# the listing pages sit behind the WAF challenge only the browser passes; the
+# document files answer plain HTTP to the browser UA
+BROWSER_TRANSPORT = Transport(browser=True, browser_timeout=TIMEOUTS[0])
 
 # the EDPS's own number as its cover prints it: "Opinion 11/2023", on the line
 # under the date. Some covers set the body's name in front of it ("EDPS Opinion
@@ -327,14 +335,13 @@ def edps_sync(root, full=False, only=None, limit=None, delay=0.5):
     (rule:instrument-failures): a row publishing no PDF at all, a row whose file
     could not be named, a cover that states a number its listing contradicts.
     """
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     known = known_identities(root)
     pending, counts = [], dict.fromkeys(
         ("rows", "no pdf", "swedish", "english", "cover number",
          "number from title only", "cover disagrees with title", "unnumbered",
          "covers read"), 0)
-    with browser.CamoufoxBrowser(Path(root) / EDPS.kod / PROFILE,
-                                 timeout=TIMEOUTS[0]) as chrome:
+    with open_transport(BROWSER_TRANSPORT, Path(root) / EDPS.kod / PROFILE) as chrome:
         rows = [(serie, row) for serie in EDPS.koder
                 for row in walk_view(chrome, EDPS.serie(serie).doctype, delay)]
     for serie, row in rows:

@@ -67,8 +67,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import select_pending, stored_index, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, get_text, make_session
+from ..lib.net import BROWSER_UA_TRANSPORT, fetcher, get_text, open_session
 from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import (
     document_extension,
@@ -488,7 +487,7 @@ def acer_sync(root, full=False, only=None, limit=None, delay=0.5):
     of the opinion they belong to. For the numbered series the duplicate is not
     known until the cover has spoken, which is why the check comes after the
     fetch -- seven files a run, against the mis-filing it prevents."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     # `--full` re-reads every cover as well as re-fetching every document: a
     # verification is only worth what the run is willing to repeat
     stored = {} if full else stored_documents(root)

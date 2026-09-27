@@ -64,8 +64,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, select_pending, stored_index, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, get_text, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, fetcher, get_text, open_session, request
 from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import document_extension, href, normalize_space
 from .issuers import ESMA
@@ -352,7 +351,7 @@ def esma_sync(root, full=False, only=None, limit=None, delay=0.5):
     mislabelled; `rapport` is a document type this source does not carry; `utan
     nummer` is a row the library itself left unnumbered. A count that moves is
     a change upstream, and one that stays is the corpus."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     known = known_documents(root)
     rows, pages = walk_library(session, delay)
     documents, unnumbered = group_by_number(rows)

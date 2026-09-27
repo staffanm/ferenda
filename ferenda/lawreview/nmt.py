@@ -362,7 +362,7 @@ def nmt_sync(root, full=False, only=None, limit=None, delay=0.5):
     """The journal's whole archive: the two listing pages, then the per-article
     PDFs the tables of contents name. `--only nmt/2025-2-01` names its own
     issue's line, and the walk stores that one document."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(NMT.transport)
     pending = []
     seen_basefiles = set()
     for listing in NMT.listings:

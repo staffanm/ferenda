@@ -24,7 +24,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import browser, compress
+from ..lib import compress
 from ..lib.harvest import (
     HarvestWatermark,
     ItemKey,
@@ -34,8 +34,13 @@ from ..lib.harvest import (
     walk,
     write_record,
 )
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import (
+    HARVESTER_TRANSPORT,
+    Transport,
+    open_session,
+    open_transport,
+    request,
+)
 from ..lib.util import normalize_space
 from .model import KINDS, RE_LANGUAGE, doc_basefile, parse_stem
 
@@ -53,6 +58,9 @@ CASE_FILES = "/sites/default/files/case-related/"
 # a Chrome profile shared across a run, so one challenge clears the whole
 # harvest rather than one per document
 PROFILE = ".browser-profile"
+# the /decisions index answers plain HTTP; the decision PDFs sit behind a
+# Cloudflare challenge no header or cookie from the index satisfies
+PDF_TRANSPORT = Transport(browser=True)
 
 # The Court's own word on the law. Judgments and advisory opinions are taken
 # whole; of the 688 orders only those indicating provisional measures are --
@@ -196,7 +204,7 @@ def resolve(chrome, root, record, full=False, delay=0.3):
 
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     root = Path(root)
-    records = enumerate_decisions(make_session(USER_AGENT))
+    records = enumerate_decisions(open_session(HARVESTER_TRANSPORT))
     if only:
         records = [select_one(records, lambda record: record["basefile"],
                               only, "ICJ lists no in-scope decision %s")]
@@ -213,7 +221,7 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     # one browser for the whole run: the Cloudflare challenge is cleared once
     # and its cookie then serves every fetch, and a browser launch per document
     # would cost more than the download
-    with browser.CamoufoxBrowser(root / PROFILE) as chrome:
+    with open_transport(PDF_TRANSPORT, root / PROFILE) as chrome:
         result = walk(records,
                       resolve=lambda r: resolve(chrome, root, r, full=full,
                                                 delay=delay),

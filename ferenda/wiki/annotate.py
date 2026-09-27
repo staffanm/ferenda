@@ -60,7 +60,7 @@ GUIDANCE_PLACEHOLDER = "[GUIDANCE TEXT]"
 # chain-of-thought plus the answer (the endpoint default of 4096 truncates it).
 MAX_TOKENS = 32000
 RE_PAGE = re.compile(r"\[Sida (\d+)\]\n")
-USER_AGENT = "ferenda/lagen.nu guidance linker"
+TRANSPORT = net.Transport(user_agent="ferenda/lagen.nu guidance linker")
 CACHE = layout.DOWNLOADED / "kommentar" / "guidance"
 
 
@@ -72,7 +72,7 @@ def fetch_pdf(url):
     cached = CACHE / (hashlib.sha1(url.encode()).hexdigest()[:16] + ".pdf")
     if cached.exists():
         return cached
-    session = net.make_session(USER_AGENT)
+    session = net.open_session(TRANSPORT)
     resp = net.request(session, "GET", url, timeout=120)
     # untrusted remote content: a WAF challenge / error page comes back 200 with
     # HTML, not a PDF. raise (not assert, which -O strips) so a non-PDF is rejected

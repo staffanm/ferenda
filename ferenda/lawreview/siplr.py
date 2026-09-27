@@ -278,7 +278,7 @@ def siplr_sync(root, full=False, only=None, limit=None, delay=0.5):
     re-fetches an issue page whose articles are all stored. `--only
     siplr/2025-2-03` names its own issue, which is then the only issue page
     fetched and the walk stores that one document."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(SIPLR.transport)
     issues = _siplr_issues(session)
     if only:
         # the basefile names its own issue, so an --only run reads that one

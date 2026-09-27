@@ -34,13 +34,14 @@ designation and this rule points at it rather than away from it.
 Transport. Six agencies serve ordinary HTTP. Skatteverket sits behind the same
 F5/Shape JavaScript challenge the SKVFS föreskrift harvest meets, so it needs
 the Camoufox transport (`lib.browser`) -- serial, and paced at one document
-every 20 seconds because the front rate-limits, which is why `browser` splits it
-out of the default `lagen rs download` sweep and onto `lagen rs
-browser-download`.
+every 20 seconds because the front rate-limits. Its transport's `browser` flag
+runs it one at a time beside the HTTP agencies, and `--no-download-browser`
+leaves it out of a `lagen rs download` run.
 """
 
 from dataclasses import dataclass
 
+from ..lib.net import BROWSER_UA, BROWSER_UA_TRANSPORT, Transport
 from ..lib.util import number_slug as _number_slug
 
 
@@ -60,7 +61,7 @@ class Agency:
     # an agency whose citation form is already short needs no second form.
     designation: str | None = None
     note: str = ""               # what is peculiar about this agency's listing
-    browser: bool = False        # Camoufox instead of an HTTP session (F5: skv)
+    transport: Transport = BROWSER_UA_TRANSPORT   # how the harvest talks to the site
     page_body: bool = False      # the document is a web page, not a PDF (skv)
 
 
@@ -97,6 +98,10 @@ REGISTRY = (
     Agency(org="migr",
            name="Migrationsverket",
            listing="https://lifos.migrationsverket.se/sokning/detaljerad-sokning.html",
+           # the site sends only its leaf certificate; the intermediate is
+           # fetched from the pointer the leaf carries (`lib.net.mount_aia_chain`)
+           transport=Transport(user_agent=BROWSER_UA, aia=(
+               ("https://lifos.migrationsverket.se/", "lifos.migrationsverket.se"),)),
            identifier="%s",
            note="published through the Lifos database, whose numbers "
                 "(RS/028/2021) are already unambiguous; revised in place, so a "
@@ -104,6 +109,8 @@ REGISTRY = (
     Agency(org="kkv",
            name="Konkurrensverket",
            listing="https://www.konkurrensverket.se/om-oss/stallningstaganden/",
+           # a Cloudflare front that 403s HTTP/1.1 and serves only HTTP/2
+           transport=Transport(user_agent=BROWSER_UA, client="httpx"),
            identifier="Konkurrensverkets ställningstagande %s",
            note="the förteckning keeps repealed and superseded entries, naming "
                 "what replaced them; a repealed one usually keeps no document"),
@@ -112,7 +119,10 @@ REGISTRY = (
            listing="https://www4.skatteverket.se/rattsligvagledning/121.html",
            identifier="Skatteverkets ställningstagande dnr %s",
            designation="%s",
-           browser=True,
+           # the F5/Shape front rejects everything for minutes once some 30
+           # navigations land inside two (measured: navigation 31 at 2 s was
+           # refused), so a document page waits 20 s
+           transport=Transport(browser=True, browser_pace=20.0),
            page_body=True,
            note="by far the largest series (2,614 documents, 2004-) and the "
                 "only one with no series number: Skatteverket cites its own "
@@ -127,8 +137,9 @@ ORGS = tuple(agency.org for agency in REGISTRY)
 # time, paced for the front's rate rule, so it cannot share a run with the HTTP
 # agencies and is kept off the default sweep -- the föreskrift
 # `browser_scopes`/`default_scopes` rule, at rs scale.
-BROWSER_ORGS = tuple(agency.org for agency in REGISTRY if agency.browser)
-DEFAULT_ORGS = tuple(agency.org for agency in REGISTRY if not agency.browser)
+BROWSER_ORGS = tuple(agency.org for agency in REGISTRY if agency.transport.browser)
+DEFAULT_ORGS = tuple(agency.org for agency in REGISTRY
+                     if not agency.transport.browser)
 
 
 # A ställningstagande's number as it appears in a URI and a file name: the

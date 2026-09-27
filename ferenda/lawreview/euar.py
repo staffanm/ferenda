@@ -203,7 +203,7 @@ def euar_sync(root, full=False, only=None, limit=None, delay=0.5):
     journal has taken its oldest issue pages offline (its pre-2005 issues
     404 at their addresses): a dead page is a skip in the run's output, and
     it keeps the store dirty until a run walks clean to the end."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(EUAR.transport)
     issues = _euar_issues(session)
     if only:
         # the basefile names its own issue, so an --only run reads that one

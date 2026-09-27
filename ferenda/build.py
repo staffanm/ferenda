@@ -572,6 +572,11 @@ def main(argv=None):
                         "upphävda archive, which is queued after its in-force "
                         "listing so an ordinary run never gets there. The "
                         "monthly catch-up, in place of a --force sweep")
+    p.add_argument("--download-browser", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="download: include the scopes whose site needs the "
+                        "Camoufox browser transport (foreskrift skvfs, mtfs; rs "
+                        "skv). On by default; --no-download-browser skips them")
     p.add_argument("--ignore-code-changes", action="store_true",
                    help="treat outputs as fresh even when the recipe code changed "
                         "(parse/generate, and the extraction/index code behind "
@@ -651,6 +656,7 @@ def main(argv=None):
 
     protocol.RUN.dry_run, protocol.RUN.force, protocol.RUN.no_deps = args.dry_run, args.force, args.no_deps
     protocol.RUN.deep = args.deep
+    protocol.RUN.download_browser = args.download_browser
     protocol.RUN.verbose = args.verbose
     protocol.RUN.ignore_code_changes = args.ignore_code_changes
     protocol.RUN.aggregates_only = args.aggregates_only

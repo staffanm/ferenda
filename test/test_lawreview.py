@@ -53,7 +53,7 @@ class _FakePdf:
 
 def _serve(module, monkeypatch, html):
     """One listing page as the only page the walk's session gets."""
-    monkeypatch.setattr(module.net, "make_session", lambda ua: object())
+    monkeypatch.setattr(module.net, "open_session", lambda transport: object())
     monkeypatch.setattr(module.net, "request",
                         lambda session, method, url: _FakeResponse(html))
 
@@ -151,7 +151,7 @@ class TestSvjtWatermark:
 
     def test_a_caught_up_run_stops_short_of_the_depth(self, monkeypatch,
                                                       tmp_path):
-        monkeypatch.setattr(download.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(download.net, "open_session", lambda transport: object())
         fetched = []
         monkeypatch.setattr(download.net, "request", self._fake_request(fetched))
 
@@ -274,7 +274,7 @@ class TestJpSync:
                     return _FakeResponse("<html><body></body></html>")
                 return _FakeResponse(self.ISSUE)
             return _FakeResponse(self.MENU)
-        monkeypatch.setattr(download.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(download.net, "open_session", lambda transport: object())
         monkeypatch.setattr(download.net, "request", request)
 
     def test_a_failing_issue_page_becomes_a_skip(self, monkeypatch, tmp_path,
@@ -299,7 +299,7 @@ class TestJpSync:
     def test_an_unknown_slug_fails_the_run(self, monkeypatch, tmp_path):
         # a slug shape the registry does not hold is a code gap, not an
         # issue to skip: the run fails loud before any page is fetched
-        monkeypatch.setattr(download.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(download.net, "open_session", lambda transport: object())
         monkeypatch.setattr(download, "_jp_issues",
                             lambda s: [("specialnummer-x", "Specialnummer")])
         with pytest.raises(ValueError, match="no jp issue code"):
@@ -325,7 +325,7 @@ class TestJpSync:
             if "nummer-012026" in url:
                 return _FakeResponse(self.ISSUE)
             return _FakeResponse(self.MENU)
-        monkeypatch.setattr(download.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(download.net, "open_session", lambda transport: object())
         monkeypatch.setattr(download.net, "request", request)
 
     def test_a_caught_up_run_reads_only_the_newest_issue(self, monkeypatch,
@@ -461,7 +461,7 @@ class TestFtSync:
             if url.endswith("/Journal/21"):
                 return _FakeResponse(self.ISSUE_B)
             raise AssertionError("an unstubbed ft request: %s" % url)
-        monkeypatch.setattr(ft.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(ft.net, "open_session", lambda transport: object())
         monkeypatch.setattr(ft.net, "request", request)
 
     def test_a_caught_up_run_reads_only_the_newest_issue(self, monkeypatch,
@@ -987,7 +987,7 @@ class TestUrtSync:
             if url == urt.URT.listings[0]:
                 return _FakeResponse(self.LISTING)
             raise AssertionError("an unstubbed urt request: %s" % url)
-        monkeypatch.setattr(urt.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(urt.net, "open_session", lambda transport: object())
         monkeypatch.setattr(urt.net, "request", request)
 
     def test_a_caught_up_run_never_rereads_the_older_articles(self,
@@ -1115,7 +1115,7 @@ class TestEuarSync:
             err.response.status_code = 404
             raise err
 
-        monkeypatch.setattr(euar.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(euar.net, "open_session", lambda transport: object())
         monkeypatch.setattr(euar.net, "request", request)
         seen, new = euar.euar_sync(tmp_path, delay=0)
         out = capsys.readouterr().out
@@ -1205,7 +1205,7 @@ class TestEuarWatermark:
             if url in pages:
                 return _FakeResponse(pages[url])
             raise AssertionError("an unstubbed euar request: %s" % url)
-        monkeypatch.setattr(euar.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(euar.net, "open_session", lambda transport: object())
         monkeypatch.setattr(euar.net, "request", request)
 
     def test_a_caught_up_run_reads_only_the_newest_issue(self, monkeypatch,
@@ -1270,7 +1270,7 @@ class TestSiplrSync:
             if url.endswith("/issue-1-2024/"):
                 return _FakeResponse(self.ISSUE_B)
             return _FakePdf()
-        monkeypatch.setattr(siplr.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(siplr.net, "open_session", lambda transport: object())
         monkeypatch.setattr(siplr.net, "request", request)
 
     def test_a_caught_up_run_reads_only_the_newest_issue(self, monkeypatch,
@@ -1341,7 +1341,7 @@ class TestNjelSync:
             if url.endswith("/issue/view/10"):
                 return _FakeResponse(self.ISSUE_B)
             return _FakePdf()
-        monkeypatch.setattr(njel.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(njel.net, "open_session", lambda transport: object())
         monkeypatch.setattr(njel.net, "request", request)
 
     def test_a_caught_up_run_reads_only_the_newest_issue(self, monkeypatch,
@@ -1508,7 +1508,7 @@ class TestLodWatermark:
 
     def test_a_caught_up_run_stops_at_the_newest_issue(self, monkeypatch,
                                                        tmp_path):
-        monkeypatch.setattr(lod.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(lod.net, "open_session", lambda transport: object())
         fetched = []
         monkeypatch.setattr(lod.net, "request", self._fake_request(fetched))
 

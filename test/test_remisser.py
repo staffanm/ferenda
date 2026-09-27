@@ -308,7 +308,7 @@ def _fake_request(pages, cases, hits=None, total=2):
 
 def _drive(monkeypatch, tmp_path, request_fn):
     monkeypatch.setattr(download, "request", request_fn)
-    monkeypatch.setattr(download, "make_session", lambda ua: object())
+    monkeypatch.setattr(download, "open_session", lambda transport: object())
     monkeypatch.setattr(download.time, "sleep", lambda s: None)
     _redirect(tmp_path, monkeypatch)
 
@@ -549,7 +549,7 @@ def test_sync_skips_collision_case_without_aborting_sweep(tmp_path, monkeypatch)
         "", {"/collider/": empty_page,
              "/healthy/": empty_page.replace("SOU 2026:14", "Ds 2026:15")},
         total=0))
-    monkeypatch.setattr(download, "make_session", lambda ua: object())
+    monkeypatch.setattr(download, "open_session", lambda transport: object())
     monkeypatch.setattr(download.time, "sleep", lambda s: None)
 
     summary = download.sync(delay=0, log=logged.append)

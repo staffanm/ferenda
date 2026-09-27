@@ -75,8 +75,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, select_pending, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, get_text, make_session
+from ..lib.net import BROWSER_UA_TRANSPORT, fetcher, get_text, open_session
 from ..lib.util import english_date, href, normalize_space
 from .issuers import BEREC
 
@@ -276,7 +275,7 @@ def berec_sync(root, full=False, only=None, limit=None, delay=0.5):
     documents this source does not carry, a row with no file is BEREC's
     register having lost one, and a number that collides with one already filed
     would be a new register shape this harvest has not seen."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     rows, total = walk_listing(session, delay)
     if len(rows) != total:
         # `raise`, not `assert` (rule:errors-drive-retry-use-raise): stripped

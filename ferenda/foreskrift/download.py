@@ -22,16 +22,16 @@ from .agencies import REGISTRY
 def browser_scopes():
     """The scopes whose sites gate public documents behind a
     JavaScript-challenge (F5/Shape) WAF, so they need the serial Camoufox
-    transport (skvfs, mtfs). Kept out of the default parallel `download` and run
-    on their own schedule via the `browser-download` action -- Playwright's sync
-    API is not built for one browser per thread."""
-    return [scope for scope in REGISTRY if REGISTRY[scope].browser]
+    transport (skvfs, mtfs). Run one at a time beside the parallel HTTP scopes
+    (Playwright's sync API is not built for one browser per thread), and left
+    out of a run by `--no-download-browser`."""
+    return [scope for scope in REGISTRY if REGISTRY[scope].transport.browser]
 
 
 def default_scopes():
     """Every scope except the browser-shielded ones -- what a bare `download`
     fans out across the pool."""
-    return [scope for scope in REGISTRY if not REGISTRY[scope].browser]
+    return [scope for scope in REGISTRY if not REGISTRY[scope].transport.browser]
 
 
 def _one(scope, root, full, deep, only, delay, log, reporter):
@@ -69,7 +69,7 @@ def sync(root, scopes=None, full=False, deep=False, only=None, delay=0.5, log=pr
 
     return harvest_lib.fan_out(
         scopelist, one, jobs=jobs, label="foreskrift",
-        serial=[s for s in scopelist if REGISTRY[s].browser], log=log)
+        serial=[s for s in scopelist if REGISTRY[s].transport.browser], log=log)
 
 
 def list_basefiles(root, fs):

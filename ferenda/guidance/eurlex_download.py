@@ -61,8 +61,7 @@ from ..lib.cellar import (
     store_document,
 )
 from ..lib.harvest import store_record
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session
+from ..lib.net import HARVESTER_TRANSPORT, open_session
 from ..lib.util import Reporter, basefile_slug, record_path
 from .issuers import BY_KOD
 
@@ -224,7 +223,7 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
     """Harvest one body's guidance out of CELLAR into this source's store."""
     issuer = BY_KOD[body.kod]
     serie = issuer.serie(body.serie)
-    session = make_session(USER_AGENT)
+    session = open_session(HARVESTER_TRANSPORT)
     works = enumerate_works(session, body, log=log)
     if only:
         works = [w for w in works

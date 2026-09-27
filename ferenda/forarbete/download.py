@@ -58,8 +58,7 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, layout, net
 from ..lib.harvest import HarvestWatermark, ItemKey, walk, write_record
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session
+from ..lib.net import BROWSER_UA_TRANSPORT, open_session
 from ..lib.regeringen import (
     BASE,
     SHARED_CATEGORY,
@@ -513,7 +512,7 @@ def refetch_landings(root, select, replace_bodies, types=("prop", "ds", "sou"),
 
     Returns (checked, updated, errors)."""
     root = Path(root)
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     checked = updated = errors = 0
     rep = Reporter()
     for typ in types:
@@ -579,7 +578,7 @@ def refetch_bodies(root, types=("lr", "so"), limit=None, delay=0.5, log=print):
     document whose links still yield nothing is left as it was, and re-tried
     by the next run. Returns (checked, recovered, errors)."""
     root = Path(root)
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     checked = recovered = errors = 0
     rep = Reporter()
     for typ in types:
@@ -724,7 +723,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
     it is found (ignoring the on-disk stop and the watermark); an `only` no
     listing walked carries is a typo or a document that has gone, and the run
     says so rather than report itself clean. Returns {type: (seen, new)}."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     totals = {}
     rep = ListingReporter()
     walked = list(types or TYPES)

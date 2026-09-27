@@ -51,8 +51,11 @@ from urllib.parse import quote
 from ..lib import compress
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import HARVESTER_TRANSPORT, open_session, request
+
+# how this source talks to its upstream (`lib.net.Transport`); `stage.session`
+# opens it for the per-document stages and actions
+TRANSPORT = HARVESTER_TRANSPORT
 
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
@@ -169,7 +172,7 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
     leaves the store dirty so the next run re-walks down to the date boundary
     instead of stopping above the truncated run's un-fetched backlog."""
     destdir = Path(destdir)
-    session = make_session(USER_AGENT)
+    session = open_session(TRANSPORT)
     watermark_path = destdir / ".watermark.json"
 
     # Migrate legacy complete marker to watermark

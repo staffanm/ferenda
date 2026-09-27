@@ -40,14 +40,13 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, datasets
-from ..lib.browser import CamoufoxBrowser
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk, write_record
-from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import (
+    BROWSER_UA_TRANSPORT,
+    Transport,
     is_not_found,
-    make_http2_session,
-    make_session,
+    open_transport,
     request,
     set_deadline,
 )
@@ -105,12 +104,10 @@ class Agency:
     enumerate: Callable | None = None      # (session, agency) -> Iterator[DocRef]; None = closed series
     resolve: Callable | None = None        # (session, agency, ref, root) -> record; None = closed series
     params: dict = field(default_factory=dict)   # architecture-specific config
-    user_agent: str | None = None          # override (a few sites gate on UA)
-    headers: dict | None = None            # extra request headers (e.g. Accept-Language)
     designation: str | None = None         # printed FS prefix ("HSLF-FS") when != fs.upper()
-    http2: bool = False                    # use the HTTP/2 client (Cloudflare front that 403s HTTP/1.1: KKVFS)
-    browser: bool = False                  # Camoufox instead of an HTTP session (F5: SKVFS/MTFS)
-    browser_pace: float = 0.0              # minimum seconds between navigations (rate-limited fronts)
+    # how the harvest talks to the site (lib.net): the browser UA unless the
+    # entry says otherwise, since most government sites 403 a bare client
+    transport: Transport = BROWSER_UA_TRANSPORT
 
 
 def fs_code(designation):
@@ -1086,19 +1083,10 @@ def harvest(agency, root, full=False, deep=False, only=None, limit=None, delay=0
     queued after the in-force listing, without re-fetching the corpus the way
     ``full`` does. ``only`` (a basefile) fetches just that one. Returns
     ``(seen, new)``."""
-    if agency.browser:
-        assert not agency.http2 and agency.headers is None and agency.user_agent is None, \
-            "%s browser transport cannot also configure an HTTP session" % agency.fs
-        with CamoufoxBrowser(Path(root) / agency.fs / ".browser-profile",
-                             pace=agency.browser_pace) as session:
-            return _harvest_session(agency, root, session, full, deep, only, limit,
-                                    delay, log, reporter)
-    session = (make_http2_session if agency.http2 else make_session)(
-        agency.user_agent or USER_AGENT)
-    if agency.headers:
-        session.headers.update(agency.headers)
-    return _harvest_session(agency, root, session, full, deep, only, limit, delay,
-                            log, reporter)
+    with open_transport(agency.transport,
+                        Path(root) / agency.fs / ".browser-profile") as session:
+        return _harvest_session(agency, root, session, full, deep, only, limit,
+                                delay, log, reporter)
 
 
 # sanity trip: a routine incremental agency harvest finishes in minutes; one

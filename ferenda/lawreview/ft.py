@@ -141,7 +141,7 @@ def ft_sync(root, full=False, only=None, limit=None, delay=0.5):
     at all, and they sit behind the stop). `--only ft/2026-1-01` names its
     own issue, which is then the only issue page fetched and the walk
     stores that one document."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(FT.transport)
     issues = _ft_issues(session)
     if only:
         # the basefile names its own issue, so an --only run reads that one

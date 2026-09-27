@@ -225,7 +225,7 @@ class TestWatermark:
                                                       tmp_path):
         # pin the listing to the three pages above and hand back the platform's
         # own bytes for a downloadsection fetch
-        monkeypatch.setattr(lawpub.net, "make_session", lambda ua: object())
+        monkeypatch.setattr(lawpub.net, "open_session", lambda transport: object())
         pages = [self._page(self.PAGE0), self._page(self.PAGE1), self._page(None)]
         listings = []
 

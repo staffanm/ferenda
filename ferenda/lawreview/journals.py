@@ -42,6 +42,8 @@ at all), and the rest ``year-issue-seq``.
 
 from dataclasses import dataclass
 
+from ..lib.net import BROWSER_UA_TRANSPORT, Transport
+
 __all__ = ["Journal", "SVJT", "JP", "FT", "NMT", "NJEL", "SIPLR", "URT",
            "EUAR", "LOD", "JOURNALS", "BY_KOD", "SCOPES"]
 
@@ -58,6 +60,7 @@ class Journal:
     sida_kalla: str | None   # "footer", "head", "record" or None
     issue_labels: dict[str, str] | None
     slug_parts: tuple[str, ...]
+    transport: Transport = BROWSER_UA_TRANSPORT   # how the harvest talks to the host
 
 
 SVJT = Journal(kod="svjt", namn="Svensk Juristtidning", abbrev="SvJT",

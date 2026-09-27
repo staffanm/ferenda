@@ -226,7 +226,7 @@ def urt_sync(root, full=False, only=None, limit=None, delay=0.5):
     issue: the page's `Sida` line states the article PDF's own first page,
     and the two are different measures on the journal's newer digital
     issues, so the walk checks no more than the year against it."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(URT.transport)
     entries = _urt_entries(session)
     if only:
         # the basefile names its own issue, so an --only run reads that

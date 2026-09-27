@@ -26,7 +26,6 @@ import re
 
 from ..lib import net, util
 from ..lib.datasets import NAMEDEUCASES
-from .download import USER_AGENT
 
 WDQS = "https://query.wikidata.org/sparql"
 
@@ -66,7 +65,7 @@ def harvest(out_path=NAMEDEUCASES, session=None):
     """Query Wikidata for EU cases with a CELEX number and write the parsed
     records to ``out_path`` (the committed snapshot). Returns the records. A
     network failure propagates (the existing snapshot stays in place)."""
-    session = session or net.make_session(USER_AGENT)
+    session = session or net.open_session(net.HARVESTER_TRANSPORT)
     bindings = net.request(session, "GET", WDQS, parse_json=True, timeout=120,
                            params={"query": QUERY, "format": "json"}
                            )["results"]["bindings"]

@@ -56,7 +56,7 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, layout
 from ..lib.harvest import write_record
-from ..lib.net import BROWSER_UA, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, open_session, request
 from ..lib.regeringen import (
     BASE,
     TYPES,
@@ -669,7 +669,7 @@ def sync_one(url, delay=0.5):
     not write records the ärende but fetches none of its answers. The escape hatch
     exists to reach an ärende the listing walk has not got to yet, not to override
     what belongs in the corpus."""
-    session = make_session(BROWSER_UA)
+    session = open_session(BROWSER_UA_TRANSPORT)
     url = url if url.endswith("/") else url + "/"
     remiss = parse_arende(request(session, "GET", url).text, url)
     existing = layout.remisser_arende(remiss.basefile)
@@ -776,7 +776,7 @@ def sync(full=False, delay=0.5, log=print):
     consecutive-hit stop until a run completes cleanly.
 
     Returns {"new", "failed", "externt", "repolled", "open", "fetched"}."""
-    session = make_session(BROWSER_UA)
+    session = open_session(BROWSER_UA_TRANSPORT)
     rep = Reporter()
     summary = {"new": 0, "failed": 0, "externt": 0, "repolled": 0, "open": 0,
                "fetched": 0}

@@ -25,6 +25,7 @@ import tempfile
 import threading
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterator
 from urllib.parse import urlsplit, urlunsplit
@@ -39,6 +40,7 @@ from cryptography.x509.oid import AuthorityInformationAccessOID
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from .browser import CamoufoxBrowser
 from .errors import UpstreamChanged
 
 _RETRY = Retry(total=4, backoff_factor=0.5,
@@ -508,6 +510,98 @@ def mount_aia_chain(session: requests.Session, prefix: str, host: str,
 
 # response headers worth quoting when a request fails: they are what tells a
 # throttle or a WAF block apart from a genuine error
+# --------------------------------------------------------------------------
+# the transport a harvest talks to one upstream through, as data
+# --------------------------------------------------------------------------
+
+TRANSPORT_CLIENTS = ("requests", "httpx")
+
+
+@dataclass(frozen=True)
+class Transport:
+    """How a harvest talks to one upstream: the flags a registry entry or a
+    source module sets, where each used to build its own session by hand.
+
+    Upstreams gate on different things, and each flag is the answer to one of
+    them (every one measured, not guessed):
+
+      * ``user_agent`` -- Tullverket and Sametinget refuse the default browser
+        UA from a client that is not a browser (403 / 429) and serve the honest
+        harvester UA; several government sites do the opposite.
+      * ``headers`` -- extra request headers: an API token (coe), a media type
+        (icrc's JSON:API), a locale a WAF expects (PTS).
+      * ``client`` -- ``"httpx"`` where the upstream fingerprints the TLS
+        handshake of requests/urllib3 (HUDOC's Cloudflare, since 2026-09-15)
+        or serves HTTP/2 only (Konkurrensverket).
+      * ``legacy_tls`` -- URL prefixes whose server offers only a small DH key
+        OpenSSL 3 refuses (the Council of Europe's web service).
+      * ``aia`` -- ``(prefix, host)`` pairs whose server omits its
+        intermediate certificates (Lifos), completed by AIA chasing.
+      * ``browser`` -- Camoufox instead of an HTTP session, for a JavaScript
+        challenge no header satisfies (F5/Shape at Skatteverket, Cloudflare at
+        the ICJ); ``browser_pace`` and ``browser_timeout`` are its navigation
+        interval and page timeout.
+
+    A browser transport configures no HTTP session, and the two TLS repairs are
+    requests adapters, so the combinations that would be silently ignored are
+    refused here (rule:fail-fast)."""
+    user_agent: str = HARVESTER_UA
+    headers: dict = field(default_factory=dict)
+    client: str = "requests"
+    legacy_tls: tuple = ()
+    aia: tuple = ()
+    browser: bool = False
+    browser_pace: float = 0.0
+    browser_timeout: float = 60.0
+
+    def __post_init__(self):
+        assert self.client in TRANSPORT_CLIENTS, (
+            "unknown client %r (one of %s)" % (self.client, TRANSPORT_CLIENTS))
+        assert not self.browser or (
+            self.user_agent == HARVESTER_UA and not self.headers
+            and self.client == "requests" and not self.legacy_tls
+            and not self.aia), \
+            "a browser transport cannot also configure an HTTP session"
+        assert self.client == "requests" or not (self.legacy_tls or self.aia), \
+            "legacy_tls and aia are requests adapters; httpx cannot mount them"
+
+
+# the pipeline's two client identities (HARVESTER_UA, BROWSER_UA) as transports:
+# what most sources and registry entries need, named once
+HARVESTER_TRANSPORT = Transport()
+BROWSER_UA_TRANSPORT = Transport(user_agent=BROWSER_UA)
+
+
+def open_session(transport: Transport) -> requests.Session | httpx.Client:
+    """The HTTP session `transport` describes. A browser transport opens
+    through :func:`open_transport`, which owns its lifetime."""
+    assert not transport.browser, "a browser transport opens with open_transport"
+    if transport.client == "httpx":
+        session = make_http2_session(transport.user_agent)
+    else:
+        session = make_session(transport.user_agent)
+        for prefix in transport.legacy_tls:
+            mount_legacy_tls(session, prefix)
+        for prefix, host in transport.aia:
+            mount_aia_chain(session, prefix, host)
+    session.headers.update(transport.headers)
+    return session
+
+
+@contextmanager
+def open_transport(transport: Transport, profile=None):
+    """`transport` opened for one run: an HTTP session, or -- for a browser
+    transport -- a Camoufox session over the persistent `profile` directory,
+    closed when the run ends."""
+    if not transport.browser:
+        yield open_session(transport)
+        return
+    assert profile is not None, "a browser transport needs a profile directory"
+    with CamoufoxBrowser(profile, timeout=transport.browser_timeout,
+                         pace=transport.browser_pace) as browser:
+        yield browser
+
+
 class ResponseTooLarge(UpstreamChanged):
     """A response body is past the byte budget its caller allowed."""
 

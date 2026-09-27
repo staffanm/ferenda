@@ -73,8 +73,13 @@ from ..lib.harvest import (
     stored_index,
     walk_records,
 )
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, get_text, make_session, set_deadline
+from ..lib.net import (
+    BROWSER_UA_TRANSPORT,
+    fetcher,
+    get_text,
+    open_session,
+    set_deadline,
+)
 from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import (
     Reporter,
@@ -487,7 +492,7 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
     138 tekniska standarder, which are adopted as kommissionsförordningar and
     belong to `eurlex`) or a page shape this harvest has not seen -- and the two
     must not look alike in a run's output (rule:instrument-failures)."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     known = known_identities(root)
     walked = read_walked(root, full)
     # a leaf whose verdict needs no document (it carries no EBA number), and

@@ -25,17 +25,26 @@ status).
 """
 
 import time
+from contextlib import ExitStack
 from pathlib import Path
 
-from ..lib import browser, compress
+from ..lib import compress
 from ..lib.harvest import ItemKey, flat_path, verify_pdf, walk
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import (
+    HARVESTER_TRANSPORT,
+    Transport,
+    open_session,
+    open_transport,
+    request,
+)
 from .model import DETAIL, load_treaties
 
 # a Chrome profile shared across the run, so one Cloudflare challenge clears
 # every OHCHR fetch rather than one per treaty
 PROFILE = ".browser-profile"
+# the UN Treaty Collection's status pages and the PDF texts answer plain HTTP;
+# OHCHR's texts sit behind a challenge only a browser passes
+OHCHR_TRANSPORT = Transport(browser=True)
 # what the OHCHR page must carry to be the treaty and not the challenge page
 OHCHR_MARKER = "Article"
 
@@ -115,7 +124,7 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     run). ``limit`` is that loop's: it caps pages actually *fetched*, not entries
     looked at. Returns (seen, fetched)."""
     root = Path(root)
-    session = make_session(USER_AGENT)
+    session = open_session(HARVESTER_TRANSPORT)
     treaties = load_treaties()
     if only and only not in treaties:
         raise ValueError("no curated UN treaty %s" % only)
@@ -125,18 +134,14 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     # wanted: a run that has every text on disk should not pay for a browser.
     opened = []
 
-    def chrome():
-        if not opened:
-            session_ = browser.CamoufoxBrowser(root / PROFILE)
-            session_.__enter__()
-            opened.append(session_)
-        return opened[0]
+    with ExitStack() as stack:
+        def chrome():
+            if not opened:
+                opened.append(stack.enter_context(
+                    open_transport(OHCHR_TRANSPORT, root / PROFILE)))
+            return opened[0]
 
-    try:
         return _walk(session, root, entries, chrome, full, only, limit, log)
-    finally:
-        for session_ in opened:
-            session_.__exit__(None, None, None)
 
 
 def _walk(session, root, entries, chrome, full, only, limit, log):

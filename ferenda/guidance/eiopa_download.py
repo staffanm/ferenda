@@ -71,8 +71,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, select_pending, stored_index, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, get_text, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, fetcher, get_text, open_session, request
 from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import document_extension, href, normalize_space
 from .issuers import EIOPA
@@ -202,15 +201,24 @@ def parse_leaf(html_text, url):
             "publicerad": leaf_date(soup), "files": files}
 
 
+# the Publication date field: the date itself, then -- on a leaf Eiopa has
+# revised -- a note of the revision ("14 July 2025 (Last updated on: 8
+# September 2026)", final-report-revised-guidelines-undertaking-specific-
+# parameters). The publication date is the first date.
+RE_LEAF_DATE = re.compile(r"^\d{1,2} [A-Z][a-z]+ \d{4}\b")
+
+
 def leaf_date(soup):
     """The leaf's own Publication date, as an ISO date. Eiopa states it as a
     definition term on every leaf ("16 February 2026")."""
     term = soup.find("dt", string=re.compile(r"^\s*Publication date\s*$"))
     if term is None:
         raise UpstreamChanged("the leaf states no publication date")
-    return datetime.strptime(
-        normalize_space(term.find_next("dd").get_text()), "%d %B %Y"
-    ).date().isoformat()
+    value = normalize_space(term.find_next("dd").get_text())
+    match = RE_LEAF_DATE.match(value)
+    if match is None:
+        raise UpstreamChanged("the leaf's publication date reads %r" % value)
+    return datetime.strptime(match.group(0), "%d %B %Y").date().isoformat()
 
 
 def cover_number(text):
@@ -289,7 +297,7 @@ def eiopa_sync(root, full=False, only=None, limit=None, delay=0.5):
     a document about a riktlinje; `otypad` is a cover shape this harvest has not
     seen; `utan nummer` is a cover that prints no Eiopa number, or two;
     `nummerkrock` is the pair below."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     known = known_documents(root)
     found, fetched, pages, both = [], 0, 0, 0
     declined = dict.fromkeys(

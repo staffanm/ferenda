@@ -70,8 +70,7 @@ from urllib3.util.retry import Retry
 from ..lib import compress
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import paginated, pdf_path, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, make_session, request
+from ..lib.net import BROWSER_UA, fetcher, make_session, request
 from ..lib.util import MONTHS_EN, href, normalize_space, record_path
 from .issuers import ENISA
 
@@ -226,7 +225,9 @@ ENISA_RETRY = Retry(total=7, backoff_factor=4.0,
 
 
 def _session():
-    session = make_session(USER_AGENT)
+    # a plain requests session, not `open_session`: ENISA's own retry policy
+    # is a requests adapter, which `lib.net.Transport` does not model
+    session = make_session(BROWSER_UA)
     session.mount(BASE + "/", HTTPAdapter(max_retries=ENISA_RETRY))
     return session
 

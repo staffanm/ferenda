@@ -38,7 +38,7 @@ from bs4 import BeautifulSoup, NavigableString
 
 from ..lib import compress, layout, util
 from ..lib.harvest import fetch_worklist
-from ..lib.net import BROWSER_UA, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, open_session, request
 
 TYPE = "sou"
 INDEX_URL = "https://sou.kb.se/"
@@ -143,7 +143,7 @@ def sync(root, limit=None, delay=0.5):
     progress line carries a real total and an ETA (rule:one-line-progress); the
     caller prints the final stdout summary. `--limit` stops after that many entries
     actually fetched (a test slice)."""
-    session = make_session(BROWSER_UA)
+    session = open_session(BROWSER_UA_TRANSPORT)
     return fetch_worklist(
         walk_index(session),
         lambda entry: download_one(session, root, entry, delay),

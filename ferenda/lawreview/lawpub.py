@@ -305,11 +305,12 @@ def _store(session, root, record, full, delay):
 # the download entry point
 # --------------------------------------------------------------------------
 
+
 def lawpub_sync(root, full=False, only=None, limit=None, delay=0.5):
     """The platform's open-access articles, newest first, down to the
     watermark. `--only lawpub/880` names one article, which is then the only
     document the run stores, the watermark untouched."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(net.BROWSER_UA_TRANSPORT)
     if only:
         record = _find_record(session, only, delay)
         written = _store(session, root, record, full, delay)

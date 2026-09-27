@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-from ..lib import annstore, compress, layout, text, util
+from ..lib import annstore, compress, layout, text
 from ..lib import stage as protocol
 from ..lib.errors import SkipDocument
 from ..lib.pdftext import pdf_intermediate
@@ -42,20 +42,21 @@ def foreskrift_harvest(scopes):
     """Bulk harvest of the agency författningssamlingar (scopes = the registry's
     scope names -- the fs code for a samling one agency owns, 'fffs', and
     'hslffs-<publisher>' for the six sites that publish into HSLF-FS; empty =
-    all *non-browser* scopes). The browser-shielded ones (skvfs, mtfs) are
-    excluded from the default sweep -- they need the serial Camoufox
-    transport, so they run on their own schedule via `lagen foreskrift
-    browser-download`. Naming one explicitly still harvests it. `--force`
+    every scope). The browser-shielded ones (skvfs, mtfs) need the Camoufox
+    transport and run one at a time beside the parallel HTTP scopes;
+    `--no-download-browser` leaves them out of an empty-scope run. Naming one
+    explicitly still harvests it. `--force`
     re-walks and refreshes existing base regulations; `--only fs/year:num` (one
     scope) fetches a single one."""
-    if not scopes:
+    if not scopes and protocol.RUN.download_browser:
+        scopes = download.default_scopes() + download.browser_scopes()
+    elif not scopes:
         skipped = download.browser_scopes()
         scopes = download.default_scopes()
-        if skipped:
-            print("foreskrift download: skipping %d browser-shielded scope%s (%s) "
-                  "-- run `lagen foreskrift browser-download` on its own schedule"
-                  % (len(skipped), "" if len(skipped) == 1 else "s",
-                     ", ".join(skipped)))
+        print("foreskrift download: skipping %d browser-shielded scope%s (%s) "
+              "-- --no-download-browser" % (
+                  len(skipped), "" if len(skipped) == 1 else "s",
+                  ", ".join(skipped)))
     # report=False: sync prints each agency's own summary as it finishes and,
     # with jobs>1, fans the agencies out across a thread pool (each hits a
     # different host)
@@ -64,26 +65,8 @@ def foreskrift_harvest(scopes):
                           noun="författningssamling",
                           example="lagen foreskrift download fffs "
                                   "--only fffs/2013:10",
-                          label="every non-browser scope", report=False,
+                          label="every scope", report=False,
                           jobs=protocol.RUN.jobs, deep=protocol.RUN.deep)
-
-
-def foreskrift_browser_download(_basefiles):
-    """`lagen foreskrift browser-download`: harvest only the browser-shielded
-    scopes (skvfs, mtfs), which need the Camoufox transport and are
-    kept off the default parallel sweep. Run sequentially (they share the
-    process-global DISPLAY and Playwright's single-thread sync API), on its own,
-    less frequent schedule."""
-    scopes = download.browser_scopes()
-    if protocol.RUN.dry_run:
-        print("foreskrift browser-download: would download %s into %s"
-              % (", ".join(scopes), layout.FORESKRIFT_DOWNLOADED))
-        return
-    util.harvest_start("foreskrift browser-download",
-                       "the Camoufox agency sites (%s)" % ", ".join(scopes))
-    download.sync(str(layout.FORESKRIFT_DOWNLOADED), scopes=scopes,
-                             full=protocol.RUN.force, deep=protocol.RUN.deep,
-                             only=protocol.RUN.only, jobs=1)
 
 
 def foreskrift_reap(basefiles):
@@ -240,8 +223,7 @@ SOURCES: tuple[Source, ...] = (Source("foreskrift", foreskrift_list, {
     # the ai-hierarki layers (regleringshierarki rows on the rail)
     layers=lambda: sorted(annstore.tree("foreskrift").rglob("*.ann")),
     harvest=foreskrift_harvest,
-    actions={"browser-download": foreskrift_browser_download,
-             "reap": foreskrift_reap},
+    actions={"reap": foreskrift_reap},
     # display label only, nothing is ever fetched from a central index: the
     # harvest engine drives each agency's own site from foreskrift/agencies.py
     origin="the %d agency sites in foreskrift/agencies.py"
@@ -251,8 +233,7 @@ SOURCES: tuple[Source, ...] = (Source("foreskrift", foreskrift_list, {
           "scopes are författningssamling codes (fffs, …), plus the six sites "
           "that publish into the shared HSLF-FS samling (hslffs-sos, "
           "hslffs-fohm, hslffs-ivo, hslffs-lv, hslffs-mfof, hslffs-tlv); "
-          "empty = all non-browser scopes\n"
-          "browser-download: harvest just the Camoufox scopes (skvfs, "
-          "mtfs), kept off the default sweep for a separate schedule\n"
+          "empty = every scope; --no-download-browser leaves out the Camoufox "
+          "scopes (skvfs, mtfs)\n"
           "reap: remove records an fs reassignment left behind under the old "
           "författningssamling (--dry-run lists them)"),)

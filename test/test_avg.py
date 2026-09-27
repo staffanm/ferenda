@@ -520,7 +520,7 @@ def test_jo_full_falls_through_to_jo_save(tmp_path, monkeypatch):
            "pdf_url": None}
     write_atomic(record_path(tmp_path, "jo", "jo/2340-2025"),
                  json.dumps(avg_download.jo_record(hit, "jo/2340-2025")))
-    monkeypatch.setattr(avg_download, "make_session", lambda ua: None)
+    monkeypatch.setattr(avg_download, "open_session", lambda transport: None)
     monkeypatch.setattr(avg_download, "jo_nonce", lambda session: "nonce")
     monkeypatch.setattr(avg_download, "jo_search",
                         lambda session, nonce, page, **kw: {
@@ -563,7 +563,7 @@ def test_jk_full_keeps_old_landing_when_refetch_fails(tmp_path, monkeypatch):
     def boom(*a, **kw):
         raise RuntimeError("refetch failed")
 
-    monkeypatch.setattr(avg_download, "make_session", lambda ua: None)
+    monkeypatch.setattr(avg_download, "open_session", lambda transport: None)
     monkeypatch.setattr(avg_download, "jk_listing", lambda session: [item])
     monkeypatch.setattr(avg_download, "request", boom)
     with pytest.raises(RuntimeError):

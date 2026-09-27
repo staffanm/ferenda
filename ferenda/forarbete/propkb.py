@@ -56,7 +56,7 @@ from pathlib import Path
 
 from ..lib import compress, layout
 from ..lib.harvest import fetch_worklist
-from ..lib.net import BROWSER_UA, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, open_session, request
 
 TYPE = "prop"
 HOST = "weburn.kb.se"
@@ -110,7 +110,7 @@ def sync(root, limit=None, delay=0.5):
     The work-list is enumerated up front (every propkb record `wanted` needs a
     scan) so the progress line carries a real total and an ETA
     (rule:one-line-progress); the caller prints the final stdout summary."""
-    session = make_session(BROWSER_UA)
+    session = open_session(BROWSER_UA_TRANSPORT)
     worklist = [r for r in (compress.read_json(p)
                             for p in sorted(compress.glob(Path(root) / TYPE, "*/*.json")))
                 if wanted(r)]

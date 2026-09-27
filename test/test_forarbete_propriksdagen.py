@@ -38,7 +38,7 @@ def _stub(monkeypatch, bodies):
             raise got
         return type("R", (), {"text": got})()
     monkeypatch.setattr(pr, "request", fake)
-    monkeypatch.setattr(pr, "make_session", lambda ua: None)
+    monkeypatch.setattr(pr, "open_session", lambda transport: None)
     monkeypatch.setattr(pr.time, "sleep", lambda *_: None)
 
 

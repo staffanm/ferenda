@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlsplit
 
-from . import compress, datasets, layout, patch
+from . import compress, datasets, layout, net, patch
 
 PKG = Path(__file__).parent.parent   # the ferenda package root
 
@@ -211,9 +211,9 @@ def origin(url):
 @functools.cache
 def session(download_mod):
     """One HTTP session per download module, for a source's per-document
-    stages and actions: built from the module's own `make_session` and
-    `USER_AGENT`, cached so one run shares one connection pool per host."""
-    return download_mod.make_session(download_mod.USER_AGENT)
+    stages and actions: opened from the module's own `TRANSPORT`
+    (`net.Transport`), cached so one run shares one connection pool per host."""
+    return net.open_session(download_mod.TRANSPORT)
 
 
 def patch_input(source, basefile):
@@ -369,6 +369,9 @@ def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
 class RunOptions:
     dry_run: bool = False
     force: bool = False
+    download_browser: bool = True   # download: include the scopes whose site
+                                    # needs the Camoufox transport (skvfs, mtfs,
+                                    # rs skv); --no-download-browser skips them
     deep: bool = False           # harvest: walk the whole listing past the
                                  # incremental stop, fetching only what is
                                  # missing -- lib.harvest.walk's `deep` mode (not

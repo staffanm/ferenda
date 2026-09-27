@@ -597,7 +597,7 @@ def test_refetch_bodies_recovers_from_the_stored_landing(tmp_path, monkeypatch):
         fetched.append(url)
         return SimpleNamespace(content=b"%PDF-1.4 fake", text="")
     monkeypatch.setattr(download, "fetch", fake_fetch)
-    monkeypatch.setattr(download, "make_session", lambda ua: None)
+    monkeypatch.setattr(download, "open_session", lambda transport: None)
 
     checked, recovered, errors = download.refetch_bodies(
         tmp_path, types=("lr",), delay=0, log=lambda *a: None)

@@ -28,7 +28,7 @@ unless the harvest has matched a translation it could not match before.
 from pathlib import Path
 
 from ..lib import layout
-from ..lib.net import make_session, request
+from ..lib.net import open_session, request
 from . import download
 from .model import ITEM_URL
 
@@ -150,7 +150,7 @@ def write_drafts(wiki_root, matched, log=print):
 
 
 def propose(root, wiki_root, dry_run=False, log=print, index=None):
-    session = make_session(download.USER_AGENT)
+    session = open_session(download.TRANSPORT)
     matched, unmatched, doubled = proposals(session, root, log=log, index=index)
     for record in unmatched:
         log("  no stored original for %s (%s) -- %s"

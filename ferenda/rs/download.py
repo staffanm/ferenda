@@ -71,8 +71,8 @@ the odd one out on every axis -- 2,614 documents, no PDFs, no series number, and
 an F5/Shape JavaScript challenge in front of the lot. Its register and page
 semantics live in `skv.py`; what is here is the walk that drives them over the
 Camoufox transport. The front rate-limits hard, so every document navigation is
-paced and the agency is kept off the default sweep and run on its own schedule
-by ``lagen rs browser-download``.
+paced (the skv entry's transport in `agencies`); a routine run costs the
+register plus what is new, and ``--no-download-browser`` leaves it out.
 
 Stored per ställningstagande under ``site/data/downloaded/rs/{org}/``: a
 ``<slug>.json`` record and the document -- ``<slug>.pdf`` for six agencies,
@@ -87,7 +87,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.browser import CamoufoxBrowser, IncompleteNavigation, WafRejected
+from ..lib.browser import IncompleteNavigation, WafRejected
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import (
     dispatch_scopes,
@@ -97,8 +97,7 @@ from ..lib.harvest import (
     stored_index,
     walk_records,
 )
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_http2_session, make_session, mount_aia_chain, request
+from ..lib.net import open_session, open_transport, request
 from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import (
     Reporter,
@@ -109,7 +108,7 @@ from ..lib.util import (
     swedish_date,
 )
 from . import skv
-from .agencies import BROWSER_ORGS, BY_ORG, DEFAULT_ORGS, number_slug
+from .agencies import BROWSER_ORGS, BY_ORG, ORGS, number_slug
 
 # --------------------------------------------------------------------------
 # per-agency constants
@@ -282,7 +281,7 @@ def imy_parse_page(html_text, url):
 
 
 def imy_sync(root, full=False, only=None, limit=None, delay=0.5):
-    session = make_session(USER_AGENT)
+    session = open_session(BY_ORG["imy"].transport)
     records = []
     for item in imy_parse_listing(
             request(session, "GET", BY_ORG["imy"].listing, timeout=120).text):
@@ -349,7 +348,7 @@ def fi_status(cell):
 
 
 def fi_sync(root, full=False, only=None, limit=None, delay=0.5):
-    session = make_session(USER_AGENT)
+    session = open_session(BY_ORG["fi"].transport)
     records = [{"basefile": basefile("fi", item["nummer"]), "org": "fi",
                 "source_url": BY_ORG["fi"].listing, **item}
                for item in fi_parse_listing(
@@ -462,7 +461,7 @@ def fk_sync(root, full=False, only=None, limit=None, delay=0.5):
     fetched and filed under the Serienummer its PDF prints -- the document naming
     itself beats the listing retyping it -- and one already harvested keeps the
     number it was filed under, so the run costs one request rather than 108."""
-    session = make_session(USER_AGENT)
+    session = open_session(BY_ORG["fk"].transport)
     items = fk_parse_listing(
         request(session, "GET", BY_ORG["fk"].listing, timeout=120).text)
     if limit:
@@ -533,7 +532,7 @@ def kfm_sync(root, full=False, only=None, limit=None, delay=0.5):
     """Harvest Kronofogdens ställningstaganden. The listing carries the number
     and the title; the beslutsdatum and the diarienummer live only in the PDF's
     own header table and are read at parse, the identity not depending on them."""
-    session = make_session(USER_AGENT)
+    session = open_session(BY_ORG["kfm"].transport)
     items, unnumbered = kfm_parse_listing(
         request(session, "GET", BY_ORG["kfm"].listing, timeout=120).text)
     if unnumbered:
@@ -550,16 +549,6 @@ def kfm_sync(root, full=False, only=None, limit=None, delay=0.5):
 # --------------------------------------------------------------------------
 # Migrationsverket (Lifos)
 # --------------------------------------------------------------------------
-
-def migr_session():
-    """A session that verifies lifos.migrationsverket.se against an
-    AIA-completed trust bundle: the site sends only its leaf certificate, so the
-    intermediate has to be fetched from the pointer the leaf itself carries
-    (`lib.net.mount_aia_chain`)."""
-    session = make_session(USER_AGENT)
-    mount_aia_chain(session, MIGR_BASE + "/", MIGR_HOST)
-    return session
-
 
 def migr_parse_results(html_text):
     """One search page's hits: the Lifos documentSummaryId of each result, in
@@ -694,7 +683,7 @@ def migr_sync(root, full=False, only=None, limit=None, delay=0.5):
     that names no number anywhere has no identity to be filed under and is
     reported rather than invented. Four numbers arrive twice, an entry and the
     revision that replaced it, and `migr_current` keeps the later."""
-    session = migr_session()
+    session = open_session(BY_ORG["migr"].transport)
     ids = migr_listing(session, delay)
     if limit:
         ids = ids[:limit]
@@ -805,7 +794,7 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
     """Harvest Konkurrensverkets förteckning. The agency sits behind the same
     HTTP/2-only Cloudflare front the KKVFS föreskrift harvest meets, so the
     session is the httpx one."""
-    session = make_http2_session(USER_AGENT)
+    session = open_session(BY_ORG["kkv"].transport)
     records = []
     for item in kkv_parse_listing(
             request(session, "GET", BY_ORG["kkv"].listing, timeout=120).text):
@@ -830,11 +819,11 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
 # in a second -- but the *pace*, not the page, is what has to be respected here:
 # measured against the live site, navigation 31 at 2-second spacing was rejected
 # and every navigation after it stayed rejected for some minutes. So a document
-# waits far longer than it needs to, which is affordable precisely because this
+# waits far longer than it needs to (the skv entry's transport, `agencies`),
+# which is affordable precisely because this
 # agency runs on a weekly schedule of its own: 20 seconds apiece is roughly 15
 # hours for the whole register once, and a few minutes for what a week adds.
 SKV_INDEX_TIMEOUT = 180.0
-SKV_PAGE_PACE = 20.0
 # Once the front starts rejecting, it keeps rejecting: knocking through the
 # remaining thousands of documents would be both useless and rude. The run stops
 # and says so, and because a stored record is only ever written with its page,
@@ -855,8 +844,8 @@ def until_blocked(pending, blocked, limit=SKV_BLOCK_LIMIT, log=print):
     for entry in pending:
         if blocked() >= limit:
             log("skv: %d navigations rejected in a row -- Skatteverkets front "
-                "has closed for now; stopping. Re-run `lagen rs "
-                "browser-download` later and it resumes here." % blocked())
+                "has closed for now; stopping. Re-run `lagen rs download "
+                "skv` later and it resumes here." % blocked())
             return
         yield entry
 
@@ -886,7 +875,7 @@ def skv_sync(root, full=False, only=None, limit=None, delay=0.5):
     and sleeping on top of it would only make a long backfill longer."""
     profile = Path(root) / "skv" / ".browser-profile"
     blocked = 0
-    with CamoufoxBrowser(profile, pace=SKV_PAGE_PACE) as browser:
+    with open_transport(BY_ORG["skv"].transport, profile) as browser:
         records, unidentified = skv.parse_index(
             browser.html(skv.INDEX_URL, skv.INDEX_MARKER,
                          timeout=SKV_INDEX_TIMEOUT))
@@ -932,10 +921,9 @@ SYNC = {"imy": imy_sync, "fi": fi_sync, "fk": fk_sync, "kfm": kfm_sync,
 
 
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5, jobs=1):
-    """Download the named agencies' ställningstaganden. With no scopes named,
-    the six ordinary HTTP agencies -- Skatteverket needs the serial Camoufox
-    browser and runs on its own schedule (`agencies.BROWSER_ORGS`), though
-    naming it explicitly still harvests it. Returns {org: (seen, new)}."""
-    return dispatch_scopes(root, scopes, SYNC, DEFAULT_ORGS, full=full,
+    """Download the named agencies' ställningstaganden, every agency when none
+    is named. Skatteverket needs the Camoufox browser and runs one at a time
+    (`agencies.BROWSER_ORGS`). Returns {org: (seen, new)}."""
+    return dispatch_scopes(root, scopes, SYNC, ORGS, full=full,
                            only=only, limit=limit, delay=delay, jobs=jobs,
                            serial=BROWSER_ORGS, label="rs download")

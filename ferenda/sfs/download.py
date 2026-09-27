@@ -44,9 +44,12 @@ import time
 from pathlib import Path
 
 from ..lib import compress, layout
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import HARVESTER_TRANSPORT, open_session, request
 from ..lib.util import Reporter, write_atomic
+
+# how this source talks to its upstream (`lib.net.Transport`); `stage.session`
+# opens it for the per-document stages and actions
+TRANSPORT = HARVESTER_TRANSPORT
 
 ENDPOINT = "https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson"
 PAGE_SIZE = 100
@@ -215,7 +218,7 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY, resume_after=None):
     page it completed is printed so it can be passed back in.
     """
     destdir = Path(destdir)
-    session = make_session(USER_AGENT)
+    session = open_session(TRANSPORT)
     watermark = read_watermark(destdir)
     backfill = full or watermark is None
     if backfill:

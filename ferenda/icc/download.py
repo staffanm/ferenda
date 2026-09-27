@@ -31,8 +31,7 @@ from ..lib.harvest import (
     walk,
     write_record,
 )
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import HARVESTER_TRANSPORT, open_session, request
 from ..lib.util import (
     Reporter,
     document_extension,
@@ -172,7 +171,7 @@ def resolve(session, root, record, full=False, delay=0.3):
 
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     root = Path(root)
-    session = make_session(USER_AGENT)
+    session = open_session(HARVESTER_TRANSPORT)
     records = enumerate_decisions(session)
     if only:
         record = select_one(records, lambda record: record["base"],

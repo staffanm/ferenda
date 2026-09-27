@@ -57,49 +57,28 @@ def rs_inputs(basefile):
 
 def rs_harvest(scopes):
     """Bulk harvest of the agencies' rättsliga ställningstaganden (scopes =
-    agency codes; empty = every *non-browser* agency). Skatteverket is excluded
-    from the default sweep -- it needs the paced, serial Camoufox transport,
-    so it runs on its own schedule via `lagen rs browser-download`.
-    Naming it explicitly still harvests it. `--force` refetches every document;
+    agency codes; empty = every agency). Skatteverket needs the paced Camoufox
+    transport and runs one at a time beside the parallel HTTP agencies;
+    `--no-download-browser` leaves it out of an empty-scope run. Naming it
+    explicitly still harvests it. `--force` refetches every document;
     `--only fk/2025:01` fetches a single ställningstagande (needs its agency
     scope)."""
-    if not scopes:
+    if not scopes and protocol.RUN.download_browser:
+        scopes = list(agencies.ORGS)
+    elif not scopes:
         skipped = agencies.BROWSER_ORGS
         scopes = list(agencies.DEFAULT_ORGS)
-        if skipped:
-            print("rs download: skipping %d browser-shielded agenc%s (%s) -- "
-                  "run `lagen rs browser-download` on its own schedule"
-                  % (len(skipped), "y" if len(skipped) == 1 else "ies",
-                     ", ".join(skipped)))
-    # six agencies, six hosts: fan them out. The browser-shielded ones are not in
-    # DEFAULT_ORGS, and `serial=` keeps them off each other if named explicitly.
+        print("rs download: skipping %d browser-shielded agenc%s (%s) -- "
+              "--no-download-browser" % (
+                  len(skipped), "y" if len(skipped) == 1 else "ies",
+                  ", ".join(skipped)))
+    # seven agencies, seven hosts: fan them out; `serial=` keeps the
+    # browser-shielded ones off each other
     return scoped_harvest("rs", download, layout.RS_DOWNLOADED, scopes,
                           noun="agency",
                           example="lagen rs download fk --only fk/2025:01",
-                          label="every non-browser agency",
+                          label="every agency",
                           limit=protocol.RUN.limit, jobs=protocol.RUN.jobs)
-
-
-def rs_browser_download(_basefiles):
-    """`lagen rs browser-download`: harvest only the browser-shielded agencies
-    (skv), which need the Camoufox transport and are kept off the default
-    sweep.
-
-    Skatteverkets register alone is 2,614 ställningstaganden, each one browser
-    navigation, so a first run takes hours and later runs cost the register plus
-    whatever moved. That cadence is a weekly job of its own, not part of the
-    nightly rs sweep."""
-    scopes = list(agencies.BROWSER_ORGS)
-    if protocol.RUN.dry_run:
-        print("rs browser-download: would download %s into %s"
-              % (protocol.RUN.only or ", ".join(scopes), layout.RS_DOWNLOADED))
-        return
-    util.harvest_start("rs browser-download",
-                       "the Camoufox agency sites (%s)" % ", ".join(scopes))
-    totals = download.sync(layout.RS_DOWNLOADED, scopes=scopes,
-                              full=protocol.RUN.force, only=protocol.RUN.only, limit=protocol.RUN.limit)
-    for org, (seen, new) in totals.items():
-        print("rs %s: %d seen, %d new" % (org, seen, new))
 
 
 def rs_intermediate(basefile):
@@ -130,15 +109,13 @@ SOURCES: tuple[Source, ...] = (Source("rs", rs_list, {
                   "pdftohtml XML (skv: the ställningstagande's own web page)"),
     artifacts=functools.partial(layout.artifacts, "rs"),
     harvest=rs_harvest,
-    actions={"browser-download": rs_browser_download},
     origin=agencies.BY_ORG["fk"].listing,
     scopes=frozenset(agencies.ORGS),
     notes="download flag: --only org/nummer (fetch one; needs its agency scope)\n"
           "scopes are the myndigheter: " + ", ".join(
               "%s (%s)" % (a.org, a.name) for a in agencies.REGISTRY)
-          + "; empty = all non-browser agencies\n"
-          "browser-download: harvest just the Camoufox agencies (skv), "
-          "kept off the default sweep for a separate weekly schedule\n"
+          + "; empty = every agency; --no-download-browser leaves out the "
+          "Camoufox agency (skv)\n"
           "identity is the agency's own number, not a diarienummer -- a "
           "ställningstagande is published as a numbered item in the agency's "
           "series (IMYRS 2024:1, FKRS 2025:01, RS/028/2021). Skatteverket is "

@@ -70,8 +70,7 @@ from urllib.parse import quote
 
 from ..lib import compress, layout
 from ..lib.harvest import HarvestWatermark, ItemKey, walk, write_record
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import HARVESTER_TRANSPORT, open_session, request
 from ..lib.util import basefile_slug
 from .download import ListingReporter, has_live_record
 
@@ -382,7 +381,7 @@ def harvest(root, *, typ, listing, fetch, currency, published, watermark,
     view of the corpus, so it NEVER touches the watermark. Returns
     (seen, new)."""
     root = Path(root)
-    session = make_session(USER_AGENT)
+    session = open_session(HARVESTER_TRANSPORT)
     rep = ListingReporter()
     kw = dict(fetch=fetch, currency=currency, published=published,
               delay=delay, log=log, rep=rep)

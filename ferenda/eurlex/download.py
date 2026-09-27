@@ -74,9 +74,12 @@ from ..lib.cellar import (
     store_document,
 )
 from ..lib.eu_structure import consolidation_parts
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import HARVESTER_TRANSPORT, open_session, request
 from ..lib.util import Reporter, write_atomic
+
+# how this source talks to its upstream (`lib.net.Transport`); `stage.session`
+# opens it for the per-document stages and actions
+TRANSPORT = HARVESTER_TRANSPORT
 
 SOAP_ENDPOINT = "https://eur-lex.europa.eu/EURLexWebService"
 
@@ -815,7 +818,7 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     keys on work date, so a re-dated/corrected old document is not re-seen."""
     root = Path(root)
     sector = SECTORS[sector_name]
-    session = make_session(USER_AGENT)
+    session = open_session(TRANSPORT)
     enumerate_fn = enumerate_celex_soap if source == "soap" else enumerate_celex
 
     manual = since is not None        # explicit --since: don't move the watermark

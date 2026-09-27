@@ -24,6 +24,7 @@ from ferenda.guidance import (
     easa_download,
     eba_download,
     edpb_download,
+    eiopa_download,
     enisa_download,
     euipo_download,
     eurlex_download,
@@ -2100,7 +2101,7 @@ def test_eba_sync_stores_a_previous_version_as_its_own_document(
     monkeypatch.setattr(eba_download, "get_text",
                         lambda _s, url, _d: pages[url])
     # a stand-in the walk can hang its `deadline` on, the way a real session does
-    monkeypatch.setattr(eba_download, "make_session",
+    monkeypatch.setattr(eba_download, "open_session",
                         lambda _ua: types.SimpleNamespace())
     monkeypatch.setattr(eba_download, "fetcher",
                         lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
@@ -2149,7 +2150,7 @@ def test_eba_sync_stops_when_the_walk_outruns_its_budget(tmp_path, monkeypatch):
     monkeypatch.setattr(eba_download, "get_text", fetch)
     monkeypatch.setattr(eba_download.time, "monotonic", lambda: clock["t"])
     monkeypatch.setattr(eba_download, "WALK_BUDGET", 2500.0)
-    monkeypatch.setattr(eba_download, "make_session",
+    monkeypatch.setattr(eba_download, "open_session",
                         lambda _ua: types.SimpleNamespace())
     monkeypatch.setattr(eba_download, "fetcher",
                         lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
@@ -2245,7 +2246,7 @@ def test_eba_sync_reads_each_leaf_page_once(tmp_path, monkeypatch):
         return pages[url]
 
     monkeypatch.setattr(eba_download, "get_text", fetch)
-    monkeypatch.setattr(eba_download, "make_session",
+    monkeypatch.setattr(eba_download, "open_session",
                         lambda _ua: types.SimpleNamespace())
     monkeypatch.setattr(eba_download, "fetcher",
                         lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
@@ -2286,7 +2287,7 @@ def test_eba_sync_does_not_remember_a_leaf_whose_document_failed_to_store(
         return pages[url]
 
     monkeypatch.setattr(eba_download, "get_text", fetch)
-    monkeypatch.setattr(eba_download, "make_session",
+    monkeypatch.setattr(eba_download, "open_session",
                         lambda _ua: types.SimpleNamespace())
     # the EBA serves an error page under the .pdf address: walk_records' verify
     # rejects it, counts the error and writes no record
@@ -2332,7 +2333,7 @@ def test_eba_sync_does_not_remember_a_leaf_whose_candidate_file_vanished(
         return fetch_document
 
     monkeypatch.setattr(eba_download, "get_text", fetch)
-    monkeypatch.setattr(eba_download, "make_session",
+    monkeypatch.setattr(eba_download, "open_session",
                         lambda _ua: types.SimpleNamespace())
     monkeypatch.setattr(eba_download, "fetcher", gone)
 
@@ -2359,7 +2360,7 @@ def test_eba_sync_does_not_remember_the_leaves_a_limit_left_unfetched(
            for n, leaf in enumerate(leaves)},
     }
     monkeypatch.setattr(eba_download, "get_text", lambda _s, url, _d: pages[url])
-    monkeypatch.setattr(eba_download, "make_session",
+    monkeypatch.setattr(eba_download, "open_session",
                         lambda _ua: types.SimpleNamespace())
     monkeypatch.setattr(eba_download, "fetcher",
                         lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
@@ -2370,3 +2371,14 @@ def test_eba_sync_does_not_remember_the_leaves_a_limit_left_unfetched(
     assert stored == ["2010/01"]
     assert eba_download.read_walked(tmp_path) == {eba_download.BASE + leaves[0]}, \
         "the leaf the limit left unfetched was remembered as read"
+
+
+@pytest.mark.parametrize("dd, iso", [
+    ("16 February 2026", "2026-02-16"),
+    # a leaf Eiopa has revised notes the revision after the date
+    # (final-report-revised-guidelines-undertaking-specific-parameters)
+    ("14 July 2025 (Last updated on: 8 September 2026)", "2025-07-14")])
+def test_eiopa_leaf_date_is_the_publication_date(dd, iso):
+    soup = BeautifulSoup("<dl><dt>Publication date</dt><dd>%s</dd></dl>" % dd,
+                         "html.parser")
+    assert eiopa_download.leaf_date(soup) == iso

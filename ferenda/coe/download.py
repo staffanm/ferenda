@@ -24,8 +24,7 @@ from ..lib.harvest import (
     store_record,
     walk,
 )
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, mount_legacy_tls, request
+from ..lib.net import Transport, open_session, request
 from ..lib.util import document_extension, normalize_space
 
 PORTAL = "https://www.coe.int"
@@ -48,12 +47,12 @@ RE_TITLE_REF = re.compile(
     r"\s*\((C?ETS)\s+(?:No\.?\s*)?(\d{1,3}[A-Z]?)\)\s*(?:\(\*+\)\s*)?$", re.I)
 
 
-def make_ws_session():
-    session = make_session(USER_AGENT)
-    mount_legacy_tls(session, WS)
-    session.headers["token"] = WS_TOKEN
-    session.headers["Accept"] = "application/json"
-    return session
+# the web service's host offers only a small DH key (hence `legacy_tls`, for
+# the whole host: its robots.txt sits outside WS, and a WS-only repair left that
+# read failing with DH_KEY_TOO_SMALL on every run), and the service wants its
+# public token and a JSON media type on every request
+TRANSPORT = Transport(headers={"token": WS_TOKEN, "Accept": "application/json"},
+                      legacy_tls=("https://conventions-ws.coe.int/",))
 
 
 def search_treaties(session):
@@ -133,7 +132,7 @@ def list_basefiles(root):
 
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     root = Path(root)
-    session = make_ws_session()
+    session = open_session(TRANSPORT)
     places = opening_places(session)
     records = [treaty_record(ws, places) for ws in search_treaties(session)]
     if only:

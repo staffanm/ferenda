@@ -34,7 +34,7 @@ import requests
 
 from ..lib import compress, layout
 from ..lib.harvest import fetch_worklist, write_record
-from ..lib.net import BROWSER_UA, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, open_session, request
 from ..lib.util import basefile_slug
 
 TYPE = "prop"
@@ -87,7 +87,7 @@ def sync(root, limit=None, delay=0.5, log=print):
     independent one-shot fetches with nothing chaining them, so one 500 must not
     strand the rest (rule:no-catch-log-continue). Rerun to retry -- a record
     that gained a body drops out of `pending`."""
-    session = make_session(BROWSER_UA)
+    session = open_session(BROWSER_UA_TRANSPORT)
     empty = 0
 
     def fetch(record):

@@ -70,8 +70,7 @@ from ..lib.harvest import (
     write_record,
 )
 from ..lib.malnummer import COURT_PHRASES
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import HARVESTER_TRANSPORT, open_session, request
 from ..lib.pdftext import ocr_pdf, pdf_first_page_text
 from ..lib.util import href, normalize_space, record_path, swedish_date
 
@@ -386,7 +385,7 @@ def _only_rows(session, only):
 
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     root = Path(root)
-    session = make_session(USER_AGENT)
+    session = open_session(HARVESTER_TRANSPORT)
     if only:
         rows = [row for row in _only_rows(session, only) if basefile(row) == only]
         # the latest registration, as the walk keeps (see is_current)

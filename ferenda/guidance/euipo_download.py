@@ -78,8 +78,7 @@ from collections import Counter
 
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import select_pending, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, fetcher, open_session, request
 from ..lib.util import normalize_space
 from .issuers import EUIPO
 
@@ -374,7 +373,7 @@ def euipo_sync(root, full=False, only=None, limit=None, delay=0.5):
     Every del not carried is counted under the reason it was not, so a del that
     publishes no PDF of its own and a page shape this harvest has not seen
     never look alike in the output (rule:instrument-failures)."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     publications = _api(session, "/api/publications", delay)
     counts = Counter()
     pending = []

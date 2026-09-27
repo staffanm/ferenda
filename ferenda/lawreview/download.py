@@ -186,7 +186,7 @@ def svjt_sync(root, full=False, only=None, limit=None, delay=0.5):
     the 1916 depth. `--only svjt/2026-104` names its own year instead, so
     that one page is the only listing fetched and the walk stores that one
     document, the watermark untouched."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(SVJT.transport)
     # newest year first; the basefile names its own year, so an --only run
     # reads that one year page instead of the archive
     years = [only.split("/", 1)[1][:4]] if only \
@@ -354,7 +354,7 @@ def jp_sync(root, full=False, only=None, limit=None, delay=0.5):
     disk in full, and never re-fetches an issue page whose records are all
     stored. `--only jp/2025-01-01` names its own issue, which is then the
     only issue page fetched and the walk stores that one document."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(JP.transport)
     # the menu sets the issues newest first: a caught-up run proves its
     # newest issues are complete and stops, and the backlist is never
     # re-read. The basefile names its own issue, so an --only run reads that

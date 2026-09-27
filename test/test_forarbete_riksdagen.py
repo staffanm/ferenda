@@ -61,7 +61,7 @@ class FakeNet:
 
 def _patch(monkeypatch, net):
     monkeypatch.setattr(riksdagen, "request", net.request)
-    monkeypatch.setattr(riksdagen, "make_session", lambda ua: None)
+    monkeypatch.setattr(riksdagen, "open_session", lambda transport: None)
     monkeypatch.setattr(riksdagen.time, "sleep", lambda *_: None)
 
 

@@ -46,8 +46,8 @@ STATUS = config.DATA / ".build" / "status.json"
 STAGES = ["download", "parse", "relate", "index", "dump", "generate"]
 
 # Steps outside that spine: one source's own extra work (sfs's `versions`,
-# stats's `compute`, dv's `namedcases`), or an occasional manual harvest
-# (`browser-download`). As columns they were 18 empty cells and one number, so
+# stats's `compute`, dv's `namedcases`), or an occasional manual action. As
+# columns they were 18 empty cells and one number, so
 # they get a list of their own under the table instead.
 STALE_AFTER_H = 26        # snapshot-age warning threshold (a daily run + slack)
 

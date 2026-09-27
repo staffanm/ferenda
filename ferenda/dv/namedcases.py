@@ -26,7 +26,6 @@ import re
 from ..lib import net, pdftext, util
 from ..lib.casenaming import case_uri
 from ..lib.datasets import NAMEDCASES
-from .download import USER_AGENT
 
 URL = ("https://www.domstol.se/globalassets/filer/domstol/hogstadomstolen/"
        "namngivna-rattsfall/officiell-lista-over-namngivna-rattsfall.pdf")
@@ -72,7 +71,7 @@ def harvest(out_path=NAMEDCASES, session=None):
     """Download HD's named-rättsfall list and write the parsed records to
     ``out_path`` (the committed snapshot). Returns the records. A network failure
     propagates (the existing snapshot stays in place as the fallback)."""
-    session = session or net.make_session(USER_AGENT)
+    session = session or net.open_session(net.HARVESTER_TRANSPORT)
     pdf_bytes = net.request(session, "GET", URL).content
     cases = parse(pdf_bytes)
     util.write_atomic(

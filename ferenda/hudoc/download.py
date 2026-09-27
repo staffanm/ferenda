@@ -54,11 +54,15 @@ from ..lib.harvest import (
     store_record,
     walk,
 )
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import Transport, open_session, request
 
 BASE = "https://hudoc.echr.coe.int"
 QUERY_ENDPOINT = BASE + "/app/query/results"
+# httpx, not requests: since 2026-09-15 HUDOC's Cloudflare front answers
+# requests/urllib3's TLS handshake with a 403 challenge page, whatever the
+# User-Agent, while httpx and curl pass (measured 2026-09-27 from the dev and
+# prod hosts alike). The summaries and translations harvests share it.
+TRANSPORT = Transport(client="httpx")
 BODY_ENDPOINT = BASE + "/app/conversion/docx/html/body"
 PAGE_SIZE = 500
 WORKERS = 4
@@ -343,7 +347,7 @@ def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES,
          collections=DEFAULT_COLLECTIONS, limit=None, delay=0.2, workers=WORKERS,
          log=print):
     root = Path(root)
-    session = make_session(USER_AGENT)
+    session = open_session(TRANSPORT)
     pool = ThreadPoolExecutor(max_workers=workers)
 
     def submit(record):

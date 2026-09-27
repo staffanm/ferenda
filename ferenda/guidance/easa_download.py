@@ -83,8 +83,7 @@ from ..lib.harvest import (
     stored_index,
     walk_records,
 )
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, get_text, make_session
+from ..lib.net import BROWSER_UA_TRANSPORT, fetcher, get_text, open_session
 from ..lib.util import href, normalize_space
 from .issuers import EASA
 
@@ -244,7 +243,7 @@ def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
     a row linking no file, a name that says neither AMC nor GM, and a name EASA
     has already used are five different things; a run that merged them would
     hide the shape it has not seen behind the four it has."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     known = {} if full else already_stored(root)
     leaves, pages = walk_library(session, delay)
     pending, taken = [], set()

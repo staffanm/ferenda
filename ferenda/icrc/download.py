@@ -23,8 +23,7 @@ from ..lib.harvest import (
     walk,
     write_record,
 )
-from ..lib.net import HARVESTER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import Transport, open_session, request
 
 SITE = "https://ihl-databases.icrc.org"
 API = SITE + "/en/jsonapi/node/treaty"
@@ -46,10 +45,8 @@ INCLUDE = ",".join((
 LIST_FIELDS = "field_treaty_number,field_treaty_date_of_adoption,changed"
 
 
-def make_api_session():
-    session = make_session(USER_AGENT)
-    session.headers["Accept"] = "application/vnd.api+json"
-    return session
+# the JSON:API media type, which the ICRC database answers in
+TRANSPORT = Transport(headers={"Accept": "application/vnd.api+json"})
 
 
 def record_path(root, number):
@@ -115,7 +112,7 @@ def list_basefiles(root):
 
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     root = Path(root)
-    session = make_api_session()
+    session = open_session(TRANSPORT)
     records = enumerate_treaties(session)
     if only:
         record = select_one(records, lambda record: record["number"],

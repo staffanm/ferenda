@@ -384,7 +384,7 @@ def test_worth_retrying_only_recent_or_undated_works():
 
 
 def _stub_session(monkeypatch):
-    monkeypatch.setattr(D, "make_session", lambda ua: object())
+    monkeypatch.setattr(D, "open_session", lambda transport: object())
 
 
 def test_a_new_act_reopens_the_metadata_of_what_it_repeals(tmp_path, monkeypatch):

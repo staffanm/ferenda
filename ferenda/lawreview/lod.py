@@ -186,7 +186,7 @@ def lod_sync(root, full=False, only=None, limit=None, delay=0.5):
     names its own issue, whose address the site's scheme states outright, so
     that one issue page is the only listing fetched and the walk stores that
     one document, the watermark untouched."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(LOD.transport)
 
     def issues():
         """Every issue page's address, newest first. The site's own index is

@@ -25,7 +25,7 @@ from ferenda.lib import (
     page,
     util,
 )
-from ferenda.lib import browser, harvest
+from ferenda.lib import browser, harvest, net
 from ferenda.lib.pdftext import Para, classify_letterhead
 from ferenda.lib.util import record_path
 from ferenda.rs import download as rs_download
@@ -750,7 +750,7 @@ def test_migr_records_are_walked_with_fetching_on(monkeypatch):
     asserting on the call is what still catches the bug if that default ever
     flips."""
     captured = {}
-    monkeypatch.setattr(rs_download, "migr_session", lambda: object())
+    monkeypatch.setattr(rs_download, "open_session", lambda _transport: object())
     monkeypatch.setattr(rs_download, "migr_listing", lambda session, delay: [])
     monkeypatch.setattr(rs_download, "_walk",
                         lambda *a, **kw: captured.update(kw) or (0, 0))
@@ -1085,7 +1085,7 @@ class _ClosedFront:
         self.error = error
         self.attempts = 0
 
-    def __call__(self, _profile, pace=None):       # stands in for CamoufoxBrowser
+    def __call__(self, _profile, timeout=None, pace=None):   # for CamoufoxBrowser
         return self
 
     def __enter__(self):
@@ -1111,7 +1111,7 @@ class _ClosedFront:
 def test_skv_stops_once_the_front_stops_answering(tmp_path, monkeypatch, capsys,
                                                   error):
     front = _ClosedFront(error)
-    monkeypatch.setattr(rs_download, "CamoufoxBrowser", front)
+    monkeypatch.setattr(net, "CamoufoxBrowser", front)
     seen, new = rs_download.skv_sync(tmp_path)
     assert new == 0
     # the register holds 8 filable entries; the run gives up after a row of

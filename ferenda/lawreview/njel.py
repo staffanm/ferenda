@@ -156,7 +156,7 @@ def njel_sync(root, full=False, only=None, limit=None, delay=0.5):
     read instead of re-reading the whole archive. `--only
     njel/2024-1-01` names its own issue, which is then the only issue page
     fetched and the walk stores that one document."""
-    session = net.make_session(net.BROWSER_UA)
+    session = net.open_session(NJEL.transport)
     issues = _njel_issues(session)
     if only:
         # the basefile names its own issue, so an --only run reads that one

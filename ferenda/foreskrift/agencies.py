@@ -55,7 +55,7 @@ from bs4 import BeautifulSoup
 from ..lib import compress, util
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import Skip, write_record
-from ..lib.net import BROWSER_UA, is_not_found, request
+from ..lib.net import BROWSER_UA, Transport, is_not_found, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
 from . import harvest, hslffs, mtfs, skvfs, statskontoret
@@ -414,7 +414,8 @@ PTSFS = Agency(
     params={"link_select": '.secondlevel__content__box a[href^="/regelbibliotek/"]',
             "pdf_select": '.documentpage__content a[href$=".pdf"]',
             "classify": classify_ptsfs},
-    user_agent=BROWSER_UA, headers={"Accept-Language": "sv-SE,sv;q=0.9"},
+    transport=Transport(user_agent=BROWSER_UA,
+                        headers={"Accept-Language": "sv-SE,sv;q=0.9"}),
 )
 
 # paginated + landing + filename-classify. MCF (Myndigheten för civilt försvar)
@@ -543,6 +544,11 @@ TFS = Agency(
                           "sortval": "NrU", "step": "0.0", "next": "0.0",
                           "submit": "« Allt »"},
             "link_select": 'a[rel="external"][href*="/download/"]', "direct": True},
+    # the site blocks the default browser UA from a client that is not a
+    # browser ("Sidan är blockerad", 403, since 2026-09) and serves the honest
+    # harvester UA -- `Transport()`'s default; measured with both requests and
+    # httpx on 2026-09-27
+    transport=Transport(),
 )
 
 
@@ -1576,7 +1582,8 @@ BOLFS = Agency(
     index_url="https://bolagsverket.se/omoss/varverksamhet/styrochplaneringsdokument/"
               "bolagsverketsforeskrifterbolfs.2161.html",
     enumerate=bolfs_enumerate, resolve=resolve_direct,
-    user_agent=BROWSER_UA, headers={"Accept-Language": "sv-SE,sv;q=0.9"},
+    transport=Transport(user_agent=BROWSER_UA,
+                        headers={"Accept-Language": "sv-SE,sv;q=0.9"}),
 )
 
 
@@ -1775,14 +1782,15 @@ KAMFS = Agency(
 # themselves ("… (KKVFS 2015:2) … ska upphöra att gälla"), which parse.py turns
 # into upphaver relations. konkurrensverket.se sits behind a Cloudflare
 # front that 403s HTTP/1.1 and only serves HTTP/2, which requests/urllib3 cannot
-# speak, so this agency sets ``http2=True``: harvest() builds the session with
-# lib.net.make_http2_session (the httpx2 HTTP/2 client) instead of a requests
-# Session, and the shared engine runs unchanged over it.
+# speak, so this agency's transport sets ``client="httpx"``: harvest() builds
+# the session with lib.net.make_http2_session (the httpx HTTP/2 client) instead
+# of a requests Session, and the shared engine runs unchanged over it.
 KKVFS = Agency(
     fs="kkvfs", name="Konkurrensverket", publisher="Konkurrensverket",
     base_url="https://www.konkurrensverket.se",
     index_url="https://www.konkurrensverket.se/om-oss/forfattningssamling/",
-    enumerate=indexed_enumerate, resolve=resolve_direct, http2=True,
+    enumerate=indexed_enumerate, resolve=resolve_direct,
+    transport=Transport(user_agent=BROWSER_UA, client="httpx"),
     params={"link_select": 'a[href*="/forfattningssamling/kkvfs"][href$=".pdf"]',
             "direct": True, "number_from_slug": True},
 )
@@ -1826,6 +1834,11 @@ STFS = Agency(
     index_url="https://sametinget.se/dokumentbank?cat=72",
     enumerate=stfs_enumerate, resolve=resolve_direct,
     params={"servlet_url": "https://sametinget.se/servlet/DocBankServlet", "cat": "72"},
+    # the servlet answers the default browser UA from a client that is not a
+    # browser with 429 on the first request (since 2026-09) and serves the
+    # honest harvester UA -- `Transport()`'s default; measured with both
+    # requests and httpx on 2026-09-27
+    transport=Transport(),
 )
 
 
@@ -3027,7 +3040,7 @@ PFS = Agency(
 # closed series (no live harvester; its documents live in the corpus, and its
 # successor HSLF-FS is harvested by the six scopes below). SKVFS is live but
 # must use Camoufox because F5 rejects plain HTTP clients and ordinary
-# Playwright Chromium alike; its Agency.browser flag selects that transport
+# Playwright Chromium alike; its transport's browser flag selects Camoufox
 # without affecting any other agency. The one SKVFS register also
 # enumerates the closed RSFS predecessor (cited "RSFS 1985:20", so its own code
 # + URIs) into its own namespace, so RSFS needs no second sweep.
@@ -3161,10 +3174,9 @@ MTFS = Agency(
     enumerate=mtfs.enumerate_register,
     resolve=mtfs.resolve,
     designation="MTFS",
-    browser=True,
     # a courtesy interval, not a measured limit: this register is 16 documents
     # and Tillväxtanalys has never rate-limited the walk (rule:respect-politeness)
-    browser_pace=2.0,
+    transport=Transport(browser=True, browser_pace=2.0),
 )
 
 SKVFS = Agency(
@@ -3174,10 +3186,9 @@ SKVFS = Agency(
     enumerate=skvfs.enumerate_register,
     resolve=skvfs.resolve,
     designation="SKVFS",
-    browser=True,
     # www4.skatteverket.se rejects everything for minutes once some 30
     # navigations land inside two -- the same rate rule `rs.download` paces for
-    browser_pace=20.0,
+    transport=Transport(browser=True, browser_pace=20.0),
 )
 RSFS = frozen_agency("rsfs", "Riksskatteverket", "Skatteverket", "RSFS",
                      "https://www.skatteverket.se")

@@ -61,8 +61,7 @@ from bs4 import BeautifulSoup
 from ..lib import archive, compress
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import pdf_path, select_pending, walk_records
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import fetcher, make_session, request
+from ..lib.net import BROWSER_UA_TRANSPORT, fetcher, open_session, request
 from ..lib.util import document_extension, href, normalize_space
 from .edpb_data import NEWSROOM, WP29, WP29_DUPLICATE_PAGES
 from .issuers import EDPB
@@ -223,7 +222,7 @@ def edpb_sync(root, serie, full=False, only=None, limit=None, delay=0.5):
     one. A page whose slug belongs to an endorsed WP29 document is skipped here
     -- `wp29_sync` owns those, from the newsroom where their text actually is.
     """
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     doctype = EDPB.serie(serie).doctype
     pages = sitemap_document_pages(_sitemap_page(session, n, delay)
                                    for n in range(1, SITEMAP_PAGES + 1))
@@ -369,7 +368,7 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
     published as Word forms, so the only PDFs of them are a tillsynsmyndighets
     conversions (`edpb_data.HBDI`, with what each was verified against recorded
     beside it)."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     pending, held = [], 0
     for wp in WP29:
         bf = basefile("wp", wp.slug)

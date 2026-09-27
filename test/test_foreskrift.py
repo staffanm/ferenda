@@ -27,8 +27,9 @@ from ferenda.foreskrift.harvest import (
 # otherwise shadow the imported function
 from ferenda.foreskrift.harvest import ref as _ref
 from ferenda.foreskrift.parse import extract_publisher
-from ferenda.lib import compress, datasets, lagrum
+from ferenda.lib import compress, datasets, lagrum, net
 from ferenda.lib.harvest import guarded_enumerate, write_record
+from ferenda.lib.net import Transport
 from ferenda.lib.util import record_path
 
 
@@ -600,8 +601,8 @@ def test_browser_agency_selects_the_camoufox_transport_only(tmp_path, monkeypatc
     selected = {}
 
     class Browser:
-        def __init__(self, profile, pace):
-            selected.update(profile=profile, pace=pace)
+        def __init__(self, profile, timeout, pace):
+            selected.update(profile=profile, timeout=timeout, pace=pace)
 
         def __enter__(self):
             return self
@@ -613,9 +614,9 @@ def test_browser_agency_selects_the_camoufox_transport_only(tmp_path, monkeypatc
         fs="skvfs", name="SKV", publisher="Skatteverket",
         base_url="https://example.se", index_url="https://example.se/list",
         enumerate=lambda *_args: (), resolve=lambda *_args: None,
-        browser=True, browser_pace=23,
+        transport=Transport(browser=True, browser_pace=23),
     )
-    monkeypatch.setattr(harvest, "CamoufoxBrowser", Browser)
+    monkeypatch.setattr(net, "CamoufoxBrowser", Browser)
     monkeypatch.setattr(
         harvest, "_harvest_session",
         lambda selected_agency, _root, session, *_args: (selected_agency.fs, session),
@@ -625,7 +626,7 @@ def test_browser_agency_selects_the_camoufox_transport_only(tmp_path, monkeypatc
     assert fs == "skvfs" and isinstance(session, Browser)
     assert selected == {
         "profile": tmp_path / "skvfs" / ".browser-profile",
-        "pace": 23,
+        "timeout": 60.0, "pace": 23,
     }
 
 

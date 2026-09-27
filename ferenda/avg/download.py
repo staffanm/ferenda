@@ -147,8 +147,7 @@ from ..lib.harvest import (
     walk,
     write_record,
 )
-from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_http2_session, make_session, request
+from ..lib.net import BROWSER_UA, BROWSER_UA_TRANSPORT, Transport, open_session, request
 from ..lib.pdftext import pdf_first_page_text
 from ..lib.util import (
     Reporter,
@@ -363,7 +362,7 @@ def jo_sync(root, full=False, only=None, limit=None, delay=0.5, log=print):
     incremental runs stop once a run of already-downloaded decisions (or one
     older than the watermark boundary) shows the corpus is caught up. ``only`` =
     one basefile ("jo/2340-2025"): a targeted search on the case number."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     nonce = jo_nonce(session)
     if only:
         dnr = only.split("/", 1)[1]
@@ -504,7 +503,7 @@ def jk_sync(root, full=False, only=None, limit=None, delay=0.5):
     """Download JK decisions. The listing is one request, so every run walks all
     entries and fetches only what is missing or changed (``--full`` refetches
     landings too, by bypassing the record equality check in :func:`jk_save`)."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     items = jk_listing(session)
     if only:
         dnr = only.split("/", 1)[1]
@@ -620,7 +619,7 @@ def arn_sync(root, full=False, only=None, limit=None, delay=0.5):
     all entries and fetches only what is missing or changed (``--full`` refetches
     every PDF and rewrites every record). ``only`` = one basefile
     ("arn/2026-00382"): the matching listing entry."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     items = arn_listing(session)
     if only:
         dnr = only.split("/", 1)[1]
@@ -1000,7 +999,7 @@ def imy_sync(root, full=False, only=None, limit=None, delay=0.5):
     ``only`` = one basefile ("imy/IMY-2024-2904"). A decision names no tillsyn
     page of its own, so the page to refetch is looked up in the stored record:
     a decision the corpus has not seen yet can only be reached by a full run."""
-    session = make_session(USER_AGENT)
+    session = open_session(BROWSER_UA_TRANSPORT)
     guid_map = imy_guid_map(session)
     praxis = imy_parse_praxis(
         request(session, "GET", IMY_PRAXIS, timeout=120).text, guid_map)
@@ -1054,11 +1053,10 @@ def imy_sync(root, full=False, only=None, limit=None, delay=0.5):
 # KKV -- the diarium's own search API, sliced by year
 # --------------------------------------------------------------------------
 
-def kkv_session():
-    """Konkurrensverket sits behind a Cloudflare front that 403s HTTP/1.1 and
-    only serves HTTP/2 (the same reason `foreskrift/agencies.py`'s KKVFS sets
-    ``http2=True``), so the diarium is harvested over the httpx client."""
-    return make_http2_session(USER_AGENT)
+# Konkurrensverket sits behind a Cloudflare front that 403s HTTP/1.1 and only
+# serves HTTP/2 (the same reason `foreskrift/agencies.py`'s KKVFS transport sets
+# ``client="httpx"``), so the diarium is harvested over the httpx client
+KKV_TRANSPORT = Transport(user_agent=BROWSER_UA, client="httpx")
 
 
 def kkv_listing(session, casetype):
@@ -1428,7 +1426,7 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
     curated account alone.
 
     ``only`` = one basefile ("kkv/558/2026")."""
-    session = kkv_session()
+    session = open_session(KKV_TRANSPORT)
     if only:
         case_number = only.split("/", 1)[1]
         curated = kkv_curated(session, delay, wanted={case_number})

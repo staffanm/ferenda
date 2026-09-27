@@ -29,7 +29,7 @@ import json
 from pathlib import Path
 
 from ..lib import compress
-from ..lib.net import make_session
+from ..lib.net import open_session
 from . import download
 
 SUBDIR = "clin"
@@ -142,7 +142,7 @@ def store(root, matched, log=print):
 
 
 def sync(root, delay=0.2, log=print, index=None):
-    session = make_session(download.USER_AGENT)
+    session = open_session(download.TRANSPORT)
     matched, unmatched = resolve(
         root, summary_records(session, delay=delay), log=log, index=index)
     changed, removed = store(root, matched, log=log)
