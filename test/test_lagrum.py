@@ -384,6 +384,10 @@ FORARB_PAGE_CASES = [
     ("(SOU 2016:7 s.184 f.)", None, [
         ("SOU 2016:7 s.184", "https://lagen.nu/sou/2016:7#sid184"),
         ("f.", "https://lagen.nu/sou/2016:7#sid185")]),
+    # "Ds." with a period
+    ("(Ds. 1998:14 s. 19 f.)", None, [
+        ("Ds. 1998:14 s. 19", "https://lagen.nu/ds/1998:14#sid19"),
+        ("f.", "https://lagen.nu/ds/1998:14#sid20")]),
     ("prop. 2017/18:105 s. 40 ff. och 52", None, [
         ("prop. 2017/18:105 s. 40", "https://lagen.nu/prop/2017/18:105#sid40"),
         ("f", "https://lagen.nu/prop/2017/18:105#sid41"),

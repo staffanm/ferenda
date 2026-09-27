@@ -581,7 +581,8 @@ PROP_PREFIX: /[Pp]rop\.|[Pp]rop(?= \d{4}\/\d)/
 BET_PREFIX: "bet."
 SKR_PREFIX: /rskr\.|rskr(?= \d{4}\/\d)/
 SOU_PREFIX: "SOU"
-DS_PREFIX: "Ds"
+// "Ds." with a period also occurs ("Ds. 1998:14")
+DS_PREFIX: /Ds\.?/
 DIR_PREFIX: /[Dd]ir\./
 SO_PREFIX: "SÖ"
 A_PROP: /a\. prop\./
@@ -905,7 +906,7 @@ FORARBETEN_TRIGGER_SRC = r"""
   | \brskr\.                                   # riksdagsskrivelser
   | \brskr\ \d{4}/\d                           # dot dropped ("rskr 2017/18:101")
   | \bSOU\                                     # statens offentliga utredningar
-  | \bDs\                                      # departementsserien
+  | \bDs\.?\                                   # departementsserien ("Ds." also occurs)
   | \b[Dd]ir\.                                 # kommittédirektiv
   | \bSÖ\ \d{4}:                               # internationella överenskommelser
   | \ba\.\ prop\.                              # "a. prop." (anförd proposition)
