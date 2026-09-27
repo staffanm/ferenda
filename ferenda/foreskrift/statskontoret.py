@@ -132,6 +132,32 @@ def _drop_repeated_heading(section, outer, next_outer):
             heading.extract()
 
 
+TYPED = frozenset({"foreskrifter", "allmanna-rad"})
+
+
+def _top_level(parent, wrapped=False):
+    """The page's top-level elements, looking through presentation wrappers.
+
+    Since September 2026 Forum sets most typed sections inside an untyped
+    ``div.grey > div.esv-comment`` box, or a bare ``div`` (intern styrning och
+    kontroll: "Riskanalys - föreskrifter till 3 § förordningen" sits two
+    wrappers down), so a walk over the literal top level met an untyped div and
+    stopped the harvest. A wrapper is an untyped div; what it holds is read as
+    if it stood at the top level. Only typed sections and further wrappers may
+    stand inside one: a paragraph there is text this walk has no rule for, and
+    it stops the harvest rather than being dropped as the förordning's mirror."""
+    for el in parent.children:
+        if isinstance(el, NavigableString):
+            continue
+        if el.name == "div" and not set(el.get("class") or []) & TYPED:
+            yield from _top_level(el, wrapped=True)
+            continue
+        assert not wrapped or el.name == "div", (
+            "a <%s> inside a presentation wrapper on a regelverk page: %s"
+            % (el.name, el.get_text(" ", strip=True)[:60]))
+        yield el
+
+
 def page_sections(box):
     """The text an EA leaf page carries, as an ordered list of section fragments.
 
@@ -154,8 +180,7 @@ def page_sections(box):
     synthetic pages the tests write have no such wrapper.
     """
     content = box.find("body") or box
-    elements = [el for el in content.children
-                if not isinstance(el, NavigableString)]
+    elements = list(_top_level(content))
     sections, outer, in_overgang, title_seen = [], None, False, False
     for i, el in enumerate(elements):
         if el.name in ("p", "ul", "ol"):
@@ -176,10 +201,6 @@ def page_sections(box):
         assert el.name == "div", (
             "unknown top-level element <%s class=%r> on a regelverk page"
             % (el.name, el.get("class")))
-        assert el.get("class") and set(el["class"]) & {
-            "foreskrifter", "allmanna-rad"}, (
-            "an untyped top-level %s on a regelverk page: %s"
-            % (el.get("class"), el.get_text(" ", strip=True)[:60]))
         if not in_overgang:
             next_el = elements[i + 1] if i + 1 < len(elements) else None
             next_outer = (" ".join(next_el.get_text(" ", strip=True).split())

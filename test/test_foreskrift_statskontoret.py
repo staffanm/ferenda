@@ -18,6 +18,7 @@ import types
 from pathlib import Path
 
 import pytest
+from bs4 import BeautifulSoup
 
 from ferenda.foreskrift import harvest, parse, statskontoret
 from ferenda.foreskrift.agencies import REGISTRY
@@ -384,3 +385,38 @@ def test_the_cutoff_names_the_amending_series_not_the_records(tmp_path):
     [cons] = reg.consolidations
     assert cons.konsolideradTom == "https://lagen.nu/stkfa/2026:1"
     assert [a.uri for a in reg.amendments] == ["https://lagen.nu/stkfa/2026:1"]
+
+WRAPPED = """<html><body><div class="regelverk-page__box">
+    <h2>Ekonomistyrningsverkets föreskrifter och allmänna råd (ESVFA 2022:8)
+      till förordningen (2007:603) om intern styrning och kontroll</h2>
+    <h2 class="ea-kapitel">Riskanalys</h2>
+    <p>3 § En riskanalys ska göras.</p>
+    <div class="grey"><div class="esv-comment esv-comment__blue">
+      <div class="foreskrifter"><h2>Riskanalys - föreskrifter till 3 §
+        förordningen</h2><p><strong>2 §</strong> Myndigheten ska vid behov
+        uppdatera riskanalysen.</p></div>
+    </div></div>
+    <div><div class="allmanna-rad"><h2>Allmänna råd till 6 §
+      förordningen</h2><p>En sammanställning bör finnas.</p></div></div>
+    %s
+    </div></body></html>"""
+
+
+def test_a_typed_section_in_a_presentation_wrapper_is_read():
+    # Forum's September 2026 layout: the typed sections sit inside untyped
+    # div.grey > div.esv-comment boxes, or a bare div
+    # (ea-regelverket/forvaltning/intern-styrning-och-kontroll)
+    ref = statskontoret.parse_page(WRAPPED % "", INDEX)
+    texts = [" ".join(BeautifulSoup(section, "html.parser")
+                      .get_text(" ", strip=True).split())
+             for section in ref.extra["sections"]]
+    assert texts == [
+        "Riskanalys",
+        "2 § Myndigheten ska vid behov uppdatera riskanalysen.",
+        "Allmänna råd till 6 § förordningen En sammanställning bör finnas."]
+
+
+def test_text_directly_in_a_wrapper_is_not_dropped_silently():
+    with pytest.raises(AssertionError, match="inside a presentation wrapper"):
+        statskontoret.parse_page(
+            WRAPPED % "<div class='grey'><p>Ny text.</p></div>", INDEX)
