@@ -249,7 +249,12 @@ def ocr_pdf(path, lang):
     # without text, and a 200 dpi CCITT page takes longer than that on a
     # machine busy with a parse (SJVFS 1991:136 came back with four empty
     # pages); an empty sidecar is cached as done, so wait for the text
+    # --invalidate-digital-signatures: ocrmypdf refuses a signed PDF otherwise
+    # (exit 2: the remissvar sou/2024:63 uppsala-universitet-juridiska-
+    # institutionen and sou/2020:54 radda-barnen). The sidecar is read for its
+    # text only and never served, and the signed original stays untouched.
     subprocess.run(["ocrmypdf", "--quiet", "--force-ocr", "--continue-on-soft-render-error",
+                    "--invalidate-digital-signatures",
                     "--tesseract-timeout", "900", "-l", lang, str(path), str(cached)],
                    check=True, capture_output=True)
     return cached
