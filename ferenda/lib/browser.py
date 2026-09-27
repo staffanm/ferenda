@@ -148,8 +148,13 @@ class CamoufoxBrowser:
         page = self._open_page()
         expired = self._timeout_error
         assert expired is not None, "the Camoufox session is not open"
-        self._goto(url, timeout)
         try:
+            # a page that has not even loaded within `timeout` is the same
+            # unfinished navigation as a challenge that never resolves, and
+            # `verify_document` below names it so: raised raw, Playwright's own
+            # timeout skipped the caller's longer-timeout retry (edps page 3,
+            # 2026-09-27, 7 s)
+            self._goto(url, timeout)
             page.wait_for_function(_READY, arg=marker, timeout=1000 * timeout)
         except expired:
             # not the error to report: `verify_document` reads the page that is
