@@ -77,7 +77,7 @@ class TextBlock(BaseModel):
     text: str = Field(max_length=MAX_CHARACTERS, description="unaltered extracted text")
 
 
-CitationKind = Literal[citationextract.KINDS]
+CitationKind = citationextract.CitationKind
 
 
 class ExtractionRequest(BaseModel):

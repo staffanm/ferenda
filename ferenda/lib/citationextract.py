@@ -8,6 +8,7 @@ Positions always refer to the submitted text; no OCR corrections are guessed.
 import functools
 import re
 from bisect import bisect_right
+from typing import Literal, get_args
 
 from . import catalog, courtids, resolve, treatyref
 from .lagrum import FS_SLUG
@@ -36,8 +37,9 @@ _AFTER_PROVISION = re.compile(
 # Each target has a kind, finer than its source: an EU judgment and an EU act
 # are both eurlex, but a client can want the judgment cited whole and the act
 # only by article.
-KINDS = ("sfs", "foreskrift", "eu-act", "eu-case", "case", "echr", "preparatory",
-         "treaty", "international-case", "decision", "guidance")
+CitationKind = Literal["sfs", "foreskrift", "eu-act", "eu-case", "case", "echr", "preparatory",
+                       "treaty", "international-case", "decision", "guidance"]
+KINDS = get_args(CitationKind)
 _SOURCE_KINDS = {"sfs": "sfs", "foreskrift": "foreskrift", "dv": "case", "hudoc": "echr",
                  "forarbete": "preparatory", "coe": "treaty", "untc": "treaty",
                  "icrc": "treaty", "icc": "international-case", "icj": "international-case",
