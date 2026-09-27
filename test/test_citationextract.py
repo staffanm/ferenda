@@ -111,3 +111,48 @@ def test_extraction_releases_cached_text_and_context(con, monkeypatch, fails):
     assert parser.state.namedlaws == {}
     for cache in (resolve._parsers, resolve._ecj_parsers):
         assert all(p._scan_text == "" and p.state.lastlaw is None for p in vars(cache).values())
+
+
+_TEXT = ("Enligt GDPR gäller detta för alla. Artikel 17 i dataskyddsförordningen ger rätt till "
+         "radering. Strukturen i uppsatsen följer brottsbalken, NJA 2013 s. 502 och ”Strukturen” "
+         "NJA 2024 s. 445 m.fl. Se även mål C-434/16, Nowak.")
+
+
+def _uris(found):
+    return [[o["text"], [t["uri"].removeprefix("https://lagen.nu/") for t in o["targets"]]] for o in found]
+
+
+def test_options_default_to_every_citation(con):
+    assert _uris(extract(con, _TEXT)) == [
+        ["GDPR", ["celex/32016R0679"]], ["Artikel 17 i dataskyddsförordningen", ["celex/32016R0679#17"]],
+        ["Strukturen", ["dom/nja/2024s445"]], ["brottsbalken", ["1962:700"]],
+        ["NJA 2013 s. 502", ["dom/nja/2013s502"]], ["Strukturen", ["dom/nja/2024s445"]],
+        ["NJA 2024 s. 445", ["dom/nja/2024s445"]], ["fl", ["2017:900"]], ["mål C-434/16", ["celex/62016CJ0434"]]]
+
+
+def test_whole_documents_and_case_names_leave_out_bare_mentions(con):
+    # A bare act, a law named in passing, "m.fl." read as FL and a popular case
+    # name used as a word are left out; a cited article and judgments stay.
+    found = citationextract.extract([{"id": "text", "text": _TEXT}], con,
+                                    whole_documents=["case", "eu-case", "echr", "international-case"],
+                                    case_names="with_identifier")
+    assert _uris(found) == [
+        ["Artikel 17 i dataskyddsförordningen", ["celex/32016R0679#17"]],
+        ["NJA 2013 s. 502", ["dom/nja/2013s502"]], ["NJA 2024 s. 445", ["dom/nja/2024s445"]],
+        ["mål C-434/16", ["celex/62016CJ0434"]]]
+
+
+def test_kinds_limit_targets_and_split_eurlex(con):
+    found = citationextract.extract([{"id": "text", "text": _TEXT}], con, kinds=["eu-case"])
+    assert _uris(found) == [["mål C-434/16", ["celex/62016CJ0434"]]]
+    assert citationextract.target_kind("https://lagen.nu/celex/32016R0679", "eurlex") == "eu-act"
+    assert citationextract.target_kind("https://lagen.nu/celex/62016CJ0434", "eurlex") == "eu-case"
+
+
+def test_context_from_a_left_out_reference_remains(con):
+    # "lagen (1915:218)" names a whole law and is left out, but it still names
+    # the law that "samma lag" refers to.
+    found = citationextract.extract(
+        [{"id": "text", "text": "lagen (1915:218). Enligt 36 § samma lag gäller detta."}],
+        con, whole_documents=["case"])
+    assert _uris(found) == [["36 § samma lag", ["1915:218#P36"]]]

@@ -1255,7 +1255,7 @@ def test_extract_empty_text(client):
 
 
 def test_extract_failure_does_not_log_submitted_text(client, monkeypatch, caplog, tmp_path):
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise ValueError("private document text must not enter logs")
     ledger = tmp_path / "extraction-errors.ndjson"
     monkeypatch.setattr(api.errors, "LEDGER", ledger)
@@ -1267,6 +1267,17 @@ def test_extract_failure_does_not_log_submitted_text(client, monkeypatch, caplog
     assert "private document text" not in caplog.text
     assert "ValueError" in caplog.text
     assert not ledger.exists()
+
+
+def test_extract_options_select_kinds_and_whole_documents(client):
+    text = "Enligt GDPR och artikel 17 i dataskyddsförordningen, se NJA 2013 s. 502."
+    response = client.post("/api/v1/citations/extract", json={
+        "text": text, "whole_documents": ["case"], "case_names": "with_identifier"})
+    assert response.status_code == 200
+    assert [o["text"] for o in response.json()["occurrences"]] == [
+        "artikel 17 i dataskyddsförordningen", "NJA 2013 s. 502"]
+    assert client.post("/api/v1/citations/extract", json={"text": text, "kinds": ["statute"]}).status_code == 422
+    assert client.post("/api/v1/citations/extract", json={"text": text, "case_names": "quoted"}).status_code == 422
 
 
 def test_citations_metadata_catalog_lists_datasets(client):

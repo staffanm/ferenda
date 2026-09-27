@@ -77,6 +77,9 @@ class TextBlock(BaseModel):
     text: str = Field(max_length=MAX_CHARACTERS, description="unaltered extracted text")
 
 
+CitationKind = Literal[citationextract.KINDS]
+
+
 class ExtractionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -85,6 +88,15 @@ class ExtractionRequest(BaseModel):
     blocks: list[TextBlock] | None = Field(
         None, min_length=1, max_length=5000,
         description="blocks in reading order, up to 250000 characters in total")
+    kinds: list[CitationKind] | None = Field(
+        None, description="return only targets of these kinds; default: all kinds")
+    whole_documents: list[CitationKind] | None = Field(
+        None, description="kinds whose document may be cited without a provision, article, "
+                          "paragraph or page; default: all kinds. For example ['case', 'eu-case'] "
+                          "leaves out a bare 'GDPR' or 'brottsbalken' but keeps 'artikel 17 GDPR'")
+    case_names: Literal["bare", "with_identifier"] = Field(
+        "bare", description="'with_identifier': a popular case name ('Strukturen') alone is not "
+                            "a citation; the case is still found by its reference (NJA 2024 s. 445)")
 
     @model_validator(mode="after")
     def check_document(self) -> Self:
@@ -147,6 +159,13 @@ def extract_endpoint(body: ExtractionRequest, con: Annotated[sqlite3.Connection,
     to check it. For an empty target list, the occurrence text can be submitted
     to `/resolve`, but an empty response does not establish invalidity.
 
+    Three optional fields select what comes back. `kinds` limits the targets to
+    some kinds. `whole_documents` lists the kinds that may be cited without a
+    provision, article, paragraph or page, so `["case", "eu-case"]` leaves out a
+    bare "GDPR" but keeps "artikel 17 GDPR". `case_names: "with_identifier"`
+    leaves out a popular case name that stands alone. Context still comes from
+    the whole text, and an occurrence left with no targets is not returned.
+
     Your text is processed only in temporary memory on lagen.nu. It is
     discarded after processing, never saved, and never forwarded elsewhere.
     Results are returned only to you. Responses and validation errors use `no-store`.
@@ -154,7 +173,8 @@ def extract_endpoint(body: ExtractionRequest, con: Annotated[sqlite3.Connection,
     """
     blocks = ([block.model_dump() for block in body.blocks] if body.blocks is not None
               else [{"id": "text", "text": body.text}])
-    return ExtractionResponse(occurrences=citationextract.extract(blocks, con))
+    return ExtractionResponse(occurrences=citationextract.extract(
+        blocks, con, kinds=body.kinds, whole_documents=body.whole_documents, case_names=body.case_names))
 
 
 DATASET_REGISTRY: dict[tuple[str, str], dict[str, Any]] = {

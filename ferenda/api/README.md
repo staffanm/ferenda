@@ -158,6 +158,13 @@ En hänvisning över en sidgräns kan ha flera positioner.
 {"text": "Se NJA 2013 s. 372 och 12 kap. 1 § avtalslagen."}
 ```
 
+Tre valfria fält styr vad som kommer tillbaka. `kinds` begränsar målen till
+vissa slag. `whole_documents` anger vilka slag som får hänvisas till som helhet,
+utan bestämmelse, artikel, punkt eller sida. Med `["case", "eu-case"]` kommer
+"artikel 17 GDPR" tillbaka men inte ett ensamt "GDPR". Med `case_names:
+"with_identifier"` räknas ett rättsfalls smeknamn ("Strukturen") bara tillsammans
+med referensen. Se konsumentdokumentationen för alla slag.
+
 Skicka sedan varje unik mål-URI till `/api/v1/resolve` för giltighetskontroll.
 Ett mål från extraktionen bevisar inte att dokumentet eller bestämmelsen finns.
 En tom mållista betyder att kandidaten saknar en bestämd tolkning.

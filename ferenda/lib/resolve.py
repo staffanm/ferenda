@@ -508,6 +508,11 @@ def _resolve_general(q):
 
 
 @functools.cache
+def named_case_names() -> list[str]:
+    """The popular names of cases ("Strukturen"), lower-cased."""
+    return list(_named_cases())
+
+
 def citation_names() -> list[str]:
     """Curated standalone names used by both lookup and document extraction."""
     return sorted({name for name, _ in (

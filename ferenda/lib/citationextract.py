@@ -33,10 +33,39 @@ _AFTER_PROVISION = re.compile(
     r"\s+(?:" + _PINPOINT + r"|[0-9]+:[0-9]+[a-z]?)", re.I)
 
 
+# Each target has a kind, finer than its source: an EU judgment and an EU act
+# are both eurlex, but a client can want the judgment cited whole and the act
+# only by article.
+KINDS = ("sfs", "foreskrift", "eu-act", "eu-case", "case", "echr", "preparatory",
+         "treaty", "international-case", "decision", "guidance")
+_SOURCE_KINDS = {"sfs": "sfs", "foreskrift": "foreskrift", "dv": "case", "hudoc": "echr",
+                 "forarbete": "preparatory", "coe": "treaty", "untc": "treaty",
+                 "icrc": "treaty", "icc": "international-case", "icj": "international-case",
+                 "avg": "decision", "guidance": "guidance", "rs": "guidance"}
+
+
+def target_kind(uri, source):
+    """The kind of a target: its source, with eurlex split into acts and judgments."""
+    if source == "eurlex":
+        return "eu-case" if uri.startswith("https://lagen.nu/celex/6") else "eu-act"
+    return _SOURCE_KINDS.get(source)
+
+
+def _whole_document(uri):
+    """True when the target names a document without a provision, article or page."""
+    return "#" not in uri
+
+
 @functools.cache
-def _names():
+def _names(case_names=True):
+    """Curated standalone names. Without case_names, a popular case name alone
+    ("Strukturen") is not a candidate; the case is still found by its reference."""
+    names = resolve.citation_names()
+    if not case_names:
+        cases = set(resolve.named_case_names())
+        names = [name for name in names if name.lower() not in cases]
     return re.compile(r"(?<!\w)(?:" + "|".join(
-        re.escape(name).replace(r"\ ", r"\s+") for name in resolve.citation_names())
+        re.escape(name).replace(r"\ ", r"\s+") for name in names)
                       + r")(?!\w)(?:\s+(?:art(?:ikel|icle)?\.?\s*)?"
                       r"[0-9]+(?:\s*kap\.?\s*[0-9]+\s*§|[.:][0-9]+|\s*§)?)?", re.I)
 
@@ -47,8 +76,8 @@ def _regulations():
                       + r")\s*[0-9]{4}:[0-9]+", re.I)
 
 
-def _candidates(value):
-    for pattern in (_IDENTIFIERS, _NJA, courtids.ICJ_REPORT, _names(), _regulations()):
+def _candidates(value, case_names=True):
+    for pattern in (_IDENTIFIERS, _NJA, courtids.ICJ_REPORT, _names(case_names), _regulations()):
         for match in pattern.finditer(value):
             start, end = match.span()
             # Sentence punctuation is not part of a document identity.
@@ -69,7 +98,7 @@ def _candidates(value):
             yield start, end
 
 
-def _occurrences(value, con):
+def _occurrences(value, con, case_names=True):
     grouped = {}
     for ref in (resolve.citation_parser().parse_text(value, context={})
                 + treatyref.refs(value)):
@@ -79,7 +108,7 @@ def _occurrences(value, con):
     # Exact lookup has priority on the same span: a signed NJA page must not
     # become a positive page, and an official alias must keep all its targets.
     interpreted = {}
-    for start, end in _candidates(value):
+    for start, end in _candidates(value, case_names):
         query = " ".join(value[start:end].split())
         if (start, end) in grouped and not _NJA.fullmatch(query):
             continue
@@ -98,12 +127,21 @@ def _occurrences(value, con):
     return selected
 
 
-def extract(blocks, con):
+def extract(blocks, con, kinds=None, whole_documents=None, case_names="bare"):
     """Ordered {id, text} blocks -> occurrences with UTF-16 block locations.
 
     Newlines join blocks so a citation can cross a PDF page boundary. One
     parser sees the whole document, including context introduced in earlier
     blocks. The caller retains the mapping from block ids to file locations.
+
+    kinds limits the targets to those kinds (default: all). whole_documents
+    lists the kinds whose document may be cited without a provision, article
+    or page (default: all), so a bare "GDPR" can be left out while "artikel 17
+    GDPR" is kept. case_names "with_identifier" drops a popular case name that
+    stands alone. The parser still reads everything, so context from a
+    dropped reference remains ("lagen (1915:218) ... 36 § samma lag").
+    An occurrence whose targets are all dropped is left out; an empty target
+    list still means an unresolved candidate.
     """
     value = "\n".join(block["text"] for block in blocks)
     starts, offsets, cursor = [], [], 0
@@ -116,10 +154,17 @@ def extract(blocks, con):
         cursor += len(block["text"]) + 1
     out = []
     try:
-        occurrences = _occurrences(value, con)
+        occurrences = _occurrences(value, con, case_names != "with_identifier")
     finally:
         resolve.clear_parser_state()
     for start, end, targets in occurrences:
+        if targets and (kinds is not None or whole_documents is not None):
+            targets = {uri: source for uri, source in targets.items()
+                       if (kinds is None or target_kind(uri, source) in kinds)
+                       and (whole_documents is None or not _whole_document(uri)
+                            or target_kind(uri, source) in whole_documents)}
+            if not targets:
+                continue
         locations = []
         index = max(0, bisect_right(starts, start) - 1)
         while index < len(blocks) and starts[index] < end:

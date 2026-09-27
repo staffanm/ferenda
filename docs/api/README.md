@@ -101,6 +101,30 @@ end is exclusive. JavaScript `block.text.slice(start, end)` selects that part
 of the citation, including when preceding text contains emoji.
 Clients retain their mapping from block ids to pages, paragraphs or footnotes.
 
+Three optional fields select what comes back. The defaults return everything.
+
+| Field | Values | Effect |
+|---|---|---|
+| `kinds` | list of kinds | Return only targets of these kinds. |
+| `whole_documents` | list of kinds | Kinds whose document may be cited without a provision, article, paragraph or page. |
+| `case_names` | `"bare"` (default) or `"with_identifier"` | With `"with_identifier"`, a popular case name that stands alone ("Strukturen") is not a citation. The case is still found by its reference ("NJA 2024 s. 445"). |
+
+The kinds are `sfs`, `foreskrift`, `eu-act` (EU legislation), `eu-case` (CJEU
+judgments), `case` (Swedish case law), `echr`, `preparatory`, `treaty`,
+`international-case`, `decision` and `guidance`.
+
+```json
+{"text": "Enligt GDPR och artikel 17 i dataskyddsförordningen, se NJA 2013 s. 502.",
+ "whole_documents": ["case", "eu-case", "echr", "international-case"],
+ "case_names": "with_identifier"}
+```
+
+This request returns `artikel 17 i dataskyddsförordningen` and `NJA 2013 s. 502`,
+but not the bare `GDPR`. The parser still reads the whole text, so a left-out
+reference still gives context: in `lagen (1915:218). Enligt 36 § samma lag`,
+only `36 § samma lag` comes back, with the target `1915:218#P36`. An occurrence
+whose targets are all left out is not returned.
+
 The shared parser accepts an omitted space before `§` and `§§`.
 For example, `12 kap. 1§ avtalslagen` retains the complete `#K12P1` target.
 Returned text and offsets preserve the original spelling. Extraction does not
