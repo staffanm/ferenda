@@ -841,6 +841,43 @@ def test_eu_generic_noun_refuses_when_no_act_of_that_kind_was_named():
     assert parser.parse_text("artikel 23 i förordningen anger", context={}) == []
 
 
+def test_a_bare_act_name_puts_the_act_in_focus():
+    # the GDPR's own title names directive 95/46 last, and a thesis then names
+    # the GDPR without an article before a bare "artikel 1"
+    parser = _eu_parser()
+    parser.parse_text("förordning (EU) 2016/679 om upphävande av direktiv 95/46/EG",
+                      context={})
+    assert [r.uri for r in parser.parse_text(
+        "den allmänna dataskyddsförordningen, även mest känt som GDPR. "
+        "Syftet är betonat i artikel 1 samt under", context={})] == ["%s#1" % GDPR]
+    # a lower-case short alias is a word, not the acronym ("dora" is not DORA)
+    parser.parse_text("enligt direktiv 95/46/EG gällde", context={})
+    assert [r.uri for r in parser.parse_text(
+        "dora sa att artikel 2 gällde", context={})] == \
+        ["https://lagen.nu/celex/31995L0046#2"]
+
+
+# a treaty or act named first, in the genitive, owns the article after it
+EU_GENITIVE_CASES = [
+    ("där vi kan se en hänvisning till EU-stadgans artikel 8.1 och "
+     "Funktionsfördragets artikel 16.1 som", [
+         ("EU-stadgans artikel 8.1", "https://lagen.nu/celex/12012P/TXT#8.1"),
+         ("Funktionsfördragets artikel 16.1",
+          "https://lagen.nu/celex/12016E/TXT#16.1")]),
+    ("enligt GDPR:s artikel 17", [("GDPR:s artikel 17", "%s#17" % GDPR)]),
+    ("artikel 16.1 i funktionsfördraget", [
+        ("artikel 16.1 i funktionsfördraget",
+         "https://lagen.nu/celex/12016E/TXT#16.1")]),
+]
+
+
+@pytest.mark.parametrize("text,links", EU_GENITIVE_CASES,
+                         ids=[c[0] for c in EU_GENITIVE_CASES])
+def test_eu_genitive_name_before_article(text, links):
+    parser = _eu_parser()
+    assert [(r.text, r.uri) for r in parser.parse_text(text, context={})] == links
+
+
 def _eu_parser():
     parser = LagrumParser(NAMEDLAWS, basefile="dom", parse_types=[EULAGSTIFTNING],
                           named_acts=NAMEDACTS_MAP)

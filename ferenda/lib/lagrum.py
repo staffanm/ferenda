@@ -881,6 +881,9 @@ EU_TRIGGER_SRC = r"""
   | \b(?:EUF-fördraget|FEUF|EU-fördraget|EU-stadgan|EKMR)\b   # treaty named first
   | \bfördraget\ om\ Europeiska\ union        # ("<treaty>, särskilt artikel N")
   | \b(?:rättighetsstadgan|europakonventionen)\b
+    # an act or treaty named first, in the genitive ("EU-stadgans artikel 8.1",
+    # "GDPR:s artikel 17"); the EU_TREATY / EU_NAMNAKT terminals reject other words
+  | (?<![\wåäöÅÄÖ-])[A-Za-zÅÄÖåäö][\wåäöÅÄÖ-]*(?::s|s)\ [Aa]rtik(?:el|larna)\ \d
 """
 
 # abbreviation-*first* KORTLAGRUM forms ("TF 2:3", "TF 3 §", "ÄB 10 kap.
@@ -1660,6 +1663,7 @@ def celex_uri(attrs, base='https://lagen.nu/'):
 EU_NAMNAKT_RULES = r"""
 %extend rattsakt_part: eu_namnakt_full
 %extend eu_ref: artikel_part _W eu_namnakt_full
+%extend eu_ref: eu_namnakt GENITIVE _W artikel_part
 eu_namnakt_full: (EU_DET _W)? (EU_ADJ _W)? eu_namnakt
 eu_namnakt: EU_NAMNAKT
 EU_ADJ: "allmänna" | "allmän"
@@ -1692,10 +1696,12 @@ TREATY_PIN = {entry["target"]: entry
 #    the instrument's consolidated-text path; a list/range links each member;
 #  * the definite generic noun ("(det) direktivet", "förordningen") -> the last
 #    named EU act, so an EU document's own back-reference to a directive it just
-#    cited resolves (the anaphora used to be Swedish-parser-only).
+#    cited resolves (the anaphora used to be Swedish-parser-only);
+#  * a treaty named first, in the genitive ("EU-stadgans artikel 8.1").
 EU_EXTRA_RULES = r"""
 %extend eu_ref: artikel_part _W (IN _W)? eu_treaty
 %extend eu_ref: eu_treaty COMMA? _W SARSKILT _W artikel_part
+%extend eu_ref: eu_treaty GENITIVE _W artikel_part
 %extend eu_ref: rattsakt_part COMMA? _W SARSKILT _W artikel_part
 %extend rattsakt_part: eu_generic
 eu_treaty: EU_TREATY
@@ -1703,6 +1709,7 @@ eu_generic: (EU_DET _W)? EU_GENERIC
 EU_DET: "EU:s" | "den" | "det"
 EU_GENERIC: "förordningen" | "direktivet" | "rättsakten"
 SARSKILT: "särskilt"
+GENITIVE: /:?s/
 """
 
 
@@ -1752,6 +1759,15 @@ def parser(requested, expanded, abbrevs=(), eu_acts=(), lang="swe"):
         grammar += "\nFS_DESIGNATION: %s\n" % " | ".join(
             '"%s"' % d for d in sorted(FS_DESIGNATIONS, key=len, reverse=True))
     return Lark(grammar, parser='earley')
+
+
+def act_mention_pattern(eu_acts):
+    """A known EU act named on its own, also in the genitive ("GDPR:s",
+    "dataskyddsförordningens"). Group 1 is the name. `eu_acts` is longest first."""
+    if not eu_acts:
+        return None
+    return re.compile(r"(?<![\wåäöÅÄÖ-])(%s)(?::s|s)?(?![\wåäöÅÄÖ-])"
+                      % "|".join(re.escape(a) for a in eu_acts), re.I)
 
 
 def _tree_tokens(tree):
@@ -1983,6 +1999,8 @@ class LagrumParser:
                            eu_acts if EULAGSTIFTNING in self.parse_types else (),
                            lang)
         self.trigger = build_trigger(self.parse_types, lang)
+        self.act_mention = act_mention_pattern(eu_acts) \
+            if EULAGSTIFTNING in self.parse_types and lang == "swe" else None
 
     def reset(self, written=None):
         """Discard per-document state (learned law names, the "samma lag"
@@ -2020,6 +2038,7 @@ class LagrumParser:
         pos = 0
         while True:
             m = self.trigger.search(text, pos)
+            self._remember_act_mentions(text, pos, m.start() if m else len(text))
             if not m:
                 break
             tree, length = self.try_parse(text, m.start())
@@ -2082,6 +2101,23 @@ class LagrumParser:
             refs = merge_refs(refs, malnummer.refs(text, self.base, predicate,
                                                    orig))
         return refs
+
+    def _remember_act_mentions(self, text, start, end):
+        """Put the last EU act named without an article in text[start:end]
+        in focus. A thesis names "den allmänna dataskyddsförordningen" or "GDPR"
+        and then writes a bare "artikel 1": without this the article went to the
+        act named last *with* an article or number, which was often directive
+        95/46 from the GDPR's own title ("om upphävande av direktiv 95/46/EG")."""
+        if self.act_mention is None:
+            return
+        celex = None
+        for m in self.act_mention.finditer(text, start, end):
+            # a short alias is an acronym ("GDPR", "NIS2") only when it is not
+            # written in lower case ("dsa", "mica" and "dora" are also words)
+            if len(m.group(1)) > 5 or not m.group(1).islower():
+                celex = self.named_acts[m.group(1).lower()]
+        if celex:
+            self.state.remember_eu_act(celex)
 
     def link_spans(self, attrlist, tree, length):
         """Per-link (start, end) spans within the window. Each link starts
@@ -2577,8 +2613,10 @@ class LagrumParser:
             if len(items) == 1:
                 # from "artikel" to the node end -- the whole "artikel N i
                 # <instrument>" for the article-first order, just "artikel N" when
-                # the instrument was named first ("<treaty>, särskilt artikel N")
-                span = (_node_span(subtree(node, 'artikel_part'))[0],
+                # the instrument was named first ("<treaty>, särskilt artikel N"),
+                # and the whole phrase again for a genitive ("EU-stadgans artikel 8")
+                genitive = any(t.type == 'GENITIVE' for t in _tree_tokens(node))
+                span = (_node_span(node if genitive else subtree(node, 'artikel_part'))[0],
                         _node_span(node)[1])
             else:
                 span = _node_span(it)
