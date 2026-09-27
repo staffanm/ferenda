@@ -36,6 +36,10 @@ MISLEADING_URLS = frozenset({
     # the 1979/06/so-198072 page is the one with the body. (rule:fail-fast would
     # otherwise collide the two on the same SÖ number.)
     "/rattsliga-dokument/sveriges-internationella-overenskommelser/1994/01/so-198072-",
+    # Ds 1998:14 dual-published: this page holds only the English summary
+    # "Digital signatures - a technological and legal overview"; the Swedish Ds
+    # "Digitala signaturer - en teknisk och juridisk översikt" is at ds-1998141.
+    "/rattsliga-dokument/departementsserien-och-promemorior/1998/01/ds-199814",
 })
 
 
