@@ -150,9 +150,9 @@ DEPENDS = {KORTLAGRUM: [LAGRUM], ENKLALAGRUM: [LAGRUM]}
 
 # root-rule alternatives each parse type contributes to ?ref
 ROOTS = {
-    KORTLAGRUM: ['kortlagrum_short', 'kortlagrum_normal',
+    KORTLAGRUM: ['kortlagrum_short', 'kortlagrum_normal', 'kortlagrum_other',
                  'kortlagrum_refs'],
-    LAGRUM: ['change_ref', 'external_refs', 'external_ref',
+    LAGRUM: ['change_ref', 'external_refs', 'external_ref', 'external_ref_other',
              'multiple_generic_refs', 'sfs_nr', 'named_external_law_ref',
              'piece_item_refs', 'piece_item_ref', 'piece_and_item_refs'],
     EULAGSTIFTNING: ['eu_ref'],
@@ -180,6 +180,11 @@ change_ref.10: CHANGE_WORD _W sfs_nr DOT?
 external_ref.6: generic_ref _W external_law
 // "17-29 och 32 §§ i lagen (2004:575)"
 external_refs.7: multiple_generic_refs _W (IN _W)? external_law
+// "4 kap. 1 § eller någon annan bestämmelse i LOU" -- 20 kap. 6 § LOU's own
+// words, quoted in nearly every överprövning -- and "4 kap. 1 § och övriga
+// bestämmelser i LOU": the law named after the phrase is the law the
+// paragraph belongs to
+external_ref_other.6: generic_ref _W _OTHER_PROVISION _W external_law
 
 ?external_law: anonymous_external_law | named_external_law_ref | same_law
 anonymous_external_law: (IN _W)? LAW_SYNONYM _W sfs_nr
@@ -411,6 +416,7 @@ IN: "i"
 AND.2: "och"
 _W_AND_OR_W: / (?:och|eller|samt) /
 _W_OR_W: / eller /
+_OTHER_PROVISION: /eller (?:någon )?annan bestämmelse i|och (?:övriga|andra) bestämmelser i/
 NUMBER: /\d+/
 PIECE_DIGIT: /[1-9](?!\d)/
 SECTION_CHAR: /[a-n](?![\wåäöA-ZÅÄÖ])/
@@ -511,6 +517,9 @@ kortlagrum_normal.9: generic_ref _W LAW_ABBREV
 // both refs to regeringsformen, named one sentence earlier.
 kortlagrum_refs.8: multiple_generic_refs _W LAW_ABBREV
 kortlagrum_short.9: LAW_ABBREV _W NUMBER COLON NUMBER (_W piece_ref)?
+// "4 kap. 1 § eller någon annan bestämmelse i LOU" -- external_ref_other's
+// abbreviated form
+kortlagrum_other.9: generic_ref _W _OTHER_PROVISION _W LAW_ABBREV
 """
 
 # RATTSFALL (Swedish case law: "NJA 1994 s. 12", "RÅ 2009 ref. 5",
@@ -2476,6 +2485,22 @@ class LagrumParser:
 
     fmt_external_refs = fmt_external_ref
 
+    def fmt_external_ref_other(self, node, match, out, context):
+        """"4 kap. 1 § eller någon annan bestämmelse i LOU": the paragraph links
+        into the law named after the alternative, and the law name gets its own
+        link. Never one combined link: its text would read "4 kap. 1 § eller
+        någon annan bestämmelse i LOU", which names no one provision."""
+        law_node = node.children[-1]
+        self.resolve_law(law_node, match)
+        self.dispatch(node.children[0], match, out, context)
+        if isinstance(law_node, Tree) and law_node.data == 'same_law':
+            return
+        match.currentchapter = None
+        anonymous = (isinstance(law_node, Tree)
+                     and law_node.data == 'anonymous_external_law')
+        span = _law_id_span(law_node) if anonymous else _node_span(law_node)
+        self.emit({'law': match.currentlaw}, match, out, context, span=span)
+
     def fmt_named_external_law_ref(self, node, match, out, context):
         self.resolve_law(node, match)
         # a named law links its name and any trailing "(SFS-number)"
@@ -2492,6 +2517,7 @@ class LagrumParser:
         self.dispatch(genref, match, out, context)
 
     fmt_kortlagrum_refs = fmt_kortlagrum_normal
+    fmt_kortlagrum_other = fmt_kortlagrum_normal
 
     def fmt_kortlagrum_short(self, node, match, out, context):
         match.currentlaw = self.abbrev_to_sfsid(node)

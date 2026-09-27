@@ -51,6 +51,7 @@ from ferenda.lib.lagrum import (
     load_namedacts,
     load_namedlaws,
     merge_refs,
+    sfs_parser,
     spans_as_refs,
     with_indefinite_aliases,
     yield_overlaps,
@@ -1759,3 +1760,30 @@ def test_guidance_numbers_resolve_to_their_own_pages():
     # a body named without a number is not a citation of a document
     assert parser.parse_text("en ESMA-rapport utan nummer") == []
     assert parser.parse_text("Eiopa har utfärdat riktlinjer") == []
+
+
+@pytest.mark.parametrize("text, links", [
+    # 20 kap. 6 § LOU's own words, quoted in nearly every överprövning: the
+    # paragraph belongs to the law named after the phrase, and the phrase
+    # itself is never inside a link
+    ("brutit mot någon av de grundläggande principerna i 4 kap. 1 § eller "
+     "någon annan bestämmelse i LOU och detta",
+     [("4 kap. 1 §", "https://lagen.nu/2016:1145#K4P1")]),
+    ("i 4 kap. 1 § eller någon annan bestämmelse i LUK och",
+     [("4 kap. 1 §", "https://lagen.nu/2016:1147#K4P1")]),
+    ("principerna i 4 kap. 1 § eller annan bestämmelse i LUF",
+     [("4 kap. 1 §", "https://lagen.nu/2016:1146#K4P1")]),
+    ("principerna i 4 kap. 1 § eller någon annan bestämmelse i lagen "
+     "(2016:1145) om offentlig upphandling",
+     [("4 kap. 1 §", "https://lagen.nu/2016:1145#K4P1"),
+      ("2016:1145", "https://lagen.nu/2016:1145")]),
+    ("principerna i 4 kap. 1 § och övriga bestämmelser i LOU.",
+     [("4 kap. 1 §", "https://lagen.nu/2016:1145#K4P1")]),
+    # "denna lag" names no law of its own: nothing to link to
+    ("4 kap. 1 § eller någon annan bestämmelse i denna lag", []),
+])
+def test_a_paragraph_before_another_provision_phrase_belongs_to_that_law(
+        text, links):
+    parser = sfs_parser("test", ALL_PARSE_TYPES, written="2024-01-01")
+    assert [(text[r.start:r.end], r.uri)
+            for r in parser.parse_text(text, context={})] == links
