@@ -564,9 +564,19 @@ def scan_body(body, written):
         clean, marks = extract_footrefs(b.text)
         refs = parser.parse_text(clean, context={})
         refs += [Ref(p, p, num, "dcterms:references", "#fn-%s" % num,
-                     kind="footnote") for p, num in marks]
+                     kind="footnote")
+                 for p, num in ((_outside(refs, p), num) for p, num in marks)]
         runs.append(interleave(clean, refs))
     return runs
+
+
+def _outside(refs, pos):
+    """A footnote marker's position, moved to the end of the citation it would
+    split. The court sets the superscript where it chose, and a citation can
+    run on past it: NJA 2023 s. 1133 marks note 4 after "C-520/18", and the
+    citation reads on to "C-520/18 p. 208". A zero-width run inside a link has
+    no place in the run list, so the note follows the whole citation."""
+    return next((r.end for r in refs if r.start < pos < r.end), pos)
 
 
 def scan_footnotes(footnotes, written):

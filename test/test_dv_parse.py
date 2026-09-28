@@ -18,6 +18,7 @@ from ferenda.dv.parse import (
     parse_body,
     parse_innehall,
     parse_pdf_record,
+    scan_body,
     to_artifact,
 )
 from ferenda.dv.structure import flatten
@@ -801,3 +802,14 @@ def test_parse_pdf_record_recovers_contiguous_domskal_numbers():
     # the sub-body running header is dropped as marginalia, never a body line
     body_text = " ".join(b.text for b in av.body)
     assert "Mal nr" not in body_text
+
+
+def test_a_footnote_marker_inside_a_citation_follows_the_citation():
+    # NJA 2023 s. 1133 marks note 4 after "C-520/18", and the citation reads
+    # on to "C-520/18 p. 208": the note moves to the citation's end instead of
+    # splitting the link
+    runs = scan_body([Stycke("(Se de förenade målen C-511/18 och "
+                             "C-520/18[4] p. 208.)")], written="2023-12-19")[0]
+    links = [r for r in runs if isinstance(r, dict)]
+    assert [r["text"] for r in links] == ["C-511/18", "C-520/18 p. 208", "4"]
+    assert links[-1]["uri"] == "#fn-4"
