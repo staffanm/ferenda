@@ -584,54 +584,28 @@ compact two-column layout and omits context; `download=1` serves it as an
 attachment. A full statute with all its context takes minutes to lay out, so
 expect a slow response on a big document.
 
-### Check a citation in private — `GET /api/v1/range/{prefix}`
+### Check and read a citation in private — `GET /api/v1/range/filter` and `GET /api/v1/range/{prefix}`
 
-`/resolve` and `/document` show the server which citation a client checks. This
-route answers the same question, "does the corpus hold this document and this
-provision", and the server learns only one bucket of 4,096.
+`/resolve` and `/document` show the server which citation a client checks.
+These two routes answer the same questions, "does the corpus hold this" and
+"what does it say", and the server learns only buckets of about 143 units.
 
-1. Remove the fragment from the citation uri. Keep the uri exactly as this API
-   writes it. Do not change the case: `bet/1980/81:KU25` and
-   `bet/1980/81:ku25` are two documents.
-2. `prefix` = the first 3 hex characters of `sha256(document uri)`.
-3. `GET /api/v1/range/{prefix}`. The answer is `text/plain`, one entry per line,
-   sorted. Each entry is 16 hex characters.
-4. The document is held if the first 16 hex characters of
-   `sha256(document uri)` are in the answer.
-5. The provision is in the document if the first 16 hex characters of
-   `sha256(full uri with fragment)` are in the answer.
-
-```
-sha256("https://lagen.nu/celex/32016R0679")      = 4b030d0f…  -> GET /api/v1/range/4b0
-                                                    the document: look for 4b030d0f85b50e90
-sha256("https://lagen.nu/celex/32016R0679#32.1") = b69f7810…  -> article 32.1: look for b69f7810d6903ad2
-```
-
-- The index holds the documents as they read today. A provision that only an
-  older wording had is not in it.
-- The anchors are those a citation can name: `K12P52`, `P3a`, `32.1`,
-  `recital-83`, `A6P1`, `sid39` for page 39 of a förarbete, and `point-98` for
-  paragraph 98 of an EU judgment. Documents of sources that no citation grammar
-  points into (Swedish court decisions, for example) are in the index without
-  anchors.
-- Every answer has the same number of lines. A short bucket gets stand-in
-  entries, which are the same on each request. A stand-in matches a real
-  citation with a probability of 2^-64.
-- The answer has `Cache-Control: no-transform` and is never compressed, so its
-  length is the same for every bucket.
-- `503` means the index is not built. `422` means the prefix is not 3 lower-case
-  hex characters.
-
-### Check and read a citation in private — `GET /api/v1/range/filter` and `GET /api/v1/range/units/{prefix}`
-
-These two routes replace the route above for a client that also wants the text.
 A *unit* is a document uri or a provision uri (`https://lagen.nu/1915:218`,
 `https://lagen.nu/1915:218#P36`). Its key is the first 8 bytes of
-`sha256(unit uri)`, big-endian. Each unit is keyed by its own uri, so a
-provision and its document fall in unrelated buckets.
+`sha256(unit uri)`, big-endian. Keep the uri exactly as this API writes it. Do
+not change the case: `bet/1980/81:KU25` and `bet/1980/81:ku25` are two
+documents. Each unit is keyed by its own uri, so a provision and its document
+fall in unrelated buckets.
+
+The anchors are those a citation can name: `K12P52`, `P3a`, `32.1`,
+`recital-83`, `A6P1`, `sid39` for page 39 of a förarbete, and `point-98` for
+paragraph 98 of an EU judgment. Documents of sources that no citation grammar
+points into (Swedish court decisions, for example) are units without anchors.
+The index holds the documents as they read today. A provision that only an
+older wording had is not in it.
 
 **Existence.** `GET /api/v1/range/filter` is one file for every client, about
-18 MB: a binary fuse filter over every unit's key, with 16-bit fingerprints. A
+21 MB: a binary fuse filter over every unit's key, with 16-bit fingerprints. A
 key is in the set with one false yes in 65,536. The client downloads it once,
 caches it, and checks every citation and its document locally; no request names
 a citation.
@@ -644,52 +618,30 @@ a citation.
   the first 32 bits of its key and its citation count (uint32 each). A client
   draws its filler requests from these.
 
-**Text.** `GET /api/v1/range/units/{prefix}?bits=16&content=true` answers every
-unit whose key starts with the first `bits` bits of `prefix`. The client chooses
-`bits` (12 to 20, default 16); `prefix` carries `ceil(bits/4)` hex characters,
-and bits past `bits` are ignored. An answer holds about 7.6 million / 2^bits
-units: 115 at 16 bits, 462 at 14.
+**Text.** `GET /api/v1/range/{prefix}?bits=16` answers every unit whose key
+starts with the first `bits` bits of `prefix`. The client chooses `bits` (12 to
+20, default 16); `prefix` carries `ceil(bits/4)` hex characters, and bits past
+`bits` are ignored. An answer holds about 9.4 million / 2^bits units: 143 at 16
+bits, 574 at 14.
 
-- Without `content` the answer is `text/plain`: one line per unit, the 8 hex
-  characters of the 32 key bits after the prefix, sorted and made up with
-  stand-ins to the largest bucket of that prefix length.
-- With `content=true` the answer is bytes: `LUR1`, the prefix length (uint8),
-  the unit count (uint32), then per unit the 32 key bits after the prefix
-  (uint32), the uri's length (uint16), the text's length (uint32), the uri, and
-  the text as raw deflate of markdown. The text length `0xFFFFFFFF` says the
-  unit has no text of its own (a document whose provisions carry it),
-  `0xFFFFFFFE` that its text is over 64 kB (fetch the document instead).
-- The text is the provision's own: a paragraph, an article paragraph with its
-  points, a förarbete page, a judgment paragraph. A document without anchors (a
-  judgment) carries its whole text.
-- Zero bytes pad an answer to the size of the largest answer of its prefix
-  length, so all answers of one prefix length have one size: 184 kB at 16 bits,
-  543 kB at 14. A unit's text is capped at 64 kB, which keeps the largest answer
-  under twice the median.
-- Both answers are `no-transform`, never compressed, and the same for every
+```
+sha256("https://lagen.nu/celex/32016R0679#32.1") = b69f7810…  -> GET /api/v1/range/b69f
+                                                    then look for the entry 7810d690
+```
+
+- The answer is bytes: `LUR1`, the prefix length (uint8), the unit count
+  (uint32), then per unit the 32 key bits after the prefix (uint32), the uri's
+  length (uint16), the text's length (uint32), the uri, and the text as raw
+  deflate of markdown. The text length `0xFFFFFFFF` says the unit has no text of
+  its own: a document whose provisions carry it.
+- The text is the provision's own: a paragraph, an article with its paragraphs,
+  an article paragraph with its points, a förarbete page, a judgment paragraph.
+  A document without anchors (a judgment) carries its whole text.
+- The answer is not padded, since the server knows the prefix it answers. It is
+  about 105 kB at 16 bits; a bucket that holds a long document is larger.
+- The answer is `no-transform`, never compressed, and the same for every
   client. `503` means the unit index is not built; `422` means a prefix of the
   wrong length or `bits` outside 12–20.
-
-### Document packs for privacy mode — `GET /api/v1/packs/{pack_id}`
-
-A client that must not reveal which document it fetches downloads static
-bundles of documents in their native JSON artifact format.
-
-- `core`: the 250 most cited legal instruments across all sources (statutes,
-  treaties, EU regulations, and directives).
-- `sfs/{decade}s`: statutes by decade (e.g. `sfs/1990s`).
-- `celex/1`: all EU primary treaties in one pack.
-- `celex/{sector}/{year}`: secondary legislation (`celex/3/2016`) or court
-  rulings (`celex/6/2019`) by year.
-- `dom/{court}/{5yr_block}`: court decisions in 5-year blocks (e.g.
-  `dom/nja/2020-2024`, `dom/echr/2020-2024`).
-- `{kind}/{year}`: preparatory works by year (e.g. `prop/1997`, `sou/1997`,
-  `ds/2024`).
-
-The response is `application/json`:
-`{"pack": "<pack_id>", "documents": {"<uri>": { ...artifact... }}}`.
-Responses are stored and served precompressed with Brotli (`Content-Encoding: br`).
-Clients resolve pinpoints directly via node IDs in the document AST.
 
 ### Oblivious HTTP — `GET /api/v1/ohttp-keys`, `POST /api/v1/ohttp-gateway`
 
@@ -751,9 +703,8 @@ request and the relay's address.
 | shortest chain between two documents | `GET /api/v1/path?from=…&to=…` |
 | a document as PDF | `GET /api/v1/pdf?path=…` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
-| check a citation without showing which | `GET /api/v1/range/filter` (or `GET /api/v1/range/{prefix}`) |
-| read a provision without showing which | `GET /api/v1/range/units/{prefix}?bits=16&content=true` |
-| fetch a bundle of documents in private | `GET /api/v1/packs/{pack_id}` |
+| check a citation without showing which | `GET /api/v1/range/filter` |
+| read a provision without showing which | `GET /api/v1/range/{prefix}?bits=16` |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 
 ### What this API does not answer yet

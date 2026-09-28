@@ -1,6 +1,6 @@
 """The unit index: every document and every anchor a citation can name, each
 keyed by the hash of its own uri, with the text the citation points at. It
-serves privacy mode in /api/v1/range/filter and /api/v1/range/units/{prefix}.
+serves privacy mode in /api/v1/range/filter and /api/v1/range/{prefix}.
 
 A *unit* is a document uri ("https://lagen.nu/1915:218") or an anchor uri
 ("https://lagen.nu/1915:218#P3"). Its key is the first 8 bytes of sha256(uri),
@@ -22,7 +22,6 @@ hundred documents rewrites their units and nothing else. A change to the code
 that makes the text (this module, mdtext, text, eu_structure) rebuilds it."""
 
 import hashlib
-import json
 import multiprocessing
 import re
 import sqlite3
@@ -40,10 +39,8 @@ MIN_BITS, MAX_BITS, DEFAULT_BITS = 12, 20, 16
 SUFFIX_BITS = 32                  # an answer's entries: the 32 key bits after the prefix
 WORKER_MEMORY = 1.5e9            # bytes a worker may need for a large consolidated act
 COMMIT_EVERY = 2000
-TEXT_CAP = 64 * 1024              # a longer unit is answered without text (NO_TEXT_OVER_CAP)
 POPULAR = 4096                    # units listed after the filter, for filler requests
 NO_TEXT = 0xFFFFFFFF              # a document whose anchors carry its text
-NO_TEXT_OVER_CAP = 0xFFFFFFFE     # a unit whose text is longer than TEXT_CAP
 ANSWER_MAGIC = b"LUR1"
 _ENTRY = struct.Struct("<IHI")    # key suffix, uri length, text length (or a NO_TEXT marker)
 _CODE = [Path(__file__).parent / name for name in
@@ -189,11 +186,8 @@ def _rows(job):
             size, body = NO_TEXT, None
         else:
             raw = md.encode()
-            if len(raw) > TEXT_CAP:
-                size, body = NO_TEXT_OVER_CAP, None
-            else:
-                deflate = zlib.compressobj(9, zlib.DEFLATED, -15)
-                size, body = len(raw), deflate.compress(raw) + deflate.flush()
+            deflate = zlib.compressobj(9, zlib.DEFLATED, -15)
+            size, body = len(raw), deflate.compress(raw) + deflate.flush()
         rows.append((_stored(key(unit)), uri, unit, size, body))
     return uri, rows
 
@@ -257,33 +251,9 @@ def update(catalog_path, pinpoints, jobs=1, ignore_code=False):
             pool.terminate()
     total = store.execute("SELECT count(*) FROM units").fetchone()[0]
     if stale or gone or not filter_path(catalog_path).exists():
-        _write_meta(store)
         _write_filter(store, catalog_path, popular)
     store.close()
     return total, len(stale) + len(gone)
-
-
-def _write_meta(store):
-    """Each prefix length's padding: the largest entry count, and the size an
-    answer with text pads to -- the largest answer's, so every answer of a prefix
-    length has one size. The 64 kB cap on a unit's text keeps that small: the
-    largest bucket was 1.1 (12 bits) to 1.7 (16 bits) times the median, measured
-    on the corpus on 2026-09-28."""
-    counts = np.zeros(1 << MAX_BITS, dtype=np.int64)
-    sizes = np.zeros(1 << MAX_BITS, dtype=np.int64)
-    shift = 64 - MAX_BITS
-    for k, uri, body in store.execute("SELECT key, uri, body FROM units"):
-        b = (k + (1 << 63)) >> shift
-        counts[b] += 1
-        sizes[b] += _ENTRY.size + len(uri.encode()) + (len(body) if body else 0)
-    padding = {}
-    for bits in range(MIN_BITS, MAX_BITS + 1):
-        group = 1 << (MAX_BITS - bits)
-        c = counts.reshape(-1, group).sum(axis=1)
-        s = sizes.reshape(-1, group).sum(axis=1) + len(ANSWER_MAGIC) + 5
-        padding[bits] = {"entries": int(c.max()), "bytes": int(s.max())}
-    with store:
-        store.execute("INSERT OR REPLACE INTO meta VALUES ('padding', ?)", (json.dumps(padding),))
 
 
 def _write_filter(store, catalog_path, popular):
@@ -299,11 +269,6 @@ def _write_filter(store, catalog_path, popular):
 
 # --- answering ---------------------------------------------------------------
 
-def _padding(con):
-    row = con.execute("SELECT value FROM meta WHERE key = 'padding'").fetchone()
-    return {int(bits): v for bits, v in json.loads(row[0]).items()}
-
-
 def _range(prefix, bits):
     lo = prefix << (64 - bits)
     return _stored(lo), _stored(lo + (1 << (64 - bits)) - 1)
@@ -313,32 +278,13 @@ def _suffix(stored, bits):
     return ((stored + (1 << 63)) >> (64 - bits - SUFFIX_BITS)) & 0xFFFFFFFF
 
 
-def entries(catalog_path, prefix, bits):
-    """The answer without text: each unit's 32 key bits after the prefix, as
-    8-hex lines, sorted and made up to the largest bucket of this prefix length
-    with stand-ins that change only when the bucket does."""
-    con = sqlite3.connect("file:%s?mode=ro" % store_path(catalog_path), uri=True)
-    capacity = _padding(con)[bits]["entries"]
-    lo, hi = _range(prefix, bits)
-    real = {_suffix(k, bits) for (k,) in con.execute(
-        "SELECT key FROM units WHERE key BETWEEN ? AND ?", (lo, hi))}
-    con.close()
-    out = set(real)
-    seed = hashlib.sha256(b"%d/%d\n" % (bits, prefix) + b"".join(
-        s.to_bytes(4, "big") for s in sorted(real))).digest()
-    while len(out) < capacity:
-        seed = hashlib.sha256(seed).digest()
-        out.add(int.from_bytes(seed[:4], "big"))
-    return "".join("%08x\n" % s for s in sorted(out))
-
-
 def content(catalog_path, prefix, bits):
-    """The answer with text, as bytes: `ANSWER_MAGIC`, the prefix length, the
-    unit count, then per unit its key suffix, uri and text (raw deflate, or a
-    NO_TEXT marker), zero-padded to the size of this prefix length's largest
-    answer."""
+    """The answer, as bytes: `ANSWER_MAGIC`, the prefix length, the unit count,
+    then per unit its key suffix, uri and text (raw deflate, or the NO_TEXT
+    marker). The server knows the prefix it answers, so the answer is not padded:
+    padding would hide its size only from a party that sees the traffic but not
+    the request."""
     con = sqlite3.connect("file:%s?mode=ro" % store_path(catalog_path), uri=True)
-    target = _padding(con)[bits]["bytes"]
     lo, hi = _range(prefix, bits)
     rows = con.execute("SELECT key, uri, size, body FROM units WHERE key BETWEEN ? AND ? "
                        "ORDER BY key", (lo, hi)).fetchall()
@@ -346,7 +292,6 @@ def content(catalog_path, prefix, bits):
     parts = [ANSWER_MAGIC, struct.pack("<BI", bits, len(rows))]
     for k, uri, size, body in rows:
         u = uri.encode()
-        length = size if size in (NO_TEXT, NO_TEXT_OVER_CAP) else len(body)
+        length = size if size == NO_TEXT else len(body)
         parts.append(_ENTRY.pack(_suffix(k, bits), len(u), length) + u + (body or b""))
-    data = b"".join(parts)
-    return data + bytes(max(0, target - len(data)))
+    return b"".join(parts)

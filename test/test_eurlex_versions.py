@@ -323,5 +323,5 @@ def test_a_judgment_paragraph_is_anchored_as_its_point(tmp_path, monkeypatch):
     html = _rendered(tmp_path, monkeypatch, art)
     assert 'id="point-37"' in html
     assert "point-37.S1" not in html
-    # the lookup index publishes the same anchor (lib.rangeindex)
+    # the lookup index publishes the same anchor (lib.unitindex)
     assert text.citable_anchors(art) == {"point-37"}

@@ -152,7 +152,7 @@ class Source:
                                           # search units for it (kommentar, lawreview)
     # which of a document's anchors a citation can name, as a regex the whole
     # anchor must match -- what /api/v1/range publishes beside the document
-    # itself (lib/rangeindex). None: nothing cites into this source's documents,
+    # itself (lib/unitindex). None: nothing cites into this source's documents,
     # so only the documents are published. It is a claim about the citation
     # grammar, not about the artifact: a HUDOC judgment mints an id per block
     # (51,671 in one case) and no citation names one. After changing it, run

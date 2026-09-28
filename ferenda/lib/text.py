@@ -226,7 +226,7 @@ def fragment_ids(art):
 
 def citable_anchors(art):
     """Every fragment a citation to this document can name, read off the
-    presented body -- the set `lib.rangeindex` publishes, so a client can tell
+    presented body -- the set `lib.unitindex` publishes, so a client can tell
     "12 kap. 52 §" from a provision the statute does not have.
 
     Three grammars, all field-driven: a node's minted ``id`` (K1P2, a14.3.1); an

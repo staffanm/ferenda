@@ -594,19 +594,15 @@ standalone SFS number as context for a later “samma lag” reference.
 Extraction clears all thread-local parser text and learned context on success
 and failure. Its error boundary logs only exception types and code locations.
 
-`lib/rangeindex.py` is the range index behind `GET /api/v1/range/{prefix}`: a
-client checks a citation against a bucket of hashes, so the server does not
-learn which citation. The bucket is the first 3 hex characters of
-`sha256(document uri)`; an entry is the first 8 bytes of `sha256(uri)` for the
-document and of `sha256(uri#anchor)` for each anchor a citation can name. The
-prefix comes from the document uri, so a document and its provisions share one
-bucket and one request answers for both. Relate writes one `range_anchors` row
-per document in `catalog._index_document`. After relate, `write_sidecar` writes
-`range-index.bin` beside the catalog, and the route reads one bucket from it
-with three small reads. `fill` makes every answer the size of the largest
-bucket, with stand-in entries that are fixed per bucket. The route marks the
-answer `no-transform`, and `api/compression.py` does not compress such an
-answer: a compressed length follows the content.
+`lib/unitindex.py` is the unit index behind `GET /api/v1/range/filter` and
+`GET /api/v1/range/{prefix}`: a client checks and reads a citation, and the
+server does not learn which citation. A unit is a document uri or an anchor
+uri, keyed by the first 8 bytes of `sha256(uri)`. The filter
+(`range-filter.bin`, a binary fuse filter from `lib/fusefilter.py`) answers
+existence in the client. The store (`range-units.sqlite`) holds each unit's
+text as raw deflate of markdown, and the route answers every unit whose key
+starts with a prefix of 12–20 bits. Relate updates the store by content hash
+after the catalog.
 
 Which anchors a citation can name has two parts. `text.citable_anchors(art)`
 reads them off the presented body: node ids, the EU sub-article anchors from
@@ -618,16 +614,6 @@ anchors. The citation grammar emits fragments for those sources only (20,000
 sampled references, 2026-09-17), and a HUDOC judgment mints one id per block
 (51,671 in `dom/echr/001-178082`), which would set the size of every answer.
 After a change to `pinpoints`, run `lagen <source> relate --force`.
-
-`lib/packs.py` builds and caches document packs behind `GET /api/v1/packs/{pack_id}`
-for Slopcheck privacy mode: coarse bundles of legal documents in their native
-JSON artifact format. Packs are partitioned deterministically: `core` (the top
-250 cited documents globally), `sfs/{decade}s`, `celex/1` (treaties),
-`celex/{sector}/{year}` (secondary legislation or case law),
-`dom/{court}/{5yr_block}`, and `{kind}/{year}` for förarbeten. Packs are
-assembled from `catalog.sqlite` and the artifact files on disk, and cached as
-Brotli-compressed `.json.br` files under `cache/packs/`. Clients parse the JSON
-directly and locate provisions via their node IDs.
 
 `api/ohttp.py` is the Oblivious HTTP gateway (RFC 9458): `GET /api/v1/ohttp-keys`
 and `POST /api/v1/ohttp-gateway`. These endpoints are disabled in the API

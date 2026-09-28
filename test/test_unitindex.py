@@ -1,6 +1,6 @@
 """The unit index (ferenda/lib/unitindex.py) behind /api/v1/range/filter and
-/api/v1/range/units: each document and provision keyed by its own uri hash, read
-here the way a client reads it."""
+/api/v1/range/{prefix}: each document and provision keyed by its own uri hash,
+read here the way a client reads it."""
 
 import hashlib
 import json
@@ -52,7 +52,7 @@ def corpus(tmp_path):
         "body": [{"type": "stycke", "text": ["Högsta domstolen fastställer hovrättens dom."]}]})]
     cat = tmp_path / "catalog.sqlite"
     for source, paths in (("sfs", sfs), ("eurlex", eurlex), ("forarbete", forarbete), ("dv", dv)):
-        catalog.rebuild(cat, source, paths, pinpoints=PINPOINTS[source])
+        catalog.rebuild(cat, source, paths)
     unitindex.update(cat, PINPOINTS)
     return cat
 
@@ -69,7 +69,7 @@ def _key(uri):
 
 
 def _decode(data):
-    """What a client does with a content answer: ``{suffix: (uri, text or marker)}``."""
+    """What a client does with an answer: ``{suffix: (uri, text or NO_TEXT)}``."""
     assert data[:4] == b"LUR1"
     bits, count = struct.unpack_from("<BI", data, 4)
     at, out = 9, {}
@@ -78,12 +78,12 @@ def _decode(data):
         at += 10
         uri = data[at:at + ulen].decode()
         at += ulen
-        if tlen in (unitindex.NO_TEXT, unitindex.NO_TEXT_OVER_CAP):
+        if tlen == unitindex.NO_TEXT:
             out[suffix] = (uri, tlen)
         else:
             out[suffix] = (uri, zlib.decompress(data[at:at + tlen], -15).decode())
             at += tlen
-    assert not any(data[at:])                     # the rest is padding
+    assert at == len(data)                        # no padding
     return bits, out
 
 
@@ -91,7 +91,7 @@ def _fetch(client, uri, bits=16):
     k = _key(uri)
     width = -(-bits // 4)
     hexprefix = "%0*x" % (width, (k >> (64 - bits)) << (4 * width - bits))
-    answer = client.get("/api/v1/range/units/%s?bits=%d&content=true" % (hexprefix, bits))
+    answer = client.get("/api/v1/range/%s?bits=%d" % (hexprefix, bits))
     assert answer.status_code == 200
     got_bits, units = _decode(answer.content)
     assert got_bits == bits
@@ -142,35 +142,32 @@ def test_a_document_with_anchors_carries_no_text(client):
 
 
 @pytest.mark.parametrize("bits", [12, 13, 16, 20])
-def test_every_answer_of_a_prefix_length_has_one_size(client, bits):
-    sizes = {len(_fetch(client, uri, bits)[1].content) for uri in (BB, PROP + "#sid39", GDPR, NJA)}
-    width = -(-bits // 4)
-    sizes.add(len(client.get("/api/v1/range/units/%s?bits=%d&content=true" % ("0" * width, bits)).content))
-    assert len(sizes) == 1
+def test_a_unit_is_found_at_every_prefix_length(client, bits):
+    for uri in (BB + "#K3P1", PROP + "#sid39", GDPR + "#6.1.a", NJA):
+        assert _fetch(client, uri, bits)[0][0] == uri
 
 
-def test_the_answer_without_text_is_padded_suffixes(client):
-    answers = [client.get("/api/v1/range/units/%04x" % n) for n in (0, 0xffff, _key(BB) >> 48)]
-    lines = [a.text.split() for a in answers]
-    assert len({len(x) for x in lines}) == 1
-    assert "%08x" % ((_key(BB) >> 16) & 0xFFFFFFFF) in lines[2]
-    assert all(x == sorted(x) and all(len(e) == 8 for e in x) for x in lines)
+def test_a_long_unit_carries_all_its_text(client, corpus):
+    arts = corpus.parent / "artifact"
+    art = json.loads((arts / "nja.json").read_text())
+    art["body"][0]["text"] = ["Högsta domstolen fastställer. " * 5000]
+    _write(arts / "nja.json", art)
+    catalog.rebuild(corpus, "dv", [arts / "nja.json"])
+    unitindex.update(corpus, PINPOINTS)
+    found, _ = _fetch(client, NJA)
+    assert found[1].count("Högsta domstolen fastställer.") == 5000
 
 
-@pytest.mark.parametrize("path", ["units/c4a", "units/c4a1f", "units/xyz1", "units/c4a1?bits=11",
-                                  "units/c4a1?bits=21", "units/c4a?bits=13"])
+@pytest.mark.parametrize("path", ["c4a", "c4a1f", "xyz1", "c4a1?bits=11",
+                                  "c4a1?bits=21", "c4a?bits=13"])
 def test_a_malformed_request_is_a_422(client, path):
     assert client.get("/api/v1/range/" + path).status_code == 422
-
-
-def test_the_legacy_range_route_still_answers(client, corpus):
-    assert client.get("/api/v1/range/000").status_code in (200, 503)
 
 
 def test_no_store_is_a_503(client, corpus):
     unitindex.store_path(corpus).unlink()
     unitindex.filter_path(corpus).unlink()
-    assert client.get("/api/v1/range/units/0000").status_code == 503
+    assert client.get("/api/v1/range/0000").status_code == 503
     assert client.get("/api/v1/range/filter").status_code == 503
 
 
@@ -179,10 +176,10 @@ def test_an_update_rewrites_only_changed_documents(corpus):
     art = json.loads((arts / "nja.json").read_text())
     art["body"][0]["text"] = ["Högsta domstolen ändrar hovrättens dom."]
     _write(arts / "nja.json", art)
-    catalog.rebuild(corpus, "dv", [arts / "nja.json"], pinpoints=None)
+    catalog.rebuild(corpus, "dv", [arts / "nja.json"])
     assert unitindex.update(corpus, PINPOINTS)[1] == 1
     (arts / "bb.json").unlink()
-    catalog.rebuild(corpus, "sfs", [], pinpoints=".+")
+    catalog.rebuild(corpus, "sfs", [])
     units, rewritten = unitindex.update(corpus, PINPOINTS)
     assert rewritten == 1
     data = unitindex.filter_path(corpus).read_bytes()

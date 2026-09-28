@@ -64,10 +64,8 @@ from ..lib import (
     history,
     layout,
     mdtext,
-    packs,
     pathgraph,
     pins,
-    rangeindex,
     search,
     unitindex,
     util,
@@ -1973,9 +1971,9 @@ def range_filter_endpoint():
     xor_singleheader reference implementation; a key is in the set with one
     false yes in 65 536. After the fingerprints: a uint32 count and, for the most
     cited units, the first 32 bits of the key and the citation count (uint32
-    each), from which a client draws its filler requests to /range/units.
+    each), from which a client draws its filler requests to /range/{prefix}.
 
-    One file for everyone, about 18 MB, rewritten when relate changes the
+    One file for everyone, about 21 MB, rewritten when relate changes the
     corpus; cache it and revalidate."""
     path = unitindex.filter_path(layout.CATALOG)
     if not path.exists():
@@ -1984,132 +1982,38 @@ def range_filter_endpoint():
                         headers={"Cache-Control": "public, max-age=86400, no-transform"})
 
 
-@app.get("/api/v1/range/units/{prefix}", response_class=Response, tags=["privacy"],
+@app.get("/api/v1/range/{prefix}", response_class=Response, tags=["privacy"],
          summary="The units whose uri hash starts with a prefix, with their text",
-         responses={200: {"content": {"text/plain": {}, "application/octet-stream": {}}}})
-def range_units_endpoint(
+         responses={200: {"content": {"application/octet-stream": {}}}})
+def range_endpoint(
         prefix: str = PathParam(..., pattern="^[0-9a-f]{3,5}$",
                                 description="hex of the first `bits` bits of sha256(unit uri)"),
         bits: int = Query(unitindex.DEFAULT_BITS, ge=unitindex.MIN_BITS, le=unitindex.MAX_BITS,
                           description="the prefix length in bits; the hex carries "
-                                      "ceil(bits/4) characters, and bits past `bits` are ignored"),
-        content: bool = Query(False, description="also send each unit's text")):
+                                      "ceil(bits/4) characters, and bits past `bits` are ignored")):
     """The units -- documents and provisions -- whose key starts with a prefix of
-    `bits` bits, where a unit's key is sha256(unit uri). Each unit is keyed by
-    its own uri, so a provision and its document fall in unrelated buckets, and
-    an answer holds about 7.6 million / 2^bits units (115 at the default 16).
+    `bits` bits, where a unit's key is sha256(unit uri), with the text of each.
+    Each unit is keyed by its own uri, so a provision and its document fall in
+    unrelated buckets, and an answer holds about 9.4 million / 2^bits units (143
+    at the default 16).
 
-    Without `content`: one line per unit, the 8 hex characters of the 32 key
-    bits after the prefix, sorted, made up to the largest bucket of this prefix
-    length with stand-ins, so the length names no bucket.
+    The answer is bytes: `LUR1`, the prefix length (uint8), the unit count
+    (uint32), then per unit: the 32 key bits after the prefix (uint32), the
+    uri's length (uint16), the text's length (uint32), the uri and the text as
+    raw deflate of markdown. The text length 0xFFFFFFFF says the unit has no
+    text of its own: a document whose provisions carry it.
 
-    With `content=true`: bytes. `LUR1`, the prefix length (uint8), the unit
-    count (uint32), then per unit: the 32 key bits after the prefix (uint32),
-    the uri's length (uint16), the text's length (uint32), the uri and the text
-    as raw deflate of markdown. The text length 0xFFFFFFFF says the unit has no
-    text of its own (a document whose provisions carry it), 0xFFFFFFFE that its
-    text is longer than 64 kB (fetch the document instead). Zero bytes pad the
-    answer to the size of the largest answer of its prefix length, so every
-    answer of one prefix length has one size (184 kB at 16 bits).
-
-    Both answers are marked `no-transform`, are never compressed, and are the
-    same for every client, so they cache well."""
+    The answer is marked `no-transform`, is never compressed, and is the same
+    for every client, so it caches well."""
     width = -(-bits // 4)
     if len(prefix) != width:
         raise HTTPException(422, "a %d-bit prefix is %d hex characters" % (bits, width))
     if not unitindex.store_path(layout.CATALOG).exists():
         raise HTTPException(503, "unit index not built -- run relate")
     number = int(prefix, 16) >> (4 * width - bits)
-    headers = {"Cache-Control": "public, max-age=86400, no-transform"}
-    if content:
-        return Response(unitindex.content(layout.CATALOG, number, bits),
-                        media_type="application/octet-stream", headers=headers)
-    return Response(unitindex.entries(layout.CATALOG, number, bits),
-                    media_type="text/plain", headers=headers)
-
-
-@app.get("/api/v1/range/{prefix}", response_class=Response, tags=["privacy"],
-         summary="The hashes of ~100 documents and their provisions",
-         responses={200: {"content": {"text/plain": {}}}})
-def range_endpoint(prefix: str = PathParam(
-        ..., pattern="^[0-9a-f]{%d}$" % rangeindex.PREFIX_HEX,
-        description="the first %d hex characters of sha256(document uri)"
-                    % rangeindex.PREFIX_HEX)):
-    """Whether the corpus holds a document, and a provision of it, answered
-    without learning which one was asked for.
-
-    The client hashes the citation's **document** uri -- the fragment removed,
-    the uri exactly as this API writes it, no case folding -- and sends the
-    first three hex characters of the SHA-256. The answer is every hash the
-    corpus holds for the documents that share them, one per line: the first 16
-    hex characters of `sha256(uri)` for each document, and of
-    `sha256(uri + "#" + anchor)` for each provision a citation to it can name
-    (`K12P52`, `32.1`, `sid39`).
-
-    The document is held when its own hash is in the answer, and the provision
-    is one it has *as it reads today* when the provision's hash is there too.
-    An older wording's provisions are not in the index.
-
-    Every answer has the same number of lines: a short bucket is made up with
-    entries that look like the others, so an answer's length names no bucket. A
-    made-up entry matches a real citation with probability 2^-64. The answer is
-    marked `no-transform` and is never compressed, for the same reason."""
-    if not rangeindex.sidecar_path(layout.CATALOG).exists():
-        raise HTTPException(503, "range index not built -- run relate")
-    number = int(prefix, 16)
-    entries = rangeindex.fill(number, *rangeindex.bucket(layout.CATALOG, number))
-    return Response("".join(e.hex() + "\n" for e in entries), media_type="text/plain",
-                    headers={"Cache-Control": "public, max-age=3600, no-transform"})
-
-
-@app.get("/api/v1/packs/{pack_id:path}", response_class=Response, tags=["privacy"],
-         summary="A static bundle of documents for privacy mode",
-         responses={200: {"content": {"application/json": {}}}})
-def pack_endpoint(
-    request: Request,
-    pack_id: str = PathParam(
-        ..., description="pack identifier (core, sfs/1990s, celex/3/2016, dom/nja/2020-2024, prop/1997, sou/1997)",
-    ),
-):
-    """A bundle of legal documents in their native JSON artifact format, for
-    checking or analyzing citations without disclosing which specific document is queried.
-
-    The client maps its citation to a deterministic pack identifier (such as
-    `core`, `sfs/1990s`, `celex/3/2016`, `dom/nja/2020-2024`, `prop/1997`, or
-    `sou/1997`) and retrieves the pack. The response is a JSON object mapping
-    document URIs to their full artifact dict.
-
-    Stored and served as a precompressed Brotli `.json.br` file. A client accepting
-    Brotli receives the file directly with `Content-Encoding: br`."""
-    if not packs.SAFE_PACK_ID.match(pack_id):
-        raise HTTPException(400, "invalid pack id")
-    cached = packs.pack_path(pack_id, layout.PACKS_CACHE)
-    if not cached.exists() and not layout.CATALOG.exists():
-        raise HTTPException(503, "catalog not built -- run relate")
-    pack_file = packs.get_cached_pack(layout.CATALOG, layout.DATA, layout.PACKS_CACHE, pack_id)
-    if pack_file is None:
-        raise HTTPException(404, f"pack not found: {pack_id}")
-
-    accepts = request.headers.get("accept-encoding", "")
-    if "br" in accepts:
-        return FileResponse(
-            pack_file,
-            media_type="application/json",
-            headers={
-                "Content-Encoding": "br",
-                "Vary": "Accept-Encoding",
-                "Cache-Control": "public, max-age=86400",
-            },
-        )
-    raw = compress.decompress_bytes(pack_file.read_bytes(), "br")
-    return Response(
-        raw,
-        media_type="application/json",
-        headers={
-            "Vary": "Accept-Encoding",
-            "Cache-Control": "public, max-age=86400",
-        },
-    )
+    return Response(unitindex.content(layout.CATALOG, number, bits),
+                    media_type="application/octet-stream",
+                    headers={"Cache-Control": "public, max-age=86400, no-transform"})
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"],

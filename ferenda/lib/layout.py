@@ -725,7 +725,6 @@ FACSIMILE = DATA / "cache" / "facsimile"
 # 40 kB of XML, since a scan carries almost no text), so the whole cache costs
 # about 1% of the downloaded bytes.
 PDFCONV = DATA / "cache" / "pdfconv"
-PACKS_CACHE = DATA / "cache" / "packs"
 
 
 def pdf_conversion(pdf_path, kind):
