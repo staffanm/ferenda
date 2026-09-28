@@ -75,7 +75,11 @@ PAD_BLOCK = 256
 # key stays in the file, or a client holding the old configuration gets a 400.
 KEYS_MAX_AGE = 86400
 
-INNER_PATH = re.compile(r"^/api/v1/(?:range|packs)/[A-Za-z0-9/_-]+$")
+# the one query the routes take: /api/v1/range/units' prefix length and whether
+# to send text (?bits=16&content=true). Any other parameter is refused.
+_QUERY_PARAM = r"(?:bits=\d{1,2}|content=(?:true|false))"
+INNER_PATH = re.compile(r"^/api/v1/(?:range|packs)/[A-Za-z0-9/_-]+"
+                        r"(?:\?%s(?:&%s)?)?$" % (_QUERY_PARAM, _QUERY_PARAM))
 INNER_METHODS = ("GET", "HEAD")
 
 
@@ -232,9 +236,10 @@ async def _dispatch(app, method, path, accept, encodings=()):
     headers = [(b"host", b"lagen.nu")] + [(b"accept", v) for v in accept]
     if encodings:
         headers.extend([(b"accept-encoding", v) for v in encodings])
+    path, _, query = path.partition("?")
     scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
              "method": method, "scheme": "https", "path": path,
-             "raw_path": path.encode("ascii"), "query_string": b"",
+             "raw_path": path.encode("ascii"), "query_string": query.encode("ascii"),
              "headers": headers,
              "client": None, "server": ("lagen.nu", 443)}
     request = [{"type": "http.request", "body": b"", "more_body": False}]

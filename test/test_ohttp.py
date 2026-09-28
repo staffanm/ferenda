@@ -52,6 +52,10 @@ def gateway(keyfile):
     def stand_in(prefix: str, request: Request):
         return {"prefix": prefix, "headers": sorted(request.headers.keys())}
 
+    @app.get("/api/v1/range/units/{prefix}")
+    def units_stand_in(prefix: str, bits: int = 16, content: bool = False):
+        return {"prefix": prefix, "bits": bits, "content": content}
+
     @app.get("/api/v1/packs/core")
     def pack_stand_in(request: Request):
         return {"pack": "core", "headers": sorted(request.headers.keys())}
@@ -153,9 +157,16 @@ def test_only_accept_reaches_the_inner_route(gateway):
     assert json.loads(content)["headers"] == ["accept", "host"]
 
 
+def test_the_units_route_gets_its_prefix_length_and_content_flag(gateway):
+    status, _, content, _ = _ask(gateway, b"GET", b"/api/v1/range/units/c4a1?bits=14&content=true")
+    assert status == 200
+    assert json.loads(content) == {"prefix": "c4a1", "bits": 14, "content": True}
+
+
 @pytest.mark.parametrize("path", [
     b"/api/v1/document", b"/internal-api/v1/auth/me", b"/ops",
-    b"/api/v1/range/../document", b"/api/v1/range/c4a?uri=x", b"/api/v1/rangefinder/x"])
+    b"/api/v1/range/../document", b"/api/v1/range/c4a?uri=x", b"/api/v1/rangefinder/x",
+    b"/api/v1/range/units/c4a1?bits=16&uri=x", b"/api/v1/range/units/c4a1?bits=100"])
 def test_a_path_outside_range_and_packs_is_refused_inside_the_seal(gateway, path):
     status, _, content, _ = _ask(gateway, b"GET", path)
     assert status == 403
