@@ -69,6 +69,7 @@ from ..lib import (
     pins,
     rangeindex,
     search,
+    unitindex,
     util,
 )
 from . import (
@@ -1954,6 +1955,77 @@ def sfs_graphic_endpoint(
         catalog.uri_local(uri), node,
         facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI,
         may_render=auth.from_own_page(request))
+
+
+@app.get("/api/v1/range/filter", response_class=FileResponse, tags=["privacy"],
+         summary="Every document and provision, as a filter a client queries locally",
+         responses={200: {"content": {"application/octet-stream": {}}}})
+def range_filter_endpoint():
+    """A binary fuse filter over every unit the corpus holds -- each document uri
+    and each provision uri (`https://lagen.nu/1915:218#P36`, `…#sid19`,
+    `…/celex/32016R0679#7.3`, `…/celex/62012CJ0131#point-98`) -- so a client
+    checks whether a citation exists without a request that names it.
+
+    A unit's key is the first 8 bytes of sha256(uri), big-endian. The file is
+    the magic line `lagen-fuse16-1`, a little-endian header (uint64 seed, uint32
+    segment length, uint32 segment count length, uint32 array length) and the
+    uint16 fingerprints, laid out and hashed as `BinaryFuse16` in the
+    xor_singleheader reference implementation; a key is in the set with one
+    false yes in 65 536. After the fingerprints: a uint32 count and, for the most
+    cited units, the first 32 bits of the key and the citation count (uint32
+    each), from which a client draws its filler requests to /range/units.
+
+    One file for everyone, about 18 MB, rewritten when relate changes the
+    corpus; cache it and revalidate."""
+    path = unitindex.filter_path(layout.CATALOG)
+    if not path.exists():
+        raise HTTPException(503, "unit index not built -- run relate")
+    return FileResponse(path, media_type="application/octet-stream",
+                        headers={"Cache-Control": "public, max-age=86400, no-transform"})
+
+
+@app.get("/api/v1/range/units/{prefix}", response_class=Response, tags=["privacy"],
+         summary="The units whose uri hash starts with a prefix, with their text",
+         responses={200: {"content": {"text/plain": {}, "application/octet-stream": {}}}})
+def range_units_endpoint(
+        prefix: str = PathParam(..., pattern="^[0-9a-f]{3,5}$",
+                                description="hex of the first `bits` bits of sha256(unit uri)"),
+        bits: int = Query(unitindex.DEFAULT_BITS, ge=unitindex.MIN_BITS, le=unitindex.MAX_BITS,
+                          description="the prefix length in bits; the hex carries "
+                                      "ceil(bits/4) characters, and bits past `bits` are ignored"),
+        content: bool = Query(False, description="also send each unit's text")):
+    """The units -- documents and provisions -- whose key starts with a prefix of
+    `bits` bits, where a unit's key is sha256(unit uri). Each unit is keyed by
+    its own uri, so a provision and its document fall in unrelated buckets, and
+    an answer holds about 7.6 million / 2^bits units (115 at the default 16).
+
+    Without `content`: one line per unit, the 8 hex characters of the 32 key
+    bits after the prefix, sorted, made up to the largest bucket of this prefix
+    length with stand-ins, so the length names no bucket.
+
+    With `content=true`: bytes. `LUR1`, the prefix length (uint8), the unit
+    count (uint32), then per unit: the 32 key bits after the prefix (uint32),
+    the uri's length (uint16), the text's length (uint32), the uri and the text
+    as raw deflate of markdown. The text length 0xFFFFFFFF says the unit has no
+    text of its own (a document whose provisions carry it), 0xFFFFFFFE that its
+    text is longer than 64 kB (fetch the document instead). Zero bytes pad the
+    answer to the size of the largest answer of its prefix length, so every
+    answer of one prefix length has one size (184 kB at 16 bits).
+
+    Both answers are marked `no-transform`, are never compressed, and are the
+    same for every client, so they cache well."""
+    width = -(-bits // 4)
+    if len(prefix) != width:
+        raise HTTPException(422, "a %d-bit prefix is %d hex characters" % (bits, width))
+    if not unitindex.store_path(layout.CATALOG).exists():
+        raise HTTPException(503, "unit index not built -- run relate")
+    number = int(prefix, 16) >> (4 * width - bits)
+    headers = {"Cache-Control": "public, max-age=86400, no-transform"}
+    if content:
+        return Response(unitindex.content(layout.CATALOG, number, bits),
+                        media_type="application/octet-stream", headers=headers)
+    return Response(unitindex.entries(layout.CATALOG, number, bits),
+                    media_type="text/plain", headers=headers)
 
 
 @app.get("/api/v1/range/{prefix}", response_class=Response, tags=["privacy"],

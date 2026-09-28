@@ -622,6 +622,54 @@ sha256("https://lagen.nu/celex/32016R0679#32.1") = b69f7810…  -> article 32.1:
 - `503` means the index is not built. `422` means the prefix is not 3 lower-case
   hex characters.
 
+### Check and read a citation in private — `GET /api/v1/range/filter` and `GET /api/v1/range/units/{prefix}`
+
+These two routes replace the route above for a client that also wants the text.
+A *unit* is a document uri or a provision uri (`https://lagen.nu/1915:218`,
+`https://lagen.nu/1915:218#P36`). Its key is the first 8 bytes of
+`sha256(unit uri)`, big-endian. Each unit is keyed by its own uri, so a
+provision and its document fall in unrelated buckets.
+
+**Existence.** `GET /api/v1/range/filter` is one file for every client, about
+18 MB: a binary fuse filter over every unit's key, with 16-bit fingerprints. A
+key is in the set with one false yes in 65,536. The client downloads it once,
+caches it, and checks every citation and its document locally; no request names
+a citation.
+
+- Layout: the line `lagen-fuse16-1`, a little-endian header (uint64 seed, uint32
+  segment length, uint32 segment count length, uint32 array length), and the
+  uint16 fingerprints. Hashing and lookup are those of `BinaryFuse16` in the
+  xor_singleheader reference implementation.
+- After the fingerprints: a uint32 count, then for each of the most cited units
+  the first 32 bits of its key and its citation count (uint32 each). A client
+  draws its filler requests from these.
+
+**Text.** `GET /api/v1/range/units/{prefix}?bits=16&content=true` answers every
+unit whose key starts with the first `bits` bits of `prefix`. The client chooses
+`bits` (12 to 20, default 16); `prefix` carries `ceil(bits/4)` hex characters,
+and bits past `bits` are ignored. An answer holds about 7.6 million / 2^bits
+units: 115 at 16 bits, 462 at 14.
+
+- Without `content` the answer is `text/plain`: one line per unit, the 8 hex
+  characters of the 32 key bits after the prefix, sorted and made up with
+  stand-ins to the largest bucket of that prefix length.
+- With `content=true` the answer is bytes: `LUR1`, the prefix length (uint8),
+  the unit count (uint32), then per unit the 32 key bits after the prefix
+  (uint32), the uri's length (uint16), the text's length (uint32), the uri, and
+  the text as raw deflate of markdown. The text length `0xFFFFFFFF` says the
+  unit has no text of its own (a document whose provisions carry it),
+  `0xFFFFFFFE` that its text is over 64 kB (fetch the document instead).
+- The text is the provision's own: a paragraph, an article paragraph with its
+  points, a förarbete page, a judgment paragraph. A document without anchors (a
+  judgment) carries its whole text.
+- Zero bytes pad an answer to the size of the largest answer of its prefix
+  length, so all answers of one prefix length have one size: 184 kB at 16 bits,
+  543 kB at 14. A unit's text is capped at 64 kB, which keeps the largest answer
+  under twice the median.
+- Both answers are `no-transform`, never compressed, and the same for every
+  client. `503` means the unit index is not built; `422` means a prefix of the
+  wrong length or `bits` outside 12–20.
+
 ### Document packs for privacy mode — `GET /api/v1/packs/{pack_id}`
 
 A client that must not reveal which document it fetches downloads static
@@ -663,7 +711,8 @@ request and the relay's address.
   `message/ohttp-res`. The inner message is a known-length Binary HTTP request
   ([RFC 9292](https://www.rfc-editor.org/rfc/rfc9292)).
 - The gateway serves `GET` and `HEAD` of `/api/v1/range/…` and `/api/v1/packs/…`
-  only. The path can not have a query string. It sends only the inner `Accept`
+  only. The only query it passes is `bits=N` and `content=true|false`, for
+  `/api/v1/range/units/…`. It sends only the inner `Accept`
   header to the route.
 - The inner response is padded with zero bytes to a multiple of 256 bytes
   before the gateway seals it.
@@ -702,7 +751,8 @@ request and the relay's address.
 | shortest chain between two documents | `GET /api/v1/path?from=…&to=…` |
 | a document as PDF | `GET /api/v1/pdf?path=…` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
-| check a citation without showing which | `GET /api/v1/range/{prefix}` |
+| check a citation without showing which | `GET /api/v1/range/filter` (or `GET /api/v1/range/{prefix}`) |
+| read a provision without showing which | `GET /api/v1/range/units/{prefix}?bits=16&content=true` |
 | fetch a bundle of documents in private | `GET /api/v1/packs/{pack_id}` |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 

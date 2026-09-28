@@ -47,6 +47,7 @@ from . import (
     render,
     runlog,
     search,
+    unitindex,
     util,
     writerlock,
 )
@@ -481,6 +482,16 @@ def cmd_relate(sources, names, force=None, jobs=1):
         print("relate: range index sidecar written -- %d documents, %d entries, "
               "largest bucket %d (%.1fs)"
               % (docs, entries, capacity, time.perf_counter() - t0))
+    # the unit store and filter behind /api/v1/range/units and /range/filter:
+    # incremental on the catalog's content hashes, so it also runs when the
+    # catalog is unchanged but the store is missing (a first run after deploy)
+    if layout.CATALOG.exists() and (dirty or not unitindex.store_path(layout.CATALOG).exists()):
+        t0 = time.perf_counter()
+        units, rewritten = unitindex.update(
+            layout.CATALOG, {n: s.pinpoints for n, s in protocol.SOURCES.items()}, jobs,
+            ignore_code=protocol.RUN.ignore_code_changes)
+        print("relate: unit index written -- %d units, %d documents rewritten (%.1fs)"
+              % (units, rewritten, time.perf_counter() - t0))
     if dirty:
         freshness.save_fingerprints(store)
     print("catalog: %s" % layout.CATALOG)
