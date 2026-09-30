@@ -602,7 +602,13 @@ uri, keyed by the first 8 bytes of `sha256(uri)`. The filter
 existence in the client. The store (`range-units.sqlite`) holds each unit's
 text as raw deflate of markdown, and the route answers every unit whose key
 starts with a prefix of 12–20 bits. Relate updates the store by content hash
-after the catalog.
+after the catalog. It compares only the documents the run wrote or dropped:
+`catalog.rebuild` returns their uris, and `cmd_relate` adds the concept stubs
+the cross-passes add or remove. A relate that changed no document returns at
+once. A `--force` or full rebuild, a text-code change, and a relate that
+stopped before its update compare every document. `unitindex.begin` sets
+`meta.pending` before relate writes the catalog, and `update` removes it. On prod
+that full comparison took 2,012 s for a run that rewrote nothing.
 
 Which anchors a citation can name has two parts. `text.citable_anchors(art)`
 reads them off the presented body: node ids, the EU sub-article anchors from

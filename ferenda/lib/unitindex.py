@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import catalog, compress, fusefilter, mdtext, text
+from . import catalog, compress, fusefilter, mdtext, text, util
 
 STORE = "range-units.sqlite"
 FILTER = "range-filter.bin"
@@ -140,40 +140,79 @@ def _rows(job):
 
 # --- building ----------------------------------------------------------------
 
-def update(catalog_path, pinpoints, jobs=1, ignore_code=False):
+def begin(catalog_path):
+    """Mark the store before a relate writes the catalog, and say whether the
+    mark was already there. The documents a relate writes are named to
+    `update` from memory: a run that stops between the catalog's commit and
+    `update` leaves them unnamed, and the next run finds their catalog rows
+    current. A mark left over from such a run is what tells the next one to
+    compare every document instead. `update` removes it."""
+    path = store_path(catalog_path)
+    if not path.exists():
+        return False          # no store: `update` builds it whole anyway
+    store = sqlite3.connect(path)
+    with store:
+        left = store.execute("SELECT 1 FROM meta WHERE key = 'pending'").fetchone()
+        store.execute("INSERT OR REPLACE INTO meta VALUES ('pending', '1')")
+    store.close()
+    return left is not None
+
+
+def update(catalog_path, pinpoints, jobs=1, ignore_code=False, changed=None):
     """Bring the store and the filter beside `catalog_path` up to date with the
     catalog. `pinpoints` maps a source name to its `stage.Source.pinpoints`.
-    A change to the code that makes the text rebuilds every unit, unless
-    `ignore_code` (the run's --ignore-code-changes): then the stored units stay,
-    and the old version stays recorded, so a later run rebuilds them.
+    `changed` is the set of document uris the relate wrote or dropped
+    (`catalog.rebuild`, the concept stubs); only those are compared with the
+    store. None compares every document instead -- the whole catalog and the
+    whole store read, 2012 s on production's disk for a run that rewrote
+    nothing (2026-09-29) -- and so does a store that predates the stored unit
+    count. The caller passes None after a relate that stopped part way
+    (`begin`). A change to the code that
+    makes the text rebuilds every unit, unless `ignore_code` (the run's
+    --ignore-code-changes): then the stored units stay, and the old version
+    stays recorded, so a later run rebuilds them.
     Returns ``(units, documents rewritten)``."""
-    con = catalog.connect_ro(catalog_path)
-    root = catalog.data_root(con)
-    current = {uri: (source, path, content_hash) for uri, source, path, content_hash in
-               con.execute("SELECT uri, source, path, content_hash FROM documents")}
-    popular = con.execute(
-        "SELECT to_uri, count(*) AS n FROM links GROUP BY to_uri ORDER BY n DESC LIMIT ?",
-        (POPULAR,)).fetchall()
-    con.close()
     store = sqlite3.connect(store_path(catalog_path))
     # the API reads the store while a relate updates it: WAL lets both run
     store.execute("PRAGMA journal_mode=WAL")
     store.executescript(SCHEMA)
+    meta = dict(store.execute("SELECT key, value FROM meta"))
     version = code_version()
-    row = store.execute("SELECT value FROM meta WHERE key = 'code'").fetchone()
-    if row and ignore_code:
-        version = row[0]
-    elif not row or row[0] != version:
+    if "code" in meta and ignore_code:
+        version = meta["code"]
+    elif meta.get("code") != version:
         store.execute("DELETE FROM units")
         store.execute("DELETE FROM docs")
-    stored = dict(store.execute("SELECT uri, content_hash FROM docs"))
+        changed = None
+    if "units" not in meta:
+        changed = None
+    if changed is not None and not changed and filter_path(catalog_path).exists():
+        with store:
+            store.execute("DELETE FROM meta WHERE key = 'pending'")
+        store.close()
+        return int(meta["units"]), 0
+    con = catalog.connect_ro(catalog_path)
+    root = catalog.data_root(con)
+    sql = "SELECT uri, source, path, content_hash FROM documents"
+    rows = (con.execute(sql) if changed is None
+            else util.select_in(con, sql + " WHERE uri IN (%s)", changed))
+    current = {uri: (source, path, content_hash) for uri, source, path, content_hash in rows}
+    sql = "SELECT uri, content_hash FROM docs"
+    stored = dict(store.execute(sql) if changed is None
+                  else util.select_in(store, sql + " WHERE uri IN (%s)", changed))
     stale = [uri for uri, (_, _, h) in current.items() if stored.get(uri, "") != (h or "")]
     gone = [uri for uri in stored if uri not in current]
+    rewrite_filter = bool(stale or gone) or not filter_path(catalog_path).exists()
     jobs_list = [(uri, str(root / current[uri][1]) if current[uri][1] else None,
                   pinpoints.get(current[uri][0])) for uri in stale]
+    total = int(meta.get("units", 0))
     with store:
+        # cleared at the end: an update that stops before then leaves units
+        # the next caller's `changed` does not name, so `begin` tells that
+        # run to compare them all
+        store.execute("INSERT OR REPLACE INTO meta VALUES ('pending', '1')")
         for uri in gone:
-            store.execute("DELETE FROM units WHERE doc = ?", (uri,))
+            total -= store.execute("DELETE FROM units WHERE doc = ?", (uri,)).rowcount
             store.execute("DELETE FROM docs WHERE uri = ?", (uri,))
         store.execute("INSERT OR REPLACE INTO meta VALUES ('code', ?)", (version,))
     # a few workers, each restarted now and then: a consolidated act's artifact
@@ -185,8 +224,10 @@ def update(catalog_path, pinpoints, jobs=1, ignore_code=False):
     results = pool.imap_unordered(_rows, jobs_list, chunksize=16) if pool else map(_rows, jobs_list)
     try:
         for n, (uri, rows) in enumerate(results, 1):
-            store.execute("DELETE FROM units WHERE doc = ?", (uri,))
+            total -= store.execute("DELETE FROM units WHERE doc = ?", (uri,)).rowcount
             store.executemany("INSERT OR REPLACE INTO units VALUES (?, ?, ?, ?, ?)", rows)
+            # a document can name one anchor twice; the store keeps one row
+            total += len({row[0] for row in rows})
             store.execute("INSERT OR REPLACE INTO docs VALUES (?, ?)",
                           (uri, current[uri][2] or ""))
             if n % COMMIT_EVERY == 0:
@@ -195,9 +236,19 @@ def update(catalog_path, pinpoints, jobs=1, ignore_code=False):
     finally:
         if pool:
             pool.terminate()
-    total = store.execute("SELECT count(*) FROM units").fetchone()[0]
-    if stale or gone or not filter_path(catalog_path).exists():
+    if changed is None:
+        total = store.execute("SELECT count(*) FROM units").fetchone()[0]
+    if rewrite_filter:
+        # the most-cited units ride along in the filter file, so they are read
+        # only when it is rewritten: a GROUP BY over every link in the catalog
+        popular = con.execute(
+            "SELECT to_uri, count(*) AS n FROM links GROUP BY to_uri ORDER BY n DESC LIMIT ?",
+            (POPULAR,)).fetchall()
         _write_filter(store, catalog_path, popular)
+    con.close()
+    with store:
+        store.execute("INSERT OR REPLACE INTO meta VALUES ('units', ?)", (str(total),))
+        store.execute("DELETE FROM meta WHERE key = 'pending'")
     store.close()
     return total, len(stale) + len(gone)
 
