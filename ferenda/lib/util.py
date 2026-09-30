@@ -726,6 +726,17 @@ def _child_init(initializer, initargs):
         initializer(*initargs)
 
 
+# SQLite's default variable ceiling is 32,766; well under it per statement
+IN_BATCH = 900
+
+
+def select_in(con, sql, keys):
+    """The rows of `sql`, whose one ``%s`` stands for the ``IN (...)`` list,
+    for `keys`, `IN_BATCH` keys per statement."""
+    for batch in itertools.batched(keys, IN_BATCH, strict=False):
+        yield from con.execute(sql % ",".join("?" * len(batch)), batch)
+
+
 def pooled(fn, items, workers, *, chunk, timeout=HANG_TIMEOUT, initializer=None,
            initargs=()):
     """`fn(chunk)` for each run of `chunk` consecutive `items` (a tuple), the

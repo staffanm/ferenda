@@ -311,24 +311,164 @@ def provision_heading(art, frag):
             if node and node.get("type") in PROVISION_HEADING_TYPES else "")
 
 
+def page_nodes(art):
+    """``{page: [node, …]}``: the nodes each printed page carries, in document
+    order. A node without a page of its own is on the page of the node before
+    it. Each node comes without its children -- they follow as nodes of their
+    own, and can sit on the next page -- and a node with no text of its own (a
+    bare container) is left out. A bilaga that restarts its own count is left
+    out whole: its pages are not the document's (see `citable_anchors`)."""
+    pages = {}
+    current = None
+    for section in body_sections(art):
+        stack = list(reversed(section if isinstance(section, list) else [section]))
+        while stack:
+            node = stack.pop()
+            if not isinstance(node, dict):
+                continue
+            if node.get("bilaga"):
+                current = None
+                continue
+            current = node.get("page") or current
+            if current and node.get("text"):
+                pages.setdefault(current, []).append(
+                    {k: v for k, v in node.items() if k != "children"})
+            stack.extend(reversed(node.get("children") or []))
+    return pages
+
+
+def eu_units(art):
+    """``{anchor: [block, …]}``: every anchor an EU act's renderer mints
+    (`25.1`, `25.1.a`, `9.2.S2`, `recital-83`) with the blocks it names, in
+    document order. The flat block list keeps a paragraph apart from its points,
+    so an anchor takes its own block and the blocks under it ("6.1" and its
+    points "6.1.a" …) up to the next anchor that is not below it, or the next
+    heading or article. A numbered paragraph's first-stycke alias (`9.2.S1`,
+    `eu_structure.first_stycke`) names that one block."""
+    anchors = eu_structure.Anchors()
+    blocks = [(anchors.key(b.get("type"), b.get("num"), b.get("id"), b.get("depth")), b)
+              for b in eu_structure.flatten(art.get("structure") or [])]
+    units = {}
+    for i, (key, block) in enumerate(blocks):
+        if key is None or key in units:
+            continue
+        unit = [block]
+        for k, b in blocks[i + 1:]:
+            if k is not None and not k.startswith(key + "."):
+                break
+            if k is None and b.get("type") in ("heading", "article"):
+                break
+            unit.append(b)
+        units[key] = unit
+        alias = eu_structure.first_stycke(block.get("type"), block.get("num"), key)
+        if alias:
+            units.setdefault(alias, [block])
+    return units
+
+
+# the containers a court decision keeps text in that is not the deciding
+# court's own reasoning: the föredragande's proposal and the separate opinions
+_NOT_THE_COURT = frozenset({"betankande", "skiljaktig", "tillagg"})
+
+
+def _numbered(node, number, container=None):
+    """The first stycke numbered `number` under `node` in document order,
+    outside `_NOT_THE_COURT`, and inside a `container` node when one is named."""
+    if isinstance(node, list):
+        return next((hit for n in node
+                     if (hit := _numbered(n, number, container)) is not None), None)
+    if not isinstance(node, dict) or node.get("type") in _NOT_THE_COURT:
+        return None
+    # a stycke with an id is reached by the id grammar: a treaty's A5P2 carries
+    # ordinal "2" too, and "P2" must not find it
+    if container is None and node.get("type") == "stycke" and not node.get("id") \
+            and str(node.get("ordinal")) == number:
+        return node
+    inner = None if node.get("type") == container else container
+    return next((hit for key, value in node.items() if key != "text"
+                 if (hit := _numbered(value, number, inner)) is not None), None)
+
+
+def _deciding(nodes):
+    """The nodes that hold the deciding court's text, one per decision: the last
+    ``instans`` of the list (or of each ``delmal`` in it), or the whole list when
+    it has no instances at all -- a record parsed without them."""
+    parts = [n for n in nodes if n.get("type") == "delmal"]
+    if parts:
+        return [d for part in parts for d in _deciding(part.get("children") or [])]
+    instances = [n for n in nodes if n.get("type") == "instans"]
+    return [instances[-1]] if instances else [nodes]
+
+
+def case_paragraph(art, number):
+    """The numbered paragraph `number` ("26") of the deciding court's own text
+    -- what "NJA 2022 s. 522 p. 26" names -- or None.
+
+    Every court in the record numbers its paragraphs from 1, and so do the
+    föredragande and a dissent, so the number alone names nothing: the lookup
+    reads the last instance only and skips `_NOT_THE_COURT`. A numbered list
+    inside the reasoning is parsed as numbered stycken too ("1 vapnet har
+    innehafts …" in NJA 2021 s. 341), and a domslut often numbers its items, so
+    the first match inside a ``domskal`` wins over any other. A split case
+    (delmål I, II) has one decision per part: a number found in more than one
+    part names no single paragraph, and is None."""
+    hits = [hit for scope in _deciding(art.get("structure") or art.get("body") or [])
+            if (hit := _numbered(scope, number, "domskal")
+                or _numbered(scope, number)) is not None]
+    return hits[0] if len(hits) == 1 else None
+
+
+_PAGE = re.compile(r"sid(\d+)")
+_CASE_PARAGRAPH = re.compile(r"[Pp](\d+)")
+
+
+def pinpoint_nodes(art, frag):
+    """``(unit type, [node, …])``: the part of the presented body a pinpoint
+    names, or None when the document has no such part. The unit type is the
+    first node's own type, or "sida" for a page. Four grammars, tried in this
+    order:
+
+    * a node id (K12, K1P5S2, B1A6, the EU articles);
+    * an EU anchor the artifact stamps no id on (`25.1`, `recital-83`), see
+      `eu_units`;
+    * a printed page (`sid12`, type "sida"), see `page_nodes`;
+    * a court decision's numbered paragraph (`P26` or `p26`), see
+      `case_paragraph`. A node id wins, so HUDOC's `P44` stays its own node.
+
+    The one lookup behind /api/v1/document, /api/v1/card, the search pins and
+    the MCP pinpoint reader (rule:second-use-goes-to-lib). The unit index reads
+    thousands of anchors per document, so `unitindex.units_of` builds the id
+    map, `page_nodes` and `eu_units` once and looks each anchor up in them.
+    It publishes no case paragraphs: `citable_anchors` has none."""
+    node = fragment_node(art, frag)
+    if node:
+        return node.get("type"), [node]
+    blocks = eu_units(art).get(frag) if art.get("structure") else None
+    if blocks:
+        return blocks[0].get("type"), blocks
+    m = _PAGE.fullmatch(frag)
+    if m and (nodes := page_nodes(art).get(int(m[1]))):
+        return "sida", nodes
+    m = _CASE_PARAGRAPH.fullmatch(frag)
+    if m and (node := case_paragraph(art, m[1])):
+        return node.get("type"), [node]
+    return None
+
+
+def has_pages(art):
+    """Whether any node of the presented body carries a printed page -- what
+    tells "no page 12 in this document" from "this document has no page data"
+    (older propositions have none)."""
+    return any(node.get("page") for section in body_sections(art)
+               for node in _nodes(section))
+
+
 def anchor_text(art, frag):
-    """The presented body text behind one anchor -- what the pinpoint says.
-
-    Two lookups, because an EU act's anchors are not all node ids: the artifact
-    stamps one on every article and on nothing finer, while the renderer mints
-    `25.1`, `25.1.S1` and `recital-83` from the block's own type and number
-    (lib.eu_structure). So an id lookup answers for the Swedish grammar and the
-    EU articles, and the anchor walk for everything else the act publishes an
-    anchor for. '' when the document has neither.
-
-    The one place that question is answered, for the search pins and
-    /api/v1/card alike (rule:second-use-goes-to-lib)."""
-    body = fragment_text(art, frag)
-    if body or "structure" not in art:
-        return body
-    return next((node_text(block) for anchor, block
-                 in eu_structure.anchored_blocks(art["structure"])
-                 if anchor == frag), "")
+    """The presented body text behind one pinpoint -- what the pinpoint says,
+    as plain text: the nodes `pinpoint_nodes` finds, joined. '' when the
+    document has no such part."""
+    found = pinpoint_nodes(art, frag)
+    return " ".join(node_text(n) for n in found[1]) if found else ""
 
 
 def fragment_text(art, frag):

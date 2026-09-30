@@ -240,6 +240,12 @@ def _plan_artifact_verb(verb, sources, names, destination):
               % (verb, name, len(sources[name].artifacts()), destination(name)))
 
 
+def _concept_stubs(con):
+    """The uris of the begrepp stubs: document rows with no artifact."""
+    return {uri for (uri,) in con.execute(
+        "SELECT uri FROM documents WHERE source = 'begrepp' AND path = ''")}
+
+
 def _relate_pass(label, fn, *args, **kwargs):
     """Name and time each cross-pass without adding outer invocation steps."""
     util.status(0, None, "relate cross-passes: %s" % label)
@@ -300,6 +306,10 @@ def cmd_relate(sources, names, force=None, jobs=1):
     else:
         target = layout.CATALOG
     dirty = False
+    touched = set()          # the document uris this run wrote or dropped
+    # before any catalog write: a mark a stopped run left behind means the
+    # documents it wrote were never named to the unit index
+    unit_backlog = layout.CATALOG.exists() and unitindex.begin(layout.CATALOG)
     for name in names:
         source = sources[name]
         if source.artifacts is None:
@@ -328,12 +338,13 @@ def cmd_relate(sources, names, force=None, jobs=1):
             if recode and not force:
                 print("relate %s: extraction code changed -- re-extracting all" % name)
             t0 = time.perf_counter()
-            docs, edges, changed = catalog.rebuild(
+            docs, edges, changed, written = catalog.rebuild(
                 target, name, paths, progress=progress, force=force or recode,
                 data_root=DATA, exclusive=full_rebuild,
                 stats={p: (size, mtime_ns) for p, size, mtime_ns in records},
                 digests=lambda stale, name=name: pooled_content_hashes(
                     stale, jobs, "relate %s" % name))
+            touched |= written
             freshness._emit_segment("relate", name, time.perf_counter() - t0, total=docs,
                           ran=changed, status="ok")
             freshness.record_step(store, "relate", name, wm, RELATE_CODE)
@@ -363,6 +374,10 @@ def cmd_relate(sources, names, force=None, jobs=1):
             # serving connections retain their small per-request cache.
             con.execute("PRAGMA cache_size=-65536")
             con.execute("PRAGMA temp_store=MEMORY")
+            # the concept stubs are the only document rows these passes write
+            # (synthesize_concepts, hierarki's ladder stubs): the ones added or
+            # removed join what the unit index compares
+            stubs = _concept_stubs(con)
             # each source's own contribution first (pinning a genomför-direktiv
             # statement to the paragraf it transposes, loading the .corr layers,
             # auditing a commentary's anchors): they read and write their own rows
@@ -411,6 +426,7 @@ def cmd_relate(sources, names, force=None, jobs=1):
             # the whole walk twice inside the nightly build
             dangling = _relate_pass("anchor audit", catalog.dangling_anchors,
                                    con, ANCHOR_EXACT)
+            touched |= stubs ^ _concept_stubs(con)
             con.commit()
             con.close()
             freshness._emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
@@ -471,13 +487,15 @@ def cmd_relate(sources, names, force=None, jobs=1):
         print("relate: path graph sidecar written -- %d documents, %d edges "
               "(%.1fs)" % (n, m, time.perf_counter() - t0))
     # the unit store and filter behind /api/v1/range/{prefix} and /range/filter:
-    # incremental on the catalog's content hashes, so it also runs when the
-    # catalog is unchanged but the store is missing (a first run after deploy)
-    if layout.CATALOG.exists() and (dirty or not unitindex.store_path(layout.CATALOG).exists()):
+    # it compares only the documents this run wrote or dropped, or every one
+    # after a --force or a full rebuild, and returns at once when there are none
+    # (it also builds a missing store, a first run after deploy)
+    if layout.CATALOG.exists():
         t0 = time.perf_counter()
         units, rewritten = unitindex.update(
             layout.CATALOG, {n: s.pinpoints for n, s in protocol.SOURCES.items()}, jobs,
-            ignore_code=protocol.RUN.ignore_code_changes)
+            ignore_code=protocol.RUN.ignore_code_changes,
+            changed=None if force or full_rebuild or unit_backlog else touched)
         print("relate: unit index written -- %d units, %d documents rewritten (%.1fs)"
               % (units, rewritten, time.perf_counter() - t0))
     if dirty:

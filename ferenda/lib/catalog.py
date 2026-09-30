@@ -1306,8 +1306,10 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     mtime_ns)}`` for every artifact when the caller has just stat'd them
     (cmd_relate's fingerprint pass); left unset, both are done here, serially.
 
-    Returns (documents, links, changed): the source's row + link totals after the
-    sync, and how many documents were (re)written this run."""
+    Returns (documents, links, changed, touched): the source's row + link
+    totals after the sync, how many documents were (re)written this run, and
+    the uris of the documents written or dropped -- what the unit index
+    (lib/unitindex) compares, instead of the whole catalog."""
     con = connect(catalog_path, data_root=data_root, exclusive=exclusive)
     widen_to_root_index(con)     # build-cost work belongs here, not in serving
     widen_to_uri_index(con)        # ... and so does its provision-level sibling
@@ -1328,6 +1330,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
         "FROM documents WHERE source = ?", (source,)) if row[0]}
     seen = set()
     written = set()          # uris (re)indexed this run, keyed independently of path
+    touched = set()          # uris re-extracted or dropped this run
     changed = done = 0
     total = len(artifact_paths)
     pending = []             # (path, key, size, mtime_ns, prev): fell through the stat check
@@ -1362,6 +1365,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
             # a SkipDocument placeholder: ensure no stale row survives at this path
             if prev:
                 _drop_document(con, prev[0])
+                touched.add(prev[0])
             current = path.stem
         elif not force and prev and prev[1] == digest:
             # bytes unchanged but the file was rewritten (mtime moved) -- skip
@@ -1377,12 +1381,14 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
             art = json.loads(compress.read_bytes(path))
             if prev and prev[0] != art["uri"]:   # uri moved under this path
                 _drop_document(con, prev[0])
+                touched.add(prev[0])
             _index_document(con, art, key, source)
             con.execute("UPDATE documents SET content_hash = ?, art_size = ?, "
                         "art_mtime_ns = ? WHERE uri = ?",
                         (digest, size, mtime_ns, art["uri"]))
             changed += 1
             written.add(art["uri"])
+            touched.add(art["uri"])
             current = local(art["uri"])
         done += 1
         if progress:
@@ -1394,6 +1400,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     for path, (uri, *_) in have.items():
         if path not in seen and uri not in written:
             _drop_document(con, uri)
+            touched.add(uri)
     docs = con.execute("SELECT COUNT(*) FROM documents WHERE source = ?",
                        (source,)).fetchone()[0]
     edges = con.execute(
@@ -1401,7 +1408,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
         "(SELECT uri FROM documents WHERE source = ?)", (source,)).fetchone()[0]
     con.commit()
     con.close()
-    return docs, edges, changed
+    return docs, edges, changed, touched
 
 
 # --------------------------------------------------------------------------

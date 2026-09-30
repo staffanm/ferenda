@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import catalog, compress, eu_structure, fusefilter, mdtext, text
+from . import catalog, compress, fusefilter, mdtext, text
 
 STORE = "range-units.sqlite"
 FILTER = "range-filter.bin"
@@ -79,54 +79,6 @@ def code_version():
 
 # --- the text of a unit ------------------------------------------------------
 
-def _page_markdown(art):
-    """``{"sid39": markdown}``: each printed page's own text, in document order. A
-    node without a page of its own is on the page of the node before it; a
-    container contributes its heading, not its children's text, which follows."""
-    pages = {}
-    current = None
-    for section in text.body_sections(art):
-        stack = list(reversed(section if isinstance(section, list) else [section]))
-        while stack:
-            node = stack.pop()
-            if not isinstance(node, dict):
-                continue
-            if node.get("bilaga"):
-                current = None
-                continue
-            current = node.get("page") or current
-            own = {k: v for k, v in node.items() if k != "children"}
-            md = mdtext.node_markdown(own) if own.get("text") else ""
-            if current and md:
-                pages.setdefault("sid%d" % current, []).append(md)
-            stack.extend(reversed(node.get("children") or []))
-    return {page: "\n\n".join(parts) for page, parts in pages.items()}
-
-
-def _eu_blocks(art):
-    """An EU act's blocks in document order, each with its anchor key or None."""
-    anchors = eu_structure.Anchors()
-    return [(anchors.key(b.get("type"), b.get("num"), b.get("id"), b.get("depth")), b)
-            for b in eu_structure.flatten(art.get("structure") or [])]
-
-
-def _eu_markdown(blocks, positions, anchor):
-    """The block an EU anchor names and the blocks under it ("6.1" and its points
-    "6.1.a" …), since the flat block list keeps a paragraph's points apart.
-    `positions` maps each key to its first block's index."""
-    start = positions.get(anchor)
-    if start is None:
-        return ""
-    parts = [blocks[start][1]]
-    for k, b in blocks[start + 1:]:
-        if k is not None and not k.startswith(anchor + "."):
-            break
-        if k is None and b.get("type") in ("heading", "article"):
-            break
-        parts.append(b)
-    return "\n\n".join(mdtext.node_markdown(b) for b in parts)
-
-
 def units_of(art, pinpoints):
     """``[(unit uri, markdown or None)]`` for one artifact: the document, and the
     anchors of it the range index publishes. The document carries its own text
@@ -137,27 +89,21 @@ def units_of(art, pinpoints):
     if not anchors:
         return [(uri, mdtext.document_markdown(art))]
     out = [(uri, None)]
-    pages = _page_markdown(art) if any(a.startswith("sid") for a in anchors) else {}
     # one walk each, not one per anchor: a consolidated act has thousands
+    pages = text.page_nodes(art) if any(a.startswith("sid") for a in anchors) else {}
     nodes = {}
     for node in text.body_id_nodes(art):
         nodes.setdefault(node["id"], node)
-    blocks = _eu_blocks(art) if art.get("structure") else []
-    positions = {}
-    for i, (k, _) in enumerate(blocks):
-        if k is not None:
-            positions.setdefault(k, i)
+    eu = text.eu_units(art) if art.get("structure") else {}
     for a in anchors:
         node = nodes.get(a)
         if node is not None:
-            md = mdtext.node_markdown(node)
-        elif a in pages:
-            md = pages[a]
-        elif a in positions:
-            md = _eu_markdown(blocks, positions, a)
+            parts = [node]
+        elif a.startswith("sid") and int(a[3:]) in pages:
+            parts = pages[int(a[3:])]
         else:
-            md = text.anchor_text(art, a)
-        out.append((uri + "#" + a, md or ""))
+            parts = eu.get(a) or []
+        out.append((uri + "#" + a, mdtext.nodes_markdown(parts)))
     return out
 
 

@@ -124,17 +124,17 @@ def test_relate_is_incremental(tmp_path):
     case = tmp_path / "case.json"
     case.write_text(json.dumps(CASE))
 
-    docs, _, changed = catalog.rebuild(db, "sfs", [law, case])
+    docs, _, changed, _ = catalog.rebuild(db, "sfs", [law, case])
     assert (docs, changed) == (2, 2)
-    docs, _, changed = catalog.rebuild(db, "sfs", [law, case])
+    docs, _, changed, _ = catalog.rebuild(db, "sfs", [law, case])
     assert (docs, changed) == (2, 0)              # unchanged -> skipped
 
     law.write_text(json.dumps({**LAW, "metadata": {"properties":
                    {"dcterms:title": "Räntelag (1975:635), ändrad"}}}))
-    _, _, changed = catalog.rebuild(db, "sfs", [law, case])
+    _, _, changed, _ = catalog.rebuild(db, "sfs", [law, case])
     assert changed == 1                           # only the edited one
 
-    docs, _, changed = catalog.rebuild(db, "sfs", [case])   # law artifact gone
+    docs, _, changed, _ = catalog.rebuild(db, "sfs", [case])   # law artifact gone
     con = catalog.connect(db)
     assert (docs, changed) == (1, 0)
     assert catalog.local(LAW["uri"]) not in {
@@ -202,14 +202,14 @@ def test_relate_survives_artifact_path_move(tmp_path):
     db = str(tmp_path / "catalog.sqlite")
     old = tmp_path / "flat.json"
     old.write_text(json.dumps(LAW))
-    docs, _, _ = catalog.rebuild(db, "sfs", [old])
+    docs, _, _, _ = catalog.rebuild(db, "sfs", [old])
     assert docs == 1
 
     new = tmp_path / "nested" / "law.json"       # same uri, different path
     new.parent.mkdir()
     new.write_text(json.dumps(LAW))
     old.unlink()
-    docs, _, changed = catalog.rebuild(db, "sfs", [new])
+    docs, _, changed, _ = catalog.rebuild(db, "sfs", [new])
     assert (docs, changed) == (1, 1)             # survived the move, re-indexed once
     con = catalog.connect(db)
     # the stored path is data_root-relative (the catalog's own directory), so it
@@ -443,7 +443,7 @@ def test_relate_skips_read_on_stat_match(tmp_path, monkeypatch):
     orig = Path.read_bytes
     monkeypatch.setattr(Path, "read_bytes",
                         lambda self: reads.append(self) or orig(self))
-    _, _, changed = catalog.rebuild(db, "sfs", [law])
+    _, _, changed, _ = catalog.rebuild(db, "sfs", [law])
     assert changed == 0 and reads == []              # decided by stat, never read
 
 
@@ -459,7 +459,7 @@ def test_relate_identical_rewrite_reads_once_then_stats(tmp_path):
     st_before = law.stat().st_mtime_ns
     while law.stat().st_mtime_ns == st_before:       # force a distinct mtime
         law.write_text(json.dumps(LAW))
-    _, _, changed = catalog.rebuild(db, "sfs", [law])
+    _, _, changed, _ = catalog.rebuild(db, "sfs", [law])
     assert changed == 0                              # bytes unchanged -> not re-extracted
 
     reads = []
@@ -467,7 +467,7 @@ def test_relate_identical_rewrite_reads_once_then_stats(tmp_path):
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(Path, "read_bytes",
                    lambda self: reads.append(self) or orig(self))
-        _, _, changed = catalog.rebuild(db, "sfs", [law])
+        _, _, changed, _ = catalog.rebuild(db, "sfs", [law])
     assert changed == 0 and reads == []              # stat refreshed -> fast path again
 
 
@@ -476,7 +476,7 @@ def test_force_relate_reextracts_all(tmp_path):
     law = tmp_path / "law.json"
     law.write_text(json.dumps(LAW))
     catalog.rebuild(db, "sfs", [law])
-    _, _, changed = catalog.rebuild(db, "sfs", [law], force=True)
+    _, _, changed, _ = catalog.rebuild(db, "sfs", [law], force=True)
     assert changed == 1
 
 

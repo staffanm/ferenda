@@ -996,9 +996,6 @@ class Manifest:
                                (key,)).fetchone()
         return json.loads(row[0]) if row else None
 
-    # SQLite's default variable ceiling is 32,766; well under it per statement
-    GET_MANY_BATCH = 900
-
     def get_many(self, keys):
         """``{key: entry}`` for the keys that exist, a few hundred per
         statement. One `get` is one SQLite transaction, and a transaction on
@@ -1006,13 +1003,8 @@ class Manifest:
         invalidation they force -- 2.5 ms, half of what a staleness check per
         document cost (2026-09-06). The scan asks for a chunk's keys at once
         instead."""
-        found = {}
-        for batch in itertools.batched(keys, self.GET_MANY_BATCH, strict=False):
-            found.update(
-                (k, json.loads(v)) for k, v in self.con.execute(
-                    "SELECT key, entry FROM manifest WHERE key IN (%s)"
-                    % ",".join("?" * len(batch)), batch))
-        return found
+        return {k: json.loads(v) for k, v in util.select_in(
+            self.con, "SELECT key, entry FROM manifest WHERE key IN (%s)", keys)}
 
     def update(self, entries):
         if not entries:

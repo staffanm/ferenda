@@ -230,3 +230,18 @@ def test_inline_runs_collapse_whitespace_and_escape_link_labels():
     assert mdtext._inline(["rad\nbruten  text"]) == "rad bruten text"
     assert mdtext._inline([{"uri": "https://x", "text": "a [b]"}]) \
         == "[a \\[b\\]](https://x)"
+
+
+def test_a_convention_article_reads_in_swedish():
+    """A statute's bilaga reproduces a convention in two or three languages
+    (1994:1219, EKMR). Every heading and paragraph carries `versions`, not
+    `text`, so without its own rule the article rendered as nothing."""
+    article = {"type": "konventionsartikel", "id": "B1A6", "ordinal": "6",
+               "versions": [
+                   {"language": "en", "text": ["Article 6 – Right to a fair trial"]},
+                   {"language": "sv", "text": ["Artikel 6 - Rätt till en rättvis rättegång"]}],
+               "paragraphs": [{"type": "konventionsstycke", "id": None, "versions": [
+                   {"language": "en", "text": ["1. In the determination …"]},
+                   {"language": "sv", "text": ["1. Var och en skall …"]}]}]}
+    assert mdtext.node_markdown(article) == (
+        "## Artikel 6 - Rätt till en rättvis rättegång\n\n1. Var och en skall …")

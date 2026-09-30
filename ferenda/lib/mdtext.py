@@ -131,6 +131,14 @@ def _table(node, out):
     out.append("\n".join(lines))
 
 
+def _swedish_version(n):
+    """A multilingual convention node's text in Swedish -- or, for an appendix
+    that prints no Swedish text, in its first language."""
+    versions = n["versions"]
+    return _inline(next((v for v in versions if v["language"] == "sv"),
+                        versions[0])["text"])
+
+
 def _walk(nodes, depth, out):
     for node in nodes or []:
         if isinstance(node, dict):
@@ -248,6 +256,15 @@ def _block(n, depth, out):
         if body:
             out.append("*%s*" % body)
         return
+    if t in ("konventionsinstrument", "konventionsavdelning", "konventionsartikel"):
+        # a convention a statute reproduces in its bilaga (1994:1219, EKMR): the
+        # heading and each paragraph in two or three parallel languages
+        head = _swedish_version(n)
+        if head:
+            out.append(_h(depth, head))
+        out.extend(p for p in map(_swedish_version, n.get("paragraphs") or []) if p)
+        _walk(children, depth + 1, out)
+        return
     if t == "ruta":
         if body:
             out.append("> " + body)
@@ -315,6 +332,12 @@ def node_markdown(node):
     out = []
     _block(node, 2, out)
     return "\n\n".join(out)
+
+
+def nodes_markdown(nodes):
+    """The nodes one pinpoint names (`text.pinpoint_nodes`: a page, an EU
+    paragraph with its points) as one markdown text."""
+    return "\n\n".join(node_markdown(n) for n in nodes)
 
 
 def document_markdown(art, title=None):

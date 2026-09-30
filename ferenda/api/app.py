@@ -528,7 +528,24 @@ class DocumentMeta(BaseModel):
     inbound_count: int = Field(description="how many catalogued documents cite it")
 
 
-class Document(DocumentMeta):
+class PinpointedMeta(DocumentMeta):
+    """The metadata head of a /document answer: a document's, plus the part
+    of it the uri's ``#fragment`` names."""
+
+    pinpoint: str | None = Field(
+        None, description="the uri's fragment (\"K12\", \"sid12\", \"P26\", "
+        "\"25.1\") when the answer is one part of the document; null for the "
+        "whole document")
+    pinpoint_label: str | None = Field(
+        None, description="what to call that part: \"12 kap.\", \"s. 12\", "
+        "\"p. 26\", \"artikel 25.1\"")
+    unit_type: str | None = Field(
+        None, description="the kind of part: the artifact's own node type "
+        "(kapitel, paragraf, article, recital, konventionsartikel, stycke for "
+        "a court decision's numbered paragraph), or sida for a printed page")
+
+
+class Document(PinpointedMeta):
     """A document: its metadata plus the parsed artifact itself."""
 
     source_url: str | None = Field(
@@ -539,10 +556,13 @@ class Document(DocumentMeta):
         "is derived from. Each source owns its shape, but every renderable "
         "text value is a list of inline runs: a plain string, or a link dict "
         "{predicate, uri, text}. Those link dicts are the citation graph. See "
-        "the artifact-format section of docs/api/README.md.")
+        "the artifact-format section of docs/api/README.md. With a pinpoint, "
+        "only the part it names: {type: unit_type, children: [node, …]} -- one "
+        "node for a provision, every node on the page for a page, an EU "
+        "paragraph and its points.")
 
 
-class MarkdownDocument(DocumentMeta):
+class MarkdownDocument(PinpointedMeta):
     """A document: its metadata plus the body rendered as markdown."""
 
     source_url: str | None = Field(
@@ -551,7 +571,8 @@ class MarkdownDocument(DocumentMeta):
         description="the document body as markdown: title, headings, "
         "paragraph designations, lists and tables, with every citation as an "
         "inline [text](uri) link. A lossy reading text derived from the "
-        "artifact -- the artifact (format=json) stays the source of truth.")
+        "artifact -- the artifact (format=json) stays the source of truth. "
+        "With a pinpoint, only the part it names.")
 
 
 class BrowseDoc(BaseModel):
@@ -1035,8 +1056,9 @@ def documents_endpoint(
 
 @app.get("/api/v1/document", response_model=Document | MarkdownDocument,
          tags=["document"],
-         summary="One document and its full parsed artifact")
-def document_endpoint(uri: str = Query(..., description="full lagen.nu document uri"),
+         summary="One document, or one part of it, with its parsed artifact")
+def document_endpoint(uri: str = Query(..., description="full lagen.nu document "
+                                       "uri, optionally with a #fragment"),
                       format: Literal["json", "md"] = Query(
                           "json", description="body format: 'json' (default) "
                           "returns the parsed artifact verbatim, 'md' the "
@@ -1058,6 +1080,19 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     links -- for consumers that want a reading text (a human, an LLM, a RAG
     chunker) rather than the tree. The envelope and metadata stay JSON.
 
+    A uri with a ``#fragment`` answers with that part of the document only,
+    named by `pinpoint`, `pinpoint_label` and `unit_type`:
+
+    * a provision or a node id: `https://lagen.nu/2009:400#K12` (12 kap.),
+      `https://lagen.nu/1994:1219#B1A6` (EKMR artikel 6, in Swedish);
+    * an EU anchor: `…/celex/32016R0679#25.1`, `#recital-83`;
+    * a printed page: `https://lagen.nu/prop/2025/26:3#sid12`;
+    * a court decision's numbered paragraph, in the deciding court's own
+      reasoning: `https://lagen.nu/dom/nja/2022s522#P26`.
+
+    A 404 names the cause: no such document, no such part of it, or a page
+    pinpoint in a document with no page data.
+
     A ``…/konsolidering/<version>`` uri -- an archived historical lydelse from
     /api/v1/document/versions -- resolves here too, to that version's own
     artifact (SFS statutes and EU acts). A version is not a catalog document:
@@ -1067,30 +1102,32 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     The same object comes back per line in the bulk dumps, so a consumer
     reprocessing the whole corpus should take the dumps and never call this
     endpoint in a loop. See docs/api/README.md for the per-source shapes."""
-    version = _version_of(uri)
-    if version is not None:
-        source, basefile, version_id = version
-        art = _version_artifact(source, basefile, version_id)
-        props = art["metadata"]["properties"]
-        label = props["dcterms:identifier"]     # an invariant of a version artifact
-        title = props.get("dcterms:title") or label
-        # a version is not a catalog row: read straight from the archive tree,
-        # with inbound_count 0 (versions index no citations) and its naming
-        # taken from the artifact's own metadata
-        if format == "md":
-            return MarkdownDocument(
-                uri=art["uri"], source=source, kind=None, label=label,
-                title=title, inbound_count=0, source_url=art.get("source_url"),
-                markdown=mdtext.document_markdown(art, title=title or label))
-        return Document(
-            uri=art["uri"], source=source, kind=None, label=label, title=title,
-            inbound_count=0, source_url=art.get("source_url"), artifact=art)
-    data = db.or_404(reads.document(con, uri), uri)
+    root, _, frag = uri.partition("#")
+    version = _version_of(root)
+    try:
+        if version is not None:
+            source, basefile, version_id = version
+            art = _version_artifact(source, basefile, version_id)
+            props = art["metadata"]["properties"]
+            label = props["dcterms:identifier"]  # an invariant of a version artifact
+            # a version is not a catalog row: read straight from the archive
+            # tree, with inbound_count 0 (versions index no citations) and its
+            # naming taken from the artifact's own metadata
+            data: dict = {"uri": art["uri"], "source": source, "kind": None,
+                          "label": label,
+                          "title": props.get("dcterms:title") or label,
+                          "inbound_count": 0, "source_url": art.get("source_url"),
+                          "artifact": art, **reads.pinpoint(art, art["uri"], frag)}
+        else:
+            data = db.or_404(reads.document(con, uri), root)
+    except reads.PinpointNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    art, unit = data.pop("artifact"), data.pop("unit")
     if format == "md":
-        art = data.pop("artifact")
-        return MarkdownDocument(**data, markdown=mdtext.document_markdown(
-            art, title=data["title"] or data["label"]))
-    return Document(**data)
+        return MarkdownDocument(**data, markdown=(
+            mdtext.nodes_markdown(unit["children"]) if unit
+            else mdtext.document_markdown(art, title=data["title"] or data["label"])))
+    return Document(**data, artifact=unit or art)
 
 
 # an SFS basefile / version id as it may appear in a query param: "1998:204",

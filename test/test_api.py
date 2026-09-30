@@ -313,6 +313,31 @@ def test_document_begrepp_stub_served_with_empty_artifact(client):
     assert body["label"] == "Mord" and body["artifact"] == {}
 
 
+def test_document_with_a_fragment_answers_with_that_part(client):
+    uri = "https://lagen.nu/1962:700#K3P2"
+    body = client.get("/api/v1/document", params={"uri": uri}).json()
+    assert body["uri"] == "https://lagen.nu/1962:700"
+    assert (body["pinpoint"], body["pinpoint_label"], body["unit_type"]) == (
+        "K3P2", "3 kap. 2 §", "paragraf")
+    assert [n["id"] for n in body["artifact"]["children"]] == ["K3P2"]
+    md = client.get("/api/v1/document", params={"uri": uri, "format": "md"}).json()
+    assert md["markdown"] == "**Är brottet mindre grovt, döms för dråp.**"
+    whole = client.get("/api/v1/document",
+                       params={"uri": "https://lagen.nu/1962:700"}).json()
+    assert whole["pinpoint"] is None and "structure" in whole["artifact"]
+
+
+def test_document_404_tells_a_missing_part_from_missing_page_data(client):
+    """A client has to tell an invalid citation from a gap in the data."""
+    def detail(uri):
+        r = client.get("/api/v1/document", params={"uri": uri})
+        assert r.status_code == 404
+        return r.json()["detail"]
+    assert "no document" in detail("https://lagen.nu/9999:1#K3P1")
+    assert "no pinpoint 'K3P9'" in detail("https://lagen.nu/1962:700#K3P9")
+    assert "has no page data" in detail("https://lagen.nu/1962:700#sid12")
+
+
 def test_document_unknown_uri_404(client):
     r = client.get("/api/v1/document", params={"uri": "https://lagen.nu/9999:1"})
     assert r.status_code == 404

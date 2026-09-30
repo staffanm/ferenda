@@ -2301,23 +2301,23 @@ def test_rebuild_hashes_only_what_the_stat_check_lets_through(tmp_path):
     def stats():
         return {str(p): (p.stat().st_size, p.stat().st_mtime_ns) for p in (a, b)}
 
-    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    docs, _, changed, _ = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
     assert (docs, changed, asked[-1]) == (2, 2, ["a.json", "b.json"])   # no rows yet
-    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    docs, _, changed, _ = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
     assert (changed, asked[-1]) == (0, [])                              # marks match: no read
     b.write_text(b.read_text())                                        # same bytes, new mtime
     os.utime(b, ns=(b.stat().st_atime_ns, b.stat().st_mtime_ns + 5_000_000_000))
-    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    docs, _, changed, _ = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
     assert (changed, asked[-1]) == (0, ["b.json"])
     con = catalog.connect(db)
     assert con.execute("SELECT art_mtime_ns FROM documents WHERE uri = ?",
                        ("https://lagen.nu/icrc/2",)).fetchone()[0] == b.stat().st_mtime_ns
     con.close()
     write("b.json", "https://lagen.nu/icrc/2", "three")                # bytes changed
-    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    docs, _, changed, _ = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
     assert (changed, asked[-1]) == (1, ["b.json"])
     a.write_text("")                                                   # a SkipDocument placeholder
-    docs, _, changed = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
+    docs, _, changed, _ = catalog.rebuild(db, "icrc", [a, b], stats=stats(), digests=digests)
     assert (docs, changed, asked[-1]) == (1, 0, ["a.json"])
     # without stats/digests the serial form stats and hashes here, same answer
     assert catalog.rebuild(db, "icrc", [a, b])[2] == 0

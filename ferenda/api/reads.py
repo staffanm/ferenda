@@ -40,6 +40,13 @@ class InboundUnavailable(RuntimeError):
     """The inbound-citation sidecar tree is not built on this corpus."""
 
 
+class PinpointNotFound(LookupError):
+    """The document exists, but its pinpoint names no part of it. The message
+    tells the two causes apart -- no such part, or a page pinpoint in a document
+    with no page data at all -- because a client has to tell an invalid
+    citation from a gap in the data."""
+
+
 def search(index, query, *, source=None, kind=None, year=None, limit,
            offset=None, cursor=None, sort="relevance"):
     """Full-text hits plus the pinned citation resolution:
@@ -131,8 +138,11 @@ def documents(con, *, source=None, kind=None, limit, offset,
 
 def document(con, uri):
     """One document's metadata, full parsed artifact and inbound count -- or
-    None when the catalog has no such uri (each face raises its own way)."""
-    row = catalog.document(con, uri)
+    None when the catalog has no such uri (each face raises its own way). A
+    uri with a ``#fragment`` also carries the part of the document it names
+    (`pinpoint`), and raises PinpointNotFound when there is no such part."""
+    root, _, frag = uri.partition("#")
+    row = catalog.document(con, root)
     if not row:
         return None
     uri, source, kind, label, title, path, _descriptive, _url = row
@@ -142,7 +152,40 @@ def document(con, uri):
     return {"uri": uri, "source": source, "kind": kind, "label": label,
             "title": title, "source_url": art.get("source_url"),
             "inbound_count": catalog.document_inbound_count(con, uri),
-            "artifact": art}
+            "artifact": art, **pinpoint(art, uri, frag)}
+
+
+def pinpoint(art, uri, frag):
+    """The part of document `uri` that `frag` names: ``pinpoint`` (the
+    fragment), ``pinpoint_label`` ("12 kap.", "s. 12", "p. 26"), ``unit_type``
+    (the artifact's own node type, or "sida" for a page) and ``unit`` -- the
+    nodes, as ``{"type", "children"}`` -- all None for an empty `frag`. Raises
+    PinpointNotFound when the document has no such part."""
+    if not frag:
+        return dict.fromkeys(("pinpoint", "pinpoint_label", "unit_type", "unit"))
+    found = text.pinpoint_nodes(art, frag)
+    if found is None:
+        if frag.startswith("sid") and not text.has_pages(art):
+            raise PinpointNotFound(
+                "%s has no page data, so no page pinpoint %r can be cut from it"
+                % (uri, frag))
+        raise PinpointNotFound("no pinpoint %r in %s" % (frag, uri))
+    unit_type, nodes = found
+    return {"pinpoint": frag, "pinpoint_label": _unit_label(frag, nodes) or frag,
+            "unit_type": unit_type,
+            "unit": {"type": unit_type, "children": nodes}}
+
+
+def _unit_label(frag, nodes):
+    """What to call a found part. A court decision's paragraph is found by its
+    printed number, not by an id ("p. 26" -- `pinpoint_label` would read "P26"
+    as a §), and a convention article in a statute's bilaga by its ordinal."""
+    node = nodes[0]
+    if frag[:1] in "Pp" and node.get("id") != frag and node.get("ordinal"):
+        return "p. %s" % node["ordinal"]
+    if node.get("type") == "konventionsartikel":
+        return "artikel %s" % node["ordinal"]
+    return pinpoint_label(frag)
 
 
 def inbound_citations(con, uri, *, scope="tree", source=None, sort="rail",
@@ -433,28 +476,31 @@ def _graph_internal(con, root, focus_unit):
             "truncated": len(dropped)}
 
 
-def _pinpoint_snippet(con, path, unit, document_snippet):
-    """The provision's own words, named by their pinpoint: "1 kap. 5 § Konungen
-    eller drottning som enligt successionsordningen innehar Sveriges tron är
-    rikets statschef. Lag (2010:1408)."
+def _pinpoint_snippet(con, path, unit):
+    """``(where, snippet)``: the provision's name and its own words, named by
+    their pinpoint: "1 kap. 5 § Konungen eller drottning som enligt
+    successionsordningen innehar Sveriges tron är rikets statschef. Lag
+    (2010:1408)." -- or None when the presented body has no such part.
 
     A card for a whole document shows the opening words relate stamped on it. On
     a fragment uri those say nothing about the place the reader selected --
     /1974:152#K1P5 answered with 1 kap. 1 §, the first § of the document. Costs
     the one artifact read the stamped snippet exists to avoid, so it is paid
-    only when the uri carries a fragment; a fragment the presented body
-    publishes no anchor for -- and a stub row with no artifact at all, which
-    `load_artifact` answers with `{}` -- keeps the document's own snippet."""
-    body = text.anchor_text(catalog.artifact_for(con, path), unit)
-    if not body:
-        return document_snippet
-    where = pinpoint_label(unit)
+    only when the uri carries a fragment; a fragment the presented body has no
+    part for -- and a stub row with no artifact at all, which `load_artifact`
+    answers with `{}` -- keeps the document's own snippet."""
+    found = text.pinpoint_nodes(catalog.artifact_for(con, path), unit)
+    if not found:
+        return None
+    body = " ".join(text.node_text(n) for n in found[1])
+    where = _unit_label(unit, found[1])
     if not where:
-        return catalog_rows.cut_snippet(body)
+        return where, catalog_rows.cut_snippet(body)
     # the pinpoint opens the line, so its first letter is raised -- the rule
     # citation_label states for a citation standing on its own ("Skäl 83 För
     # att …"). An SFS pinpoint opens with its number and is unaffected.
-    return catalog_rows.cut_snippet("%s%s %s" % (where[:1].upper(), where[1:], body))
+    return where, catalog_rows.cut_snippet(
+        "%s%s %s" % (where[:1].upper(), where[1:], body))
 
 
 def card(con, uri):
@@ -474,8 +520,10 @@ def card(con, uri):
     (source, kind, label, title, descriptive,
      short_id, source_url, snippet, cited, path) = row
     unit = unit_anchor(frag) if frag else None
-    if unit:
-        snippet = _pinpoint_snippet(con, path, unit, snippet)
+    where = pinpoint_label(unit) if unit else ""
+    found = _pinpoint_snippet(con, path, unit) if unit else None
+    if found:
+        where, snippet = found
     return {
         "uri": uri, "root": root,
         "source": source, "kind": kind,
@@ -484,7 +532,7 @@ def card(con, uri):
         "descriptive": descriptive or None,
         "citation": citation_label(short_name(descriptive) or label,
                                    unit or ""),
-        "pinpoint": (pinpoint_label(unit) or unit) if unit else None,
+        "pinpoint": (where or unit) if unit else None,
         "url": layout.page_url(root) + (("#" + frag) if frag else ""),
         "source_url": source_url,
         "snippet": snippet,

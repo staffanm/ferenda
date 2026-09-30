@@ -32,7 +32,7 @@ from mcp.types import ToolAnnotations
 from pydantic import ConfigDict, Field
 
 from .. import config
-from ..lib import layout, mdtext, pins, text
+from ..lib import layout, mdtext, pins
 from ..lib.search import SearchIndex
 from . import analytics, db, reads
 
@@ -203,7 +203,9 @@ DocUriArg = Annotated[str, Field(
     "verktygsresultat; ange inte en sökfråga här.")]
 PinpointArg = Annotated[str | None, Field(
     description="Pekar ut en enskild bestämmelse: 'K3P1' för 3 kap. 1 §, 'P6' "
-    "för 6 §, ett artikel-id för en EU-rättsakt, eller ett fragment/ankare som "
+    "för 6 §, ett artikel-id för en EU-rättsakt, 'sid12' för s. 12 i ett "
+    "förarbete, 'P26' för p. 26 i den avgörande domstolens domskäl, eller ett "
+    "fragment/ankare som "
     "`search`, `resolve_citation` eller hänvisningsverktygen har returnerat. "
     "Utelämna för hela dokumentet.")]
 MaxCharsArg = Annotated[int, Field(
@@ -569,19 +571,21 @@ def get_document(uri: DocUriArg, pinpoint: PinpointArg = None,
     `format` och `text`.
     """
     max_chars = max(1, min(max_chars, MAX_CHARS))
+    # a fragment in `uri` is a pinpoint too; an explicit `pinpoint` wins
+    uri, _, frag = uri.partition("#")
+    pinpoint = (pinpoint or frag).lstrip("#") or None
     with _con() as con:
-        data = reads.document(con, uri)
+        try:
+            data = reads.document(con, uri + "#" + pinpoint if pinpoint else uri)
+        except reads.PinpointNotFound as exc:
+            raise ValueError("%s -- check the pinpoint against a search fragment "
+                             "or a citation anchor" % exc) from exc
     if data is None:
         raise ValueError("no document %r in the catalog" % uri)
-    art = data.pop("artifact")
-    if pinpoint:
-        node = text.fragment_node(art, pinpoint.lstrip("#"))
-        if node is None:
-            raise ValueError("no section %r in %s -- check the pinpoint against a "
-                             "search fragment or a citation anchor"
-                             % (pinpoint, uri))
-        body = (json.dumps(node, ensure_ascii=False) if format == "json"
-                else mdtext.node_markdown(node))
+    art, unit = data.pop("artifact"), data.pop("unit")
+    if unit:
+        body = (json.dumps(unit, ensure_ascii=False) if format == "json"
+                else mdtext.nodes_markdown(unit["children"]))
     else:
         body = (json.dumps(art, ensure_ascii=False) if format == "json"
                 else mdtext.document_markdown(

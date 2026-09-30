@@ -4,6 +4,7 @@ read here the way a client reads it."""
 
 import hashlib
 import json
+import sqlite3
 import struct
 import zlib
 
@@ -191,3 +192,51 @@ def test_a_code_change_rebuilds_unless_code_changes_are_ignored(corpus, monkeypa
     assert unitindex.update(corpus, PINPOINTS, ignore_code=True)[1] == 0
     assert unitindex.update(corpus, PINPOINTS)[1] == 4        # every document again
     assert unitindex.update(corpus, PINPOINTS)[1] == 0
+
+
+def _count(corpus):
+    with sqlite3.connect(unitindex.store_path(corpus)) as store:
+        return store.execute("SELECT count(*) FROM units").fetchone()[0]
+
+
+def test_an_update_compares_only_the_named_documents(corpus, monkeypatch):
+    arts = corpus.parent / "artifact"
+    art = json.loads((arts / "nja.json").read_text())
+    art["body"][0]["text"] = ["Högsta domstolen ändrar hovrättens dom."]
+    _write(arts / "nja.json", art)
+    *_, touched = catalog.rebuild(corpus, "dv", [arts / "nja.json"])
+    assert touched == {NJA}
+    # nothing named: the catalog is not opened at all
+    monkeypatch.setattr(catalog, "connect_ro", None)
+    assert unitindex.update(corpus, PINPOINTS, changed=set()) == (_count(corpus), 0)
+    monkeypatch.undo()
+    assert unitindex.update(corpus, PINPOINTS, changed=touched)[1] == 1
+    (arts / "bb.json").unlink()
+    *_, touched = catalog.rebuild(corpus, "sfs", [])
+    assert touched == {BB}
+    units, rewritten = unitindex.update(corpus, PINPOINTS, changed=touched)
+    assert (units, rewritten) == (_count(corpus), 1)
+    assert _key(BB + "#K3P1") not in fusefilter.Filter(unitindex.filter_path(corpus).read_bytes())
+
+
+def test_a_relate_that_stops_before_the_update_makes_the_next_one_compare_everything(corpus):
+    assert unitindex.begin(corpus) is False
+    arts = corpus.parent / "artifact"
+    art = json.loads((arts / "nja.json").read_text())
+    art["body"][0]["text"] = ["Högsta domstolen ändrar hovrättens dom."]
+    _write(arts / "nja.json", art)
+    catalog.rebuild(corpus, "dv", [arts / "nja.json"])
+    # the run stops here: the next one's rebuild finds the row current
+    *_, touched = catalog.rebuild(corpus, "dv", [arts / "nja.json"])
+    assert touched == set()
+    assert unitindex.begin(corpus) is True
+    assert unitindex.update(corpus, PINPOINTS, changed=None)[1] == 1
+    assert unitindex.begin(corpus) is False
+
+
+def test_a_store_without_a_unit_count_is_compared_whole(corpus):
+    units = _count(corpus)
+    with sqlite3.connect(unitindex.store_path(corpus)) as store:
+        store.execute("DELETE FROM meta WHERE key = 'units'")
+    assert unitindex.update(corpus, PINPOINTS, changed=set()) == (units, 0)
+    assert unitindex.update(corpus, PINPOINTS, changed=set()) == (units, 0)

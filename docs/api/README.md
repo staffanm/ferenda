@@ -354,6 +354,35 @@ and metadata stay JSON. The markdown is a lossy derivation; the artifact
 (`format=json`, the default) stays the source of truth. The MCP server's
 `get_document` tool answers with the same markdown by default.
 
+**A uri with a `#fragment`** answers with that part of the document only. The
+envelope then names the part in `pinpoint`, `pinpoint_label` and `unit_type`.
+With `format=md`, `markdown` holds the part only. With `format=json`,
+`artifact` is `{"type": unit_type, "children": [node, …]}`. The fragment can
+name:
+
+- a node id: `2009:400#K12` (12 kap.), `1994:1219#B1A6` (EKMR artikel 6, in
+  Swedish);
+- an EU anchor: `celex/32016R0679#25.1` (with its points), `#recital-83`;
+- a printed page: `prop/2025/26:3#sid12` (every node on the page, `unit_type`
+  `sida`);
+- a court decision's numbered paragraph: `dom/nja/2022s522#P26` or `#p26`. The
+  paragraph comes from the deciding court's domskäl. The lookup skips the
+  lower courts, the föredragande and any dissent.
+
+```jsonc
+// GET /api/v1/document?uri=https://lagen.nu/dom/nja/2022s522%23P26&format=md
+{
+  "uri": "https://lagen.nu/dom/nja/2022s522",
+  "pinpoint": "P26", "pinpoint_label": "p. 26", "unit_type": "stycke",
+  "markdown": "26. Det följer av det anförda att konsumenten ska ansvara …",
+  /* … the document's metadata */
+}
+```
+
+A 404 gives one of three causes in `detail`: no such document, no such part
+(`no pinpoint 'K999' in …`), or a page pinpoint in a document with no page
+data (`… has no page data …`). Older propositions have no page data.
+
 ### Derived views
 
 **Inbound links / citation graph — `GET /api/v1/document/inbound?uri=…`** — the
@@ -690,6 +719,7 @@ request and the relay's address.
 | browse by facet | `GET /api/v1/facets`, `GET /api/v1/browse` |
 | get one document | `GET /api/v1/document?uri=…` |
 | a document as markdown | `GET /api/v1/document?uri=…&format=md` |
+| the text of one provision, page or case paragraph | `GET /api/v1/document?uri=…%23K12&format=md` |
 | who cites this? | `GET /api/v1/document/inbound?uri=…` |
 | which citers weigh most? | `GET /api/v1/document/inbound?uri=…&source=dv&sort=citations` |
 | what does this cite? | `GET /api/v1/document/outbound?uri=…` |

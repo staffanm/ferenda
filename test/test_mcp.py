@@ -185,6 +185,9 @@ def test_get_document_full_and_pinpoint(corpus):
 
     frag = mcpmod.get_document("https://lagen.nu/1962:700", pinpoint="K3P1")
     assert "berövar annan livet" in frag["text"]
+    # a fragment in the uri is the same pinpoint, and the answer names it
+    inline = mcpmod.get_document("https://lagen.nu/1962:700#K3P1")
+    assert inline["pinpoint"] == "K3P1" and inline["text"] == frag["text"]
 
     with pytest.raises(ValueError):
         mcpmod.get_document("https://lagen.nu/1962:700", pinpoint="P999")
@@ -211,7 +214,9 @@ def test_get_document_format_json_returns_the_artifact_tree(corpus):
 
     frag = mcpmod.get_document("https://lagen.nu/1962:700", pinpoint="K3P1",
                                format="json")
-    node = json.loads(frag["text"])
+    unit = json.loads(frag["text"])
+    assert unit["type"] == "paragraf"
+    [node] = unit["children"]
     assert node["id"] == "K3P1" and "berövar annan livet" in node["text"][0]
 
 

@@ -178,3 +178,72 @@ def test_provision_heading_reads_the_types_that_print_one():
     assert text.provision_heading(art, "K4P5") == ""
     assert text.provision_heading(art, "A6S1") == ""
     assert text.provision_heading(art, "A9") == ""
+
+
+def test_a_page_pinpoint_names_every_node_on_that_page():
+    """"prop. 1997/98:45 s. 39" names a page, not a node id: every node the
+    page carries, a node without a page of its own on the page before it, and
+    nothing from a bilaga that restarts its own count."""
+    prop = {"uri": "https://lagen.nu/prop/1997/98:45", "body": [
+        {"type": "avsnitt", "id": "a4.1", "page": 39, "text": ["Bakgrund"],
+         "children": [{"type": "stycke", "text": ["Text på sidan 39."]}]},
+        {"type": "stycke", "page": 40, "text": ["Text på sidan 40."]},
+        {"type": "bilaga", "bilaga": True, "children": [
+            {"type": "stycke", "page": 39, "text": ["Bilagans sida 39."]}]}]}
+    unit_type, nodes = text.pinpoint_nodes(prop, "sid39")
+    assert unit_type == "sida"
+    assert [text.node_text(n) for n in nodes] == ["Bakgrund", "Text på sidan 39."]
+    assert text.anchor_text(prop, "sid40") == "Text på sidan 40."
+    assert text.pinpoint_nodes(prop, "sid41") is None
+    assert text.has_pages(prop) and not text.has_pages(ART)
+
+
+def _numbered(ordinal, words):
+    return {"type": "stycke", "ordinal": ordinal, "text": [words]}
+
+
+def test_a_case_paragraph_is_the_deciding_courts_own():
+    """Every court numbers from 1, and so do the föredragande, a dissent, a
+    numbered list inside the reasoning and the domslut: "p. 1" is the first
+    numbered paragraph of the last instance's domskäl."""
+    case = {"uri": "https://lagen.nu/dom/nja/2021s341", "structure": [
+        {"type": "instans", "children": [
+            {"type": "dom", "children": [{"type": "domskal", "children": [
+                _numbered("1", "Tingsrättens punkt 1.")]}]}]},
+        {"type": "instans", "court": "Högsta domstolen", "children": [
+            {"type": "betankande", "children": [{"type": "domskal", "children": [
+                _numbered("1", "Föredragandens punkt 1.")]}]},
+            {"type": "dom", "children": [
+                {"type": "domslut", "children": [_numbered("1", "Domslutets punkt 1.")]},
+                {"type": "domskal", "children": [
+                    _numbered("1", "HD:s punkt 1."),
+                    _numbered("1", "en uppräkning inne i skälen,"),
+                    _numbered("2", "HD:s punkt 2.")]}]},
+            {"type": "skiljaktig", "children": [_numbered("3", "Skiljaktig punkt 3.")]}]}]}
+    assert text.anchor_text(case, "P1") == "HD:s punkt 1."
+    assert text.anchor_text(case, "p2") == "HD:s punkt 2."
+    assert text.pinpoint_nodes(case, "P1")[0] == "stycke"
+    assert text.pinpoint_nodes(case, "P3") is None
+
+
+def test_a_case_paragraph_in_a_split_case_must_be_unique():
+    """A split case (delmål I, II) has one decision per part, each numbered
+    from 1: a number both parts have names no single paragraph."""
+    def part(words):
+        return {"type": "delmal", "children": [{"type": "instans", "children": [
+            {"type": "dom", "children": [{"type": "domskal", "children": [
+                _numbered("1", words + " punkt 1.")]}]}]}]}
+    case = {"uri": "https://lagen.nu/dom/nja/2020s1", "structure": [part("I")]}
+    assert text.anchor_text(case, "P1") == "I punkt 1."
+    case["structure"].append(part("II"))
+    assert text.pinpoint_nodes(case, "P1") is None
+
+
+def test_a_numbered_stycke_with_an_id_is_no_case_paragraph():
+    """A treaty article's stycken carry an ordinal too (coe/005: A5P2 has
+    ordinal "2"). "P2" names no node there, and must not find artikel 5.2."""
+    treaty = {"uri": "https://lagen.nu/coe/005", "structure": [
+        {"type": "artikel", "id": "A5", "children": [
+            {"type": "stycke", "id": "A5P2", "ordinal": "2", "text": ["Var och en …"]}]}]}
+    assert text.pinpoint_nodes(treaty, "P2") is None
+    assert text.anchor_text(treaty, "A5P2") == "Var och en …"
