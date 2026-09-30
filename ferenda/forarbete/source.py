@@ -226,6 +226,27 @@ def fa_prop_riksdagen_bodies(args):
           % (seen, fetched, empty))
 
 
+def fa_propriksdagen_scan(args):
+    """`lagen forarbete propriksdagen-scan` -- the propositions riksdagen holds
+    as scans (its listing marks them ``digitaliserad``, ~4 000 from 1971 on):
+    store each scan as the body and the facsimile, OCR it into the OCR copy
+    parse reads first, and write the record from the listing with the landing
+    page as its url (see forarbete/propriksdagen.py). Builds the records
+    itself, so it runs on an empty store. Resumable: a document already done is
+    skipped, so a killed run is just rerun. `--limit N` caps the documents
+    done."""
+    if args:
+        sys.exit("usage: lagen forarbete propriksdagen-scan")
+    if protocol.RUN.dry_run:
+        print("forarbete propriksdagen-scan: would store and OCR the "
+              "riksdagen proposition scans into %s"
+              % (layout.FA_DOWNLOADED / "prop"))
+        return
+    seen, done = propriksdagen.scan_sync(
+        layout.FA_DOWNLOADED, limit=protocol.RUN.limit, delay=POLITENESS)
+    print("forarbete propriksdagen-scan: %d seen, %d scanned" % (seen, done))
+
+
 def fa_soukb_scans(args):
     """`lagen forarbete soukb-scans` -- one-time bulk re-download of the
     KB-digitised SOUs (1922-1999), the scanned OCR'd PDFs that *are* the body (no
@@ -391,6 +412,7 @@ SOURCES: tuple[Source, ...] = (Source("forarbete", fa_list, {
    scopes=frozenset(download.TYPES) | {"bet", "rskr"},
    actions={"propkb-scans": fa_propkb_scans,
             "prop-riksdagen-bodies": fa_prop_riksdagen_bodies,
+            "propriksdagen-scan": fa_propriksdagen_scan,
             "soukb-scans": fa_soukb_scans,
             "refetch-bodies": fa_refetch_bodies,
             "refetch-landings": fa_refetch_landings,
@@ -412,6 +434,10 @@ SOURCES: tuple[Source, ...] = (Source("forarbete", fa_list, {
          "re-stales no parse)\n"
          "prop-riksdagen-bodies: one-time fetch of the 1756 proposition bodies "
          "riksdagen serves but the legacy import never stored\n"
+         "propriksdagen-scan: store and OCR the ~4000 propositions riksdagen "
+         "holds as scans (1971 on), each scan the body and the facsimile, the "
+         "record's url its riksdagen.se landing page (--limit N caps it; runs "
+         "on an empty store)\n"
          "soukb-scans: one-time hundreds-of-GB re-download of the KB SOU bodies "
          "(1922-1999) from sou.kb.se as the source of truth (--limit N caps it; "
          "the scanned PDF is the body)"),)

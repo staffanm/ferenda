@@ -112,3 +112,74 @@ def test_sync_does_not_swallow_a_non_network_failure(tmp_path, monkeypatch):
                         lambda *a, **kw: (_ for _ in ()).throw(OSError("disk full")))
     with pytest.raises(OSError, match="disk full"):
         pr.sync(tmp_path, delay=0)
+
+
+# ---- propriksdagen-scan: the scan as the body --------------------------------
+
+PDF_URL = "https://data.riksdagen.se/fil/E5606AA5"
+LANDING = ("https://www.riksdagen.se/sv/dokument-och-lagar/dokument/proposition/"
+           "andringar-i-brottsbalken-m-m_gh03130/")
+ENTRY = {"rm": "1993/94", "beteckning": "130", "dok_id": "GH03130",
+         "titel": "Ändringar i brottsbalken m.m. (ansvarsfrihetsgrunder m.m.)",
+         "datum": "1994-03-10", "status": "digitaliserad",
+         "filbilaga": {"fil": [{"typ": "pdf", "url": PDF_URL}]}}
+
+
+def _scan(monkeypatch, tmp_path, text=""):
+    """Stub the network, the text-layer probe and the OCR; return the OCR
+    destinations asked for."""
+    def fake(session, method, url, **kw):
+        if method == "HEAD":
+            assert url.endswith("/proposition/_gh03130/")
+            return type("R", (), {"url": LANDING})()
+        assert url == PDF_URL
+        return type("R", (), {"content": b"%PDF-1.2 scan"})()
+    ocr = []
+    monkeypatch.setattr(pr, "request", fake)
+    monkeypatch.setattr(pr, "pdftotext_text", lambda path: text)
+    monkeypatch.setattr(pr, "ocr_pdf",
+                        lambda path, lang, dest: ocr.append((lang, dest)))
+    return ocr
+
+
+def test_scan_one_replaces_the_html_body_with_the_scan(tmp_path, monkeypatch):
+    _record(tmp_path, "1993/94:130", files=["1993-94-130.html"])
+    record = compress.read_json(layout.fa_record_file(tmp_path, "prop", "1993/94:130"))
+    record["body_format"] = pr.BODY_FORMAT
+    compress.write_download(layout.fa_record_file(tmp_path, "prop", "1993/94:130"),
+                            json.dumps(record))
+    ocr = _scan(monkeypatch, tmp_path)
+    assert pr.scan_one(None, tmp_path, ENTRY, 0) is True
+    stored = compress.read_json(layout.fa_record_file(tmp_path, "prop", "1993/94:130"))
+    assert stored == {"type": "prop", "basefile": "1993/94:130",
+                      "identifier": "Prop. 1993/94:130", "title": ENTRY["titel"],
+                      "date": "1994-03-10", "url": LANDING, "dok_id": "GH03130",
+                      "files": ["1993-94-130.pdf"]}
+    # the scan is the body and the facsimile, one file for both
+    scan = layout.fa_dir(tmp_path, "prop", "1993/94:130") / "1993-94-130.pdf"
+    assert scan.read_bytes() == b"%PDF-1.2 scan"
+    assert scan.name == layout.fa_facsimile_pdf("prop", "1993/94:130").name
+    assert ocr == [("swe", layout.fa_ocr_pdf("prop", "1993/94:130"))]
+    # and a rerun finds it done
+    assert pr.scan_one(None, tmp_path, ENTRY, 0) is False
+
+
+def test_scan_one_runs_on_an_empty_store(tmp_path, monkeypatch):
+    _scan(monkeypatch, tmp_path)
+    assert pr.scan_one(None, tmp_path, ENTRY, 0) is True
+    assert compress.read_json(layout.fa_record_file(
+        tmp_path, "prop", "1993/94:130"))["url"] == LANDING
+
+
+def test_a_born_digital_pdf_needs_no_ocr(tmp_path, monkeypatch):
+    ocr = _scan(monkeypatch, tmp_path, text="Regeringens proposition 1973:146")
+    assert pr.scan_one(None, tmp_path, ENTRY, 0) is True
+    assert ocr == []
+
+
+def test_a_body_another_route_owns_is_left_alone(tmp_path, monkeypatch):
+    _record(tmp_path, "1993/94:130", files=["1993-94-130.pdf"],
+            url="https://www.regeringen.se/rattsliga-dokument/proposition/x/")
+    ocr = _scan(monkeypatch, tmp_path)
+    assert pr.scan_one(None, tmp_path, ENTRY, 0, log=lambda *a: None) is False
+    assert ocr == []
