@@ -20,6 +20,7 @@ from opensearchpy.exceptions import OpenSearchException
 
 from ..lib import catalog, catalog_rows, facets, inbound, layout, pathgraph, pins, text
 from ..lib.pinpoint import (
+    case_paragraph_label,
     citation_label,
     is_change_marker,
     pinpoint_label,
@@ -182,7 +183,7 @@ def _unit_label(frag, nodes):
     as a §), and a convention article in a statute's bilaga by its ordinal."""
     node = nodes[0]
     if frag[:1] in "Pp" and node.get("id") != frag and node.get("ordinal"):
-        return "p. %s" % node["ordinal"]
+        return case_paragraph_label(node["ordinal"])
     if node.get("type") == "konventionsartikel":
         return "artikel %s" % node["ordinal"]
     return pinpoint_label(frag)
@@ -531,7 +532,7 @@ def card(con, uri):
         "label": label, "short_id": short_id, "title": title,
         "descriptive": descriptive or None,
         "citation": citation_label(short_name(descriptive) or label,
-                                   unit or ""),
+                                   unit or "", where),
         "pinpoint": (where or unit) if unit else None,
         "url": layout.page_url(root) + (("#" + frag) if frag else ""),
         "source_url": source_url,

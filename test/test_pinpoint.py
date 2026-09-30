@@ -3,6 +3,7 @@ reader-facing label both the graph explorer and the search pins print."""
 
 from ferenda.lib.pinpoint import (
     acronym,
+    case_paragraph_label,
     citation,
     citation_label,
     human_fragment,
@@ -91,6 +92,15 @@ def test_a_citation_names_the_document_as_well_as_the_place():
     # no fragment: the document itself; no name: the pinpoint alone
     assert citation_label("räntelagen", "") == "Räntelagen"
     assert citation_label("", "A6") == "Artikel 6"
+    # a page and a court decision's paragraph follow the report's name; only
+    # the caller knows "P26" is a paragraph, not a §
+    assert citation_label("prop. 1997/98:45", "sid39") == "Prop. 1997/98:45 s. 39"
+    assert citation_label("NJA 2022 s. 522", "P26", case_paragraph_label("26")) \
+        == "NJA 2022 s. 522 p. 26"
+    assert citation_label("BankID-bedrägeriet (NJA 2022 s. 522)", "P26",
+                          case_paragraph_label("26")) \
+        == "BankID-bedrägeriet (NJA 2022 s. 522 p. 26)"
+    assert citation_label("räntelagen", "P6") == "6 § räntelagen"
 
 
 def test_citation_falls_back_to_the_address_it_cannot_name():

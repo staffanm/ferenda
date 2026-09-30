@@ -22,6 +22,9 @@ from the fragment alone; the fourth adds *which document*:
     the "S2" inside "9.2.S2" as a Swedish stycke segment and answers "2 st".
   * ``citation_label`` / ``citation`` -- the pinpoint plus the document's name,
     which is what a reader can actually look up: "Artikel 6 EKMR", not "A6".
+
+``case_paragraph_label`` names a court decision's numbered paragraph ("p. 26"),
+which only a caller that has read the document can tell from a §.
 """
 
 import re
@@ -154,22 +157,50 @@ def short_name(descriptive):
     return acronym(descriptive) or (descriptive or "")
 
 
-def citation_label(name, frag):
+def case_paragraph_label(number):
+    """A court decision's numbered paragraph as a lawyer cites it: "p. 26".
+
+    The fragment cannot say this on its own: the renderer anchors paragraph 26
+    as "P26", which `pinpoint_label` reads as the § of a statute without
+    chapters. Only the document tells the two apart, so the caller that looked
+    the paragraph up names it (api/reads)."""
+    return "p. %s" % number
+
+
+# a pinpoint into a printed report -- a page, a court decision's numbered
+# paragraph -- follows the report's name: "NJA 2022 s. 522 p. 26", "prop.
+# 1997/98:45 s. 39". A provision comes before the act's name: "6 § räntelagen".
+_AFTER_NAME = re.compile(r"[sp]\. \d")
+
+
+def citation_label(name, frag, where=None):
     """A cited provision written as a lawyer would cite it: "6 § räntelagen",
-    "8 kap. 7 § regeringsformen", "Artikel 6 EKMR".
+    "8 kap. 7 § regeringsformen", "Artikel 6 EKMR", "NJA 2022 s. 522 p. 26",
+    "Prop. 1997/98:45 s. 39".
 
     The raw "1975:635#P6" a link carries is a machine address -- readable only
     if you already know which act 1975:635 is, which is the opposite of what a
     "most-cited paragraf" list, or the middle of a citation graph, is for.
     `name` is the document's own citing name (the catalog's `descriptive`
     column, or `short_name` of it where the space is tight) and
-    `pinpoint_label` turns the anchor into the pinpoint.
+    `pinpoint_label` turns the anchor into the pinpoint -- unless the caller
+    already knows it better and passes it as `where` (`case_paragraph_label`).
+    A page or a case paragraph follows the name (`_AFTER_NAME`), inside the
+    parentheses of a named case: "BankID-bedrägeriet (NJA 2022 s. 522 p. 26)".
 
     The first letter is raised, because this is a citation standing on its own
     -- a heading, a row in a table -- and not a phrase inside a sentence. A
     name that starts with its number ("6 § räntelagen") is unaffected."""
-    where = pinpoint_label(frag)
-    out = "%s %s" % (where, name) if where and name else (where or name or "")
+    where = pinpoint_label(frag) if where is None else where
+    if not (where and name):
+        out = where or name or ""
+    elif _AFTER_NAME.match(where):
+        # a named case carries its report in parentheses, "BankID-bedrägeriet
+        # (NJA 2022 s. 522)": the pinpoint goes inside, next to the report
+        out = (("%s %s)" % (name[:-1], where)) if name.endswith(")")
+               else "%s %s" % (name, where))
+    else:
+        out = "%s %s" % (where, name)
     return out[:1].upper() + out[1:]
 
 
