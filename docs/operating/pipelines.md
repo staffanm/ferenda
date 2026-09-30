@@ -183,8 +183,9 @@ uv run python -m ferenda.build dv parse                                       # 
 uv run python -m ferenda.dv.legacy --index site/data/artifact/dom/identity-index.json   # legacy path, batch report
 uv run python -m ferenda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # one Word file -> artifact
 
-# rewrite artifact/dom/casenumbers.json from the parsed artifacts. A full-source
-# `dv parse` already ends with this; run it by hand after a targeted parse, or
+# rewrite artifact/dom/casenumbers.json from the parsed dv and kkvdomar
+# artifacts. A full-source `dv parse` or `kkvdomar parse` already ends with
+# this; run it by hand after a targeted parse, or
 # to see what the snapshot holds. Not a recipe input: a refresh reparses
 # nothing, so a document parsed before the decision it cites was held links
 # to it only at a later `--force` parse of its source (schedule that on dev
@@ -199,6 +200,38 @@ The incremental download only covers late publication within its 365-day
 safety window below the watermark; a record edit or a referat published
 later than that surfaces only under `--full`, so a periodic cron'd `--full`
 sweep remains the backstop.
+
+**forarbete — one-time proposition repairs** (operates on
+`site/data/{downloaded,artifact}/forarbete/`):
+
+```sh
+uv run python -m ferenda.build forarbete propkb-scans            # KB two-chamber scans (1867-1970), facsimile only; --limit N
+uv run python -m ferenda.build forarbete prop-riksdagen-bodies    # riksdagen's own OCR'd HTML body for 1,756 pre-1999 props with none; --limit N
+uv run python -m ferenda.build forarbete propriksdagen-scan       # riksdagen's own prop scans, 1971 to 1994/95; --limit N
+uv run python -m ferenda.build forarbete soukb-scans              # KB-digitised SOUs (1922-1999), hundreds of GB; --limit N
+```
+
+Four one-time repairs (`ferenda/forarbete/propriksdagen.py`,
+`propkb.py`, `soukb.py`), none part of `harvest`, all resumable and capped
+with `--limit N`. `propriksdagen-scan` walks riksdagen's own prop listing
+riksmöte by riksmöte, 1994/95 back to 1971, and for every entry with a PDF:
+stores it as the body and the facsimile (`layout.fa_facsimile_pdf`), OCRs it
+into the förarbete OCR copy (`layout.fa_ocr_pdf`, which `parse` reads first)
+when it has no text layer, and writes the record from the listing entry with
+the riksdagen.se landing page as its `url`. It replaces the OCR'd HTML body
+`prop-riksdagen-bodies` installs (riksdagen's own `skanning2007` export),
+builds its own records so it runs on an empty store, and leaves a record
+another route owns alone.
+
+`soukb-scans` fetches every volume of a KB-digitised SOU multi-volume set and
+writes the record's `files`/`volumes` (each volume's own KB title), `title`
+and `url` from the reading order — the report first, then its parts, then
+its appendices (`volumes.kb_order`), never KB's own index order, which is
+arbitrary. A rerun with every part already on disk does no download: it
+only rewrites those fields for a multi-volume record (so a record written
+before this ordering existed catches up without refetching hundreds of GB),
+and leaves a single-volume record, or a record another route owns (e.g.
+sou/1999:78, harvested from regeringen.se), alone.
 
 **avg — JO + JK + ARN + IMY + KKV decisions** (operates on `site/data/{downloaded,artifact}/avg/`):
 
@@ -267,6 +300,16 @@ notis. Parse leaves those kammarrätt decisions out: the HFD referat is the
 page a reader finds. So `kkvdomar download` needs dv's case-number snapshot
 (`lagen dv casenumbers`) on the data root, and a kammarrätt decision drops
 out at the first kkvdomar download after dv publishes the referat.
+
+The kammarrätt decisions cite each other by court and case number
+("Kammarrätten i Göteborgs dom den 14 december 2018 i mål nr 2666-18"). The
+case-number snapshot holds the kkvdomar decisions beside dv's, so those
+citations link. A full-source `kkvdomar parse` ends by refreshing the
+snapshot. A decision parsed before the snapshot held the decision it cites
+links to it at the next `--force` parse of kkvdomar.
+
+The decisions list in the dv browse tree, under Kammarrätterna (RK) as Domar
+(`facets.BROWSE_MEMBERS`). kkvdomar has no browse tree of its own.
 
 **guidance — EU-organens vägledningar, 12 utgivare** (operates on
 `site/data/{downloaded,artifact}/guidance/`):
