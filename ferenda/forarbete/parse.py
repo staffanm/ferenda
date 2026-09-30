@@ -31,10 +31,12 @@ from ..lib.pdftext import (
     FOOTNOTE_DROP,
     RE_KAP_MARK,
     RE_PARA_MARK,
+    PagePosition,
     bilaga_labels,
     is_italic_subheading,
     line_body_size,
     line_body_support,
+    ocr_text_pages,
     page_number_candidates,
     page_paragraphs,
     pdf_figures,
@@ -376,7 +378,7 @@ def _pdf_probe(pdf_path):
             pdf_first_page_text(pdf_path))
 
 
-def parse_pdf(pdf_path, identifier, patch_key=None):
+def parse_pdf(pdf_path, identifier, patch_key=None, ocr=False, first_page=1):
     """All body blocks of a förarbete PDF, page by page. The page a block
     carries is the *printed* page (the `#sid{N}` anchor citations resolve to):
     the marginal folio numbers are read off every page
@@ -390,14 +392,30 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
     Each page is first split around its nuvarande/föreslagen lydelse tables
     (lydelse.split_page); the normal segments reflow and classify as before,
     a table segment becomes one `tabell` block whose rows pair the aligned
-    cell paragraphs (row 0 the column header pair)."""
-    raw = list(pdf_pages(pdf_path, patch_key))
-    figures = pdf_figures(pdf_path, patch_key)
-    printed_map = printed_pages(
-        {pageno: page_number_candidates(lines[:3] + lines[-3:], identifier)
-         for pageno, lines in raw},
-        [pageno for pageno, _lines in raw],
-        bilaga_labels(raw, identifier))
+    cell paragraphs (row 0 the column header pair).
+
+    `ocr` reads an ocrmypdf copy of a scan (`layout.fa_ocr_pdf`) through
+    `ocr_text_pages`. Its pages are numbered by the PDF page rather than read off
+    the folios: one misread folio ("178" on page 8 of prop. 1993/94:130) moved
+    the running offset for the whole document, and the PDF page is what the
+    facsimile beside the text is paged by. It carries no figures either, since
+    every page of a scan is one full-page image.
+
+    `first_page` skips the pages before it: a KB scan's front matter
+    (`legacy_formats.kb_front_pages`)."""
+    if ocr:
+        raw = ocr_text_pages(pdf_path, "swe", patch_key)
+        figures = {}
+        printed_map = {pageno: PagePosition(pageno, None) for pageno, _ in raw}
+    else:
+        raw = [(pageno, lines) for pageno, lines in pdf_pages(pdf_path, patch_key)
+               if pageno >= first_page]
+        figures = pdf_figures(pdf_path, patch_key)
+        printed_map = printed_pages(
+            {pageno: page_number_candidates(lines[:3] + lines[-3:], identifier)
+             for pageno, lines in raw},
+            [pageno for pageno, _lines in raw],
+            bilaga_labels(raw, identifier))
     # (printed pageno, [("paras", [Para], None)
     #                   | ("tabell", header, rows)         (a lydelse table)
     #                   | ("gtabell", th, rows)])          (a generic table)
@@ -610,7 +628,7 @@ def _paged_body(pages):
     return blocks
 
 
-def _legacy_pdf_body(pdf_path, identifier, patch_key=None):
+def _legacy_pdf_body(pdf_path, identifier, patch_key=None, first_page=1):
     """A PDF body from a scanned-or-born-digital corpus: the font-aware
     `pdf_pages` path for born-digital PDFs (regeringen-era, proptrips 2007+),
     falling back to a `pdftotext` OCR-text extraction for the scans (soukb,
@@ -623,12 +641,12 @@ def _legacy_pdf_body(pdf_path, identifier, patch_key=None):
     other). Returns (blocks, ocr) -- the route taken is the one fact that says
     whether the text is OCR output (the chronology check keys on it)."""
     try:
-        blocks = parse_pdf(pdf_path, identifier, patch_key)
+        blocks = parse_pdf(pdf_path, identifier, patch_key, first_page=first_page)
     except subprocess.CalledProcessError:   # pdftohtml chokes on some KB scans
         blocks = []
     if blocks:
         return blocks, False
-    return _paged_body(legacy_formats.scanned_pdf_pages(pdf_path)), True
+    return _paged_body(legacy_formats.scanned_pdf_pages(pdf_path)[first_page - 1:]), True
 
 
 def _harvested_body(record, root):
@@ -652,7 +670,7 @@ def _harvested_body(record, root):
     patch_key = ("forarbete", "%s/%s" % (typ, basefile_slug(basefile)))
     ocr = layout.fa_ocr_pdf(typ, basefile)
     if ocr.exists():
-        return _legacy_pdf_body(ocr, record["identifier"], patch_key)
+        return parse_pdf(ocr, record["identifier"], patch_key, ocr=True), True
     files = record.get("files", [])
     pdfs = [f for f in files if f.lower().endswith(".pdf")]
     if pdfs:
@@ -675,11 +693,24 @@ def _harvested_body(record, root):
             # artifact would look like a parsed document with no body
             raise SkipDocument("%s/%s: no body PDF among %d file(s)"
                                % (typ, basefile, len(pdfs)))
+        # a KB-scanned SOU volume opens on KB's banner, the cover, the title
+        # page and the imprint -- none of it the report's (see
+        # legacy_formats.kb_front_pages)
+        kb_sou = typ == "sou" and volumes.population(record) == "kb"
+        start = ((lambda name: legacy_formats.kb_front_pages(docdir / name) + 1)
+                 if kb_sou else (lambda name: 1))
         blocks, ocr = _legacy_pdf_body(docdir / body[0], record["identifier"],
-                                       patch_key)
+                                       patch_key, first_page=start(body[0]))
+        # a KB scan set's later volumes restart their page numbers, so each
+        # keeps them under its own label ("Bilaga 3 s. 5"); a live record's
+        # later parts carry on the body's numbering and need none
+        own = volumes.page_labels(record)
         for extra in body[1:]:
             more, more_ocr = _legacy_pdf_body(docdir / extra,
-                                              record["identifier"])
+                                              record["identifier"],
+                                              first_page=start(extra))
+            for block in more if extra in own else ():
+                block.bilaga = own[extra]
             blocks += more
             ocr = ocr or more_ocr
         return blocks, ocr

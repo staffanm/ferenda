@@ -11,6 +11,7 @@ sidecar seam and the metadata-only degenerate.
 import json
 from pathlib import Path
 
+from ferenda.forarbete import legacy_formats as lf
 from ferenda.forarbete import parse
 from ferenda.lib import compress, layout
 
@@ -196,3 +197,46 @@ def test_ocr_sidecar_wins_over_stored_scan(tmp_path, monkeypatch):
     art = parse.to_artifact(parse.parse_record(record, str(tmp_path)))
     # the sidecar's text layer (not the textless scan) produced the body
     assert "riktig textnivara" in json.dumps(art["structure"], ensure_ascii=False)
+
+
+# ---- KB SOU front matter ------------------------------------------------------
+
+KB_1997_116 = [                                     # sou/1997:116's opening pages
+    "Ur KB:s samlingar\nDigitaliserad år 2015\n",
+    "v\nFMs konvention om\nbarnets rättigheter förverkligas\ni Sverige.\n"
+    "BARNKOMMITTEN\nSOU 1997:116\n",
+    "",
+    "Lili\nän\nW Statens offentliga utredningar\nWW 1997:116\nE Socialdepartementet\n"
+    "Barnets bästa\ni främsta rummet\nFN:s konvention om barnets\nrättigheter "
+    "förverkligas i Sverige\nBarnkommitténs huvudbetänkande\nStockholm 1997\n",
+    "SOU och Ds kan köpas från Fritzes kundtjänst. För remissutsändningar\n"
+    "av SOU och Ds svarar Fritzes, Offentliga Publikationer.\n"
+    "Beställningsadress: Fritzes kundtjänst\n106 47 Stockholm\n",
+    "SOU 1997:116\nTill statsrådet Maj-Inger Klingvall\nGenom beslut den 1 "
+    "februari 1996 bemyndigade regeringen dåvarande statsrådet Anna Hedborg\n",
+    "SOU 1997:116\nBarnen, generalsekreteraren Bodil Långberg\n",
+]
+
+
+def test_kb_front_pages_drops_the_librarys_and_the_printers_pages(monkeypatch):
+    # the report starts on pdf page 6 with the letter to the minister, as a
+    # modern SOU on regeringen.se does
+    monkeypatch.setattr(lf, "pdftotext_text", lambda path: "\f".join(KB_1997_116))
+    assert lf.kb_front_pages("x.pdf") == 5
+
+
+def test_kb_front_pages_stops_at_a_short_volumes_early_start(monkeypatch):
+    # sou/1926:2 opens its letter on pdf page 4, after the year's list
+    pages = ["National Library\nof Sweden\nDenna bok digitaliserades på Kungl. "
+             "biblioteket år 2012\n",
+             "STATENS OFFENTLIGA UTREDNINGAR\n1926:2\nJUSTITIEDEPARTEMENTET\n",
+             "Statens offentliga utredningar 1926\nK r o n o l o g i s k\n"
+             "Utredning rörande lagstiftningen om arbetstiden\n",
+             "Till herr statsrådet och chefen för kungl.\njustitiedepartementet.\n"
+             "Med stöd av nådigt bemyndigande den 27 november\n",
+             "Departementschefens förutsättningar\n"]
+    monkeypatch.setattr(lf, "pdftotext_text", lambda path: "\f".join(pages))
+    assert lf.kb_front_pages("x.pdf") == 3
+    # and a PDF that does not open on KB's banner keeps every page
+    monkeypatch.setattr(lf, "pdftotext_text", lambda path: "\f".join(pages[1:]))
+    assert lf.kb_front_pages("x.pdf") == 0

@@ -150,6 +150,21 @@ def _numbered(node, level, outline):
     return num, drop_prefix(runs, len(flat) - len(flat.lstrip()) + m.start(2))
 
 
+
+def volume_label(bilaga):
+    """What a page's `bilaga` reads as. A number is an appendix the body's own
+    pages detected ("23" -> "Bilaga 23"); anything else is a separately
+    paginated volume's own label, already spelled out ("Bilaga 3", "Del 2",
+    "Bilaga" -- `volumes.kb_order`)."""
+    return "Bilaga %s" % bilaga if bilaga[:1].isdigit() else bilaga
+
+
+def volume_anchor(label):
+    """The anchor prefix for a volume's pages, off its label: "Bilaga 23" ->
+    "bilaga23" (the #bilaga23-sid{N} form these pages always had), "Del 2" ->
+    "del2"."""
+    return re.sub(r"[^0-9a-zåäö-]", "", label.lower())
+
 def render(art, site):
     lb = labels.document_labels("forarbete", art)
     title = lb.short_title or art["uri"]
@@ -177,8 +192,10 @@ def render(art, site):
         pg, bil = node.get("page"), node.get("bilaga")
         if pg and (pg, bil) != state["page"]:
             state["page"] = (pg, bil)
-            key = "bilaga%s-sid%d" % (bil, pg) if bil else "sid%d" % pg
-            rail.add(key, "bilaga %s s. %d" % (bil, pg) if bil else "s. %d" % pg)
+            vol = volume_label(bil) if bil else None
+            key = "%s-sid%d" % (volume_anchor(vol), pg) if vol else "sid%d" % pg
+            rail.add(key, "%s s. %d" % (vol[0].lower() + vol[1:], pg) if vol
+                     else "s. %d" % pg)
             # the page number doubles as the facsimile button: a click loads
             # the source PDF page as a retina PNG (faksimil.js + the
             # /api/v1/facsimile endpoint, rendered on demand and disk-cached).
@@ -189,7 +206,7 @@ def render(art, site):
             rail_id = key if key in rail.data else None
             fax = (None if bil else "/api/v1/facsimile?uri=%s&sid=%d"
                    % (quote(doc_uri, safe=""), pg))
-            parts.append(NODES.fa_sid(key, rail_id, pg, fax, bil))
+            parts.append(NODES.fa_sid(key, rail_id, pg, fax, vol))
 
     def close_komm():
         if state["komm"] is not None:

@@ -3,7 +3,9 @@ volumes.py). The record's `files` is every PDF the landing page linked, so the
 rule has to tell a volume from a rättelseblad, an English summary, a reprinted
 EU directive and a duplicate 'hela dokumentet' edition."""
 
-from ferenda.forarbete import volumes
+import pytest
+
+from ferenda.forarbete import render, volumes
 
 
 def _rec(files, typ="prop", basefile="2015/16:195", labels=None, **extra):
@@ -30,14 +32,73 @@ def test_a_single_pdf_is_always_the_body():
     assert volumes.body_pdfs(rec, _probe({})) == (["a.pdf"], {})
 
 
-def test_kb_scan_set_keeps_only_the_first_file():
-    # sou/1996:158's 22 files are Bilaga 15, 21, 14, 16 … of the EMU-utredningen
-    # -- sibling volumes catalogued under one SOU number, not parts of one text
-    rec = _rec(["a.pdf", "b.pdf", "c.pdf"], typ="sou", basefile="1996:158",
-               orig_url="http://urn.kb.se/resolve?urn=x")
+def test_kb_scan_set_reads_the_report_first_and_its_appendices_after():
+    # sou/1997:116: KB lists the appendix before Barnkommitténs huvudbetänkande,
+    # and taking the first file as the work published the appendix
+    rec = _rec(["1997-116.pdf", "1997-116-1.pdf"][::-1], typ="sou",
+               basefile="1997:116", orig_url="http://urn.kb.se/resolve?urn=x",
+               volumes=[
+                   "Barnets bästa i främsta rummet  FN:s konvention om barnets "
+                   "rättigheter förverkligas i Sverige : Barnkommitténs "
+                   "huvudbetänkande",
+                   "Barnets bästa i främsta rummet  Bil.,FN:s konvention om "
+                   "barnets rättigheter förverkligas i Sverige."])
     body, dropped = volumes.body_pdfs(rec, _probe({}))
-    assert body == ["a.pdf"]
-    assert set(dropped) == {"b.pdf", "c.pdf"}
+    assert body == ["1997-116-1.pdf", "1997-116.pdf"] and dropped == {}
+    assert volumes.page_labels(rec) == {"1997-116.pdf": "Bilaga"}
+
+
+def test_kb_scan_set_without_volume_titles_is_refused():
+    rec = _rec(["a.pdf", "b.pdf"], typ="sou", basefile="1996:158",
+               orig_url="http://urn.kb.se/resolve?urn=x")
+    with pytest.raises(AssertionError, match="soukb-scans"):
+        volumes.body_pdfs(rec, _probe({}))
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Långtidsutredningen 1987.  Bil. 25,", ("appendix", "Bilaga 25")),
+    ("Företagsförvärv i svenskt näringsliv  Bil. 1-5,betänkande", ("appendix", "Bilaga 1-5")),
+    ("Arbete och hälsa  betänkande. Bilagedel D", ("appendix", "Bilaga D")),
+    ("Sverige, framtiden och mångfalden  Bil. [A],slutbetänkande", ("appendix", "Bilaga A")),
+    ("Skogspolitiken inför 2000-talet  huvudbetänkande. Bilagor II", ("appendix", "Bilaga II")),
+    ("Förnyelse av kreditmarknaden  slutbetänkande. Bilaga", ("appendix", "Bilaga")),
+    ("Omställning av energisystemet  D. 3slutbetänkande. Underlagsbilagor,", ("appendix", "Del 3")),
+    ("Reformerad inkomstbeskattning  D. 2,betänkande.", ("main", "Del 2")),
+    ("Partnerskap  D. Abetänkande.", ("main", "Del A")),
+    ("Vilka vattendrag skall skyddas?  2,betänkande.", ("main", "Del 2")),
+    ("Svensk kärnteknisk tillsynsverksamhet  Vol. 1,betänkande.", ("main", "Del 1")),
+    ("Ett reformerat åklagarväsende: betänkande D. B", ("main", "Del B")),
+    ("Arbete och hälsa  betänkande", ("main", None)),
+    ("From massmedia to multimedia  English summary and conclusion", ("english", None)),
+    ("Environment for sustainable health development  an action plan", ("english", None)),
+    ("Märk väl!  [om märkning av varor vi köper nästan varje dag] : lättläst", ("kortversion", None)),
+    ("Ny socialtjänstlag  sammanfattning och lagförslag : särtryck", ("sammanfattning", None)),
+])
+def test_kb_volume_reads_what_a_volume_is_off_its_title(title, expected):
+    # every form here is taken from KB's index
+    assert volumes.kb_volume(title) == expected
+
+
+def test_kb_order_puts_the_parts_in_order_and_names_other_reports():
+    # sou/1989:33 lists D. 2, D. 1, D. 3, D. 4
+    order, _ = volumes.kb_order(["a", "b", "c", "d"], [
+        "Reformerad inkomstbeskattning  D. 2,betänkande.",
+        "Reformerad inkomstbeskattning  D. 1,betänkande.",
+        "Reformerad inkomstbeskattning  D. 3,betänkande.",
+        "Reformerad inkomstbeskattning  D. 4,betänkande. Bilagor, expertrapport"])
+    assert order == [("b", None), ("a", "Del 2"), ("c", "Del 3"), ("d", "Del 4")]
+    # sou/1987:3: two reports of their own follow the Långtidsutredning and
+    # its appendices, under their own names
+    order, _ = volumes.kb_order(["a", "b", "c"], [
+        "Sveriges arbetskraft  prognos till år 2000",
+        "Långtidsutredningen 1987.  Bil. 3,",
+        "Långtidsutredningen 1987"])
+    assert order == [("c", None), ("b", "Bilaga 3"), ("a", "Sveriges arbetskraft")]
+    # English versions go, as for a live record
+    order, dropped = volumes.kb_order(["a", "b"], [
+        "Sweden and Europe  committee of enquiry: Consequences of the EU",
+        "Sverige och Europa  en samhällsekonomisk konsekvensanalys"])
+    assert order == [("b", None)] and dropped == {"a": "english"}
 
 
 def test_budget_proposition_is_skipped_whole():
@@ -212,3 +273,13 @@ def test_every_broken_pdf_entry_is_well_formed():
         assert ":" in basefile, key
         assert name.lower().endswith(".pdf"), key
         assert why and isinstance(why, str), key
+
+
+def test_a_volume_label_is_shown_as_written_and_anchored_off_it():
+    # a number is an appendix the body's own pages detected, and keeps the
+    # #bilaga23-sid{N} anchor those pages always had
+    assert render.volume_label("23") == "Bilaga 23"
+    assert render.volume_anchor(render.volume_label("23")) == "bilaga23"
+    assert render.volume_anchor("Del 2") == "del2"
+    assert render.volume_anchor("Bilaga 1-5") == "bilaga1-5"
+    assert render.volume_anchor("Bilaga") == "bilaga"

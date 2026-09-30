@@ -148,11 +148,12 @@
 <section class="dom">{% if label %}<h3 id="{{ anchor }}" class="instans-rubrik">{{ label }}</h3>{% endif %}{{ inner }}</section>
 {%- endmacro -%}
 {#- =========================== förarbete walk ============================ -#}
-{%- macro fa_sid(key, rail_id, pg, fax, bil=None) -%}
+{%- macro fa_sid(key, rail_id, pg, fax, vol=None) -%}
 {#- the page-number anchor; with `fax` it doubles as the facsimile button
-    (a bilaga page repeats a printed body number, so it gets no button) -#}
+    (a page of a separately paginated volume, `vol` -- "Bilaga 3", "Del 2" --
+    repeats a printed body number, so it gets no button) -#}
 <span class="sid" id="{{ key }}"{{ rail_attr(rail_id) }}{% if fax %} role="tablist"{% endif %}>
-{% if fax %}<button type="button" class="sid-nr" role="tab" aria-selected="true">{% if bil %}Bilaga {{ bil }} s. {{ pg }}{% else %}Sida {{ pg }}{% endif %}</button>{% else %}<span class="sid-nr">{% if bil %}Bilaga {{ bil }} s. {{ pg }}{% else %}Sida {{ pg }}{% endif %}</span>{% endif %}
+{% if fax %}<button type="button" class="sid-nr" role="tab" aria-selected="true">{% if vol %}{{ vol }} s. {{ pg }}{% else %}Sida {{ pg }}{% endif %}</button>{% else %}<span class="sid-nr">{% if vol %}{{ vol }} s. {{ pg }}{% else %}Sida {{ pg }}{% endif %}</span>{% endif %}
 {%- if fax %}<button type="button" role="tab" aria-selected="false" data-fax="{{ fax }}" title="Visa sidan {{ pg }} som den trycktes"><svg class="sid-ico" viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg> Original</button>{% endif -%}
 </span>
 {%- endmacro -%}

@@ -304,6 +304,75 @@ def scanned_pdf_pages(pdf_path):
             for pageno, page in enumerate(text.split("\f"), 1)]
 
 
+# --- KB SOU front matter ---------------------------------------------------
+#
+# A KB-scanned SOU volume opens on pages that are the library's and the
+# printer's, not the report's: KB's banner (the whole of page 1: "Ur KB:s
+# samlingar / Digitaliserad år 2015", or "National Library of Sweden / Denna
+# bok digitaliserades på Kungl. biblioteket år 2012"), the outer cover again
+# without it, the year's list of SOUs ("Kronologisk förteckning") or a blank,
+# the title page, and the imprint or a blank. The report -- what a modern SOU
+# on regeringen.se opens on -- starts after them, on pdf page 6 in most
+# volumes, with its covering letter ("Till statsrådet …") or its table of
+# contents. A short volume can start sooner (sou/1926:2's letter is on page 4,
+# sou/1942:44's contents on page 5), so the start is found, never counted: the
+# first page from page 3 on that reads as the report's own.
+
+# KB's banner page
+RE_KB_BANNER = re.compile(r"Ur KB:s samlingar|National Library|digitaliserades på Kungl",
+                          re.I)
+# a page of the printer's: the imprint, the ordering notice, the cover credit
+RE_KB_IMPRINT = re.compile(r"\bISBN\b|\bISSN\b|kan köpas|Beställningsadress|"
+                           r"^\s*Omslag\b|Offsettryck|Tryckt? av\b|Boktryckeri|"
+                           r"\bTRYCK\b", re.I | re.M)
+# the report's first page announces itself: the covering letter to the
+# minister or the king, a table of contents, a foreword
+RE_KB_LETTER = re.compile(
+    r"^(?:skrivelse\s+)?(?:underdånig\s+skrivelse|till\s+)?(?:(?:herr|fru)\s+)?"
+    r"(?:statsrådet|chefen|konungen|regeringen|kungl|statsministern)\b")
+KB_OPENINGS = ("innehål", "förord", "underdånig")
+# the year's list of SOUs, as the OCR spells its heading ("Kronologisk
+# förteckning", "Krön ologisk", "Kroiclogisk", "Kronoloarisk"), or its first
+# line: the series and a bare year, where the title page has the number
+RE_KB_YEAR_LIST = re.compile(r"kr[oöø0](?:no|nö|ic|n)l|förteckning|forteckning|"
+                             r"^statensoffentligautredningar\d{4}(?!:)")
+# a page of the report's prose, in real words: the OCR reads the printer's logo
+# as noise ("W: WW w Statens") and letter-spacing ("S T A T E N S") as one
+# word a letter, so a raw word count cannot tell a title page from a page of text
+RE_REAL_WORD = re.compile(r"[A-Za-zÅÄÖåäöÉé]{3,}[.,:;]?")
+KB_PROSE_WORDS = 50
+# pages looked through for the start: KB's five, and the errata slip or second
+# title page some volumes bind in after them
+KB_FRONT_MAX = 8
+
+
+def _kb_report_page(text):
+    """Whether a page after KB's banner and the cover is the report's own."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for k in range(min(4, len(lines))):
+        joined = " ".join(lines[k:k + 4]).lower()
+        if (RE_KB_LETTER.match(joined)
+                or re.sub(r"\s+", "", joined).startswith(KB_OPENINGS)):
+            return True
+    head = re.sub(r"\s+", "", " ".join(lines[:8])).lower()
+    if RE_KB_YEAR_LIST.search(head) or RE_KB_IMPRINT.search(text):
+        return False                    # the year's list of SOUs, an imprint
+    return sum(1 for w in text.split() if RE_REAL_WORD.fullmatch(w)) >= KB_PROSE_WORDS
+
+
+def kb_front_pages(pdf_path):
+    """How many leading pages of a KB-scanned SOU volume are front matter, 0
+    for a PDF that does not open on KB's banner. Read off the text layer
+    `pdftotext` gives, which every KB scan carries."""
+    pages = pdftotext_text(pdf_path).split("\f")
+    if not RE_KB_BANNER.search(pages[0]):
+        return 0
+    drop = 2                                        # the banner and the cover
+    while drop < min(KB_FRONT_MAX, len(pages) - 1) and not _kb_report_page(pages[drop]):
+        drop += 1
+    return drop if drop < KB_FRONT_MAX else 2
+
+
 # --- Adapter 4: TRIPS plaintext-HTML --------------------------------------
 
 def trips_paras(html_text):

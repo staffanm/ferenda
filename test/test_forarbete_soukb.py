@@ -19,6 +19,7 @@ import pytest
 from ferenda.forarbete import soukb
 from ferenda.forarbete.soukb import basefile_of
 from ferenda.lib import compress, layout
+from ferenda.lib.harvest import write_record
 
 
 @pytest.mark.parametrize("label, basefile", [
@@ -42,8 +43,8 @@ INDEX = """
 <html><body>
 <a href="http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-100">1922:1</a> Plain one. <br>
 <a href="http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-101">1922:1 första serien</a> The first series. <br>
-<a href="http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-200">1987:3</a> Volume one. <br>
-<a href="http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-201">1987:3</a> Volume two. <br>
+<a href="http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-200">1987:3</a> Långtidsutredningen 1987.  Bil. 3, <br>
+<a href="http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-201">1987:3</a> Långtidsutredningen 1987 <br>
 <a href="/some/other/link">not a sou</a>
 </body></html>
 """
@@ -84,14 +85,15 @@ def soudir(tmp_path):
 
 def test_walk_index_groups_the_volumes_of_one_sou(monkeypatch):
     """A label repeated across URNs (the 128 multi-volume SOUs) becomes one entry
-    whose url list is the volumes in index order; the title is the first volume's,
-    read from the anchor's `next_sibling` text node."""
+    whose title and url lists are the volumes in index order, each title read
+    from the anchor's `next_sibling` text node."""
     monkeypatch.setattr(soukb, "request", _fake_request())
     entries = soukb.walk_index(None)
     assert [(b, t, len(u)) for b, t, u in entries] == [
-        ("1922:1", "Plain one.", 1),
-        ("1922:1fs", "The first series.", 1),
-        ("1987:3", "Volume one.", 2),
+        ("1922:1", ["Plain one."], 1),
+        ("1922:1fs", ["The first series."], 1),
+        ("1987:3", ["Långtidsutredningen 1987.  Bil. 3,",
+                    "Långtidsutredningen 1987"], 2),
     ]
     assert entries[2][2] == ["http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-200",
                              "http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-201"]
@@ -121,7 +123,7 @@ def test_download_one_writes_the_body_pdf_and_a_fresh_record(monkeypatch, soudir
     """A single-part SOU: the scan PDF is the body, so it lands in `files` and a
     fresh record is written keyed by the index basefile."""
     monkeypatch.setattr(soukb, "request", _fake_request(b"%PDF-1.4 one"))
-    entry = ("1922:1", "Plain one.",
+    entry = ("1922:1", ["Plain one."],
              ["http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-100"])
     assert soukb.download_one(None, soudir, entry, delay=0) is True
     assert (layout.fa_dir(soudir, "sou", "1922:1")
@@ -137,11 +139,14 @@ def test_download_one_writes_the_body_pdf_and_a_fresh_record(monkeypatch, soudir
 
 
 def test_download_one_names_multi_volume_parts_in_order(monkeypatch, soudir):
-    """The 128 multi-volume SOUs: each URN is a part, named like
-    `download.download_document` (`<slug>.pdf`, `<slug>-1.pdf`, ...), all listed
-    in `files` -- never colliding onto one PDF."""
+    """The 128 multi-volume SOUs: each URN is a volume, named by its place in
+    KB's index like `download.download_document` (`<slug>.pdf`, `<slug>-1.pdf`,
+    ...) -- never colliding onto one PDF -- and listed in reading order: KB lists
+    sou/1997:116's appendix before the report, and the record takes the
+    report's title and url, not the first-listed volume's."""
     monkeypatch.setattr(soukb, "request", _fake_request(b"%PDF-1.4 vol"))
-    entry = ("1987:3", "Volume one.",
+    entry = ("1987:3", ["Långtidsutredningen 1987.  Bil. 3,",
+                        "Långtidsutredningen 1987"],
              ["http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-200",
               "http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-201"])
     assert soukb.download_one(None, soudir, entry, delay=0) is True
@@ -150,7 +155,46 @@ def test_download_one_names_multi_volume_parts_in_order(monkeypatch, soudir):
         == ["1987-3-1.pdf", "1987-3.pdf"]
     record = json.loads(compress.read_text(
         layout.fa_record_file(soudir, "sou", "1987:3")))
-    assert record["files"] == ["1987-3.pdf", "1987-3-1.pdf"]
+    assert record["files"] == ["1987-3-1.pdf", "1987-3.pdf"]
+    assert record["volumes"] == ["Långtidsutredningen 1987",
+                                 "Långtidsutredningen 1987.  Bil. 3,"]
+    assert record["title"] == "Långtidsutredningen 1987"
+    assert record["url"].endswith("sou-201")
+
+
+def test_a_rerun_reorders_a_set_but_leaves_other_records_alone(monkeypatch, soudir):
+    """With every part on disk, a rerun brings a set's reading order up to date
+    without a download, and touches neither a single volume's record nor one
+    another route owns (sou/1999:78: regeringen.se's file has the same name)."""
+    def explode(*a, **kw):
+        raise AssertionError("fetched with every part on disk")
+    monkeypatch.setattr(soukb, "request", explode)
+    urns = ["http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-200",
+            "http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-201"]
+    titles = ["Långtidsutredningen 1987.  Bil. 3,", "Långtidsutredningen 1987"]
+    d = layout.fa_dir(soudir, "sou", "1987:3")
+    d.mkdir(parents=True)
+    for name in ("1987-3.pdf", "1987-3-1.pdf"):
+        (d / name).write_bytes(b"%PDF")
+    old = {"type": "sou", "basefile": "1987:3", "identifier": "SOU 1987:3",
+           "title": titles[0], "date": None, "orig_url": urns[0], "url": urns[0],
+           "files": ["1987-3.pdf", "1987-3-1.pdf"], "source": "soukb"}
+    write_record(layout.fa_record_file(soudir, "sou", "1987:3"), old)
+    assert soukb.download_one(None, soudir, ("1987:3", titles, urns), 0) is False
+    record = compress.read_json(layout.fa_record_file(soudir, "sou", "1987:3"))
+    assert record["files"] == ["1987-3-1.pdf", "1987-3.pdf"]
+    assert record["source"] == "soukb"               # the rest is kept
+    for basefile, url in (("1985:10", urns[0]),
+                          ("1999:78", "https://www.regeringen.se/x/sou-199978/")):
+        d = layout.fa_dir(soudir, "sou", basefile)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / (basefile.replace(":", "-") + ".pdf")).write_bytes(b"%PDF")
+        mine = {"type": "sou", "basefile": basefile, "title": "Eget",
+                "url": url, "files": [basefile.replace(":", "-") + ".pdf"]}
+        write_record(layout.fa_record_file(soudir, "sou", basefile), mine)
+        assert soukb.download_one(None, soudir, (basefile, ["KB:s titel"], [urns[0]]),
+                                  0) is False
+        assert compress.read_json(layout.fa_record_file(soudir, "sou", basefile)) == mine
 
 
 def test_download_one_is_resumable_from_disk(monkeypatch, soudir):
@@ -165,7 +209,7 @@ def test_download_one_is_resumable_from_disk(monkeypatch, soudir):
         raise AssertionError("re-fetched an entry already on disk")
 
     monkeypatch.setattr(soukb, "request", explode)
-    entry = ("1922:1", "Plain one.",
+    entry = ("1922:1", ["Plain one."],
              ["http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-100"])
     assert soukb.download_one(None, soudir, entry, delay=0) is False
 
@@ -175,7 +219,7 @@ def test_download_one_rejects_non_pdf_bytes(monkeypatch, soudir):
     proof we got a PDF: an error page stored as one would parse to an empty body
     forever (rule:errors-drive-retry-use-raise)."""
     monkeypatch.setattr(soukb, "request", _fake_request(b"<html>404</html>"))
-    entry = ("1922:1", "Plain one.",
+    entry = ("1922:1", ["Plain one."],
              ["http://urn.kb.se/resolve?urn=urn:nbn:se:kb:sou-100"])
     with pytest.raises(ValueError, match="KB served no PDF"):
         soukb.download_one(None, soudir, entry, delay=0)

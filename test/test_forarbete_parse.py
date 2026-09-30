@@ -330,7 +330,7 @@ def test_parse_record_patch_key_is_typ_qualified_slug(monkeypatch, tmp_path):
     # a born-digital PDF's yield: non-empty, so `_legacy_pdf_body` keeps these
     # blocks instead of reading the stub as a textless scan and falling through
     # to the pdftotext OCR route (which would shell out on a 5-byte fake PDF)
-    def fake_parse_pdf(path, identifier, patch_key=None):
+    def fake_parse_pdf(path, identifier, patch_key=None, first_page=1):
         seen["patch_key"] = patch_key
         return [Block("stycke", "Regeringens proposition", 1)]
 
@@ -362,7 +362,7 @@ def test_harvested_body_prefers_pdf_over_xml(tmp_path, monkeypatch):
     ABBYY-bodied doc onto a pdftotext of the scan. Lock the precedence."""
     seen = {}
 
-    def fake_pdf(path, identifier, patch_key=None):
+    def fake_pdf(path, identifier, patch_key=None, first_page=1):
         seen["path"] = str(path)
         return [Block("stycke", "from pdf", 1)], False
 
@@ -385,15 +385,17 @@ def test_harvested_body_ocr_sidecar_wins_and_carries_patch_key(tmp_path, monkeyp
     monkeypatch.setattr(fa_parse.layout, "fa_ocr_pdf", lambda typ, bf: sidecar)
     seen = {}
 
-    def fake_pdf(path, identifier, patch_key=None):
-        seen["path"], seen["patch_key"] = str(path), patch_key
-        return [Block("stycke", "x", 1)], False
+    def fake_pdf(path, identifier, patch_key=None, ocr=False):
+        seen["path"], seen["patch_key"], seen["ocr"] = str(path), patch_key, ocr
+        return [Block("stycke", "x", 1)]
 
-    monkeypatch.setattr(fa_parse, "_legacy_pdf_body", fake_pdf)
+    monkeypatch.setattr(fa_parse, "parse_pdf", fake_pdf)
     _stage(tmp_path, "prop", "1999/2000:1", "1999-2000-1.pdf", b"%PDF-1.4 body")
     fa_parse.parse_record(_harvested_rec(files=["1999-2000-1.pdf"]), tmp_path)
     assert seen["path"] == str(sidecar)              # sidecar parsed, not the pdf
     assert seen["patch_key"] == ("forarbete", "prop/1999-2000-1")
+    # read as an OCR copy: hidden text, "§" repaired, pages by PDF page
+    assert seen["ocr"] is True
 
 
 def test_harvested_body_concatenates_multi_volume_pdfs(tmp_path, monkeypatch):
@@ -403,7 +405,7 @@ def test_harvested_body_concatenates_multi_volume_pdfs(tmp_path, monkeypatch):
     that volume's XML, so applying them to later volumes would fail."""
     calls = []
 
-    def fake_pdf(path, identifier, patch_key=None):
+    def fake_pdf(path, identifier, patch_key=None, first_page=1):
         calls.append((Path(path).name, patch_key))
         return [Block("stycke", "text from " + Path(path).name, 1)], False
 
@@ -1208,3 +1210,30 @@ def test_split_two_column_rejects_a_landscape_table_of_rotated_fragments():
 
     segs = tabell.split_two_column([fragmented(100 + 40 * i) for i in range(5)])
     assert [s[0] for s in segs] == ["lines"]
+
+
+def test_a_reading_far_above_the_pdf_page_needs_a_second_that_agrees():
+    # sou/1989:33 del 2: its table of contents on pdf page 15 prints "230" and
+    # "232" in the margin, and the first strong reading used to start the
+    # count there -- page 1 became 216, and the real folios after it read as
+    # a restart that left the rest of the volume without numbers
+    candidates = {15: _marks((230, 232)), 16: _marks((13,)), 42: _marks((39,))}
+    m = fa_parse.printed_pages(candidates, list(range(1, 61)))
+    assert m[16] == (13, None) and m[42] == (39, None) and m[60] == (57, None)
+    assert m[15] == (12, None) and m[3] is not None and m[3].printed is None
+    # a far-off reading with no peer is dropped: page 1 is not page 2743
+    m = fa_parse.printed_pages({1: _marks((2743,))}, list(range(1, 11)))
+    assert m[1] == (1, None) and m[10] == (10, None)
+    # two that agree start it (a volume continuing another's numbering)
+    m = fa_parse.printed_pages({5: _marks((362,)), 6: _marks((363,))},
+                               list(range(1, 11)))
+    assert m[1] == (358, None) and m[10] == (367, None)
+
+
+def test_a_reading_below_the_pdf_page_starts_the_count_alone():
+    # unnumbered front matter runs long: sou/1994:48's page 1 is pdf page 14,
+    # and sou/1995:69's "16" on pdf page 19 found no peer before an appendix
+    # restarting at page 362
+    m = fa_parse.printed_pages({14: _marks((1,)), 362: _marks((3,)),
+                                364: _marks((5,))}, list(range(1, 370)))
+    assert m[13].printed is None and m[14] == (1, None) and m[300] == (287, None)

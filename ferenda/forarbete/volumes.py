@@ -20,10 +20,18 @@ Provenance splits the 485 into five populations that need different handling
 records and live records), and the record itself says which -- so 179 of them
 are decided without opening a single PDF:
 
-* **KB scan sets** (128, `orig_url` on urn.kb.se) -- the extra files are
-  *sibling* volumes catalogued under the same SOU number, not later parts of
-  one text: sou/1996:158's 22 files are Bilaga 15, 21, 14, 16 … of the
-  EMU-utredningen, in no order. Only the first is the work.
+* **KB scan sets** (128, `orig_url` on urn.kb.se) -- the files are the
+  volumes KB catalogued under one SOU number: the report itself, its parts
+  ("D. 1", "D. 2"), its appendix volumes ("Bil. 3", "Bilagedel D") and now and
+  then an English version, in KB's index order, which is no order at all --
+  sou/1996:158's 22 files are Bilaga 15, 21, 14, 16 … of the EMU-utredningen,
+  and sou/1997:116 lists its appendix before Barnkommitténs huvudbetänkande.
+  Taking the first file as the work picked an appendix, a later part or an
+  English version for 88 of the 128. So each volume is read by its KB title (`kb_volume`, the titles
+  `soukb` stores in the record's `volumes`): the report and its parts come
+  first, then the appendices, and each volume after the first keeps its own
+  pagination under its own label (`Block.bilaga`: "Bilaga 3", "Del 2"). An
+  English version is dropped, as for a live record.
 * **Budget propositions** (11) -- 30-odd separately paginated volumes of
   tables; prop. 2016/17:1 is nine one-page fragments. Not a legal source, and
   skipped outright.
@@ -36,6 +44,7 @@ are decided without opening a single PDF:
 import functools
 import json
 import re
+from collections import Counter
 from html import unescape
 from pathlib import Path
 
@@ -93,6 +102,25 @@ RE_CONTENT_LINK = re.compile(
     r'<a\b[^>]+href="[^"]*(?:contentassets|globalassets)[^"]*"[^>]*>(.*?)</a>',
     re.I | re.S)
 RE_TAG = re.compile(r"<[^>]+>")
+
+# What a KB volume is, from the part of its index title after the SOU's own
+# name (KB separates the two with two spaces): "Bil. 3,", "Bil. 1-5,", "Bil.,",
+# "Bilagedel D", "Bilagor II", "Expertbilaga", "Appendix"; "D. 2,", "D. Abetänk-
+# ande" (KB drops the space), "Del 1", "Vol. 2,", "2,betänkande.". Measured
+# over all 128 multi-volume SOUs in KB's index (2026-09).
+RE_KB_APPENDIX = re.compile(
+    r"(?i:bilag)\w*\s*(\d+(?:-\d+)?|[IVX]+\b|[A-Z](?![a-zåäö]))?"
+    r"|\bBil\.\s*\[?(\d+(?:-\d+)?|[A-Z](?![a-zåäö]))?\]?|(?i:\bappendix\b)")
+RE_KB_PART = re.compile(r"\b(?:D|Vol)\.\s*(\d+|[A-Z])|\bDel\s*(\d+|[A-Z](?![a-zåäö]))"
+                        r"|^(\d+)(?=,|[a-zåäö])")
+# the report says what it is ("huvudbetänkande", "slutbetänkande :")
+RE_KB_BETANKANDE = re.compile(r"betänkande", re.I)
+# an English version: an English title has no Swedish letter at all and some
+# English function word ("Environment for sustainable health development  an
+# action plan", "Swedish nuclear regulatory activities  Vol. 1,report.")
+RE_KB_ENGLISH_WORD = re.compile(
+    r"\b(?:the|and|for|of|to|in|on|an|report|summary)\b", re.I)
+
 
 
 @functools.cache
@@ -198,8 +226,16 @@ def body_pdfs(record, probe):
     if kind == "budget":
         return [], dropped | {f: "budgetproposition" for f in pdfs}
     if kind == "kb":
-        return pdfs[:1], dropped | {f: "syskonvolym i KB-skanningen"
-                                    for f in pdfs[1:]}
+        # the record's `volumes` are KB's title for each file, in `files` order
+        # (written by `soukb`); a record written before it stored them cannot
+        # say which volume is the report (rule:fail-fast)
+        assert "volumes" in record, (
+            "%s/%s: a KB scan set without its volume titles -- run `lagen "
+            "forarbete soukb-scans` to rewrite its record"
+            % (record["type"], record["basefile"]))
+        titles = dict(zip(record["files"], record["volumes"], strict=True))
+        order, english = kb_order(pdfs, [titles[f] for f in pdfs])
+        return [f for f, _label in order], dropped | english
 
     # the link texts align with `files`, which may hold .doc/.docx/.rtf beside
     # the PDFs, so a label is looked up by the file's position *there* -- not by
@@ -266,3 +302,106 @@ def body_pdfs(record, probe):
         else:
             dropped[f] = "separat dokument"
     return body, dropped
+
+
+def kb_volume(title):
+    """What one KB volume is, from its index title: `("main", None)` for the
+    report itself, `("main", "Del 2")` for one part of it, `("appendix",
+    "Bilaga 3")` -- `"Bilaga"` for an unnumbered one -- or a volume that is
+    not the report's text: `("english", None)`, `("kortversion", None)` (an
+    easy-read or short version) and `("sammanfattning", None)`."""
+    # after the SOU's name where KB's two spaces mark it; some titles run the
+    # volume on without them ("…: betänkande D. A")
+    rest = title.split("  ", 1)[1] if "  " in title else title
+    if RE_ENGLISH.search(title) or (RE_KB_ENGLISH_WORD.search(title)
+                                    and not re.search("[åäöÅÄÖ]", title)):
+        return "english", None
+    if RE_POPULAR.search(title) or re.search(r"\bi korthet\b", title, re.I):
+        return "kortversion", None
+    if RE_SUMMARY.search(title) or re.search(r"\bsärtryck\b", title, re.I):
+        return "sammanfattning", None
+    part = RE_KB_PART.search(rest)
+    if m := RE_KB_APPENDIX.search(rest):
+        number = m.group(1) or m.group(2)
+        if number:
+            return "appendix", "Bilaga %s" % number
+        # one part of an appendix set (sou/1995:140: "D. 3slutbetänkande.
+        # Underlagsbilagor", four parts and no other volume)
+        return "appendix", ("Del %s" % next(g for g in part.groups() if g)
+                            if part else "Bilaga")
+    if part:
+        return "main", "Del %s" % next(g for g in part.groups() if g)
+    return "main", None
+
+
+def kb_name(title):
+    """The SOU's own name in a KB volume title: the part before KB's two
+    spaces, without the trailing full stop some volumes carry."""
+    return title.split("  ", 1)[0].strip().rstrip(".")
+
+
+def _natural(label):
+    return [(0, int(t)) if t.isdigit() else (1, t)
+            for t in re.split(r"(\d+)", label or "") if t]
+
+
+def kb_order(files, titles):
+    """A KB scan set's files in reading order, each with the label its pages
+    carry, and the files dropped: `([(file, label)], {file: reason})`.
+
+    The report first -- its unlabelled volume, then its parts by number -- then
+    the appendices by number. The first volume's pages need no label: they are
+    the report's own, cited as "SOU 1997:116 s. 42". Every later volume keeps
+    its own page numbers under its label, so its page 5 is "Bilaga 3 s. 5" and
+    never a second "s. 5".
+
+    The report is the unmarked volume under the name most of the set carries:
+    sou/1987:3 files "Sveriges arbetskraft" and "Den framtida befolkningen"
+    beside "Långtidsutredningen 1987" and its 25 appendices, and those two are
+    reports of their own, so they follow the appendices under their own names.
+    Where two volumes are the same unmarked report (sou/1990:14 lists
+    "Långtidsutredningen 1990" twice) the later one is labelled by its place in
+    the set ("Volym 2"): nothing else tells the two apart, and they restart
+    their page numbers alike. An English, short or summary version is dropped,
+    as for a live record."""
+    assert len(files) == len(titles), "one KB title per file"
+    kinds = [kb_volume(t) for t in titles]
+    dropped = {f: kind for f, (kind, _) in zip(files, kinds, strict=True)
+               if kind not in ("main", "appendix")}
+    # the report's name: the one most volumes carry, and on a tie the one a
+    # volume calling itself a betänkande carries (sou/1996:155 files its
+    # slutbetänkande beside a report of another name, one volume each)
+    names = Counter(kb_name(t) for t, (kind, _) in zip(titles, kinds, strict=True)
+                    if kind in ("main", "appendix"))
+    name = max(names, key=lambda n: (names[n], any(
+        kb_name(t) == n and RE_KB_BETANKANDE.search(t) for t in titles)),
+        default=None)
+
+    def key(v):
+        _f, kind, label, i = v
+        own = kb_name(titles[i]) == name
+        group = (0 if kind == "main" and own else 1 if kind == "appendix" else 2)
+        return (group, label is not None,
+                not RE_KB_BETANKANDE.search(titles[i]), _natural(label), i)
+
+    kept = sorted(((f, kind, label, i) for i, (f, (kind, label))
+                   in enumerate(zip(files, kinds, strict=True))
+                   if f not in dropped), key=key)
+    order = []
+    for pos, (f, _kind, label, i) in enumerate(kept):
+        if pos == 0:
+            label = None
+        elif label is None:
+            label = (kb_name(titles[i]) if kb_name(titles[i]) != name
+                     else "Volym %d" % (pos + 1))
+        order.append((f, label))
+    return order, dropped
+
+
+def page_labels(record):
+    """{file: label} for the volumes of a KB scan set after the first -- the
+    label each one's pages carry (`kb_order`). Empty for any other record."""
+    if population(record) != "kb" or len(record.get("files", [])) < 2:
+        return {}
+    order, _dropped = kb_order(record["files"], record["volumes"])
+    return {f: label for f, label in order if label is not None}
