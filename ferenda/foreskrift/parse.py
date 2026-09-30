@@ -50,6 +50,7 @@ from ..lib.pdftext import (
     RE_PARA_MARK,
     Para,
     ocr_pdf,
+    ocr_text_pages,
     only_furniture,
     page_paragraphs,
     pdf_pages,
@@ -1800,7 +1801,7 @@ def _pages(path, patch_key=None):
     pages = list(pdf_pages(path, patch_key, hidden=True))
     if any(lines for _pageno, lines in pages) and not only_furniture(pages):
         return pages
-    return list(pdf_pages(ocr_pdf(path, "swe"), patch_key, hidden=True))
+    return ocr_text_pages(ocr_pdf(path, "swe"), "swe", patch_key)
 
 
 def _repair_ocr_text(text):

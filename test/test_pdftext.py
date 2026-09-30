@@ -1406,3 +1406,63 @@ def test_pages_with_ocr_ocrs_a_layer_that_is_only_a_stamp(monkeypatch, tmp_path)
     pages = pdftext.pages_with_ocr(str(tmp_path / "scan.pdf"))
     assert [l.text for _no, lines in pages for l in lines] == ["Beslut i ärendet"]
     assert calls[-1].endswith(".ocr.pdf")
+
+
+# ---- the "§" a Swedish OCR cannot read ---------------------------------------
+
+def test_a_dollar_after_a_number_is_the_section_sign_it_was():
+    # tesseract's Swedish models have no "§" in their character set; prop.
+    # 1993/94:130 came back with 315 "$" and not one "§"
+    assert pdftext.ocr_section_signs("nödvärn (24 kap. 1 $ BrB)") \
+        == "nödvärn (24 kap. 1 § BrB)"
+    assert pdftext.ocr_section_signs("de nya 24 kap. 6 och 8 $$ skall") \
+        == "de nya 24 kap. 6 och 8 §§ skall"
+    assert pdftext.ocr_section_signs("enligt 4$ lagen") == "enligt 4§ lagen"
+    # not after a number, it is left as it is
+    assert pdftext.ocr_section_signs("US $ 5") == "US $ 5"
+
+
+@pytest.mark.parametrize("ocr, expected", [
+    # the forms the 1 090 "§" of four 1990s propositions took, aligned
+    # against riksdagen's exact text
+    ("enligt 5a$ och 7 a $ lagen", "enligt 5a§ och 7 a § lagen"),
+    ("8 $ $ skall", "8 § § skall"),
+    ("3 & första stycket", "3 § första stycket"),
+    ("24 kap. 1 8 brottsbalken", "24 kap. 1 § brottsbalken"),
+    ("3 8 första stycket", "3 § första stycket"),
+    # "%" read as "$" or "&": a share is "av" something or has a decimal
+    ("cirka 75 & av den totala", "cirka 75 % av den totala"),
+    ("1,5 $ tas dock ut", "1,5 % tas dock ut"),
+    # an 8 anywhere else may be the digit it looks like
+    ("de 8 ledamöterna", "de 8 ledamöterna"),
+    ("år 1988 8 månader", "år 1988 8 månader"),
+])
+def test_the_other_forms_a_section_sign_takes(ocr, expected):
+    assert pdftext.ocr_section_signs(ocr) == expected
+
+
+def test_ocr_text_pages_repairs_a_swedish_ocr_only(monkeypatch):
+    line = _line("24 kap. 1 $ BrB", 40)
+    line.runs = [pdftext.Run(0, 10, "24 kap. 1 $ BrB", False, False)]
+    monkeypatch.setattr(pdftext, "pdf_pages",
+                        lambda path, patch_key=None, hidden=False: [(1, [line])])
+    (_no, (swe,)), = pdftext.ocr_text_pages("x.pdf", "swe")
+    assert swe.text == swe.runs[0].text == "24 kap. 1 § BrB"
+    (_no, (eng,)), = pdftext.ocr_text_pages("x.pdf", "eng")
+    assert eng.text == "24 kap. 1 $ BrB"
+
+
+def test_ocr_writes_to_dest_through_a_temporary_name(tmp_path, monkeypatch):
+    # a killed run must leave no half-written copy the next run takes as done
+    seen = []
+
+    def run(cmd, check, capture_output):
+        seen.append(cmd[-1])
+        pathlib.Path(cmd[-1]).write_bytes(b"%PDF-1.4 ocr")
+    monkeypatch.setattr(pdftext.subprocess, "run", run)
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    dest = tmp_path / "ocr" / "prop" / "scan.pdf"
+    assert pdftext.ocr_pdf(pdf, "swe", dest=dest) == dest
+    assert dest.read_bytes() == b"%PDF-1.4 ocr"
+    assert seen[0] != str(dest) and not pathlib.Path(seen[0]).exists()

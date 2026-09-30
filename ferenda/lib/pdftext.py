@@ -223,10 +223,13 @@ def pdf_intermediate(pdf_path):
     return pdftohtml_xml(pdf_path).decode("utf-8", "replace")
 
 
-def ocr_pdf(path, lang):
+def ocr_pdf(path, lang, dest=None):
     """OCR a scanned PDF (no recoverable text layer) into a cached hidden
     sidecar, returning its path. Cached beside the source as
-    ``.<stem>.ocr.pdf`` so a re-parse is free.
+    ``.<stem>.ocr.pdf`` so a re-parse is free -- or at `dest`, for a source
+    that keeps its OCR copies in a tree of their own (`layout.fa_ocr_pdf`).
+    Written to a temporary name and renamed into place, so a killed run leaves
+    no half-written copy that the next one would take as done.
 
     A missing ocrmypdf binary is a broken environment and propagates
     (rule:fail-fast); a per-document OCR failure (a corrupt scan, a missing
@@ -236,9 +239,12 @@ def ocr_pdf(path, lang):
 
     Extract text from the result with ``hidden=True``: what ocrmypdf adds is an
     invisible text layer behind the page image, which pdftohtml drops otherwise."""
-    cached = Path(path).with_name("." + Path(path).stem + ".ocr.pdf")
+    cached = (Path(dest) if dest is not None
+              else Path(path).with_name("." + Path(path).stem + ".ocr.pdf"))
     if cached.exists():
         return cached
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    partial = cached.with_name("." + cached.name + ".partial")
     # --force-ocr: rasterize and OCR every page, replacing the unrecoverable
     # (Identity-H, no ToUnicode) text layer these scans carry -- --skip-text
     # would see that broken layer as "already text" and skip the page.
@@ -255,9 +261,63 @@ def ocr_pdf(path, lang):
     # text only and never served, and the signed original stays untouched.
     subprocess.run(["ocrmypdf", "--quiet", "--force-ocr", "--continue-on-soft-render-error",
                     "--invalidate-digital-signatures",
-                    "--tesseract-timeout", "900", "-l", lang, str(path), str(cached)],
+                    "--tesseract-timeout", "900", "-l", lang, str(path), str(partial)],
                    check=True, capture_output=True)
+    os.replace(partial, cached)
     return cached
+
+
+# tesseract's Swedish models have no "§" in their character set (checked on the
+# installed swe.traineddata and on tessdata and tessdata_best: 101 characters,
+# no section sign), so every "§" of a Swedish scan comes out as something else.
+# English has the sign, but `swe+eng` turned 159 Swedish words of prop.
+# 1993/94:130 into English-looking ones ("för" -> "for", "är" -> "dr"). So the
+# Swedish model reads, and the forms a "§" takes are put back where nothing else
+# could stand there. Aligned against riksdagen's exact text of four 1990s
+# propositions, the 1 090 "§" read as "$" (756), "8" (98), "$ $" (57), "&"
+# (48); the rest are gone or merged into a number. Each rule keeps the length
+# of what it replaces, so every offset into the line (spans, runs) still holds.
+_OCR_SECTION_RULES = (
+    # the Swedish model reads "%" as "$" or "&" too ("75 & av den totala",
+    # "1,5 $"). A share has a decimal comma or is "av" something; a section
+    # never is
+    (re.compile(r"(?<=\d)(\s?)[$&](?=\s(?:av|per)\b)|(?<=\d,\d)(\s?)[$&]"),
+     lambda m: (m.group(1) or m.group(2) or "") + "%"),
+    # "24 kap. 1 $ BrB", "5a$", "5 a $", "6 och 8 $$", "8 $ $": a dollar sign
+    # after a section number, with its letter if it has one
+    (re.compile(r"(?<=\d)(\s?(?:[a-z]\s?)?)\$(\s?)(\$?)"),
+     lambda m: m.group(1) + "§" + m.group(2) + ("§" if m.group(3) else "")),
+    # "3 & första stycket": an ampersand between a number and a word
+    (re.compile(r"(?<=\d)(\s)&(?=\s[a-zåäö])"), lambda m: m.group(1) + "§"),
+    # "24 kap. 1 8 brottsbalken", "3 8 första stycket": an 8 standing where
+    # only the sign can -- any other 8 may be the digit it looks like
+    (re.compile(r"(?<=kap\.\s)(\d+\s?(?:[a-z]\s)?)8(?=\s[a-zåäö])"),
+     lambda m: m.group(1) + "§"),
+    (re.compile(r"(?<=\d\s)8(?=\s(?:första|andra|tredje|fjärde|femte|sjätte)"
+                r"\s+stycket)"), lambda m: "§"),
+)
+
+
+def ocr_section_signs(text):
+    """`text` with the "§" a Swedish OCR misread put back."""
+    for rx, repl in _OCR_SECTION_RULES:
+        text = rx.sub(repl, text)
+    return text
+
+
+def ocr_text_pages(ocr_path, lang, patch_key=None):
+    """(pageno, [Line]) from an ocrmypdf copy: its text layer is invisible, so
+    it reads with ``hidden=True``, and a Swedish one gets its "§" back
+    (`ocr_section_signs`). The one reader of OCR output, so no source can read
+    it without the repair."""
+    pages = pdf_pages(str(ocr_path), patch_key, hidden=True)
+    if "swe" not in lang.split("+"):
+        return list(pages)
+    return [(pageno, [replace(line, text=ocr_section_signs(line.text),
+                              runs=[replace(run, text=ocr_section_signs(run.text))
+                                    for run in line.runs])
+                      for line in lines])
+            for pageno, lines in pages]
 
 
 # poppler's own words when a PDF's cross-reference table is unusable -- the one
@@ -578,7 +638,7 @@ def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
         pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
     if any(lines for _pageno, lines in pages) and not only_furniture(pages):
         return pages
-    return list(pdf_pages(str(ocr_pdf(pdf_path, lang)), patch_key, hidden=True))
+    return ocr_text_pages(ocr_pdf(pdf_path, lang), lang, patch_key)
 
 
 def pdf_images(pdf_path):
@@ -1023,10 +1083,18 @@ def _number_section(candidates, pagenos):
     PDFs omit blank printed leaves between chapters and bind in unnumbered
     divider pages, so no single document-wide offset exists.
 
-    Reading trust: the first reading establishes the offset outright and
-    applies retroactively to the pages before it (unnumbered cover matter maps
-    below printed 1 -> no anchor, never a duplicate of the real page 1). A
-    later reading shifting the offset by at most PAGE_SHIFT_TOL pages is
+    Reading trust: a strong reading at or below the pdf page (at most
+    PAGE_SHIFT_TOL above it) starts the count on its own -- unnumbered front
+    matter can run long. One well above the pdf page starts it only when a
+    second strong reading agrees (at most PAGE_SHIFT_TOL pages ahead of it,
+    which absorbs an omitted leaf between them), and a page offering two bare
+    numbers cannot start it there. A table of contents prints bare page references in
+    the margin, and nothing else stops "230" on pdf page 15 from numbering page
+    1 as 216. The offset then applies retroactively to every page
+    before (unnumbered cover matter maps below printed 1 -> no anchor, never a
+    duplicate of the real page 1). A far-off reading that never finds a peer is
+    dropped, and the pdf page numbering stands, as for a document with no
+    reading at all. A later reading shifting the offset by at most PAGE_SHIFT_TOL pages is
     adopted at once. A larger *forward* shift is adopted only when the next
     reading agrees (one misread folio must not drag the rest of the document).
     Any *backward* shift is a section restarting its own numbering, however
@@ -1036,17 +1104,44 @@ def _number_section(candidates, pagenos):
     tolerance-bounded; a backward one of two pages is a four-page bilaga
     starting over, and adopting it mints the same `#sid` ids twice."""
     out = {}
-    offset = None          # None until the first reading
+    offset = None          # None until two readings agree
     pending = None         # (implied offset,) awaiting corroboration ...
     pending_at = None      # ... first seen on this page
     first_offset = None
+    unconfirmed = []       # implied offsets read before the count is running
     for pageno in pagenos:
         detected = _pick_pageno(candidates.get(pageno), pageno, offset)
+        if detected is not None and offset is None:
+            implied = detected - pageno
+            if implied > PAGE_SHIFT_TOL and len(candidates[pageno].strong) > 1:
+                # two bare numbers in one page's margins, well above the pdf
+                # page, are a table of contents' page references, not its folio
+                # (sou/1993:36's "103 104", then "105 219", agreed with each
+                # other). Below it they can be a folio beside footnote markers:
+                # prop. 1936:242's appendix opens on pdf page 168 with "1 6 8"
+                out[pageno] = pageno
+                continue
+            # a reading at or below the pdf page starts the count on its own:
+            # unnumbered front matter runs long (sou/1994:48's page 1 is pdf
+            # page 14). One well above it needs a second that agrees:
+            # sou/1989:33 del 2's "230" on pdf page 15 numbered its page 1 as
+            # 216, and sou/1998:70's page 1 became 2743. Asking every first
+            # reading for a peer instead cost sou/1995:69 its whole body -- its
+            # "16" on pdf page 19 found none, and the first pair that agreed was
+            # an appendix restarting at page 362
+            peer = (implied if implied <= PAGE_SHIFT_TOL else
+                    next((u for u in unconfirmed
+                          if 0 <= implied - u <= PAGE_SHIFT_TOL), None))
+            if peer is None:
+                unconfirmed.append(implied)
+                out[pageno] = pageno
+                continue
+            offset = first_offset = peer
+            for done in out:                # the pages read so far, recounted
+                out[done] = done + offset if done + offset >= 1 else None
         if detected is not None:
             implied = detected - pageno
-            if offset is None:
-                offset = first_offset = implied
-            elif implied != offset:
+            if implied != offset:
                 if 0 < implied - offset <= PAGE_SHIFT_TOL:
                     offset = implied            # an omitted blank leaf
                 elif pending == implied:

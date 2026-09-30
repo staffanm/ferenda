@@ -43,9 +43,9 @@ from ..lib.lagrum import ALL_PARSE_TYPES, sfs_parser
 from ..lib.pdftext import (
     join_across_pages,
     ocr_pdf,
+    ocr_text_pages,
     page_paragraphs,
     pages_with_ocr,
-    pdf_pages,
 )
 from ..lib.util import approximate_date, normalize_space, store_relpath
 from .download import body_path, record_json, superseded
@@ -128,8 +128,7 @@ def pages(path, patch_key):
     only when no page has text."""
     read = pages_with_ocr(path, patch_key)
     if read and not read[0][1]:
-        read = list(pdf_pages(str(ocr_pdf(path, "swe")), patch_key,
-                              hidden=True))
+        read = ocr_text_pages(ocr_pdf(path, "swe"), "swe", patch_key)
     return read
 
 

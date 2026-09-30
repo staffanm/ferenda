@@ -2345,6 +2345,8 @@ def test_a_text_layer_that_is_only_a_stamp_is_read_as_no_text(monkeypatch):
 
     monkeypatch.setattr(fp, "pdf_pages", fake)
     monkeypatch.setattr(fp, "ocr_pdf", lambda path, lang: path + ".ocr.pdf")
+    monkeypatch.setattr(fp, "ocr_text_pages",
+                        lambda path, lang, patch_key=None: fake(path, patch_key, True))
     assert fp._pages("scan.pdf")[0][1][0].text == "Myndighetens föreskrifter om buller"
     # a page of its own text is the document's, however short
     real = [(1, [_line("Myndighetens föreskrifter om buller")]),
