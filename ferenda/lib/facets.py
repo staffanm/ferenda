@@ -826,8 +826,19 @@ def sources():
 # browse.py, so there is one authority for which schemes become pages (the two
 # used to disagree: the API answered /browse for four sources whose pages were
 # never generated).
-UNGENERATED = frozenset({"coe", "icrc", "untc", "icc", "icj"})
+UNGENERATED = frozenset({"coe", "icrc", "untc", "icc", "icj", "kkvdomar"})
 assert UNGENERATED <= set(SCHEMES), "UNGENERATED names a source with no scheme"
+
+# A browse tree that lists other sources' documents beside its own. The
+# kammarrätternas upphandlingsmål are original verdicts, minted at the same
+# `dom/{court}/{målnr}/{date}` address a dv verdict gets, so `_dv_court` files
+# them under Kammarrätterna (RK) and `_dv_variant` under Domar -- beside the
+# RK referat, the way HD's verdicts list beside NJA. A member source keeps its
+# own scheme for the API and the search buckets, and is UNGENERATED above.
+BROWSE_MEMBERS = {"dv": ("dv", "kkvdomar")}
+assert all(m in UNGENERATED for ms in BROWSE_MEMBERS.values()
+           for m in ms if m not in BROWSE_MEMBERS), \
+    "a source listed in another's browse tree must not get a tree of its own"
 
 
 def browsable():
@@ -1039,9 +1050,10 @@ def _rows(con, source):
     expired = catalog.expired_uris(con, date.today().isoformat())
     rows = [Row(uri, local, kind, label, title, display, doc_date,
                 short_id, short_title, description, upphavande)
+            for member in BROWSE_MEMBERS.get(source, (source,))
             for uri, _src, kind, label, title, _url, _path, display, doc_date,
                 short_id, short_title, description, upphavande
-            in catalog.facet_documents(con, source)
+            in catalog.facet_documents(con, member)
             for local in (catalog.local(uri),)          # bind once, reuse below
             if uri not in expired and _is_browsable(source, local)]
     if source == "eurlex":

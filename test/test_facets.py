@@ -232,6 +232,22 @@ def test_tree_orders_buckets_and_picks_default(tmp_path):
     assert nja["label"] == "Högsta domstolen (NJA)"
 
 
+def test_kkvdomar_verdicts_list_as_domar_beside_the_rk_referat(tmp_path):
+    con = _catalog(tmp_path, [
+        (U + "dom/rk/2019:5", "dv", "case", "RK 2019:5", ""),
+        (U + "dom/kst/2894-26/2026-05-26", "kkvdomar", "kst",
+         "KamR Stockholm mål 2894-26", ""),
+        (U + "dom/kgg/838-19/2019-06-19", "kkvdomar", "kgg",
+         "KamR Göteborg mål 838-19", ""),
+    ])
+    rk = next(b for b in facets.tree(con, "dv")["buckets"] if b["key"] == "rk")
+    assert [(c["key"], c["count"]) for c in rk["children"]] == [
+        ("2026", 1), ("2019", 2)]
+    leaf = facets.browse_view(con, "dv")["buckets"][0]["children"][1]
+    assert sorted(d["variant"] for d in leaf["documents"]) == ["dom", "referat"]
+    assert "kkvdomar" not in facets.browsable()
+
+
 def test_documents_naturally_ordered_within_bucket(tmp_path):
     con = _catalog(tmp_path, [
         (U + "dom/nja/2024s10", "dv", "case", "NJA 2024 s. 10", ""),

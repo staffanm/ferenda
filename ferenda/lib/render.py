@@ -253,7 +253,7 @@ def render_document(art, source, site, renderers):
 # /dom/, lagen.nu's grammar; every other source browses under its own name.
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
-SOURCE_ORDER = ("sfs", "dv", "kkvdomar", "hudoc", "forarbete", "foreskrift",
+SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift",
                 "avg", "rs",
                 "eurlex", "guidance", "coe", "icrc", "untc",
                 "icc", "icj", "begrepp")
@@ -304,7 +304,9 @@ def _index_rows(n):
             if total:
                 yield "/folkratt/", FOLKRATT_LABEL, total
         elif n.get(s):
-            yield "/%s/" % browse_dir(s), SOURCE_LABEL.get(s, s), n[s]
+            # a tree that lists another source's documents counts them too
+            yield ("/%s/" % browse_dir(s), SOURCE_LABEL.get(s, s),
+                   sum(n.get(m, 0) for m in facets.BROWSE_MEMBERS.get(s, (s,))))
 
 
 def _render_index(con):

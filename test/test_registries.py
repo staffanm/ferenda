@@ -102,5 +102,7 @@ def test_ungenerated_schemes_are_declared_in_facets_not_in_browse():
     longer disagree about which sources have browse pages."""
     assert facets.UNGENERATED <= set(facets.SCHEMES)
     assert set(facets.browsable()) == set(facets.SCHEMES) - facets.UNGENERATED
-    # the folkrätt landing lists these in full; that is why they are here
-    assert facets.UNGENERATED == {"coe", "icrc", "untc", "icc", "icj"}
+    # the folkrätt landing lists the first five in full, and dv's tree lists
+    # the kkvdomar decisions (facets.BROWSE_MEMBERS); that is why they are here
+    assert facets.UNGENERATED == {"coe", "icrc", "untc", "icc", "icj",
+                                  "kkvdomar"}
