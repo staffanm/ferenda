@@ -60,11 +60,12 @@ FS_SERIES = _PKG / "foreskrift" / "data" / "series.json"
 # held court decisions by the case number they were filed under ("T 3-08" ->
 # NJA 2009 s. 672), for the citation engine's "Högsta domstolens dom 2009-11-03
 # T 3-08" resolution. The one path here that is NOT in the package: it is a
-# derived index of the parsed dv artifacts (dv.casenumbers writes it) and lives
-# in the data root beside the case-law identity index. The artifact tree is
-# `layout`'s, but layout sits in catalog's import chain, which ends in
-# `malnummer` -- the parse-time reader of this file -- so the one segment is
-# spelled here; test_dv_casenumbers pins it to layout.DOM_INDEX's directory.
+# derived index of the parsed dv and kkvdomar artifacts (lib.casenumbers
+# writes it) and lives in the data root beside the case-law identity index.
+# The artifact tree is `layout`'s, but layout sits in catalog's import chain,
+# which ends in `malnummer` -- the parse-time reader of this file -- so the one
+# segment is spelled here; test_casenumbers pins it to layout.DOM_INDEX's
+# directory.
 CASENUMBERS = config.DATA / "artifact" / "dom" / "casenumbers.json"
 # JO ämbetsberättelse pages ("2005/06 s. 171") mapped onto the diarienummer
 # that mints the decision's URI. Auto-generated from the JO artifacts

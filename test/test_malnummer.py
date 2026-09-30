@@ -66,6 +66,8 @@ SNAPSHOT = {
                     ["HDO", "2011-04-19", "dom/nja/2011s89"]],
         "623-07": [["REGR", "2007-11-08", "dom/ra/2007/not/163"]],
         "M 971-24": [["MMOD", "2026-04-07", "dom/mmd/M971-24/2026-04-07"]],
+        # a kammarrätt upphandlingsmål (kkvdomar)
+        "6414-17": [["KGG", "2018-05-09", "dom/kgg/6414-17/2018-05-09"]],
         # a number the corpus holds under a court no citation here names
         "17-29": [["REGR", "1994-01-01", "dom/ra/1994/not/1"]],
     }}
@@ -95,6 +97,14 @@ def test_spans_resolve_the_citation_forms_a_commentary_uses(snapshot):
     # letterhead, so the phrase reaches its series too
     assert spans("SVEA HOVRÄTT DOM Mål nr M 971-24") \
         == [(24, 32, "https://lagen.nu/dom/mmd/M971-24/2026-04-07")]
+
+
+def test_a_kammarratt_is_named_in_either_genitive(snapshot):
+    # the kammarrätternas upphandlingsmål cite each other both ways
+    assert spans("Kammarrätten i Göteborgs dom den 9 maj 2018 i mål nr 6414-17") \
+        == [(53, 60, "https://lagen.nu/dom/kgg/6414-17/2018-05-09")]
+    assert spans("Kammarrättens i Göteborg dom den 9 maj 2018 i mål nr 6414-17") \
+        == [(53, 60, "https://lagen.nu/dom/kgg/6414-17/2018-05-09")]
 
 
 def test_the_court_decides_which_decision_a_shared_number_means(snapshot):

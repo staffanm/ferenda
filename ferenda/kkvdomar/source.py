@@ -9,7 +9,7 @@ verdict, and a redaction is a patch on its PDF text."""
 import functools
 from pathlib import Path
 
-from ..lib import compress, layout
+from ..lib import casenumbers, compress, layout
 from ..lib.pdftext import pdf_intermediate
 from ..lib.stage import (
     CASENUMBER_CODE,
@@ -59,6 +59,9 @@ SOURCES: tuple[Source, ...] = (simple_source(
     inputs=kkvdomar_inputs,
     intermediate=(kkvdomar_intermediate, "pdftohtml XML"),
     origin=origin(download.LISTING),
+    # the decisions cite each other by court and case number, which resolves
+    # only through the case-number snapshot
+    after={"parse": (functools.partial(casenumbers.after_parse, "kkvdomar"),)},
     dry_label="the kammarrätternas avgöranden in Konkurrensverkets domstolsdatabas",
     notes="download flags: --only <court/målnummer/date, e.g. "
           "kst/6426-25/2026-03-12>, --limit N\n"

@@ -35,7 +35,7 @@ POLITENESS = 0.3   # seconds between per-document network fetches
 # inputs: emdref's ECHR case registry (datasets.EMD_CASES, `hudoc casenames`),
 # the JO ämbetsberättelse page table (datasets.JO_ARSBERATTELSE, `avg
 # arsberattelse`) and the case-number index (datasets.CASENUMBERS, rewritten by
-# every full-source `dv parse`). Each grows with its corpus, and hashing it
+# every full-source dv or kkvdomar parse). Each grows with its corpus, and hashing it
 # would reparse eleven (or six) sources in full every time a harvest adds a
 # decision -- a day on prod. A newly held decision is new: a document parsed
 # after the refresh resolves it, and an already-parsed document that cited it
@@ -43,8 +43,8 @@ POLITENESS = 0.3   # seconds between per-document network fetches
 # --force pass, the way dv's identity index already works (dv/source.DV_CODE).
 CITATION_DATA = (datasets.NAMEDLAWS, datasets.EMD_RESPONDENTS)
 # The case-number matcher, on the recipes of the sources that can actually
-# request MALNUMMER (`lagrum.ALL_PARSE_TYPES`: dv, forarbete, avg, rs,
-# lawreview, wiki). Kept out of CITATION_DATA because the
+# request MALNUMMER (`lagrum.ALL_PARSE_TYPES`: dv, kkvdomar, forarbete, avg,
+# rs, lawreview, wiki). Kept out of CITATION_DATA because the
 # sfs/eurlex/foreskrift/guidance parsers never ask for that parse type.
 CASENUMBER_CODE = (PKG / "lib" / "malnummer.py",)
 
@@ -333,14 +333,15 @@ def parse_stage(name, parse_fn, root, *, inputs, code):
 
 def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
                    notes, dry_label, render, artifacts, pinpoints=None,
-                   intermediate=None):
+                   intermediate=None, after=None):
     """A source whose whole chain is the common shape: one bulk
     ``sync(root, full=, only=, limit=, delay=)`` over a publisher's own list of
     instruments, and a parse that reads the stored record(s) into an artifact in
     one call. No sub-scopes, no per-document download stage, no extra actions.
 
     `dry_label` names what a `--dry-run` would fetch. `intermediate` makes the
-    source patchable (`Source.intermediate`). A source whose sync takes
+    source patchable (`Source.intermediate`), and `after` is `Source.after`.
+    A source whose sync takes
     anything beyond the shared five keeps its own registration (hudoc does, for
     its `--lang` and its two collection scopes) -- this is a shape shared by
     several sources, not a base class to bend."""
@@ -361,7 +362,7 @@ def simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
                                          inputs=inputs, code=code)},
                   harvest=harvest, origin=origin, notes=notes,
                   render=render, artifacts=artifacts, pinpoints=pinpoints,
-                  intermediate=intermediate)
+                  intermediate=intermediate, after=after or {})
 
 
 # run-wide options, set once in main() (kept off the recursion signature)

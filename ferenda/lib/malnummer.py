@@ -153,6 +153,13 @@ COURT_PHRASES = {
     "kammarrätten i göteborg": ("KGG",),
     "kammarrätten i jönköping": ("KJO",),
     "kammarrätten i sundsvall": ("KSU",),
+    # the older genitive puts the -s on the court rather than on the town
+    # ("Kammarrättens i Göteborg dom den 9 maj 2018 i mål nr 6414-17"), which
+    # the genitive suffix RE_COURT allows after the phrase does not reach
+    "kammarrättens i stockholm": ("KST",),
+    "kammarrättens i göteborg": ("KGG",),
+    "kammarrättens i jönköping": ("KJO",),
+    "kammarrättens i sundsvall": ("KSU",),
     "rättshjälpsnämnden": ("RHN",),
 }
 

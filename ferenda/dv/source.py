@@ -15,9 +15,9 @@ from urllib.parse import quote
 
 import requests
 
-from ..lib import casenaming, compress, freshness, layout, util
+from ..lib import casenaming, casenumbers, compress, freshness, layout, util
 from ..lib import stage as protocol
-from ..lib.datasets import CASENUMBERS, NAMEDCASES
+from ..lib.datasets import NAMEDCASES
 from ..lib.errors import SkipDocument
 from ..lib.pdftext import pdf_intermediate
 from ..lib.stage import (
@@ -30,7 +30,7 @@ from ..lib.stage import (
     patch_input,
     write_artifact,
 )
-from . import casenumbers, download, identity, legacy, namedcases, paths, render
+from . import download, identity, legacy, namedcases, paths, render
 from .parse import (
     api_member,
     parse_api_record,
@@ -75,7 +75,9 @@ def _dv_after_parse():
     into a referat (R2), then the case-number snapshot is refreshed from what
     remains."""
     dv_reconcile_artifacts()
-    _dv_casenumbers_after_parse()
+    # after the reconcile, so a case number does not survive in the snapshot
+    # on the strength of an artifact that pass just deleted
+    casenumbers.after_parse("dv")
 
 
 def dv_reconcile_artifacts():
@@ -224,48 +226,12 @@ def dv_namedcases(args=()):
 
 def dv_casenumbers(args=()):
     """Refresh the case-number snapshot (`lagen dv casenumbers`): sweep the dv
-    artifacts' målnummer and rewrite artifact/dom/casenumbers.json, which the citation
-    engine reads to resolve "Högsta domstolens dom 2009-11-03 T 3-08" onto the
-    referat it became. Reads artifacts already on disk -- no network, no
-    per-document chain. Run it after a parse run that added decisions, or their
-    case numbers link nothing."""
-    if protocol.RUN.dry_run:
-        print("dv casenumbers: would sweep dv artifacts -> %s" % CASENUMBERS)
-        return False            # nothing was written, so nothing re-stales
-    numbers, courts, refused, changed = casenumbers.write()
-    print("dv casenumbers: %d case numbers across %d courts -> %s%s"
-          % (numbers, courts, CASENUMBERS,
-             "" if changed else " (unchanged)"))
-    if refused:
-        print("dv casenumbers: %d printed values are not a readable case "
-              "number, left out: %s" % (len(refused), ", ".join(
-                  sorted(set(refused))[:5]) + (" ..." if len(refused) > 5 else "")))
-    if changed:
-        # deliberately not a parse input (stage.CASENUMBER_CODE): a document
-        # already parsed before we held the decision it cites links to it only
-        # at the next code-staleness or --force pass of its source
-        print("dv casenumbers: snapshot changed -- documents parsed from now "
-              "on resolve the new numbers; already-parsed ones reach them at "
-              "the next --force parse of dv, forarbete, avg, rs, lawreview "
-              "or wiki")
-    return changed
-
-
-def _dv_casenumbers_after_parse():
-    """Refresh the case-number snapshot at the end of a full-source dv parse.
-
-    The snapshot is a view of the whole parsed dv tree, so it belongs to the
-    parse that produced the tree rather than to the harvest (`dv namedcases`
-    downloads HD's list and rides the harvest instead). It runs after
-    `dv_reconcile_artifacts`, so a case number does not survive in it on the
-    strength of an artifact that pass just deleted. ~3 s over 23,739 artifacts.
-
-    Full-source parse only. A one-document run leaves the snapshot as it is: it
-    is rebuilt from the whole tree either way."""
-    t0 = time.perf_counter()
-    changed = dv_casenumbers()
-    freshness._emit_segment("casenumbers", "dv", time.perf_counter() - t0,
-                  ran=int(changed), status="ok")
+    and kkvdomar artifacts' målnummer and rewrite artifact/dom/casenumbers.json,
+    which the citation engine reads to resolve "Högsta domstolens dom 2009-11-03
+    T 3-08" onto the referat it became. Reads artifacts already on disk -- no
+    network, no per-document chain. Run it after a parse run that added
+    decisions, or their case numbers link nothing."""
+    return casenumbers.refresh("dv casenumbers")
 
 
 def dv_parse_run(basefile):

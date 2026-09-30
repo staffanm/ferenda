@@ -7,20 +7,25 @@ the months before that -- and afterwards in law review articles, which keep
 citing what the reader could look up at the time -- it is named by court, date
 and case number: "Högsta domstolens dom 2009-11-03 T 3-08". Nothing in that
 string says which referat it became, so the citation engine can only resolve it
-against the corpus.
+against the corpus. The kammarrätternas upphandlingsmål cite each other the same
+way ("Kammarrätten i Göteborgs dom den 14 december 2018 i mål nr 2666-18"), and
+those decisions are kkvdomar's, not dv's.
 
-`lib` may not read a vertical's stored documents (rule:lib-never-imports-
-vertical), so the join surface is a plain JSON file: this module writes
-``artifact/dom/casenumbers.json`` (`datasets.CASENUMBERS`, beside the case-law
-identity index -- a derived index of the same artifacts, so it lives with the
-data rather than in the package like the hand-curated datasets) and
-`lib.datasets` reads it back as pure JSON.
+So the snapshot is swept from every source in `SOURCES`, over the artifact
+fields they share (`court`, `court_namn`, `malnummer`, `avgorandedatum`,
+`uri`), and written as a plain JSON file: ``artifact/dom/casenumbers.json``
+(`datasets.CASENUMBERS`, beside the case-law identity index -- a derived index
+of the artifacts, so it lives with the data rather than in the package like the
+hand-curated datasets). `lib.malnummer` reads it back through `lib.datasets`.
+It moved here from `dv/` when kkvdomar became its second source
+(rule:second-use-goes-to-lib), and each of the two refreshes it at the end of
+its own full parse.
 
-A decision with no recorded date carries an empty one (19 of the 23,739
+A decision with no recorded date carries an empty one (19 of the 23,739 dv
 artifacts), so the candidate lists stay sortable and comparable as data.
 
 Every candidate is kept, never a pre-picked winner. A case number is not a key:
-298 of the 24,411 held numbers name more than one decision -- the same number
+298 of the 24,411 dv-held numbers name more than one decision -- the same number
 in another court's series (B 53-11 is both an AD and an HD case), or two
 Arbetsdomstolen cases a year apart. Picking is the citation's problem, and
 `lib/malnummer` picks with the court and date the citation prints.
@@ -32,18 +37,26 @@ it cites links to it at its source's next code-staleness or --force pass.
 """
 
 import json
+import time
 
-from ..lib import catalog, compress, layout, malnummer
-from ..lib.datasets import CASENUMBERS
+from . import catalog, compress, freshness, layout, malnummer
+from . import stage as protocol
+from .datasets import CASENUMBERS
+
+# the sources whose artifacts are court decisions filed under a case number
+SOURCES = ("dv", "kkvdomar")
 
 
 def build():
-    """The snapshot dict, from the dv artifacts on disk, plus the case numbers it
+    """The snapshot dict, from the artifacts of `SOURCES` on disk, plus the case numbers it
     refused (a printed form `lib/malnummer` cannot read back -- the caller
     reports them rather than shipping keys nothing can ever match)."""
     numbers, courts, refused = {}, {}, []
-    for path in layout.artifacts("dv"):
-        art = json.loads(compress.read_text(str(path)))
+    for path in (p for source in SOURCES for p in layout.artifacts(source)):
+        text = compress.read_text(str(path))
+        if not text:            # a SkipDocument placeholder (kkvdomar's superseded)
+            continue
+        art = json.loads(text)
         courts.setdefault(art["court"], set()).add(art["court_namn"])
         for number in art["malnummer"]:
             # a key only counts if the matcher reads the whole value back as one
@@ -64,8 +77,8 @@ def build():
                         "that the citation's own court and date decide. The "
                         "courts map is what each code calls itself; the phrases "
                         "a citation uses for them are lib/malnummer's. "
-                        "Generated from the parsed dv artifacts by `lagen dv "
-                        "casenumbers`; do not hand-edit.",
+                        "Generated from the parsed dv and kkvdomar artifacts "
+                        "by `lagen dv casenumbers`; do not hand-edit.",
             "courts": {code: sorted(names)
                        for code, names in sorted(courts.items())},
             "numbers": {number: sorted(entries)
@@ -88,3 +101,43 @@ def write(path=CASENUMBERS):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(serialized, encoding="utf-8")
     return len(snapshot["numbers"]), len(snapshot["courts"]), refused, changed
+
+
+def refresh(label):
+    """Rewrite the snapshot and report it under `label` (the command or source
+    that asked). Returns whether the file changed."""
+    if protocol.RUN.dry_run:
+        print("%s: would sweep the %s artifacts -> %s"
+              % (label, " and ".join(SOURCES), CASENUMBERS))
+        return False            # nothing was written, so nothing re-stales
+    numbers, courts, refused, changed = write()
+    print("%s: %d case numbers across %d courts -> %s%s"
+          % (label, numbers, courts, CASENUMBERS,
+             "" if changed else " (unchanged)"))
+    if refused:
+        print("%s: %d printed values are not a readable case number, left "
+              "out: %s" % (label, len(refused), ", ".join(
+                  sorted(set(refused))[:5]) + (" ..." if len(refused) > 5 else "")))
+    if changed:
+        # deliberately not a parse input (stage.CASENUMBER_CODE): a document
+        # already parsed before we held the decision it cites links to it only
+        # at the next code-staleness or --force pass of its source
+        print("%s: snapshot changed -- documents parsed from now on resolve "
+              "the new numbers; already-parsed ones reach them at the next "
+              "--force parse of dv, kkvdomar, forarbete, avg, rs, lawreview "
+              "or wiki" % label)
+    return changed
+
+
+def after_parse(source):
+    """Refresh the snapshot at the end of a full-source parse of `source`.
+
+    The snapshot is a view of the whole parsed tree, so it belongs to the parse
+    that produced the tree. ~3 s over 23,739 dv artifacts. Full-source parse
+    only: a one-document run leaves the snapshot as it is, since it is rebuilt
+    from the whole tree either way."""
+    assert source in SOURCES, "%s writes no case-numbered decisions" % source
+    t0 = time.perf_counter()
+    changed = refresh("%s casenumbers" % source)
+    freshness._emit_segment("casenumbers", source, time.perf_counter() - t0,
+                            ran=int(changed), status="ok")

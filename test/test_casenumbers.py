@@ -1,13 +1,13 @@
-"""The case-number snapshot (ferenda/dv/casenumbers.py): what it keeps, what
+"""The case-number snapshot (ferenda/lib/casenumbers.py): what it keeps, what
 it refuses, and whether it rewrote the file -- which is what a full-source dv
-parse reports on, since the snapshot is a parse input for five sources."""
+or kkvdomar parse reports on, since the snapshot is a parse input for six
+sources."""
 
 import json
 
 import pytest
 
-from ferenda.dv import casenumbers
-from ferenda.lib import datasets, layout
+from ferenda.lib import casenumbers, datasets, layout
 
 
 def _artifact(uri, court, namn, date, numbers):
@@ -15,14 +15,18 @@ def _artifact(uri, court, namn, date, numbers):
             "avgorandedatum": date, "malnummer": numbers}
 
 
-def _snapshot(monkeypatch, tmp_path, artifacts):
-    """Write `artifacts` as a dv tree `build()` reads, and return its snapshot."""
-    paths = []
-    for i, art in enumerate(artifacts):
-        path = tmp_path / ("a%d.json" % i)
-        path.write_text(json.dumps(art), encoding="utf-8")
-        paths.append(path)
-    monkeypatch.setattr(casenumbers.layout, "artifacts", lambda source: paths)
+def _snapshot(monkeypatch, tmp_path, artifacts, kkvdomar=()):
+    """Write `artifacts` as a dv tree and `kkvdomar` as a kkvdomar tree (an
+    empty string is a SkipDocument placeholder), and return the snapshot
+    `build()` reads from the two."""
+    trees = {"dv": [], "kkvdomar": []}
+    for source, arts in (("dv", artifacts), ("kkvdomar", kkvdomar)):
+        for i, art in enumerate(arts):
+            path = tmp_path / ("%s%d.json" % (source, i))
+            path.write_text(art if isinstance(art, str) else json.dumps(art),
+                            encoding="utf-8")
+            trees[source].append(path)
+    monkeypatch.setattr(casenumbers.layout, "artifacts", trees.__getitem__)
     return casenumbers.build()
 
 
@@ -82,6 +86,23 @@ def test_a_decision_with_no_recorded_date_stays_sortable(monkeypatch, tmp_path):
     assert snapshot["numbers"]["B 1084-22"] == [
         ["HDO", "", "dom/nja/2022/not/4"],
         ["HDO", "2022-01-11", "dom/nja/2022s1"]]
+
+
+def test_the_kammarratt_upphandlingsmal_join_the_snapshot(monkeypatch,
+                                                         tmp_path):
+    # the kkvdomar decisions cite each other by court and case number, so the
+    # snapshot holds them beside dv's; a superseded decision's empty
+    # placeholder holds no number
+    snapshot, refused = _snapshot(monkeypatch, tmp_path, [
+        _artifact("https://lagen.nu/dom/nja/2009s672", "HDO", "Högsta domstolen",
+                  "2009-11-03", ["T 3-08"])], kkvdomar=[
+        _artifact("https://lagen.nu/dom/kgg/2666-18/2018-12-14", "KGG",
+                  "Kammarrätten i Göteborg", "2018-12-14", ["2666-18"]),
+        ""])
+    assert snapshot["numbers"]["2666-18"] == [
+        ["KGG", "2018-12-14", "dom/kgg/2666-18/2018-12-14"]]
+    assert snapshot["courts"]["KGG"] == ["Kammarrätten i Göteborg"]
+    assert refused == []
 
 
 def test_write_reports_whether_the_file_changed(monkeypatch, tmp_path):
