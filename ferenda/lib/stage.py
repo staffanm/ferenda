@@ -181,9 +181,10 @@ class Source:
     cross_code: tuple[Path, ...] = ()
     # every side file outside the catalog that the source's pages or
     # cross-passes read: authored .ann/.corr layers, versions-stage sidecars,
-    # the artifacts of a source that catalogues none. Both the cross-block gate
-    # and generate's coarse gate fold them in, so authoring, regenerating or
-    # hand-editing one reopens both (corpus._layers)
+    # the artifacts of a source that catalogues none. Generate's coarse gate
+    # folds them all in, and the cross-block gate those of a catalogued source,
+    # so authoring, regenerating or hand-editing one reopens what reads it
+    # (corpus._layers, corpus._corr_watermark)
     layers: Callable[[], list[Path]] | None = None
     # the pristine intermediate-text provider and the human label of the
     # format a patch edits (`patchsource.intermediate` returns the pair): the

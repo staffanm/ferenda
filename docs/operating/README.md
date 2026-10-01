@@ -358,6 +358,13 @@ three minutes (2213 s before). The step then counts the source's links once
 more for its summary line; on a cold catalog that count is tens of seconds
 to minutes of index reads and is the same either way.
 
+A relate that names only sources without a catalogue (`site`, `stats`,
+`remisser`) does nothing: `lagen site rebuild` runs no cross-passes. Their
+artifacts and layers are also left out of the cross-pass fingerprint, so a
+sitenews push does not make the next relate run the cross-passes either. Such
+a relate also skips the path-graph sidecar and the unit index: on a fresh
+deploy, `/api/v1/range` works after the first relate of a catalogued source.
+
 The cross-passes at the end of relate (`relate cross-passes`, ledger key
 `relate __corr__`) took 5581 s in the same run. Almost all of it was
 förarbete's hook: `fk.resolve` reads every proposition artifact (28,278) to

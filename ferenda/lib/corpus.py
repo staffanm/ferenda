@@ -178,9 +178,13 @@ def _corr_watermark(sources, jobs=1):
     layers and the cross-pass code (CORR_CODE + each `Source.cross_code`) --
     the gate for re-running them, shared by cmd_relate and the targeted relate
     check (build._catalog_current_for), so both notice the same layer or code
-    edits. 270,000 paths; `jobs` stat them in parallel."""
+    edits. 270,000 paths; `jobs` stat them in parallel. Only the catalogued
+    sources' layers count: the cross-passes join catalog rows, and a source
+    with none (site, remisser) declares its layers for generate's gate alone.
+    Counted here, a sitenews push made the next relate run every cross-pass
+    (930 s on production, 2026-09-29)."""
     return freshness.file_fingerprint(
-        _layers(sources) + list(CORR_CODE)
+        _layers({n: s for n, s in sources.items() if s.artifacts}) + list(CORR_CODE)
         + [p for s in sources.values() for p in s.cross_code],
         label="relate cross-passes", jobs=jobs)
 
@@ -240,6 +244,14 @@ def _plan_artifact_verb(verb, sources, names, destination):
               % (verb, name, len(sources[name].artifacts()), destination(name)))
 
 
+def _relates_any(sources, names):
+    """Whether a relate over `names` has a catalogued source to relate. One
+    that names only uncatalogued sources (site, stats, remisser) relates no
+    document and changes nothing the cross-passes read (`_corr_watermark`),
+    so it returns before their gate's stat pass over 270,000 paths."""
+    return any(sources[name].artifacts for name in names)
+
+
 def _concept_stubs(con):
     """The uris of the begrepp stubs: document rows with no artifact."""
     return {uri for (uri,) in con.execute(
@@ -265,6 +277,10 @@ def cmd_relate(sources, names, force=None, jobs=1):
     a targeted generate passes False so its override stays local. `jobs`
     processes share the stat pass over the artifacts and the read + hash of
     the ones whose stat mark moved; the catalog writes stay single-process."""
+    if not _relates_any(sources, names):
+        print("relate: %s catalogue(s) no documents -- nothing to relate"
+              % ", ".join(names))
+        return
     if protocol.RUN.dry_run:
         _plan_artifact_verb("relate", sources, names, lambda _name: layout.CATALOG)
         print("relate: would run the cross-document passes (norm chain, "
@@ -949,8 +965,9 @@ def build_invocation_plan(sources, names, *, whole_corpus, download=False):
     # relate's cross-document passes over the whole catalog -- exactly the
     # `util.step` calls their own loops make
     steps += _artifact_verb_steps(sources, names, "relate", history)
-    steps.append(PlannedStep("", "relate cross-passes", False,
-                             _history_secs(history, "relate", "__corr__")))
+    if _relates_any(sources, names):
+        steps.append(PlannedStep("", "relate cross-passes", False,
+                                 _history_secs(history, "relate", "__corr__")))
     for verb in ("index", "dump"):
         steps += _artifact_verb_steps(sources, names, verb, history)
     if whole_corpus:
@@ -1024,7 +1041,7 @@ def plan_verb_steps(sources, names, verb):
         return _download_steps(sources, names, history)
     if verb in ("relate", "index", "dump"):
         steps = _artifact_verb_steps(sources, names, verb, history)
-        if verb == "relate":
+        if verb == "relate" and _relates_any(sources, names):
             steps.append(PlannedStep("", "relate cross-passes", False,
                                      _history_secs(history, "relate", "__corr__")))
         return steps

@@ -277,3 +277,46 @@ def test_a_one_source_run_plans_a_single_step(wired):
     # invocation_bar opens no outer bar below two steps
     source = _source(wired)
     assert len(corpus.plan_verb_steps({"syn": source}, ["syn"], "parse")) == 1
+
+
+def _uncatalogued(tmp_path):
+    source = _source(tmp_path)
+    return dataclasses.replace(source, artifacts=None)
+
+
+def test_a_relate_of_only_uncatalogued_sources_plans_no_cross_passes(wired):
+    # site, stats, remisser: nothing to relate, so no corpus-wide passes
+    sources = {"syn": _uncatalogued(wired)}
+    for plan in (corpus.plan_verb_steps(sources, ["syn"], "relate"),
+                 corpus.build_invocation_plan(sources, ["syn"], whole_corpus=False)):
+        assert not [s for s in plan if s.verb == "relate cross-passes"]
+    both = {"syn": _source(wired), "site": _uncatalogued(wired)}
+    assert [s for s in corpus.plan_verb_steps(both, ["syn", "site"], "relate")
+            if s.verb == "relate cross-passes"]
+
+
+def test_a_relate_of_only_uncatalogued_sources_does_nothing(wired, monkeypatch):
+    def _boom(*a, **kw):
+        raise AssertionError("a relate with nothing to relate must not run the cross-passes")
+
+    monkeypatch.setattr(corpus, "_corr_watermark", _boom)
+    corpus.cmd_relate({"syn": _uncatalogued(wired)}, ["syn"])
+    assert not layout.CATALOG.exists()
+
+
+def test_only_a_catalogued_source_s_layers_reopen_the_cross_passes(wired):
+    # a sitenews edit rewrites a site artifact, which site declares as a
+    # layer for generate's gate; the cross-passes never read it
+    site_layer, ann = wired / "site.json", wired / "x.ann"
+    site_layer.write_text("{}")
+    ann.write_text("{}")
+    sources = {"syn": dataclasses.replace(_source(wired), layers=lambda: [ann]),
+               "site": dataclasses.replace(_uncatalogued(wired), layers=lambda: [site_layer])}
+    before = corpus._corr_watermark(sources)
+    # a step that writes drops the run's stat cache; so does this test
+    site_layer.write_text('{"edited": true}')
+    freshness.forget_stats()
+    assert corpus._corr_watermark(sources) == before
+    ann.write_text('{"edited": true}')
+    freshness.forget_stats()
+    assert corpus._corr_watermark(sources) != before
