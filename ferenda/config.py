@@ -379,6 +379,17 @@ def resolve_ohttp_keys_file(doc):
     return None if path is None else Path(path).expanduser()
 
 
+def resolve_search_business_hours(doc):
+    """Whether a batch pass's SQLite cache (lib/sqlcache) leaves the OpenSearch
+    index its share of memory during business hours (Monday to Friday, 08-18
+    Stockholm time). On for the production host, where readers wait on search
+    in the day; off by default, so a dev box sizes its cache from free memory
+    alone at any hour. Precedence: the ``FERENDA_SEARCH_BUSINESS_HOURS``
+    environment variable, then the ``search_business_hours`` key in
+    config.yml, else off."""
+    return _resolve_bool(doc, "search_business_hours", "FERENDA_SEARCH_BUSINESS_HOURS", False)
+
+
 def resolve_cookie_secure(doc):
     """Whether the editor session cookie (api/auth.py) carries the ``Secure``
     flag. Default on: the prod deploy is https-only, so the cookie should never
@@ -483,5 +494,6 @@ OHTTP_KEYS_FILE = resolve_ohttp_keys_file(_doc)
 COMPRESS = resolve_compress(_doc)
 COMPRESS_QUALITY = resolve_compress_quality(_doc)
 COOKIE_SECURE = resolve_cookie_secure(_doc)
+SEARCH_BUSINESS_HOURS = resolve_search_business_hours(_doc)
 MATOMO_URL = resolve_matomo_url(_doc)
 MATOMO_SITE_API = resolve_matomo_site_api(_doc)

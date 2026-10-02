@@ -883,6 +883,12 @@ class SearchIndex:
         `ok`, nothing would ever go red (rule:fail-fast)."""
         return bool(self.client.ping())
 
+    def store_bytes(self):
+        """The index's size on disk: the files OpenSearch wants in the OS page
+        cache to answer from memory."""
+        stats = self.client.indices.stats(index=self.index, metric="store")
+        return stats["_all"]["total"]["store"]["size_in_bytes"]
+
     def ensure_index(self, recreate=False):
         def go():
             if recreate and self.client.indices.exists(index=self.index):

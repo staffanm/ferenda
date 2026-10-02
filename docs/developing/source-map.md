@@ -609,7 +609,19 @@ the cross-passes add or remove. A relate that changed no document returns at
 once. A `--force` or full rebuild, a text-code change, and a relate that
 stopped before its update compare every document. `unitindex.begin` sets
 `meta.pending` before relate writes the catalog, and `update` removes it. On prod
-that full comparison took 2,012 s for a run that rewrote nothing.
+that full comparison took 2,012 s for a run that rewrote nothing. For a changed
+document, `update` writes only the unit rows whose text changed and deletes
+only the keys that disappeared. Each write lands on a random page of the
+store, so identical rows are not rewritten.
+
+`lib/sqlcache.py` sizes SQLite's page cache for a single-process batch pass:
+the relate cross-passes, the unit store update and the stats measures. The
+cache is the smallest of the database file, the host's available memory and
+the room under the process's cgroup limit, less 2 GB. With config.yml's
+`search_business_hours` (prod only), it also leaves the OpenSearch index's
+size free Monday to Friday, 08–18 Stockholm time. Serving connections and pool
+workers keep SQLite's default cache: the cache grows to its cap as a
+connection reads pages, and twelve workers at a large cap exceed prod's RAM.
 
 Which anchors a citation can name has two parts. `text.citable_anchors(art)`
 reads them off the presented body: node ids, the EU sub-article anchors from

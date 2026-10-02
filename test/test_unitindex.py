@@ -187,6 +187,51 @@ def test_an_update_rewrites_only_changed_documents(corpus):
     assert _key(BB + "#K3P1") not in fusefilter.Filter(data)
 
 
+def test_an_update_writes_only_the_units_that_changed(corpus):
+    arts = corpus.parent / "artifact"
+    art = json.loads((arts / "bb.json").read_text())
+    paragrafer = art["structure"][0]["children"]
+    paragrafer.append({"type": "paragraf", "id": "K3P2", "text": ["Den som dödar annan döms för dråp."]})
+    _write(arts / "bb.json", art)
+    catalog.rebuild(corpus, "sfs", [arts / "bb.json"])
+    unitindex.update(corpus, PINPOINTS)
+    units = _count(corpus)
+    with sqlite3.connect(unitindex.store_path(corpus)) as store:
+        store.executescript("""
+            CREATE TABLE written (uri TEXT);
+            CREATE TRIGGER log_write AFTER INSERT ON units
+            BEGIN INSERT INTO written VALUES (new.uri); END;""")
+    paragrafer[0]["text"] = ["Den som uppsåtligen dödar annan döms för mord."]
+    del paragrafer[1]
+    _write(arts / "bb.json", art)
+    catalog.rebuild(corpus, "sfs", [arts / "bb.json"])
+    assert unitindex.update(corpus, PINPOINTS) == (units - 1, 1)
+    with sqlite3.connect(unitindex.store_path(corpus)) as store:
+        written = {uri for (uri,) in store.execute("SELECT uri FROM written")}
+        held = {uri for (uri,) in store.execute("SELECT uri FROM units WHERE doc = ?", (BB,))}
+    # the chapter holds its paragraphs' text; the document's own row is unchanged
+    assert written == {BB + "#K3", BB + "#K3P1"}
+    assert held == {BB, BB + "#K3", BB + "#K3P1"}
+    assert _count(corpus) == units - 1
+
+
+@pytest.mark.parametrize("hours, sizings", [
+    ([False] * 5, 1),                     # one sizing, however long the update runs
+    ([False, False, True, True, False], 3),   # and once more at each change of hours
+])
+def test_an_update_sizes_its_cache_again_only_when_the_hours_change(
+        corpus, monkeypatch, hours, sizings):
+    calls = []
+    monkeypatch.setattr(unitindex.sqlcache, "batch_cache",
+                        lambda con, path, reserve=0: calls.append(path))
+    states = iter(hours)
+    monkeypatch.setattr(unitindex.sqlcache, "search_hours", lambda: next(states))
+    monkeypatch.setattr(unitindex, "COMMIT_EVERY", 1)
+    monkeypatch.setattr(unitindex, "code_version", lambda: "changed")   # every document
+    assert unitindex.update(corpus, PINPOINTS)[1] == 4
+    assert len(calls) == sizings
+
+
 def test_a_code_change_rebuilds_unless_code_changes_are_ignored(corpus, monkeypatch):
     monkeypatch.setattr(unitindex, "code_version", lambda: "changed")
     assert unitindex.update(corpus, PINPOINTS, ignore_code=True)[1] == 0

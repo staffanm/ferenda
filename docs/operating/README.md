@@ -113,6 +113,10 @@ llm_top_p: 0.95                          # whose thinking mode needs it (Qwen3.6
 compress: true                       # store artifact/ + generated/ as Brotli (.json.br/.html.br); default on
 compress_quality: 11                 # Brotli quality 0-11; default 11 (lower for faster builds)
 
+# --- memory ----------------------------------------------------------
+search_business_hours: true          # prod only: Mon-Fri 08-18 Stockholm, a batch pass's SQLite
+                                     # cache leaves the OpenSearch index its page cache; default off
+
 # --- inline content editor (mutating surface) + /ops dashboard -------
 editor_secret: <random hex>          # signs the session cookie; unset ⇒ editing AND /ops off (403)
 cookie_secure: true                  # Secure flag on the session cookie; off only for plain-http dev
@@ -136,6 +140,7 @@ editors:                             # hand-curated; there is no self-signup
 | `compress_quality` | `FERENDA_COMPRESS_QUALITY` | `11` |
 | `editor_secret` | `EDITOR_SECRET` | unset (editing + `/ops` disabled) |
 | `cookie_secure` | `EDITOR_COOKIE_SECURE` | `true` |
+| `search_business_hours` | `FERENDA_SEARCH_BUSINESS_HOURS` | `false` |
 | `ohttp_keys_file` | `OHTTP_KEYS_FILE` | unset (the Oblivious HTTP gateway answers 404) |
 | `editors` | — (config only) | `{}` |
 

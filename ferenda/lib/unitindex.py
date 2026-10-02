@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import catalog, compress, fusefilter, mdtext, text, util
+from . import catalog, compress, fusefilter, mdtext, sqlcache, text, util
 
 STORE = "range-units.sqlite"
 FILTER = "range-filter.bin"
@@ -113,12 +113,7 @@ def _matches(pinpoints, anchor):
 
 def _workers(jobs):
     """`jobs` workers, or as many as the free memory holds, whichever is fewer."""
-    try:
-        with open("/proc/meminfo") as f:
-            free = next(int(line.split()[1]) * 1024 for line in f if line.startswith("MemAvailable:"))
-    except (OSError, StopIteration):
-        return max(1, jobs)
-    return max(1, min(jobs, int(free // WORKER_MEMORY)))
+    return max(1, min(jobs, int(sqlcache.meminfo("MemAvailable") // WORKER_MEMORY)))
 
 
 def _rows(job):
@@ -175,6 +170,9 @@ def update(catalog_path, pinpoints, jobs=1, ignore_code=False, changed=None):
     store = sqlite3.connect(store_path(catalog_path))
     # the API reads the store while a relate updates it: WAL lets both run
     store.execute("PRAGMA journal_mode=WAL")
+    # no fsync at a checkpoint: a crash loses at most the last commits, and
+    # the 'pending' mark already makes the next run compare every document
+    store.execute("PRAGMA synchronous=NORMAL")
     store.executescript(SCHEMA)
     meta = dict(store.execute("SELECT key, value FROM meta"))
     version = code_version()
@@ -219,19 +217,38 @@ def update(catalog_path, pinpoints, jobs=1, ignore_code=False, changed=None):
     # is hundreds of megabytes in memory. A document's units and its `docs` row
     # commit together every COMMIT_EVERY documents, so a stopped build resumes.
     workers = _workers(jobs)
+    # a document's units sit on unrelated pages (the key is a hash): the batch
+    # cache keeps the units_doc index and the inner pages between documents,
+    # in the memory the workers leave
+    reserve = workers * WORKER_MEMORY
+    sqlcache.batch_cache(store, store_path(catalog_path), reserve)
+    search_hours = sqlcache.search_hours()
     pool = (multiprocessing.Pool(workers, maxtasksperchild=200)
             if workers > 1 and len(jobs_list) > 100 else None)
     results = pool.imap_unordered(_rows, jobs_list, chunksize=16) if pool else map(_rows, jobs_list)
     try:
         for n, (uri, rows) in enumerate(results, 1):
-            total -= store.execute("DELETE FROM units WHERE doc = ?", (uri,)).rowcount
-            store.executemany("INSERT OR REPLACE INTO units VALUES (?, ?, ?, ?, ?)", rows)
-            # a document can name one anchor twice; the store keeps one row
-            total += len({row[0] for row in rows})
+            # a document can name one anchor twice; the store keeps one row.
+            # Only the rows that differ are written: a changed document mostly
+            # keeps its units' text, and every write is a random page in the
+            # store, so rewriting identical rows was most of an update's I/O
+            fresh = {row[0]: row for row in rows}
+            old = {row[0]: row for row in store.execute(
+                "SELECT key, doc, uri, size, body FROM units WHERE doc = ?", (uri,))}
+            store.executemany("DELETE FROM units WHERE key = ?",
+                              [(k,) for k in old.keys() - fresh.keys()])
+            store.executemany("INSERT OR REPLACE INTO units VALUES (?, ?, ?, ?, ?)",
+                              [row for k, row in fresh.items() if old.get(k) != row])
+            total += len(fresh) - len(old)
             store.execute("INSERT OR REPLACE INTO docs VALUES (?, ?)",
                           (uri, current[uri][2] or ""))
             if n % COMMIT_EVERY == 0:
                 store.commit()
+                # an update can run for hours: into business hours the cache
+                # gives memory back to the OpenSearch index, and takes it again after
+                if (now := sqlcache.search_hours()) != search_hours:
+                    search_hours = now
+                    sqlcache.batch_cache(store, store_path(catalog_path), reserve)
         store.commit()
     finally:
         if pool:

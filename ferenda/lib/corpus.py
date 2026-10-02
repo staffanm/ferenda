@@ -46,6 +46,7 @@ from . import (
     render,
     runlog,
     search,
+    sqlcache,
     unitindex,
     util,
     writerlock,
@@ -384,11 +385,11 @@ def cmd_relate(sources, names, force=None, jobs=1):
         if dirty or force or not freshness.fingerprint_fresh(store, "relate", "__corr__",
                                                    corr_wm):
             t0 = time.perf_counter()
-            con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
+            con = sqlcache.batch_cache(
+                catalog.connect(target, data_root=DATA, exclusive=full_rebuild), target)
             # This single batch writer repeatedly joins the same metadata.
             # Keep its working pages and temporary sorts off the slow disk;
             # serving connections retain their small per-request cache.
-            con.execute("PRAGMA cache_size=-65536")
             con.execute("PRAGMA temp_store=MEMORY")
             # the concept stubs are the only document rows these passes write
             # (synthesize_concepts, hierarki's ladder stubs): the ones added or

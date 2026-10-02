@@ -31,7 +31,7 @@ import re
 import statistics
 from concurrent.futures import ProcessPoolExecutor
 
-from ..lib import catalog, layout, util
+from ..lib import catalog, layout, sqlcache, util
 from ..lib.facets import flow_group
 from ..lib.markdown import begrepp_uri
 from ..lib.page import register_anchor
@@ -1400,7 +1400,7 @@ def compute(catalog_path, progress=None):
     scans = run_scans(progress=progress)
     if progress:
         progress("measures")
-    con = catalog.connect_ro(str(catalog_path))
+    con = sqlcache.batch_cache(catalog.connect_ro(str(catalog_path)), catalog_path)
     try:
         scans = _in_force(con, scans)       # once, not once per group
         measures = [m for group in _GROUPS for m in group(con, scans)]
