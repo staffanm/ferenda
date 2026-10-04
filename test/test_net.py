@@ -8,6 +8,7 @@ that claim without testing it -- a real `httpx.Response` has neither `ok` nor
 `reason`, and reaches `url` through its bound request."""
 
 import datetime
+import warnings
 from unittest import mock
 
 import httpx
@@ -149,6 +150,20 @@ def test_anchored_rejects_a_certificate_no_trusted_root_signed():
     the walk only on a certificate a real root demonstrably signed."""
     _key, evil = selfsigned("EVIL-CA")
     assert net._anchored(evil) is False
+
+
+def test_the_trusted_roots_leave_out_a_root_cryptography_refuses():
+    # certifi carries six roots with serial number 0; loading them must not
+    # warn (a later cryptography raises instead), and ISRG Root X1 -- where
+    # lifos's chain ends -- is still a terminator
+    net._trusted_roots.cache_clear()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        roots = net._trusted_roots()
+    names = {name.rfc4514_string() for name in roots}
+    assert "CN=ISRG Root X1,O=Internet Security Research Group,C=US" in names
+    assert not any("Go Daddy Root Certificate Authority - G2" in n for n in names)
+    assert all(r.serial_number > 0 for group in roots.values() for r in group)
 
 
 def serves(certificate):

@@ -18,12 +18,14 @@ import functools
 import ipaddress
 import json
 import os
+import re
 import socket
 import ssl
 import sys
 import tempfile
 import threading
 import time
+import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +38,7 @@ import requests
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.utils import CryptographyDeprecationWarning
 from cryptography.x509.oid import AuthorityInformationAccessOID
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -424,12 +427,28 @@ def _aia_target(url):
 AIA_CHAIN_MAX = 4
 
 
+_RE_PEM = re.compile(rb"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", re.S)
+
+
 @functools.cache
 def _trusted_roots():
     """The system trust anchors (certifi), grouped by subject -- the terminator
-    every completed chain has to reach."""
+    every completed chain has to reach.
+
+    Loaded one by one, and a root cryptography refuses is left out. Six roots
+    in Mozilla's list (GoDaddy and Starfield Root G2, SECOM RootCA2, two HARICA
+    2015 roots) carry serial number 0, which RFC 5280 forbids: cryptography 50
+    warns on them and a later release will refuse them. OpenSSL still verifies
+    TLS against them, so only this chain walk loses them, and a host whose
+    chain ends there fails it loudly ("does not reach a trusted root")."""
     roots = {}
-    for root in x509.load_pem_x509_certificates(Path(certifi.where()).read_bytes()):
+    for pem in _RE_PEM.findall(Path(certifi.where()).read_bytes()):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", CryptographyDeprecationWarning)
+            try:
+                root = x509.load_pem_x509_certificate(pem)
+            except (CryptographyDeprecationWarning, ValueError):
+                continue
         roots.setdefault(root.subject, []).append(root)
     return roots
 
