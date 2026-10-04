@@ -185,7 +185,14 @@ def _document_of(kind, rel, cache):
     return (source, _basefiles_by_artifact(source, cache).get(str(art)))
 
 
-WHOLE = "lagen all rebuild --ignore-code-changes"
+# A publish rebuilds what the push changed, never what a deploy changed: a
+# code-driven rebuild belongs to the nightly. Without the flag a targeted
+# generate's relate rebuilds every unit of the unit store once the deployed
+# code's version differs from the stored one -- on 2026-10-04 a one-page
+# `lagen kommentar generate` started deleting all 9.9M units, days of work on
+# prod's disk, before it was killed.
+IGNORE_CODE = "--ignore-code-changes"
+WHOLE = "lagen all rebuild " + IGNORE_CODE
 
 
 def commands(changed, wiki_root=None):
@@ -213,8 +220,8 @@ def commands(changed, wiki_root=None):
     # sources whose whole rebuild is already in the plan; their per-document
     # lines are redundant
     wide = {source for source, basefile in found if basefile is None}
-    out = {"lagen %s rebuild" % source for source in wide}
-    out |= {"lagen %s generate %s" % (source, shlex.quote(basefile))
+    out = {"lagen %s rebuild %s" % (source, IGNORE_CODE) for source in wide}
+    out |= {"lagen %s generate %s %s" % (source, shlex.quote(basefile), IGNORE_CODE)
             for source, basefile in found
             if basefile is not None and source not in wide}
     return sorted(out)

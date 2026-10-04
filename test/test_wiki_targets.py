@@ -55,27 +55,27 @@ def test_a_news_edit_costs_the_site_source_not_the_corpus(wiki):
     catalogued and a document-scoped generate selects by catalog row -- see
     `test_a_source_the_catalog_does_not_hold_gets_its_whole_generate`. Site is
     33 pages against half a million documents, so the win is the same."""
-    assert _commands(wiki, "site/sitenews.md") == ["lagen site rebuild"]
+    assert _commands(wiki, "site/sitenews.md") == ["lagen site rebuild --ignore-code-changes"]
 
 
 def test_repeated_paths_do_not_repeat_commands(wiki):
     assert _commands(wiki, "site/sitenews.md", "site/om/nytt.md",
-                     "site/sitenews.md") == ["lagen site rebuild"]
+                     "site/sitenews.md") == ["lagen site rebuild --ignore-code-changes"]
     assert _commands(wiki, "concept/fullmakt.md", "concept/fullmakt.md") == [
-        "lagen begrepp generate Fullmakt"]
+        "lagen begrepp generate Fullmakt --ignore-code-changes"]
 
 
 def test_a_concept_names_its_own_document(wiki):
     """Keyed on the file's `title:`, not on its filename -- concept files are
     named after the term, which is not the basefile in general."""
     assert _commands(wiki, "concept/fullmakt.md") == [
-        "lagen begrepp generate Fullmakt"]
+        "lagen begrepp generate Fullmakt --ignore-code-changes"]
 
 
 def test_media_has_nothing_to_parse_but_still_needs_the_copy(wiki):
     """`site/render.py` copies the media tree during generate, so a new
     screencast is published by a site run even though no file is parsed."""
-    assert _commands(wiki, "site/media/oversikt.webm") == ["lagen site rebuild"]
+    assert _commands(wiki, "site/media/oversikt.webm") == ["lagen site rebuild --ignore-code-changes"]
 
 
 def test_a_path_under_nothing_known_widens_to_everything(wiki):
@@ -100,7 +100,7 @@ def test_a_basefile_with_spaces_is_quoted(monkeypatch, wiki):
     monkeypatch.setattr(wiki_targets, "targets",
                         lambda changed, wiki_root=None: [("dv", "NJA 1990 s. 442")])
     assert wiki_targets.commands(["patches/dv/NJA_1990_s_442.patch"]) == [
-        "lagen dv generate 'NJA 1990 s. 442'"]
+        "lagen dv generate 'NJA 1990 s. 442' --ignore-code-changes"]
 
 
 def test_a_patch_path_names_its_artifact_arithmetically():
@@ -160,10 +160,10 @@ def test_a_source_rebuild_subsumes_that_source_s_document_commands(wiki):
     would, and running both is pure waste. It does not reach across sources --
     a site rebuild says nothing about begrepp."""
     assert _commands(wiki, "site/media/oversikt.webm", "site/sitenews.md",
-                     "site/om/nytt.md") == ["lagen site rebuild"]
+                     "site/om/nytt.md") == ["lagen site rebuild --ignore-code-changes"]
     assert _commands(wiki, "site/media/oversikt.webm",
                      "concept/fullmakt.md") == [
-        "lagen begrepp generate Fullmakt", "lagen site rebuild"]
+        "lagen begrepp generate Fullmakt --ignore-code-changes", "lagen site rebuild --ignore-code-changes"]
 
 
 def test_the_content_repo_s_own_ci_is_not_content(wiki):
@@ -177,7 +177,7 @@ def test_the_content_repo_s_own_ci_is_not_content(wiki):
     assert _commands(wiki, ".github/workflows/publish.yml") == []
     # and it does not mask the edits it was pushed alongside
     assert _commands(wiki, ".github/workflows/publish.yml",
-                     "site/sitenews.md") == ["lagen site rebuild"]
+                     "site/sitenews.md") == ["lagen site rebuild --ignore-code-changes"]
 
 
 def test_a_stray_file_still_widens_even_though_ci_does_not(wiki):
@@ -195,10 +195,10 @@ def test_a_source_the_catalog_does_not_hold_gets_its_whole_generate(wiki):
     success while the page stayed stale. The whole-source generate is the
     narrowest form that exists for them; site is 33 pages."""
     assert "site" not in layout.CATALOGUED_SOURCES
-    assert _commands(wiki, "site/sitenews.md") == ["lagen site rebuild"]
+    assert _commands(wiki, "site/sitenews.md") == ["lagen site rebuild --ignore-code-changes"]
     assert _commands(wiki, "site/sitenews.md", "site/om/nytt.md") == [
-        "lagen site rebuild"]
+        "lagen site rebuild --ignore-code-changes"]
     # a catalogued source keeps its per-document command
     assert "begrepp" in layout.CATALOGUED_SOURCES
     assert _commands(wiki, "concept/fullmakt.md") == [
-        "lagen begrepp generate Fullmakt"]
+        "lagen begrepp generate Fullmakt --ignore-code-changes"]
