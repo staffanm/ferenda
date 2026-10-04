@@ -523,8 +523,8 @@ Each `## …` heading anchors the section to the host node it annotates, per hos
 |---|---|---|
 | `## N §` | `#P{N}` | continuously-numbered SFS |
 | `## N kap M §` | `#K{N}P{M}` | per-chapter SFS |
-| `## Artikel N` | `#{N}` | EU act article |
-| `## Artikel N.M` / `## Artikel N.M a` | `#{N}.{M}` / `#{N}.{M}.{a}` | EU sub-article (definition/list point) |
+| `## Artikel N` | `#{N}` | EU act article; `N` may carry up to two letters (`## Artikel 33a` → `#33a`) |
+| `## Artikel N.M` / `## Artikel N.M a` | `#{N}.{M}` / `#{N}.{M}.{a}` | EU sub-article (definition/list point); the point is one or two letters (`## Artikel 1.1 aa` → `#1.1.aa`) and must end the heading or come before its title's dash |
 | `## Skäl N` or `## (N)` | `#recital-{N}` | EU recital |
 
 `annotates:` is an SFS number (`2009:400`) or a CELEX (`32024R2847`); the host act

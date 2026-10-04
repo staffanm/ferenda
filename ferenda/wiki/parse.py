@@ -49,8 +49,13 @@ RE_KAP = re.compile(r"^\s*(\d+(?:\s*[a-z])?)\s*kap\b")
 # an EU act is commented per article (PRD Step 3): `## Artikel 5` -> "5", the
 # sub-article forms `## Artikel 3.4` -> "3.4", `## Artikel 5.2 a` -> "5.2.a" --
 # the dotted `article(.paragraph)(.point)` anchors render_eurlex mints from the
-# act's structure (a definitions point is `#3.4`, a list point `#5.2.a`).
-RE_ARTIKEL = re.compile(r"^\s*[Aa]rtikel\s+(\d+)(?:[.\s]+(\d+))?(?:[.\s]+([a-z]))?\b")
+# act's structure (a definitions point is `#3.4`, a list point `#5.2.a`). An
+# amending act inserts lettered articles and points (AVMSD `## Artikel 33a` ->
+# "33a", `## Artikel 1.1 aa` -> "1.1.aa"), and render_eurlex mints them as such.
+# A point's letters end the heading or come before its title's dash, so a word
+# that follows the number (`## Artikel 5 om tillämpningsområde`) is not a point.
+RE_ARTIKEL = re.compile(r"^\s*[Aa]rtikel\s+(\d+[a-z]{0,2})(?:[.\s]+(\d+))?"
+                        r"(?:[.\s]+([a-z]{1,2})(?=\s*(?:$|[-–:])))?\b")
 # and per recital: `## Skäl 13` or `## (13)` -> "recital-13" (the `#recital-N`
 # anchor render_eurlex mints for a numbered preamble recital).
 RE_SKAL = re.compile(r"^\s*(?:[Ss]käl\s+|\()(\d+)\)?\s*$")
@@ -83,7 +88,7 @@ def heading_fragment(heading):
 
 # `K21P1S2` / `P7` / `K25` / EU `5.2.a` / `recital-13` -> the heading text
 _RE_FRAG_SFS = re.compile(r"^(?:K(\d+))?(?:P(\d+)([a-z])?)?(?:S(\d+))?$")
-_RE_FRAG_EU = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.([a-z]))?$")
+_RE_FRAG_EU = re.compile(r"^(\d+[a-z]{0,2})(?:\.(\d+))?(?:\.([a-z]{1,2}))?$")
 
 
 def fragment_heading(anchor):

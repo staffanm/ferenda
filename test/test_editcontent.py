@@ -39,7 +39,8 @@ def wiki_root(tmp_path, monkeypatch):
 @pytest.mark.parametrize("anchor,heading", [
     ("P7", "7 §"), ("K21P1", "21 kap. 1 §"), ("K1P1c", "1 kap. 1 c §"),
     ("K25", "25 kap."), ("5", "Artikel 5"), ("5.2", "Artikel 5.2"),
-    ("5.2.a", "Artikel 5.2 a"), ("recital-13", "Skäl 13"),
+    ("5.2.a", "Artikel 5.2 a"), ("33a", "Artikel 33a"),
+    ("1.1.aa", "Artikel 1.1 aa"), ("recital-13", "Skäl 13"),
 ])
 def test_fragment_heading_roundtrips(anchor, heading):
     assert wiki.fragment_heading(anchor) == heading

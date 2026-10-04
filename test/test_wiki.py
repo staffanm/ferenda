@@ -5,20 +5,20 @@ concept-synthesis that unifies extracted definitions/keywords with the wiki
 concepts."""
 
 import json
+import re
 import sys
 from pathlib import Path
 
 import pytest
 
-from ferenda.lib import annstore, catalog, catalog_rows, markdown
+from ferenda.eurlex import render as eurlex_render
+from ferenda.lib import annstore, catalog, catalog_rows, markdown, page
 from ferenda.wiki import annotate
 from ferenda.wiki import parse as wiki
-from ferenda.lib import page
-from ferenda.eurlex import render as eurlex_render
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools" / "migrations"))
-import mediawiki_to_markdown as conv  # noqa: E402
-import wiki_artifact_diff as diff  # noqa: E402  (legacy reference builders + _norm)
+import mediawiki_to_markdown as conv
+import wiki_artifact_diff as diff  # legacy reference builders + _norm
 
 
 def test_begrepp_uri_ucfirst_and_underscores():
@@ -222,6 +222,15 @@ def test_heading_fragment():
     assert wiki.heading_fragment("Artikel 3.4") == "3.4"
     assert wiki.heading_fragment("Artikel 5.2 a") == "5.2.a"
     assert wiki.heading_fragment("Artikel 5.2.a") == "5.2.a"
+    # an inserted article or point carries its letters (AVMSD 33a, 1(1)(aa))
+    assert wiki.heading_fragment("Artikel 33a") == "33a"
+    assert wiki.heading_fragment("Artikel 1.1 aa") == "1.1.aa"
+    assert wiki.heading_fragment("Artikel 5.2 a – Definitioner") == "5.2.a"
+    # a word after the number is prose, not a point
+    assert wiki.heading_fragment("Artikel 5 om tillämpningsområde") == "5"
+    assert wiki.heading_fragment("Artikel 10 se ovan") == "10"
+    assert wiki.heading_fragment("Artikel 12 i lydelse") == "12"
+    assert wiki.heading_fragment("Artikel 7 - Yttrandefrihet") == "7"
     # recitals are commentable too -> the `#recital-N` anchor
     assert wiki.heading_fragment("Skäl 13") == "recital-13"
     assert wiki.heading_fragment("(13)") == "recital-13"
@@ -451,7 +460,6 @@ def test_eurlex_guidance_renders_in_document_rail(tmp_path):
     # `## Externa länkar` block puts its links in the EU act's document-level rail
     # panel (key '') -- shown when no single article is in focus, in place of the
     # empty-rail placeholder
-    import re
     ad = tmp_path / "art"
     ad.mkdir()
     act = ad / "act.json"
@@ -494,7 +502,6 @@ def test_eurlex_guidance_renders_in_document_rail(tmp_path):
 def test_eurlex_per_article_guidance_and_commentary_render_in_article_rail(tmp_path):
     # end-to-end (PRD Step 3 acceptance): a `## Artikel 5` annotation section with
     # prose + a `## Externa länkar` block shows both in article 5's context rail
-    import re
     ad = tmp_path / "art"
     ad.mkdir()
     act = ad / "act.json"
@@ -559,7 +566,6 @@ def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path,
     # own rail, and the sub-article gets its `2.21` citation anchor even though
     # the act carries no editorial recital layer.
     monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
-    import re
     ad = tmp_path / "art"
     ad.mkdir()
     act = ad / "act.json"
