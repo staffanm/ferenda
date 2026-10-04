@@ -1,9 +1,10 @@
 """SQLite's own page cache for a single-process batch pass over the catalog or
 the unit store, sized from the memory the host can spare.
 
-The default 2 MB cache re-reads a joined table's pages for every row: the stats
-measures read 89.5 GB through it from a 7.8 GB catalog, hours on production's
-disk once the OS cache no longer holds the file. A larger cache is memory taken
+The default 2 MB cache re-reads the same pages again and again: the unit store
+keeps a document's units on unrelated pages, and with that cache an update of
+11,138 changed documents took 51,662 s on production's disk (2026-10-01).
+A larger cache is memory taken
 from the OS page cache, which is also what keeps the OpenSearch index fast. So
 the cache is the smallest of:
 
@@ -22,16 +23,24 @@ counts what the cache already holds, so sizing it again at the same hour would
 shrink it for nothing. Into business hours that errs small, which is the side
 search is on.
 
+`prewarm` reads the database file once, in order, into the OS page cache
+before a pass: on prod's disk that runs at 53 MB/s, where the pass's own
+random reads run at 51 pages a second. A pass calls it once, at its start. It
+is skipped in business hours (the page cache is the index's then) and when the
+file does not fit in the memory the cache may take.
+
 In business hours the index size comes from OpenSearch itself. A cluster that
 does not answer stops the pass: the cache cannot leave room for an index it
 cannot measure, and the unit store's `pending` mark makes the next run resume."""
 
 import datetime
 import sqlite3
+import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .. import config
+from . import util
 from .search import SearchIndex
 
 STOCKHOLM = ZoneInfo("Europe/Stockholm")
@@ -76,19 +85,44 @@ def search_hours():
     return config.SEARCH_BUSINESS_HOURS and business_hours()
 
 
-def cache_bytes(db_path, reserve=0):
-    """The batch cache for the database at `db_path`, in bytes. `reserve` is
-    memory the pass's own workers will take."""
-    need = Path(db_path).stat().st_size
-    if need <= MIN_CACHE:
-        return need
+def _spare(reserve):
+    """Bytes a batch pass may fill now: available memory and the cgroup room,
+    less `reserve` (the memory the pass's own workers will take), the
+    OpenSearch index in search hours, and the margin."""
     spare = meminfo("MemAvailable") - reserve
     if search_hours():
         spare -= SearchIndex().store_bytes()
     room = _cgroup_room()
     if room is not None:
         spare = min(spare, room - reserve)
-    return max(MIN_CACHE, min(need, spare - MARGIN))
+    return spare - MARGIN
+
+
+def cache_bytes(db_path, reserve=0):
+    """The batch cache for the database at `db_path`, in bytes."""
+    need = Path(db_path).stat().st_size
+    if need <= MIN_CACHE:
+        return need
+    return max(MIN_CACHE, min(need, _spare(reserve)))
+
+
+PREWARM_CHUNK = 8 << 20
+
+
+def prewarm(db_path, reserve=0):
+    """Read the database at `db_path` front to back, so the OS page cache holds
+    it for the random reads of the pass that follows."""
+    path = Path(db_path)
+    size = path.stat().st_size
+    if size <= MIN_CACHE or search_hours() or size > _spare(reserve):
+        return
+    t0 = time.perf_counter()
+    buf = bytearray(PREWARM_CHUNK)
+    with open(path, "rb", buffering=0) as f:
+        while f.readinto(buf):
+            pass
+    util.write("sqlcache: read %s into the page cache (%.1f GB, %.0f s)"
+               % (path.name, size / 1e9, time.perf_counter() - t0), err=True)
 
 
 def batch_cache(con: sqlite3.Connection, db_path, reserve=0) -> sqlite3.Connection:

@@ -1063,6 +1063,22 @@ def step(label):
         _outer.finish()
 
 
+def phase_timer(label):
+    """A `mark(phase)` for a long step: each call prints one persistent line,
+    ``[HH:MM:SS] <label>: <phase> [+<dt>]``, `dt` the time since the previous
+    mark (or since this call). A real run's log then says where the step's time
+    went, phase by phase."""
+    last = time.perf_counter()
+
+    def mark(phase):
+        nonlocal last
+        now = time.perf_counter()
+        write("%s%s: %s [+%s]" % (time.strftime("[%H:%M:%S] "), label, phase,
+                                  _hms(now - last)))
+        last = now
+    return mark
+
+
 def checking(label):
     """Report a staleness scan that has no item count to report yet -- the
     artifact walk `relate`/`dump` open with, the catalog signature `index`

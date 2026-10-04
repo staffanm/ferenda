@@ -89,3 +89,32 @@ def test_the_workers_memory_is_reserved_first(host, monkeypatch):
     # 30 GB available and 20 GB under the limit, 18 GB of it promised to workers
     assert sqlcache.cache_bytes(host, reserve=18 * GB) == sqlcache.MIN_CACHE
     assert sqlcache.cache_bytes(host, reserve=10 * GB) == (20 - 10 - 2) * GB
+
+
+def test_prewarm_reads_the_file_at_night(host, monkeypatch, capsys):
+    _at(monkeypatch, False)
+    with open(host, "r+b") as f:
+        f.truncate(100 << 20)              # past MIN_CACHE, quick to read
+    sqlcache.prewarm(host)
+    out = capsys.readouterr()
+    assert "read catalog.sqlite into the page cache (0.1 GB" in out.out + out.err
+
+
+@pytest.mark.parametrize("business, available", [
+    (True, 30 * GB),       # the page cache is the search index's in the day
+    (False, 11 * GB),      # 10 GB does not fit beside a 2 GB margin
+])
+def test_prewarm_leaves_the_page_cache_alone(host, monkeypatch, capsys, business, available):
+    _at(monkeypatch, business)
+    monkeypatch.setattr(sqlcache, "meminfo", lambda field: available)
+    sqlcache.prewarm(host)
+    out = capsys.readouterr()
+    assert out.out + out.err == ""
+
+
+def test_prewarm_leaves_room_for_the_workers(host, monkeypatch, capsys):
+    # 30 GB available would hold the 10 GB file, but not beside 20 GB of workers
+    _at(monkeypatch, False)
+    sqlcache.prewarm(host, reserve=20 * GB)
+    out = capsys.readouterr()
+    assert out.out + out.err == ""

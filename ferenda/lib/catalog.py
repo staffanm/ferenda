@@ -264,8 +264,7 @@ CREATE INDEX IF NOT EXISTS idx_links_from    ON links(from_uri);
 #
 # `to_root` stays leftmost, so this serves every plain `to_root = ?` lookup the
 # narrow index served and replaces rather than joins it -- at the cost of a wider
-# range to scan for the ones that only wanted `to_root` (stats/compute.py runs
-# one such count per statute). The index measured 735 MB built alongside the
+# range to scan for the ones that only wanted `to_root`. The index measured 735 MB built alongside the
 # narrow one on dev; built as its replacement, `DROP` returns the old pages to
 # the freelist for `CREATE` to reuse, and the real corpus catalog went from
 # 4.87 to 4.96 GB.

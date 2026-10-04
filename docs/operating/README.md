@@ -115,7 +115,8 @@ compress_quality: 11                 # Brotli quality 0-11; default 11 (lower fo
 
 # --- memory ----------------------------------------------------------
 search_business_hours: true          # prod only: Mon-Fri 08-18 Stockholm, a batch pass's SQLite
-                                     # cache leaves the OpenSearch index its page cache; default off
+                                     # cache leaves the OpenSearch index its page cache, and no
+                                     # pass reads a database into the page cache first; default off
 
 # --- inline content editor (mutating surface) + /ops dashboard -------
 editor_secret: <random hex>          # signs the session cookie; unset ⇒ editing AND /ops off (403)
@@ -402,7 +403,14 @@ The cross-passes also avoid repeated SQLite reads and writes:
   The curated-row merge and the anchor containment tests index their rows
   instead of scanning them pairwise.
 - Each cross-pass prints its name and elapsed time. The batch connection
-  uses a 64 MiB SQLite page cache and keeps temporary sorts in memory.
+  keeps temporary sorts in memory, and its SQLite page cache comes from
+  `sqlcache.batch_cache`: the smallest of the catalog file, the free memory
+  and the cgroup room, less 2 GB (and less the OpenSearch index in business
+  hours with `search_business_hours`), never under 64 MiB. Before the passes,
+  `sqlcache.prewarm` reads the catalog file in order into the OS page cache
+  and prints `sqlcache: read catalog.sqlite into the page cache (…)`. On
+  prod's disk that runs at 53 MB/s, where random page reads run at 51 a
+  second. The stats measures and the unit store update do the same.
 
 The passes are then bound by the catalog file's page layout. A full relate
 leaves every table and index scattered one page at a time: on the production
@@ -436,6 +444,22 @@ file, and the manifest lives beside the catalog under `catalog_root`
 (`<catalog_root>/.build/manifest.sqlite`). The first run after that change
 copies the manifest there from the data tree once and leaves the old file in
 place; a machine that rsyncs the corpus copies the manifest with the catalog.
+
+A full generate prints one line per phase as the phase ends, with the time
+since the previous line:
+
+```
+[03:12:44] generate: freshness of 466463 pages [+41m10s]
+```
+
+The phases, in order: staleness of the sources, site fingerprint, catalog
+into the page cache (the prewarm, after the gate, so a run with nothing to
+render reads nothing), dirty pages, manifest, documents and site model,
+dependency digests, graphics/cross-document digests/repeals, freshness of
+N pages, rendering N pages, inbound files, frontpage and browse indexes,
+sitemaps, browse tree and subdomain projections, source pages, manifest and
+fingerprints written. A scoped generate (`lagen <source> generate`, the
+editor's rebuild) prints none.
 
 A run that changes nothing still paid about 900 s of staleness scans on
 2026-09-07 (parse 461 s cold, then versions, relate, dump and generate's

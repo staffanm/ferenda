@@ -26,6 +26,7 @@ lede that names two of five reads as though the other three do not exist.
 """
 
 import collections
+import dataclasses
 import datetime
 import re
 import statistics
@@ -962,40 +963,100 @@ def _ikraft_months(laws):
 # D. the citation graph (29-36)
 # ==========================================================================
 
-def _flows(con):
+@dataclasses.dataclass
+class _LinkTally:
+    """Every count the measures read off the links table, from one pass over it.
+
+    One pass in the table's own order, with `documents` held in memory, instead
+    of a join per measure that looks up `documents` once per link: on prod's
+    disk a page read in order runs at 53 MB/s and a random one at 51 a second.
+    Measured on dev (2026-10-03), the measures read 89.5 GB through SQLite's
+    default cache for a 7.8 GB catalog with the joins, and 4.2 GB with this."""
+    documents: int = 0
+    links: int = 0
+    paged: int = 0           # links that name the page they stand on
+    unresolved: int = 0      # links to a document the catalog does not hold
+    # (citing source, kind, cited source, kind), both in the catalog
+    flows: collections.Counter[tuple[str, str, str, str]] = dataclasses.field(
+        default_factory=collections.Counter)
+    inbound: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
+    anchors: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
+    outbound: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
+    selfrefs: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
+    # (citing uri, cited root, cited uri) of every rpubl:bemyndigande link
+    bemyndigande: list[tuple[str, str, str]] = dataclasses.field(default_factory=list)
+
+
+def _link_tally(con):
+    docs = {uri: (source, kind) for uri, source, kind in
+            _q(con, "SELECT uri, source, kind FROM documents")}
+    t = _LinkTally(documents=len(docs))
+    for from_uri, to_root, to_uri, from_page, predicate in con.execute(
+            "SELECT from_uri, to_root, to_uri, from_page, predicate FROM links"):
+        t.links += 1
+        if predicate == "rpubl:bemyndigande":
+            t.bemyndigande.append((from_uri, to_root, to_uri))
+        t.paged += from_page is not None
+        t.inbound[to_root] += 1
+        if "#" in to_uri:
+            t.anchors[to_uri] += 1
+        if from_uri == to_root:
+            t.selfrefs[from_uri] += 1
+        cited = docs.get(to_root)
+        t.unresolved += cited is None
+        citing = docs.get(from_uri)
+        if citing is not None:
+            t.outbound[from_uri] += 1
+            if cited is not None:
+                t.flows[citing + cited] += 1
+    return t
+
+
+def _document(con, uri):
+    """(title, descriptive) of the catalogued document `uri`, or Nones."""
+    return (_q(con, "SELECT title, descriptive FROM documents WHERE uri = ?",
+               (uri,)) or [(None, None)])[0]
+
+
+def _largest(counts, n=12):
+    """The `n` largest of `counts` as (key, count), equal counts in key order --
+    not in the order the links table happens to hold them, which a relate that
+    re-inserts links changes -- so a rebuild lists the same rows."""
+    return sorted(counts.items(), key=lambda t: (-t[1], t[0]))[:n]
+
+
+def _top(con, counts, n=12):
+    """The `n` largest of `counts` as (uri, title, count), the title None for a
+    document the catalog does not hold."""
+    return [(u, _document(con, u)[0], c) for u, c in _largest(counts, n)]
+
+
+def _flows(tally):
     """Every reference counted by (citing group, cited group), largest first.
 
-    The catalog answers per (source, kind) -- 1 900 rows -- and the grouping
+    The tally counts per (source, kind) -- 1 900 keys -- and the grouping
     is `facets.flow_group`, shared with the /api/v1/graph endpoint, so one
     map says what a node is. References to a document the corpus does not hold
     have no cited group and are not counted; 29's lede says how many that is."""
     flows = collections.Counter()
-    for src, kind, to_src, to_kind, n in _q(
-            con, "SELECT d1.source, d1.kind, d2.source, d2.kind, count(*) "
-                 "FROM links l JOIN documents d1 ON d1.uri = l.from_uri "
-                 "JOIN documents d2 ON d2.uri = l.to_root GROUP BY 1,2,3,4"):
+    for (src, kind, to_src, to_kind), n in tally.flows.items():
         flows[(flow_group(src, kind), flow_group(to_src, to_kind))] += n
-    return [Cell(a, b, n)
-            for (a, b), n in sorted(flows.items(), key=lambda t: -t[1])]
+    return [Cell(a, b, n) for (a, b), n in _largest(flows, len(flows))]
 
 
 def _group_d(con, s):
-    docs = _q(con, "SELECT count(*) FROM documents")[0][0]
-    links = _q(con, "SELECT count(*) FROM links")[0][0]
-    paged = _q(con, "SELECT count(*) FROM links WHERE from_page IS NOT NULL")[0][0]
-    flows = _flows(con)
+    t = s["links"]
+    flows = _flows(t)
     # both numbers measured, neither inferred from the other: a reference the
-    # flow leaves out because its target is missing is counted by its own query.
+    # flow leaves out because its target is missing is counted on its own.
     # "links - landed" would say the same thing only while every citing document
     # is itself in the catalog, which nothing here states or checks.
-    unresolved = _q(con, "SELECT count(*) FROM links l LEFT JOIN documents d "
-                         "ON d.uri = l.to_root WHERE d.uri IS NULL")[0][0]
     yield Measure(
         29, "D", "Databasen i siffror", "sankey", unit="hänvisningar",
-        value=links,
+        value=t.links,
         display="%s hänvisningar mellan %s dokument"
-                % ("{:,}".format(links).replace(",", " "),
-                   "{:,}".format(docs).replace(",", " ")),
+                % ("{:,}".format(t.links).replace(",", " "),
+                   "{:,}".format(t.documents).replace(",", " ")),
         # no characterisation of what the unresolved targets are: measured, they
         # are EU-domar 33 %, äldre författningar 22 %, EU-rättsakter 18 % and a
         # long tail, and any short phrase for that reads as a ranking the page
@@ -1004,46 +1065,39 @@ def _group_d(con, s):
              "sidor, till sidan den står på (%s av dem). Flödet visar de %s "
              "hänvisningar som går mellan två dokument i databasen. Ytterligare "
              "%s pekar på ett dokument som databasen inte har."
-             % ("{:,}".format(paged).replace(",", " "),
+             % ("{:,}".format(t.paged).replace(",", " "),
                 "{:,}".format(sum(c.value for c in flows)).replace(",", " "),
-                "{:,}".format(unresolved).replace(",", " ")),
+                "{:,}".format(t.unresolved).replace(",", " ")),
         cells=flows)
 
     yield Measure(
         30, "D", "Mest hänvisade dokument", "toplist", unit="hänvisningar",
         lede="Inkommande länkar från hela databasen.",
-        rows=[Row(t or u.replace(BASE, ""), c, u) for u, t, c in
-              _q(con, "SELECT l.to_root, d.title, count(*) c FROM links l "
-                      "LEFT JOIN documents d ON d.uri = l.to_root "
-                      "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+        rows=[Row(title or u.replace(BASE, ""), c, u)
+              for u, title, c in _top(con, t.inbound)])
 
+    anchors = [(u, _document(con, catalog.strip_fragment(u))[1], c)
+               for u, c in _largest(t.anchors)]
     yield Measure(
         31, "D", "Mest hänvisade enskilda paragraf", "toplist", unit="hänvisningar",
         lede="Ner på paragrafnivå — vilken enskild regel databasen faktiskt talar om.",
-        rows=[Row(citation(u, desc), c, u) for u, desc, _src, c in
-              _q(con, "SELECT l.to_uri, d.descriptive, d.source, count(*) c "
-                      "FROM links l LEFT JOIN documents d ON d.uri = l.to_root "
-                      "WHERE l.to_uri LIKE '%#%' "
-                      "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+        rows=[Row(citation(u, desc), c, u) for u, desc, c in anchors])
 
     yield Measure(
         32, "D", "Dokument med flest utgående hänvisningar", "toplist",
         unit="hänvisningar",
         lede="Vilka dokument som citerar mest — utredningar, i praktiken.",
-        rows=[Row(t or u.replace(BASE, ""), c, u) for u, t, c in
-              _q(con, "SELECT l.from_uri, d.title, count(*) c FROM links l "
-                      "JOIN documents d ON d.uri = l.from_uri "
-                      "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+        rows=[Row(title or u.replace(BASE, ""), c, u)
+              for u, title, c in _top(con, t.outbound)])
 
+    matrix = collections.Counter()
+    for (src, _kind, to_src, _to_kind), n in t.flows.items():
+        matrix[(src, to_src)] += n
     yield Measure(
         33, "D", "Vem citerar vem", "matrix", unit="hänvisningar",
         lede="Hänvisningsmatrisen mellan källor. Förarbetenas hänvisningar till "
              "SFS dominerar allt annat.",
-        cells=[Cell(a, b, c) for a, b, c in
-               _q(con, "SELECT d1.source, d2.source, count(*) FROM links l "
-                       "JOIN documents d1 ON d1.uri = l.from_uri "
-                       "JOIN documents d2 ON d2.uri = l.to_root "
-                       "GROUP BY 1,2 HAVING count(*) > 500")])
+        cells=[Cell(a, b, c) for (a, b), c in sorted(matrix.items()) if c > 500])
 
     # 34 -- the shape of how attention is distributed, not a defect count. An
     # act nothing refers to is not orphaned: it is a self-contained island,
@@ -1051,10 +1105,9 @@ def _group_d(con, s):
     # cited. The distribution says that far better than a single number did --
     # the zero bucket is the tall one, and the corpus still runs out to a
     # handful of acts with six-figure inbound counts.
-    refs = dict(_q(con, "SELECT n, count(*) FROM (SELECT d.uri, "
-                        "(SELECT count(*) FROM links l WHERE l.to_root = d.uri) n "
-                        "FROM documents d WHERE d.source='sfs' "
-                        "AND " + in_force("d.expired") + ") GROUP BY n"))
+    refs = collections.Counter(t.inbound[u] for (u,) in _q(
+        con, "SELECT uri FROM documents d WHERE d.source='sfs' AND "
+             + in_force("d.expired")))
     bins = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 11), (11, 26),
             (26, 101), (101, 10**9)]
     labels = ["0", "1", "2", "3", "4", "5", "6–10", "11–25", "26–100", ">100"]
@@ -1073,20 +1126,16 @@ def _group_d(con, s):
     yield Measure(
         35, "D", "Den mest självrefererande texten", "toplist", unit="hänvisningar",
         lede="Hänvisningar från ett dokument till sig självt.",
-        rows=[Row(t or u.replace(BASE, ""), c, u) for u, t, c in
-              _q(con, "SELECT l.from_uri, d.title, count(*) c FROM links l "
-                      "LEFT JOIN documents d ON d.uri = l.from_uri "
-                      "WHERE l.from_uri = l.to_root "
-                      "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+        rows=[Row(title or u.replace(BASE, ""), c, u)
+              for u, title, c in _top(con, t.selfrefs)])
 
+    begrepp = collections.Counter({u: t.inbound[u] for (u,) in _q(
+        con, "SELECT uri FROM documents WHERE source='begrepp'") if t.inbound[u]})
     yield Measure(
         36, "D", "Mest omtalade begrepp", "toplist", unit="hänvisningar",
         lede="Begreppen rankade på antalet inkommande länkar: vilka begrepp "
              "resten av databasen hänvisar till.",
-        rows=[Row(t, c, u) for u, t, c in
-              _q(con, "SELECT d.uri, d.title, count(*) c FROM links l "
-                      "JOIN documents d ON d.uri = l.to_root "
-                      "WHERE d.source='begrepp' GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+        rows=[Row(title, c, u) for u, title, c in _top(con, begrepp)])
 
 
 # ==========================================================================
@@ -1267,48 +1316,58 @@ def _group_f(con, s):
 # to the regering, and the regering subdelegate to a myndighet. A föreskrift's
 # own bemyndigande citation names the rung it stands on, so counting the
 # citations per empowering act says where delegated lawmaking actually sits.
-#
-# Two joins carry the population and are written once. The citing side must
-# really be a föreskrift: 135 SFS documents mint the same predicate for their
-# own bemyndigandeupplysning, and this measure's unit is föreskrifter. The
-# empowering side must still be in force -- a repealed act empowers nothing
-# today. The föreskrift side is every föreskrift we hold; that corpus carries
-# no repeal dates at all, so it cannot be narrowed (the page says so, `note=`).
-_BEM = ("FROM links l "
-        "JOIN documents f ON f.uri = l.from_uri AND f.source = 'foreskrift' "
-        "JOIN documents d ON d.uri = l.to_root AND d.source = 'sfs' "
-        "  AND " + in_force("d.expired") + " "
-        "WHERE l.predicate = 'rpubl:bemyndigande' ")
+def _delegations(con, tally):
+    """The bemyndigande links that carry measure 57's population, as
+    (föreskrift, empowering act, cited uri, the act's kind, its title).
+
+    The citing side must really be a föreskrift: 135 SFS documents mint the
+    same predicate for their own bemyndigandeupplysning, and this measure's
+    unit is föreskrifter. The empowering side must still be in force -- a
+    repealed act empowers nothing today. The föreskrift side is every
+    föreskrift we hold; that corpus carries no repeal dates at all, so it
+    cannot be narrowed (the page says so, `note=`)."""
+    foreskrifter = {u for (u,) in _q(con, "SELECT uri FROM documents "
+                                          "WHERE source = 'foreskrift'")}
+    acts = {u: (kind, title) for u, kind, title in _q(
+        con, "SELECT uri, kind, title FROM documents d WHERE d.source = 'sfs' "
+             "AND " + in_force("d.expired"))}
+    return [(f, root, uri, *acts[root]) for f, root, uri in tally.bemyndigande
+            if f in foreskrifter and root in acts]
 
 
-def _delegated(con, kind=None):
+def _delegated(bem, kind=None):
     """How many föreskrifter stand on an empowering act of `kind`, or on any
     act when `kind` is None. Distinct in the föreskrift: one that names two
     provisions of an act, or two acts of the same kind, is one föreskrift."""
-    return _q(con, "SELECT count(DISTINCT l.from_uri) " + _BEM
-              + ("AND d.kind = ?" if kind else ""),
-              (kind,) if kind else ())[0][0]
+    return len({f for f, _root, _uri, k, _title in bem if kind is None or k == kind})
 
 
-def _delegation_rows(con, kind, group, limit=8):
+def _most_named(pairs, n):
+    """The `n` keys of (key, föreskrift) `pairs` named by the most distinct
+    föreskrifter, as (key, count); equal counts in key order."""
+    named = collections.defaultdict(set)
+    for k, f in pairs:
+        named[k].add(f)
+    return _largest(collections.Counter({k: len(fs) for k, fs in named.items()}), n)
+
+
+def _delegation_rows(bem, kind, group, limit=8):
     """The acts of `kind` that empower the most föreskrifter, as toplist rows.
 
     The detail column names the provision that actually carries the
     delegation: gymnasieförordningen empowers 1 312 föreskrifter and 1 075 of
     them name 1 kap. 4 §. An act cited only doc-level (no fragment) names no
     provision, and gets no detail rather than its own title a second time."""
+    bem = [link for link in bem if link[3] == kind]
+    titles = {root: title for _f, root, _uri, _k, title in bem}
     rows = []
-    for uri, title, n in _q(
-            con, "SELECT l.to_root, d.title, count(DISTINCT l.from_uri) c "
-            + _BEM + "AND d.kind = ? GROUP BY 1 ORDER BY c DESC LIMIT ?",
-            (kind, limit)):
-        top = _q(con, "SELECT l.to_uri, count(DISTINCT l.from_uri) c " + _BEM
-                 + "AND l.to_root = ? AND l.to_uri LIKE '%#%' "
-                   "GROUP BY 1 ORDER BY c DESC LIMIT 1", (uri,))
+    for root, n in _most_named(((root, f) for f, root, _u, _k, _t in bem), limit):
+        top = _most_named(((uri, f) for f, r, uri, _k, _t in bem
+                           if r == root and "#" in uri), 1)
         detail = ("oftast %s (%s)"
                   % (human_fragment(top[0][0].partition("#")[2]),
                      "{:,}".format(top[0][1]).replace(",", " "))) if top else None
-        rows.append(Row(_shorten(title, 70), n, uri, detail, group=group))
+        rows.append(Row(_shorten(titles[root], 70), n, root, detail, group=group))
     return rows
 
 
@@ -1324,17 +1383,18 @@ def _group_g(con, s):
         xlabel="myndighet", ylabel="föreskrifter",
         points=_series(pub))
 
+    bem = _delegations(con, s["links"])
     yield Measure(
         57, "G", "Bemyndigandekedjan", "toplist", unit="föreskrifter",
         lede="%s föreskrifter står på ett bemyndigande i en gällande "
              "författning. %s av dem pekar på en förordning och %s på en lag "
              "— somliga på båda. Den delegerade normgivningen delegeras "
              "alltså av regeringen, inte av riksdagen."
-             % ("{:,}".format(_delegated(con)).replace(",", " "),
-                "{:,}".format(_delegated(con, "forordning")).replace(",", " "),
-                "{:,}".format(_delegated(con, "lag")).replace(",", " ")),
-        rows=(_delegation_rows(con, "forordning", "Förordningar")
-              + _delegation_rows(con, "lag", "Lagar")))
+             % ("{:,}".format(_delegated(bem)).replace(",", " "),
+                "{:,}".format(_delegated(bem, "forordning")).replace(",", " "),
+                "{:,}".format(_delegated(bem, "lag")).replace(",", " ")),
+        rows=(_delegation_rows(bem, "forordning", "Förordningar")
+              + _delegation_rows(bem, "lag", "Lagar")))
 
     yield Measure(
         50, "G", "Direktiven som satt djupast spår i svensk rätt", "toplist",
@@ -1351,10 +1411,8 @@ def _group_g(con, s):
         51, "G", "Europakonventionen i svensk rätt", "toplist", unit="hänvisningar",
         lede="Vilka konventionsartiklar som faktiskt används.",
         rows=[Row("Artikel " + u.split("#A")[-1].replace("P", ".") , c, u)
-              for u, c in
-              _q(con, "SELECT to_uri, count(*) c FROM links "
-                      "WHERE to_uri LIKE '%coe/005#%' "
-                      "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+              for u, c in _largest(collections.Counter(
+                  {u: c for u, c in s["links"].anchors.items() if "coe/005#" in u}))])
 
     cases = s["remisser"]
     orgs = collections.Counter(o for answers in cases.values() for o, _ in answers)
@@ -1400,9 +1458,12 @@ def compute(catalog_path, progress=None):
     scans = run_scans(progress=progress)
     if progress:
         progress("measures")
+    sqlcache.prewarm(catalog_path)
     con = sqlcache.batch_cache(catalog.connect_ro(str(catalog_path)), catalog_path)
     try:
-        scans = _in_force(con, scans)       # once, not once per group
+        # once, not once per group: the statutes in force, and every count
+        # read off the links table in one pass
+        scans = {**_in_force(con, scans), "links": _link_tally(con)}
         measures = [m for group in _GROUPS for m in group(con, scans)]
     finally:
         con.close()

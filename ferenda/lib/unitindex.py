@@ -217,14 +217,15 @@ def update(catalog_path, pinpoints, jobs=1, ignore_code=False, changed=None):
     # is hundreds of megabytes in memory. A document's units and its `docs` row
     # commit together every COMMIT_EVERY documents, so a stopped build resumes.
     workers = _workers(jobs)
+    pooled = workers > 1 and len(jobs_list) > 100
     # a document's units sit on unrelated pages (the key is a hash): the batch
     # cache keeps the units_doc index and the inner pages between documents,
     # in the memory the workers leave
-    reserve = workers * WORKER_MEMORY
+    reserve = workers * WORKER_MEMORY if pooled else 0
+    sqlcache.prewarm(store_path(catalog_path), reserve)
     sqlcache.batch_cache(store, store_path(catalog_path), reserve)
     search_hours = sqlcache.search_hours()
-    pool = (multiprocessing.Pool(workers, maxtasksperchild=200)
-            if workers > 1 and len(jobs_list) > 100 else None)
+    pool = multiprocessing.Pool(workers, maxtasksperchild=200) if pooled else None
     results = pool.imap_unordered(_rows, jobs_list, chunksize=16) if pool else map(_rows, jobs_list)
     try:
         for n, (uri, rows) in enumerate(results, 1):

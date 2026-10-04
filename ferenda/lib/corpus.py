@@ -385,6 +385,7 @@ def cmd_relate(sources, names, force=None, jobs=1):
         if dirty or force or not freshness.fingerprint_fresh(store, "relate", "__corr__",
                                                    corr_wm):
             t0 = time.perf_counter()
+            sqlcache.prewarm(target)
             con = sqlcache.batch_cache(
                 catalog.connect(target, data_root=DATA, exclusive=full_rebuild), target)
             # This single batch writer repeatedly joins the same metadata.
@@ -1456,6 +1457,9 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     # dependency); a scoped render skips that corpus-wide scan and uses the catalog
     # as-is -- run `lagen <source> relate` to refresh it
     scoped = only is not None or source is not None
+    # a full run says where its time went; a scoped one (the editor's
+    # post-commit rebuild of one page) stays quiet
+    mark = (lambda phase: None) if scoped else util.phase_timer("generate")
     if not scoped:
         # stale_sources() stats every artifact of every source and
         # generate_fingerprint() below signs the whole catalog -- minutes on a
@@ -1466,6 +1470,7 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
     if stale:
         print("catalog stale for %s -- relating first" % ", ".join(stale))
         cmd_relate(sources, stale, jobs=jobs)
+    mark("staleness of the sources")
 
     # full-corpus generate: a coarse gate over the whole catalog + .corr/.ann
     # layers + render code. All unchanged since the last full generate ⟹ every
@@ -1481,10 +1486,18 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
             print("generate: up to date -- skipped (%s)" % layout.GENERATED)
             freshness._emit_segment("generate", "__site__", 0.0, ran=0, status="skipped")
             return
+        mark("site fingerprint")
+        # every page to render reads the catalog: in order into the page
+        # cache first, where the random reads that follow find it -- after
+        # the gate, so a run with nothing to render reads nothing
+        sqlcache.prewarm(layout.CATALOG)
+        mark("catalog into the page cache")
         if not (force or protocol.RUN.force):
             only = _run_dirty_pages(sources, store, sides, expired)
+            mark("dirty pages")
 
     manifest = freshness.load_manifest()
+    mark("manifest")
     code_version = freshness.recipe_version(GENERATE_CODE)
     updates = {}
     own_hash = {}                # artifact path -> content hash, memoized per run
@@ -1558,7 +1571,7 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
                                            progress=progress,
                                            fresh=fresh, record=record, only=only,
                                            source=source, jobs=jobs, extra=extra,
-                                           write_index=write_index)
+                                           write_index=write_index, mark=mark)
     if not scoped:                       # editorial pages ride a full-corpus run
         # the faceted browse tree and the subdomain projections: generated as a
         # client of the REST API, which lives a layer above lib/, so the caller
@@ -1566,12 +1579,14 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
         con = catalog.connect(layout.CATALOG)
         aggregates(con, full=True)
         con.close()
+        mark("browse tree and subdomain projections")
         # ... and each source that publishes pages of its own rather than
         # catalog rows (the editorial chrome, /statistik), which `generate_site`
         # above never reaches. Without this a rebuild recomputed the corpus
         # measurements and then published the previous run's page -- fresh
         # numbers on disk, stale numbers on screen.
         write_source_pages(sources)
+        mark("source pages")
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)
@@ -1582,6 +1597,7 @@ def cmd_generate(sources, only=None, source=None, jobs=1, force=False, *,
         freshness.write_stat_records(OWN_LAYER_RECORDS,
                                      freshness.stat_records(_own_layers(sources)))
         freshness.save_fingerprints(store)
+    mark("manifest and fingerprints written")
     freshness._emit_segment("generate", seg_source, time.perf_counter() - t0, total=total,
                   ran=rendered, status="ok")
     if only is not None and not total:

@@ -820,7 +820,7 @@ def _render_one(job):
 
 def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
                   record=None, only=None, source=None, jobs=1, extra=None,
-                  write_index=True):
+                  write_index=True, mark=lambda phase: None):
     """Render every catalogued document to static HTML. `renderers` maps a source
     key to that source's own `render(art, site) -> str` (its `Source.render`);
     lib cannot import a source, so the registry is composed by the caller. Its
@@ -839,7 +839,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     path, title) page rows that have no catalog row (the sfs historical
     consolidations). `jobs>1` renders the stale pages across a process pool.
     Returns (total_pages, rendered) -- rendered < total when pages were
-    skipped.
+    skipped. `mark(phase)` is called as each phase ends (`util.phase_timer`).
 
     Every page rendered also (re)writes its inbound-citation file under data_root
     (`_write_inbound`), so the two stay in step: the same staleness that
@@ -885,6 +885,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     # pages identically to the full one
     site = Site.from_catalog(
         con, target_uris=[r[0] for r in rows] if only is not None else None)
+    mark("documents and site model")
     # the whole-corpus dependency digests in one batched pass (not one pair of
     # subqueries per document -- the 124k-page planning loop). An `only`-scoped
     # run (a handful of pages: the targeted CLI render, the editor's post-commit
@@ -894,6 +895,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     util.checking(label)
     deps = (catalog.page_dependency_digests_for(con, [r[0] for r in rows])
             if only is not None else catalog.page_dependency_digests(con))
+    mark("dependency digests")
     # the graphic crops the pages link. Written before any page is rendered, so
     # a page and the files it names appear together; corpus-wide even under a
     # scope, since there are 331 of them in all and the check is one stat each
@@ -920,6 +922,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     # temporality). The date is read off the uri itself; an SFS lydelse id is
     # an SFS number, never date-shaped, so this matches only the dated form.
     today = date.today().isoformat()
+    mark("graphics, cross-document digests, repeals")
 
     def future_lydelse(uri):
         m = _RE_DATED_LYDELSE.search(uri)
@@ -970,6 +973,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
                     progress(done, total, catalog.local(uri), rendered)
             else:
                 plan.append((uri, src, path, title, dep, chash))
+    mark("freshness of %d pages" % total)
 
     skipped = []                 # uris whose artifact vanished (stale catalog rows)
 
@@ -1000,6 +1004,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
             if written:
                 _write_inbound(con, root, uri)
             finish(uri, path, dep, chash, written)
+    mark("rendering %d pages" % len(plan))
 
     if skipped:
         sys.stderr.write(
@@ -1022,8 +1027,11 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
 
     if only is None and source is None:          # corpus-wide pages on a full run
         _sync_inbound_tree(con, root, progress is not None)
+        mark("inbound files")
         render_aggregates(con, out_root, write_index=write_index)
+        mark("frontpage and browse indexes")
         write_sitemaps(con, out_root, renderers)
+        mark("sitemaps")
     if progress:
         progress(total, total, "", rendered)
     con.close()

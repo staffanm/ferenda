@@ -12,7 +12,7 @@ import sqlite3
 
 import pytest
 
-from ferenda.lib import catalog, facets, layout, pathgraph
+from ferenda.lib import catalog, facets, layout
 from ferenda.stats import charts, compute, render, scan
 from ferenda.stats.model import Cell, Measure, Point, Report, Row, Tile
 
@@ -362,30 +362,82 @@ def test_a_flow_group_splits_eurlex_and_merges_the_folkratt_sources():
         facets.flow_group("nysource", "kind")
 
 
+def _tally_catalog():
+    """Two statutes, a proposition, a begrepp node and a dangling target, with
+    the links group D counts: 600 prop -> lag (past the matrix's 500 floor),
+    anchored links, a self-reference and a reference out of the corpus."""
+    b = "https://lagen.nu/"
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE documents (uri TEXT, source TEXT, kind TEXT, "
+                "title TEXT, descriptive TEXT, expired TEXT)")
+    con.execute("CREATE TABLE links (from_uri TEXT, to_root TEXT, to_uri TEXT, "
+                "from_page INTEGER, predicate TEXT)")
+    con.executemany("INSERT INTO documents VALUES (?, ?, ?, ?, ?, ?)", [
+        (b + "lag", "sfs", "lag", "Testlag (2001:1)", "testlagen", None),
+        (b + "gammal", "sfs", "lag", "Gammal lag (1990:1)", None, "1999-01-01"),
+        (b + "prop", "forarbete", "prop", "Prop. 2000/01:1", None, None),
+        (b + "begrepp/Avtal", "begrepp", "begrepp", "Avtal", None, None),
+        (b + "begrepp/Anbud", "begrepp", "begrepp", "Anbud", None, None),
+    ])
+    links = ([(b + "prop", b + "lag", b + "lag#P1", 12, None)] * 590
+             + [(b + "prop", b + "lag", b + "lag#P2", None, None)] * 10
+             + [(b + "lag", b + "lag", b + "lag#P1", None, None)] * 3
+             + [(b + "lag", b + "begrepp/Avtal", b + "begrepp/Avtal", None, None)]
+             + [(b + "prop", b + "borta", b + "borta", None, None)] * 2)
+    con.executemany("INSERT INTO links VALUES (?, ?, ?, ?, ?)", links)
+    return con
+
+
+def test_group_d_reads_every_measure_off_one_pass():
+    b = "https://lagen.nu/"
+    con = _tally_catalog()
+    tally = compute._link_tally(con)
+    m = {x.id: x for x in compute._group_d(con, {"links": tally})}
+
+    def rows(i):
+        return [(r.label, r.value) for r in m[i].rows]
+    assert (tally.links, tally.paged, tally.unresolved) == (606, 590, 2)
+    assert rows(30) == [("Testlag (2001:1)", 603), ("borta", 2), ("Avtal", 1)]
+    assert [(r.uri, r.value) for r in m[31].rows] == [(b + "lag#P1", 593),
+                                                      (b + "lag#P2", 10)]
+    assert rows(32) == [("Prop. 2000/01:1", 602), ("Testlag (2001:1)", 4)]
+    assert [(c.row, c.col, c.value) for c in m[33].cells] == [
+        ("forarbete", "sfs", 600)]
+    # the one statute in force has 603 inbound; the repealed one is not counted
+    assert dict((p.x, p.y) for p in m[34].points)[">100"] == 1
+    assert sum(p.y for p in m[34].points) == 1
+    assert rows(35) == [("Testlag (2001:1)", 3)]
+    assert rows(36) == [("Avtal", 1)]           # Anbud, never cited, is not listed
+
+
 def test_the_flow_query_groups_across_the_join_and_drops_a_dangling_target():
     # the flow is measured over the catalog, so the grouping has to survive the
     # join: two eurlex kinds on one side become two different nodes, three
     # folkrätt sources become one. A reference whose target the corpus does not
-    # hold has no cited group and cannot be drawn -- it is counted by 29's own
-    # second query instead, which is why that number is not `links - flows`.
+    # hold has no cited group and cannot be drawn -- it is counted on its own
+    # as unresolved, which is why that number is not `links - flows`.
     con = sqlite3.connect(":memory:")
     con.execute("CREATE TABLE documents (uri TEXT, source TEXT, kind TEXT)")
-    con.execute("CREATE TABLE links (from_uri TEXT, to_root TEXT)")
+    con.execute("CREATE TABLE links (from_uri TEXT, to_root TEXT, "
+                "to_uri TEXT AS (to_root), from_page INTEGER, predicate TEXT)")
     con.executemany("INSERT INTO documents VALUES (?, ?, ?)", [
         ("prop", "forarbete", "prop"), ("sfs", "sfs", "lag"),
         ("reg", "eurlex", "regulation"), ("dom", "eurlex", "judgment"),
         ("echr", "hudoc", "judgment"), ("coe", "coe", "treaty"),
         ("icrc", "icrc", "protocol"),
     ])
-    con.executemany("INSERT INTO links VALUES (?, ?)", [
+    con.executemany("INSERT INTO links (from_uri, to_root) VALUES (?, ?)", [
         ("prop", "sfs"), ("prop", "sfs"), ("prop", "reg"),
         ("dom", "reg"), ("echr", "coe"), ("echr", "icrc"),
         ("prop", "borta"),                      # target not in the catalog
     ])
-    # largest first, which is the order the drawing and the table both read
-    assert [(c.row, c.col, c.value) for c in compute._flows(con)] == [
-        ("Förarbeten", "Författningar", 2),
+    # largest first, which is the order the drawing and the table both read,
+    # and equal counts in name order
+    tally = compute._link_tally(con)
+    assert (tally.links, tally.unresolved) == (7, 1)
+    assert [(c.row, c.col, c.value) for c in compute._flows(tally)] == [
         ("Folkrättslig praxis", "Konventioner", 2),   # coe + icrc are one node
+        ("Förarbeten", "Författningar", 2),
         ("EU-domar", "EU-rättsakter", 1),       # not folded into EU-rättsakter
         ("Förarbeten", "EU-rättsakter", 1),
     ]
@@ -837,12 +889,12 @@ def _legislation_catalog(tmp_path):
 
 
 def _delegation_catalog():
-    """A catalog holding the four cases measure 57 has to get right."""
+    """The delegations of a catalog holding the four cases measure 57 has to get right."""
     con = sqlite3.connect(":memory:")
     con.execute("CREATE TABLE documents (uri TEXT, source TEXT, kind TEXT, "
                 "title TEXT, expired TEXT)")
     con.execute("CREATE TABLE links (from_uri TEXT, predicate TEXT, "
-                "to_uri TEXT, to_root TEXT)")
+                "to_uri TEXT, to_root TEXT, from_page INTEGER)")
     con.executemany("INSERT INTO documents VALUES (?, ?, ?, ?, ?)", [
         ("f1", "foreskrift", "afs", "AFS 1:1", None),
         ("f2", "foreskrift", "afs", "AFS 1:2", None),
@@ -852,7 +904,8 @@ def _delegation_catalog():
         ("gammal", "sfs", "forordning", "Upphävd förordning (1990:1)", "1999-01-01"),
         ("sen", "sfs", "forordning", "Framtida förordning (2001:3)", "2999-01-01"),
     ])
-    con.executemany("INSERT INTO links VALUES (?, ?, ?, ?)", [
+    con.executemany("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                    "VALUES (?, ?, ?, ?)", [
         ("f1", "rpubl:bemyndigande", "fo#P3", "fo"),
         ("f1", "rpubl:bemyndigande", "fo#P4", "fo"),   # same föreskrift, one act
         ("f2", "rpubl:bemyndigande", "fo#P3", "fo"),
@@ -862,7 +915,7 @@ def _delegation_catalog():
         ("fo", "rpubl:bemyndigande", "lag#K1P1", "lag"),   # not a föreskrift
         ("f1", "dcterms:references", "fo#P9", "fo"),       # not a bemyndigande
     ])
-    return con
+    return compute._delegations(con, compute._link_tally(con))
 
 
 def test_the_delegation_count_is_distinct_in_the_foreskrift():
@@ -870,20 +923,20 @@ def test_the_delegation_count_is_distinct_in_the_foreskrift():
     # f2 stands on both a förordning and a lag, so the two kinds sum past the
     # total -- which is why the lede says "somliga på båda" instead of
     # presenting the split as a partition.
-    con = _delegation_catalog()
+    bem = _delegation_catalog()
     # four förordning links (f1 twice, f2, f3) over three föreskrifter
-    assert compute._delegated(con, "forordning") == 3
-    assert compute._delegated(con, "lag") == 1             # f2
-    assert compute._delegated(con) == 3                    # not 4: f2 is one
+    assert compute._delegated(bem, "forordning") == 3
+    assert compute._delegated(bem, "lag") == 1             # f2
+    assert compute._delegated(bem) == 3                    # not 4: f2 is one
 
 
 def test_a_repealed_act_empowers_nothing_but_a_future_repeal_still_does():
     # f3's two bemyndiganden are a förordning repealed in 1999 and one
     # repealed in 2999. The first cannot empower anything today; the second is
     # law until then (`in_force`), so f3 is counted once, not twice or never.
-    con = _delegation_catalog()
+    bem = _delegation_catalog()
     assert [(r.label, r.value) for r in
-            compute._delegation_rows(con, "forordning", "Förordningar")] == [
+            compute._delegation_rows(bem, "forordning", "Förordningar")] == [
         ("Testförordning (2001:1)", 2), ("Framtida förordning (2001:3)", 1)]
 
 
@@ -891,15 +944,15 @@ def test_an_sfs_bemyndigandeupplysning_is_not_a_foreskrift():
     # a förordning citing the lag that empowers it mints the same predicate.
     # Counting it would put a document that is not a föreskrift into a measure
     # whose unit is föreskrifter (135 SFS documents do this in the real corpus).
-    con = _delegation_catalog()
-    rows = compute._delegation_rows(con, "lag", "Lagar")
+    bem = _delegation_catalog()
+    rows = compute._delegation_rows(bem, "lag", "Lagar")
     assert [(r.label, r.value) for r in rows] == [("Testlag (2001:2)", 1)]
 
 
 def test_the_detail_names_the_provision_that_carries_the_delegation():
     # fo#P3 is named by two föreskrifter and fo#P4 by one, so the detail is
     # P3's pinpoint and its own count -- not the act's row total.
-    con = _delegation_catalog()
-    rows = compute._delegation_rows(con, "forordning", "Förordningar")
+    bem = _delegation_catalog()
+    rows = compute._delegation_rows(bem, "forordning", "Förordningar")
     assert rows[0].detail == "oftast 3 § (2)"
     assert rows[0].group == "Förordningar"

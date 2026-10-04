@@ -233,7 +233,7 @@ def test_install_warnings_hook_routes_through_write(monkeypatch):
     original = warnings.showwarning
     try:
         util.install_warnings_hook()
-        warnings.warn("something worth knowing", UserWarning)
+        warnings.warn("something worth knowing", UserWarning, stacklevel=1)
     finally:
         warnings.showwarning = original
     out = err_buf.getvalue()
@@ -890,3 +890,15 @@ def test_the_outer_total_follows_the_real_step_count():
         assert ib.step_no == 3
         assert ib.total_steps == 3
         assert ib.bar.total == 3
+
+
+def test_a_phase_timer_prints_each_phase_with_the_time_since_the_last(monkeypatch, capsys):
+    clock = iter([100.0, 103.5, 190.0])
+    monkeypatch.setattr(util.time, "perf_counter", lambda: next(clock))
+    mark = util.phase_timer("generate")
+    mark("site fingerprint")
+    mark("rendering 994 pages")
+    out = capsys.readouterr()
+    lines = (out.out + out.err).splitlines()
+    assert lines[0].endswith("] generate: site fingerprint [+3.5s]")
+    assert lines[1].endswith("] generate: rendering 994 pages [+1m26s]")
