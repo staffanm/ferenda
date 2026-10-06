@@ -113,10 +113,14 @@ printf '%s\n' "$plan" > "$steps"
 say "plan:"
 while IFS= read -r line; do say "  $line"; done < "$steps"
 
+# </dev/null: `docker compose exec` always forwards its stdin into the
+# container, and here that stdin is the plan itself -- the first command read
+# the remaining lines and the loop ended after it, reporting "published" for
+# one command of 37 (2026-10-04).
 while IFS= read -r line; do
     say "running: $line"
     if ! $COMPOSE exec -T ferenda sh -c "cd /app && /app/.venv/bin/$line" \
-         >>"$LOG" 2>&1; then
+         </dev/null >>"$LOG" 2>&1; then
         report "publish-wiki: '$line' failed. The content repo is pulled and
 earlier commands in the plan did run, so the site may be partly updated."
         exit 1

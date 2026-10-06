@@ -166,6 +166,31 @@ def test_a_source_rebuild_subsumes_that_source_s_document_commands(wiki):
         "lagen begrepp generate Fullmakt --ignore-code-changes", "lagen site rebuild --ignore-code-changes"]
 
 
+def test_a_commentary_edit_renders_its_host_act_s_page(wiki):
+    """kommentar has no page of its own, so `lagen kommentar generate` renders
+    nothing -- which is what the 2026-10-04 publish of 34 EU commentary files
+    did. The commentary is parsed and related first, then the act it annotates
+    is generated, in that order."""
+    (wiki / "commentary" / "eurlex" / "1995").mkdir(parents=True)
+    for celex in ("31995L0046", "31995L0047"):
+        (wiki / "commentary" / "eurlex" / "1995" / (celex + ".md")).write_text(
+            "---\nannotates: %s\n---\n\nText.\n" % celex)
+    assert _commands(wiki, "commentary/eurlex/1995/31995L0046.md",
+                     "commentary/eurlex/1995/31995L0047.md",
+                     "commentary/sfs/1915/218.md") == [
+        "lagen kommentar parse 1915:218 31995L0046 31995L0047 --ignore-code-changes",
+        "lagen kommentar relate --ignore-code-changes",
+        # one generate per host source, so its start is paid once
+        "lagen eurlex generate 31995L0046 31995L0047 --ignore-code-changes",
+        "lagen sfs generate 1915:218 --ignore-code-changes"]
+
+
+def test_a_commentary_file_no_document_is_built_from_widens_to_everything(wiki):
+    # a deleted commentary leaves its host page showing it, and the host
+    # cannot be read back from a filename
+    assert _commands(wiki, "commentary/eurlex/2020/borta.md") == [WHOLE]
+
+
 def test_the_content_repo_s_own_ci_is_not_content(wiki):
     """lagen-wiki runs a workflow of its own, and GitHub is the only thing that
     reads it. On 2026-09-07 the push that installed that workflow cost a

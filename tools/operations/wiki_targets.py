@@ -5,7 +5,7 @@ different, usually very small, set of documents:
 
     site/<page>.md        one site page's parse
     site/media/…          nothing to parse -- generate copies the tree
-    commentary/…/<x>.md   one kommentar document
+    commentary/…/<x>.md   one kommentar document, shown on its host act's page
     concept/<x>.md        one begrepp document
     patches/<source>/…    the parse of the one document that source patches
     ann/<source>/…        the generate of the one document it annotates
@@ -196,8 +196,9 @@ WHOLE = "lagen all rebuild " + IGNORE_CODE
 
 
 def commands(changed, wiki_root=None):
-    """The shell commands to run, one per line -- the narrowest set that covers
-    every change, with nothing that another line already does.
+    """The shell commands to run, one per line and in this order -- the
+    narrowest set that covers every change, with nothing that another line
+    already does.
 
     A wider command subsumes a narrower one over the same ground, so running
     both is pure waste: a corpus rebuild does what every other line would, and
@@ -205,8 +206,19 @@ def commands(changed, wiki_root=None):
     that adds a screencast *and* edits a news item is one command, not three.
     """
     found = targets(changed, wiki_root)
-    if any(source is None for source, _ in found):
+    # a commentary file no document is built from -- most often one the push
+    # deleted -- leaves its host's page showing it, and which host that was
+    # cannot be read back from a filename
+    if any(source is None for source, _ in found) or ("kommentar", None) in found:
         return [WHOLE]
+    # kommentar has no page of its own: its text renders on the act it
+    # annotates, so `lagen kommentar generate` renders nothing ("no catalogued
+    # document matched"). The commentary is parsed and related first, then the
+    # host act's page is generated -- the order `build.rebuild_after_commit`
+    # uses for an editor commit.
+    notes = sorted(bf for source, bf in found if source == "kommentar")
+    found = [(layout.kommentar_host(bf), bf) if source == "kommentar" else (source, bf)
+             for source, bf in found]
     # A document-scoped generate selects by catalog row, so it can only name a
     # document the catalog holds. `site`, `stats` and `remisser` are parsed and
     # deliberately never catalogued (layout.CATALOGUED_SOURCES), and asking for
@@ -221,10 +233,18 @@ def commands(changed, wiki_root=None):
     # lines are redundant
     wide = {source for source, basefile in found if basefile is None}
     out = {"lagen %s rebuild %s" % (source, IGNORE_CODE) for source in wide}
-    out |= {"lagen %s generate %s %s" % (source, shlex.quote(basefile), IGNORE_CODE)
-            for source, basefile in found
-            if basefile is not None and source not in wide}
-    return sorted(out)
+    # one generate per source, naming all its documents: each run pays the
+    # generate's own start (the site model, the dependency digests) once
+    named = {}
+    for source, basefile in found:
+        if basefile is not None and source not in wide:
+            named.setdefault(source, set()).add(basefile)
+    out |= {"lagen %s generate %s %s" % (source, " ".join(map(shlex.quote, sorted(bfs))),
+                                         IGNORE_CODE)
+            for source, bfs in named.items()}
+    prepare = (["lagen kommentar parse %s %s" % (" ".join(map(shlex.quote, notes)), IGNORE_CODE),
+                "lagen kommentar relate " + IGNORE_CODE] if notes else [])
+    return prepare + sorted(out)
 
 
 def main(argv):
