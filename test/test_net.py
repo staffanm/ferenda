@@ -8,6 +8,8 @@ that claim without testing it -- a real `httpx.Response` has neither `ok` nor
 `reason`, and reaches `url` through its bound request."""
 
 import datetime
+import http.server
+import threading
 import warnings
 from unittest import mock
 
@@ -520,3 +522,73 @@ def test_an_aia_url_with_a_non_http_scheme_is_refused():
                            return_value="file:///etc/ssl/cert.pem"), \
             pytest.raises(ValueError, match="not http"):
         net._omitted_chain(leaf, None, 5)
+
+
+@pytest.mark.parametrize("value, seconds", [
+    ("5", 5), ("0.000", 0), ("1.5", 1.5), ("-3", 0),
+    ("soon", 0), ("inf", 0), ("nan", 0),      # not a time: back to the backoff
+])
+def test_a_retry_after_urllib3_would_refuse_is_read_or_ignored(value, seconds):
+    assert net._RETRY.parse_retry_after(value) == seconds
+
+
+class _Upstream(http.server.BaseHTTPRequestHandler):
+    """A host that answers once with 503 and `Retry-After: 0.000`, then with
+    JSON; and a JSON endpoint that now redirects to an HTML page."""
+    hits = []
+
+    def do_GET(self):
+        self.hits.append(self.path)
+        if self.path == "/robots.txt":
+            self.send_response(404)
+            self.end_headers()
+        elif self.path == "/api" and self.hits.count("/api") == 1:
+            self.send_response(503)
+            self.send_header("Retry-After", "0.000")
+            self.end_headers()
+        elif self.path == "/api":
+            self._send(b'{"ok": true}', "application/json")
+        elif self.path == "/moved":
+            self.send_response(301)
+            self.send_header("Location", "/portal")
+            self.end_headers()
+        else:
+            self._send(b"<html>portal</html>", "text/html")
+
+    def _send(self, body, content_type):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture
+def upstream():
+    _Upstream.hits = []
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Upstream)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield "http://127.0.0.1:%d" % server.server_address[1]
+    server.shutdown()
+
+
+def test_a_decimal_retry_after_is_retried_not_raised(upstream):
+    # retries=1: request()'s own loop cannot step in, so the transport's retry
+    # has to read the header -- urllib3 alone raised InvalidHeader on it
+    session = net.open_session(net.Transport())
+    assert net.request(session, "GET", upstream + "/api", parse_json=True,
+                       retries=1) == {"ok": True}
+    assert _Upstream.hits.count("/api") == 2
+
+
+def test_a_json_endpoint_redirected_to_a_page_fails_at_once_and_says_where(upstream):
+    # the Council of Europe's treaty service did this from 2026-10-03: every
+    # call answered 301 to the portal, and the downloader retried six times
+    # before raising a JSON parse error that named neither
+    session = net.open_session(net.Transport())
+    with pytest.raises(net.UpstreamChanged, match=r"redirected \(301\) to .*/portal.*text/html"):
+        net.request(session, "GET", upstream + "/moved", parse_json=True)
+    assert _Upstream.hits.count("/moved") == 1

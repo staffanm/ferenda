@@ -17,6 +17,7 @@ import atexit
 import functools
 import ipaddress
 import json
+import math
 import os
 import re
 import socket
@@ -41,12 +42,35 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.utils import CryptographyDeprecationWarning
 from cryptography.x509.oid import AuthorityInformationAccessOID
 from requests.adapters import HTTPAdapter
+from urllib3.exceptions import InvalidHeader
 from urllib3.util.retry import Retry
 
 from .browser import CamoufoxBrowser
 from .errors import UpstreamChanged
 
-_RETRY = Retry(total=4, backoff_factor=0.5,
+
+class _Retry(Retry):
+    """urllib3's retry, reading a Retry-After it would refuse. urllib3 takes
+    whole seconds or an HTTP date and raises `InvalidHeader` on anything else,
+    which ends the request; on 2026-10-06 a `Retry-After: 0.000` ended the
+    whole guidance download that way. Decimal seconds are read as seconds,
+    and a value that is not a time at all (or not a finite one) is 0, which
+    falls back to the backoff -- the same as a response that sent none."""
+
+    def parse_retry_after(self, retry_after: str) -> float:
+        try:
+            seconds = float(retry_after)
+        except ValueError:
+            try:
+                return super().parse_retry_after(retry_after)
+            except InvalidHeader:
+                return 0
+        if not math.isfinite(seconds):
+            return 0
+        return min(max(seconds, 0), self.retry_after_max)
+
+
+_RETRY = _Retry(total=4, backoff_factor=0.5,
                status_forcelist=(429, 500, 502, 503, 504),
                allowed_methods=frozenset({"GET", "POST"}),
                raise_on_status=False)
@@ -755,10 +779,11 @@ def _log_failure(exc, response):
 
 
 def _retry_after(response):
-    """The server-requested cooldown in seconds, if it sent a numeric
-    Retry-After; else None (fall back to exponential backoff)."""
+    """The server-requested cooldown in seconds, read the way the transport's
+    retry reads it (`_Retry`); None when it sent none, or nothing usable (fall
+    back to exponential backoff)."""
     value = response.headers.get("Retry-After") if response is not None else None
-    return float(value) if value and value.isdigit() else None
+    return (_RETRY.parse_retry_after(value) or None) if value else None
 
 
 class BudgetExceeded(Exception):
@@ -860,6 +885,15 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES,
             response = session.request(method, url, **kwargs)
             _enforce_size(response, max_bytes, streamed)
             raise_for_status(response)
+            if parse_json and response.history \
+                    and "json" not in response.headers.get("Content-Type", ""):
+                # a JSON endpoint that now redirects to a page has moved or
+                # closed: retrying cannot help, and the parse error it would
+                # raise names neither the redirect nor where it led
+                raise UpstreamChanged(
+                    "%s %s redirected (%s) to %s, which answers %s, not JSON"
+                    % (method, url, response.history[0].status_code, response.url,
+                       response.headers.get("Content-Type") or "no content type"))
             return response.json() if parse_json else response
         # both transports: requests raises RequestException (its JSONDecodeError
         # included, a subclass); the httpx HTTP/2 client raises httpx.HTTPError for
