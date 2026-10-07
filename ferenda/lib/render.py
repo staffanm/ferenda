@@ -1203,6 +1203,10 @@ def write_assets(out_root):
     # compressed, so they are stored plain.
     compress.write_text(out_root / "favicon.svg",
                         (ASSETS / "favicon.svg").read_text(encoding="utf-8"))
+    # the Lysator logo the footer shows (lib/templates/page.html), as the
+    # society's graphic profile publishes it
+    compress.write_text(out_root / "lysator.svg",
+                        (ASSETS / "lysator.svg").read_text(encoding="utf-8"))
     # og-image.png is the link-preview card every page's og:image names
     # (tools/corpus/og_image.py renders it from the mark and the wordmark)
     for icon in ("favicon.ico", "apple-touch-icon.png", "og-image.png"):

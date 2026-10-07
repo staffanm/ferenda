@@ -102,6 +102,10 @@
 </main>
 {%- if not solo %}<aside class="rail" id="rail" aria-live="polite"></aside>{% endif -%}
 </div>
+{#- Lysator's hosting rules (§ 2.4) ask every hosted service to say so, with a
+    link to its hosting page and the society's logo: the yellow-on-black
+    version, which reads the same in the light and the dark theme -#}
+<footer class="site-foot"><p>Lagen.nu får <a href="https://www.lysator.liu.se/inhysningar">serverdrift</a> av <a class="lysator" href="https://www.lysator.liu.se/"><img src="/lysator.svg" alt="" width="20" height="20">Lysator</a></p></footer>
 {%- if not solo %}
 <nav class="mobile-bar" aria-label="Verktyg">
   {#- both drawer buttons are always here, so the bar keeps the same three

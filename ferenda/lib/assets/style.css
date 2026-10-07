@@ -187,6 +187,13 @@ a:hover { text-decoration: underline; }
 .gr-main { min-width: 0; padding: 2.5rem clamp(1.5rem, 4vw, 4rem) 8rem; max-width: 56rem; }
 .gr-body.solo .gr-main { max-width: none; }
 
+/* -- Site footer: the hosting credit Lysator's rules ask for -- */
+.site-foot { border-top: 1px solid var(--rule); background: var(--surf); }
+.site-foot p { max-width: var(--page-max); margin: 0 auto; padding: 1.1rem 1.5rem;
+               font: .8rem var(--sans); color: var(--ink-3); }
+.site-foot a { color: var(--ink-2); }
+.site-foot .lysator img { vertical-align: -.3rem; margin-right: .3rem; border-radius: 3px; }
+
 /* -- Frontpage: curated multi-column law index --
    cluster headings (h2) and the intro/"vanliga ingångar" paragraphs span every
    column; the `### category` + its law list flow into columns and never break
@@ -1534,6 +1541,8 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .mobile-bar button[disabled] { color: var(--ink-4); opacity: .55;
                                  cursor: default; }
   body.split .mobile-bar { display: none; }
+  /* the footer ends above the fixed toolbar, not under it */
+  body:has(.mobile-bar) .site-foot p { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
 
   /* the sheet shows only the context for where you are, so the summary lines
      have nothing left to summarise -- the panel itself is what the sheet is for */
