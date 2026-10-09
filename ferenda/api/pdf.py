@@ -550,7 +550,7 @@ def _paper_html(doc) -> str:
 # any change to _print_toc/_kontext_aside/_attach/_drop or the fold handling,
 # or the cache serves the old transform's output for every unchanged page
 # (the search index's INDEX_FORMAT is the same pattern)
-PDF_FORMAT = 7
+PDF_FORMAT = 8
 
 
 class PageNotGenerated(FileNotFoundError):
@@ -800,7 +800,7 @@ def paper_document(html_text: str, *, toc: bool, kinds: frozenset[str],
     panels = island(doc) if kinds else {}
     # the TOC aside is harvested before the chrome it sits in is dropped
     nav = _print_toc(doc, dropped) if toc else None
-    _drop(doc, "masthead", "toc-col", "rail", "mobile-bar")
+    _drop(doc, "masthead", "toc-col", "rail", "mobile-bar", "site-foot")
     _running_labels(doc)
     front = next(iter(doc.find_class("frontmatter")), None)
     annotated = {}

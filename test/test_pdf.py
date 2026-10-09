@@ -42,6 +42,8 @@ PAGE = """<!doctype html>
 </main>
 <aside class="rail" id="rail"></aside>
 </div>
+<footer class="site-foot"><p>Lagen.nu får serverdrift av <a class="lysator"
+href="https://www.lysator.liu.se/"><img src="/lysator.svg" alt="">Lysator</a></p></footer>
 <script type="application/json" id="lagen-context">{"P1":
 "<div class=\\"rail-h\\">Kontext f\\u00f6r <b>1 \\u00a7</b></div>\
 <details class=\\"rail-sec dv\\" data-sec=\\"dv\\" data-label=\\"R\\u00e4ttsfall\\" data-n=\\"3\\" open>\
