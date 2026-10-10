@@ -1,0 +1,107 @@
+<Forfattning>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Medel får betalas ut enligt beslutet.</str>
+    </Stycke>
+    <Stycke id="P2S2">
+      <str>Vid tillämpning av </str>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S1">första stycket</LinkSubject>
+      <str> gäller</str>
+      <Lista>
+        <Listelement id="P2S2N1">
+          <str>i fråga om byggnads- och markarbeten</str>
+          <NumreradLista>
+            <Listelement id="P2S2N1N1" ordinal="1">
+              <str>att utbetalning inte får ske innan arbetet har påbörjats,</str>
+            </Listelement><Listelement id="P2S2N1N2" ordinal="2">
+              <str>att återstoden av medlen får betalas ut när arbetet är slutfört;</str>
+            </Listelement>
+          </NumreradLista>
+        </Listelement><Listelement id="P2S2N2">
+          <str>i fråga om anskaffning av inventarier</str>
+          <NumreradLista>
+            <Listelement id="P2S2N2N1" ordinal="1">
+              <str>att utbetalning inte får ske innan leverans har skett och</str>
+            </Listelement><Listelement id="P2S2N2N2" ordinal="2">
+              <str>att återstoden av medlen får betalas ut efter leveransen.</str>
+            </Listelement>
+          </NumreradLista>
+        </Listelement>
+      </Lista>
+    </Stycke>
+    <Stycke id="P2S3">
+      <str>Myndigheten får medge undantag från </str>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S2">andra stycket</LinkSubject>
+      <str>.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Bolagsordningen ska ange</str>
+      <NumreradLista>
+        <str>för samtliga bolag</str>
+        <Listelement id="P3S1N1" ordinal="1">
+          <str>bolagets firma,</str>
+        </Listelement><Listelement id="P3S1N2" ordinal="2">
+          <str>den ort där styrelsen ska ha sitt säte,</str>
+        </Listelement>
+        <str>för aktiebolag</str>
+        <Listelement id="P3S1N3" ordinal="3">
+          <str>aktiekapitalet.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Avgift tas ut enligt följande.</str>
+    </Stycke>
+    <Stycke id="P4S2">
+      <str>för varje ansökan</str>
+      <NumreradLista>
+        <Listelement id="P4S2N1" ordinal="1">
+          <str>100 kronor för en enskild,</str>
+        </Listelement><Listelement id="P4S2N2" ordinal="2">
+          <str>200 kronor för ett bolag.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P5" ordinal="5">
+    <Stycke id="P5S1">
+      <str>Avgift tas ut</str>
+    </Stycke>
+    <Stycke id="P5S2">
+      <str>för varje ansökan och</str>
+      <NumreradLista>
+        <Listelement id="P5S2N1" ordinal="1">
+          <str>för varje tillstånd,</str>
+        </Listelement><Listelement id="P5S2N2" ordinal="2">
+          <str>för varje anmälan.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P6" ordinal="6">
+    <Stycke id="P6S1">
+      <str>Bidrag lämnas för kostnader. (Se vidare anvisningarna.)</str>
+    </Stycke>
+    <Stycke id="P6S2">
+      <str>till </str>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1">1 §</LinkSubject>
+      <NumreradLista>
+        <Listelement id="P6S2N1" ordinal="1">
+          <str>Med kostnader avses utgifter för material.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P7" ordinal="7">
+    <Stycke id="P7S1">
+      <str>Avgiften betalas</str>
+    </Stycke>
+    <Stycke id="P7S2">
+      <str>till myndigheten</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

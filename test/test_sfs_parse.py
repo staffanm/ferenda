@@ -413,12 +413,12 @@ class _NoContext:
         pass
 
 
-def render_first_stycke(text, paragraf=0):
+def render_first_stycke(text, paragraf=0, stycke=0):
     reader = TextReader(text)
     reader.autostrip = True
     doc = assemble(Tokenizer(reader, BASEFILE))
-    stycke = to_normalform(doc, BASEFILE)["structure"][paragraf]["children"][0]
-    return page.render_node(stycke, page.Site(None, set()), BASEFILE,
+    node = to_normalform(doc, BASEFILE)["structure"][paragraf]["children"][stycke]
+    return page.render_node(node, page.Site(None, set()), BASEFILE,
                             page.Toc(), _NoContext())
 
 
@@ -456,6 +456,16 @@ def test_entries_without_markers_render_without_markers():
     html = render_first_stycke(text, paragraf=1)
     assert ('lagstiftningsärenden som gäller<ol class="punkter">'
             '<li id="P3S1N2N1">revisorer och revisionsbolag,</li>') in html
+
+
+def test_group_labels_render_above_their_own_items():
+    """Each group label reads above the items that restart their count under
+    it, and every item gets an id of its own (shortened from 1983:55 2 §)."""
+    text = (FIXTURES / "regression-lista-gruppetiketter.txt").read_text(
+        encoding="iso-8859-1")
+    html = render_first_stycke(text, stycke=1)
+    assert ('</ol></li><li id="P2S2N2">i fråga om anskaffning av inventarier'
+            '<ol class="punkter"><li id="P2S2N2N1">') in html
 
 
 def test_entries_without_markers_nest_in_an_overgangsbestammelse():

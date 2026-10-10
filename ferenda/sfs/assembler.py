@@ -55,6 +55,13 @@ NESTS = {
 # ‖ kungörelsen (1963:456) …,", 1984:545 övergångsbestämmelser)
 re_ItemEnd = re.compile(r"(?:[,.;:]|\b(?:och|eller|samt))$")
 
+
+def ends(text):
+    """Does the block end its sentence or its item, also inside a closing
+    bracket or quote ("(Se vidare anvisningarna.)", 1928:370)?"""
+    return re_ItemEnd.search(text.rstrip().rstrip(")\"”’»")) is not None
+
+
 # containment hierarchy: opening an element at rank r closes all open
 # elements at rank >= r
 RANK: dict[type, int] = {
@@ -173,7 +180,7 @@ def assemble(tokens):
         opening words for the next item, if any."""
         last = lista.children[-1]
         if (len(blocks) > 1 and isinstance(last, Listelement)
-                and not re_ItemEnd.search(last.text.rstrip())
+                and not ends(last.text)
                 and not (isinstance(ev, t.ListItemEv) and nests(ev))):
             last.children.append(Lista(kind="omarkerad", children=[
                 Listelement(ordinal=str(n), text=text)
@@ -184,12 +191,42 @@ def assemble(tokens):
         lista.children.append(Listtext(" ".join(blocks)))
         return None
 
+    def is_label(text):
+        """A lowercase block between a stycke and a list, both without an end:
+        a group label that goes on with the stycke's sentence ("Vid
+        tillämpning av första stycket gäller ‖ i fråga om byggnads- och
+        markarbeten ‖ 1. att …", 1983:55). It must not open a stycke of its
+        own, or the stycken after it get the wrong number."""
+        return (not lists and isinstance(stack[-1], Stycke)
+                and text[:1].islower() and not re_Definition.match(text)
+                and not ends(text) and not ends(stack[-1].text))
+
+    def place_label(text, ev):
+        """The group label opens the list that `ev` starts, or else it is a
+        stycke after all."""
+        if isinstance(ev, t.ListItemEv):
+            attach_listitem(ev)
+            lists[0].children.insert(0, Listtext(text))
+            labelled.append(lists[0])
+        else:
+            open_node(Stycke(text=text))
+
     in_numrerad = False
     # lowercase blocks after an open list, waiting for the next event to tell
     # where in the list they go: (innermost list, [block text, ...])
     pending = None
     opening = None
+    # a group label waiting for the list item after it, and the lists that
+    # open with a group label
+    label = None
+    labelled = []
     while (ev := tokens.next_event(in_numrerad=in_numrerad)) is not None:
+        if label is not None:
+            place_label(label, ev)
+            label = None
+            if isinstance(ev, t.ListItemEv):
+                in_numrerad = any(lst.kind == "numrerad" for lst in lists)
+                continue
         if pending is not None:
             if (isinstance(ev, t.StyckeEv) and ev.text[:1].islower()
                     and not is_definition(ev.text)):
@@ -261,6 +298,8 @@ def assemble(tokens):
                 if (lists and ev.text[:1].islower()
                         and not is_definition(ev.text)):
                     pending = (lists[-1], [ev.text])
+                elif is_label(ev.text):
+                    label = ev.text
                 else:
                     open_node(Stycke(text=ev.text))
             case t.ListItemEv():
@@ -273,4 +312,30 @@ def assemble(tokens):
         in_numrerad = any(lst.kind == "numrerad" for lst in lists)
     if pending is not None:
         place_pending(*pending, None)
+    if label is not None:
+        place_label(label, None)
+    for lista in labelled:
+        group_labels(lista)
     return doc
+
+
+def group_labels(lista):
+    """A list that opens with a group label, and whose count starts again
+    after each later label, holds one group per label: "i Danmark ‖ a) … b) …
+    ‖ i Finland ‖ a) … b) … c) …" (1983:163). Each label becomes an entry of
+    a list without markers, with its items nested under it, so that every
+    item gets an id of its own. A list whose count goes on after a label
+    keeps the labels as text between its items."""
+    groups = []
+    for child in lista.children:
+        if isinstance(child, Listtext):
+            groups.append((child.text, []))
+        else:
+            groups[-1][1].append(child)
+    if (len(groups) > 1 and all(items for _, items in groups)
+            and len({items[0].ordinal for _, items in groups}) == 1):
+        lista.children = [
+            Listelement(ordinal=str(n), text=text,
+                        children=[Lista(kind=lista.kind, children=items)])
+            for n, (text, items) in enumerate(groups, 1)]
+        lista.kind = "omarkerad"

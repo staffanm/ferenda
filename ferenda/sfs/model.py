@@ -83,8 +83,10 @@ class Stycke:
 
 @dataclass
 class Lista:
-    # "omarkerad" is a list whose entries carry no marker in the source; its
-    # items are counted, as a strecksats list's are
+    # "omarkerad" is a list whose entries carry no marker in the source, or
+    # the group labels over items that start their count again ("i Danmark ‖
+    # a) … ‖ i Finland ‖ a) …", 1983:163); its items are counted, as a
+    # strecksats list's are
     kind: str  # "numrerad" | "bokstav" | "romersk" | "strecksats" | "omarkerad"
     children: list[Listelement | Listtext] = field(default_factory=list)
 
@@ -95,7 +97,8 @@ class Listtext:
     # end the sentence the list sits in ("Den som 1. … 2. … ‖ döms till böter
     # …", 1994:1738 10 kap. 1 §), words between two items that join the items
     # above to the items below ("4. … ‖ samt minskas med ‖ 5. …", 2010:110
-    # 30 kap. 14 §), or the words that open a nested list
+    # 30 kap. 14 §), or the words that open a list ("lämnas med ‖ högst ‖
+    # - 810 kronor …", 2022:81)
     text: str
 
 
