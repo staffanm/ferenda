@@ -867,7 +867,9 @@ runs. The distinctive top-level fields:
   a list that is no item of it is a `listtext` (`id: null`, `of`, `text`)
   among them: the words after the last item, words between two items, or the
   words that open a nested list. `of` is the id of the node the list sits in
-  (the `punkt` that holds a nested list, or the stycke).
+  (the `punkt` that holds a nested list, or the stycke). An entry that the
+  source prints without a marker is a `punkt` with `ordinal: null`; its id
+  still counts it (`K1P2S1N2N3` is the third entry under `K1P2S1N2`).
 - `amendments` = list of `{ uri, properties, forarbeten, content? }`, one per
   register row.
 - A versioned consolidation artifact adds a top-level `version` (e.g. `"2003:466"`).

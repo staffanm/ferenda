@@ -1,0 +1,64 @@
+<Forfattning>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Genom förordningen upphävs</str>
+      <NumreradLista>
+        <Listelement id="P2S1N1" ordinal="1">
+          <str>kungörelsen om legitimation av sjukgymnaster,</str>
+        </Listelement><Listelement id="P2S1N2" ordinal="2">
+          <str>kungörelser om behörighet, nämligen</str>
+          <Lista>
+            <Listelement id="P2S1N2N1">
+              <str>kungörelsen om legitimation av glasögonoptiker,</str>
+            </Listelement><Listelement id="P2S1N2N2">
+              <str>kungörelsen med tillämpningsföreskrifter till lagen om behörighet att utöva tandläkaryrket, och</str>
+            </Listelement><Listelement id="P2S1N2N3">
+              <str>förordningen om legitimation av psykolog,</str>
+            </Listelement>
+          </Lista>
+        </Listelement><Listelement id="P2S1N3" ordinal="3">
+          <str>förordningen om legitimation eller annan behörighet för hälso- och sjukvårdspersonal med utländsk utbildning.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Rättssekretariatet bereder</str>
+      <NumreradLista>
+        <Listelement id="P3S1N1" ordinal="1">
+          <str>lagstiftningsärenden som gäller grundlagarna,</str>
+        </Listelement><Listelement id="P3S1N2" ordinal="2">
+          <str>lagstiftningsärenden som gäller</str>
+          <Lista>
+            <Listelement id="P3S1N2N1">
+              <str>revisorer och revisionsbolag,</str>
+            </Listelement><Listelement id="P3S1N2N2">
+              <str>svenskt medborgarskap.</str>
+            </Listelement>
+          </Lista>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Overgangsbestammelser rubrik="Övergångsbestämmelser">
+    <Overgangsbestammelse id="L1988:681" sfsnr="1988:681">
+      <NumreradLista>
+        <Listelement id="L1988:681N1" ordinal="1">
+          <str>Denna förordning träder i kraft den 1 juli 1988.</str>
+        </Listelement><Listelement id="L1988:681N2" ordinal="2">
+          <str>Genom förordningen upphävs</str>
+          <Lista>
+            <Listelement id="L1988:681N2N1">
+              <str>förordningen om statsbidrag till driftkostnader för vissa lanthushållsskolor,</str>
+            </Listelement><Listelement id="L1988:681N2N2">
+              <str>förordningen om statsbidrag till vissa privatskolor.</str>
+            </Listelement>
+          </Lista>
+        </Listelement><Listelement id="L1988:681N3" ordinal="3">
+          <str>Äldre föreskrifter gäller fortfarande i fråga om statsbidrag som avser tid före ikraftträdandet.</str>
+        </Listelement>
+      </NumreradLista>
+    </Overgangsbestammelse>
+  </Overgangsbestammelser>
+</Forfattning>

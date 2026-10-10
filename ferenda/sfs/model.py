@@ -83,7 +83,9 @@ class Stycke:
 
 @dataclass
 class Lista:
-    kind: str  # "numrerad" | "bokstav" | "romersk" | "strecksats"
+    # "omarkerad" is a list whose entries carry no marker in the source; its
+    # items are counted, as a strecksats list's are
+    kind: str  # "numrerad" | "bokstav" | "romersk" | "strecksats" | "omarkerad"
     children: list[Listelement | Listtext] = field(default_factory=list)
 
 

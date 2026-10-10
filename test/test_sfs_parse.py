@@ -445,3 +445,34 @@ def test_text_between_items_splits_the_list_where_the_source_has_it():
             '<ol class="punkter">') in html
     html = render_first_stycke(text, paragraf=1)
     assert ('i övrigt<p>i Danmark</p><ol class="punkter">') in html
+
+
+def test_entries_without_markers_render_without_markers():
+    """Entries the source prints without markers nest under their item and
+    show no marker the source does not print (shortened from 1996:1515
+    bilaga, avsnitt 2.2 punkt 3)."""
+    text = (FIXTURES / "regression-lista-utan-markorer.txt").read_text(
+        encoding="iso-8859-1")
+    html = render_first_stycke(text, paragraf=1)
+    assert ('lagstiftningsärenden som gäller<ol class="punkter">'
+            '<li id="P3S1N2N1">revisorer och revisionsbolag,</li>') in html
+
+
+def test_entries_without_markers_nest_in_an_overgangsbestammelse():
+    """A numbered övergångsbestämmelse holds its list with no stycke around
+    it; the entries after "Genom förordningen upphävs" still nest under that
+    punkt, and the next punkt stays in the same list (shortened from 1983:412,
+    övergångsbestämmelser 1988:681). The fixture comparison skips
+    övergångsbestämmelser, so this checks the tree itself."""
+    reader = TextReader((FIXTURES / "regression-lista-utan-markorer.txt")
+                        .read_text(encoding="iso-8859-1"))
+    reader.autostrip = True
+    ob = assemble(Tokenizer(reader, BASEFILE)).children[-1].children[0]
+    [lista] = ob.children
+    assert [i.ordinal for i in lista.children] == ["1", "2", "3"]
+    [entries] = lista.children[1].children
+    assert entries.kind == "omarkerad"
+    assert [e.text for e in entries.children] == [
+        "förordningen om statsbidrag till driftkostnader för vissa "
+        "lanthushållsskolor,",
+        "förordningen om statsbidrag till vissa privatskolor."]

@@ -50,6 +50,11 @@ NESTS = {
     "strecksats": set(),
 }
 
+# a list item that ends without punctuation or a joining word goes on in the
+# blocks after it ("2. Genom förordningen upphävs ‖ kungörelsen (1937:864) …,
+# ‖ kungörelsen (1963:456) …,", 1984:545 övergångsbestämmelser)
+re_ItemEnd = re.compile(r"(?:[,.;:]|\b(?:och|eller|samt))$")
+
 # containment hierarchy: opening an element at rank r closes all open
 # elements at rank >= r
 RANK: dict[type, int] = {
@@ -158,26 +163,39 @@ def assemble(tokens):
                     isinstance(c, Stycke) and BEGREPP_RULES.trigger(c.text)
                     for c in stack[-2].children))
 
+    def place_pending(lista, blocks, ev):
+        """The lowercase blocks after a list item stay in the list, where the
+        source has them. Two or more blocks after an item that does not end
+        its sentence are the entries of a list without markers, nested under
+        that item. Else the blocks open the list nested under the item when
+        the next item starts one, or they follow the item -- between two
+        items, or after the last one, ending the sentence. Returns the
+        opening words for the next item, if any."""
+        last = lista.children[-1]
+        if (len(blocks) > 1 and isinstance(last, Listelement)
+                and not re_ItemEnd.search(last.text.rstrip())
+                and not (isinstance(ev, t.ListItemEv) and nests(ev))):
+            last.children.append(Lista(kind="omarkerad", children=[
+                Listelement(ordinal=str(n), text=text)
+                for n, text in enumerate(blocks, 1)]))
+            return None
+        if isinstance(ev, t.ListItemEv) and nests(ev):
+            return " ".join(blocks)
+        lista.children.append(Listtext(" ".join(blocks)))
+        return None
+
     in_numrerad = False
     # lowercase blocks after an open list, waiting for the next event to tell
-    # where in the list they go: (innermost list, text)
+    # where in the list they go: (innermost list, [block text, ...])
     pending = None
     opening = None
     while (ev := tokens.next_event(in_numrerad=in_numrerad)) is not None:
         if pending is not None:
             if (isinstance(ev, t.StyckeEv) and ev.text[:1].islower()
                     and not is_definition(ev.text)):
-                pending = (pending[0], pending[1] + " " + ev.text)
+                pending[1].append(ev.text)
                 continue
-            # the lowercase blocks after a list item stay in the list, where
-            # the source has them: they open the list nested under that item
-            # when the next item starts one, else they follow the item --
-            # between two items, or after the last one, ending the sentence
-            lista, text = pending
-            if isinstance(ev, t.ListItemEv) and nests(ev):
-                opening = text
-            else:
-                lista.children.append(Listtext(text))
+            opening = place_pending(*pending, ev)
             pending = None
         match ev:
             case t.OpenAvdelning():
@@ -234,11 +252,15 @@ def assemble(tokens):
                 # keeps the following genuine, capitalised stycke's ordinal. Scoped to an open list so the
                 # lowercase definienda of a definition paragraph ("konsument:
                 # ..." under "I denna lag avses med") stay their own stycken --
-                # also after a definition that holds a list.
-                if (lists and isinstance(stack[-1], Stycke)
-                        and ev.text[:1].islower()
+                # also after a definition that holds a list. An open list, not
+                # an open stycke, is what the block follows: a numbered
+                # övergångsbestämmelse puts its list straight in the
+                # Overgangsbestammelse ("2. Genom förordningen upphävs ‖
+                # förordningen (1981:107) …,", 1983:412 övergångsbestämmelser
+                # 1988:681)
+                if (lists and ev.text[:1].islower()
                         and not is_definition(ev.text)):
-                    pending = (lists[-1], ev.text)
+                    pending = (lists[-1], [ev.text])
                 else:
                     open_node(Stycke(text=ev.text))
             case t.ListItemEv():
@@ -250,5 +272,5 @@ def assemble(tokens):
                 attach(ev.tabell)
         in_numrerad = any(lst.kind == "numrerad" for lst in lists)
     if pending is not None:
-        pending[0].children.append(Listtext(pending[1]))
+        place_pending(*pending, None)
     return doc

@@ -829,7 +829,10 @@ def flatten_list(lista, pairs, proj, frag, live=True, mode=None):
         eff = item_id or frag
         text = util.normalize_space(item.text)
         terms = BEGREPP_RULES.defined_terms(text, mode, "listelement") if mode else []
-        out.append({"type": "punkt", "id": item_id, "ordinal": item.ordinal,
+        # an entry of a list without markers is counted for its id, but the
+        # page shows no marker the source does not print
+        out.append({"type": "punkt", "id": item_id,
+                    "ordinal": None if lista.kind == "omarkerad" else item.ordinal,
                     "text": proj.inline(text, eff, live, subject_terms=terms)})
         submode = None if terms else mode
         for sublist in item.children:
