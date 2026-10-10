@@ -39,6 +39,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from html import escape
+from itertools import groupby
 from urllib.parse import quote, urlsplit
 
 from markupsafe import Markup
@@ -1531,7 +1532,10 @@ def _renest_punkter(children):
     ids still encode the hierarchy: a sub-item ``K1P2S1N12Na`` sits under
     ``K1P2S1N12``. Return the children with each sub-item moved into its parent
     punkt's ``children`` so the caller emits it as a nested <ol>. A non-punkt
-    child (a tabell) or an id-less punkt breaks the run and stays at top level.
+    child (a tabell) or an id-less punkt breaks the run and stays at top level;
+    a ``listtext`` (words in a list that are no item of it) goes into the punkt
+    its ``of`` names, after the items read so far -- between two items, after
+    the last, or before a nested list's first item.
 
     The ``"N"`` separator is a load-bearing cross-layer contract: ``sfs.nf``'s
     ``flatten_list`` mints each sub-item id as ``<parent-id>N<ordfrag>`` (see the
@@ -1540,6 +1544,13 @@ def _renest_punkter(children):
     roots = []
     stack = []  # (id, node copy) of the punkt ancestors currently open
     for c in children:
+        if c.get("type") == "listtext":
+            # inside the punkt that holds the list (`of`), or at top level for
+            # a stycke's list
+            while stack and stack[-1][0] != c.get("of"):
+                stack.pop()
+            (stack[-1][1]["children"] if stack else roots).append(c)
+            continue
         if c.get("type") != "punkt" or not c.get("id"):
             roots.append(c)
             stack.clear()
@@ -1550,6 +1561,17 @@ def _renest_punkter(children):
         (stack[-1][1]["children"] if stack else roots).append(node)
         stack.append((c["id"], node))
     return roots
+
+
+def _render_punkter(children, tag, site, doc_uri, toc, rail):
+    """A node's list children as HTML: each run of punkter is one list
+    element (`tag`); a listtext or a tabell renders outside it, so text
+    between two items splits the list in two."""
+    return "".join(
+        ('<%s class="punkter">%%s</%s>' % (tag, tag) if is_punkt else "%s")
+        % "".join(render_node(c, site, doc_uri, toc, rail) for c in run)
+        for is_punkt, run in groupby(_renest_punkter(children),
+                                     lambda c: c.get("type") == "punkt"))
 
 
 _GRAFIK_LABEL = {
@@ -1890,13 +1912,12 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
             Markup("".join(render_node(c, site, doc_uri, toc, rail)
                            for c in node.get("children", []))))
     if t == "lista":
-        items = "".join(render_node(c, site, doc_uri, toc, rail)
-                        for c in node.get("children", []))
         # a numbered list keeps its numbering: the wiki commentary writes out
         # seven criteria for övergång av verksamhet (1982:80 6 b §), and which
         # criterion is the fourth is part of what the text says
-        tag = "ol" if node.get("ordered") else "ul"
-        return "<%s class=\"punkter\">%s</%s>" % (tag, items, tag)
+        return _render_punkter(node.get("children", []),
+                               "ol" if node.get("ordered") else "ul",
+                               site, doc_uri, toc, rail)
     if t == "rubrik":
         text = node.get("text", [])
         anchor = toc.add(nid, plain(text), node.get("level") or 1, node)
@@ -1924,12 +1945,8 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         # flattens nested lists into document order (nf.flatten_list); rebuild the
         # nesting the item ids still encode (K1P2S1N12Na under K1P2S1N12) so a
         # sub-list (a/b/c under a numbered point) renders as a nested <ol>.
-        kids = _renest_punkter(node.get("children", []))
-        inner = ""
-        if kids:
-            inner = "".join(render_node(c, site, doc_uri, toc, rail) for c in kids)
-            if any(c.get("type") == "punkt" for c in kids):
-                inner = '<ol class="punkter">%s</ol>' % inner
+        inner = _render_punkter(node.get("children", []), "ol",
+                                site, doc_uri, toc, rail)
         # a `redaktionell` node is a publisher's editorial note (a repeal
         # notice, "text finns bara i tryckt version"): rendered like the stycke
         # it replaced -- same marker, same links -- but subdued, so the reader

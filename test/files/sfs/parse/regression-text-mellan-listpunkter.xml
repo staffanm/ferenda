@@ -1,0 +1,40 @@
+<Forfattning>
+  <Paragraf id="P14" ordinal="14">
+    <Stycke id="P14S1">
+      <str>Inkomsten ska ökas med</str>
+      <NumreradLista>
+        <Listelement id="P14S1N1" ordinal="1">
+          <str>avdrag för avsättning till periodiseringsfond,</str>
+        </Listelement><Listelement id="P14S1N2" ordinal="2">
+          <str>avdrag för avsättning till expansionsfond,</str>
+        </Listelement>
+        <str>samt minskas med</str>
+        <Listelement id="P14S1N3" ordinal="3">
+          <str>återfört avdrag för avsättning till periodiseringsfond, och</str>
+        </Listelement><Listelement id="P14S1N4" ordinal="4">
+          <str>återfört avdrag för avsättning till expansionsfond.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P15" ordinal="15">
+    <Stycke id="P15S1">
+      <str>Tillkännagivanden om konkurser ska</str>
+      <NumreradLista>
+        <Listelement id="P15S1N1" ordinal="1">
+          <str>införas i Post- och Inrikes Tidningar, och</str>
+        </Listelement><Listelement id="P15S1N2" ordinal="2">
+          <str>i övrigt</str>
+          <Bokstavslista>
+            <str>i Danmark</str>
+            <Listelement id="P15S1N2Na" ordinal="a">
+              <str>tinglysas vid den underrätt där egendomen är belägen,</str>
+            </Listelement><Listelement id="P15S1N2Nb" ordinal="b">
+              <str>införas i fartygsregistret.</str>
+            </Listelement>
+          </Bokstavslista>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

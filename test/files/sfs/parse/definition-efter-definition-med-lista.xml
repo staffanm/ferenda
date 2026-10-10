@@ -1,0 +1,22 @@
+<Forfattning>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>I lagen avses med</str>
+    </Stycke><Stycke id="P2S2">
+      <str>affärslokal: fast affärsställe där näringsidkaren bedriver verksamhet,</str>
+    </Stycke><Stycke id="P2S3">
+      <str>avtal utanför affärslokaler: avtal som ingås</str>
+      <Strecksatslista>
+        <Listelement id="P2S3N1" ordinal="1">
+          <str>då näringsidkaren och konsumenten är närvarande på någon annan plats, eller</str>
+        </Listelement><Listelement id="P2S3N2" ordinal="2">
+          <str>under en utflykt som har organiserats av näringsidkaren,</str>
+        </Listelement>
+      </Strecksatslista>
+    </Stycke><Stycke id="P2S4">
+      <str>digitalt innehåll: data som framställs i digital form,</str>
+    </Stycke><Stycke id="P2S5">
+      <str>konsument: en fysisk person.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

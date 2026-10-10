@@ -1,7 +1,7 @@
 <Forfattning>
   <Paragraf id="P1" ordinal="1">
     <Stycke id="P1S1">
-      <str>Den som av oaktsamhet vållar döms för vårdslöshet till böter.</str>
+      <str>Den som av oaktsamhet vållar</str>
       <NumreradLista>
         <Listelement id="P1S1N1" ordinal="1">
           <str>brand eller ofärd,</str>
@@ -9,6 +9,7 @@
         <Listelement id="P1S1N2" ordinal="2">
           <str>skada eller hinder</str>
         </Listelement>
+        <str>döms för vårdslöshet till böter.</str>
       </NumreradLista>
     </Stycke><Stycke id="P1S2">
       <str>Är brottet grovt döms till fängelse.</str>

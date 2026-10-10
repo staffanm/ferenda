@@ -54,6 +54,7 @@ from .model import (
     Konventionsstycke,
     Lista,
     Listelement,
+    Listtext,
     Overgangsbestammelse,
     Overgangsbestammelser,
     Paragraf,
@@ -463,6 +464,8 @@ def content_key(node):
             return (node.text,) + tuple(content_key(c) for c in node.children)
         case Lista():
             return tuple(content_key(c) for c in node.children)
+        case Listtext():
+            return node.text
         case Listelement() | Paragraf() | Kapitel() | Avdelning() \
                 | Underavdelning():
             return ("OE", node.ordinal)
@@ -812,6 +815,15 @@ def flatten_list(lista, pairs, proj, frag, live=True, mode=None):
     References in each item resolve against the item's own id."""
     out = []
     for item in lista.children:
+        if isinstance(item, Listtext):
+            # words in the list that are no item carry no id of their own;
+            # `of` names the node the list sits in (its item, or its stycke),
+            # so the renderer sets them there, in document order among the
+            # items
+            out.append({"type": "listtext", "id": None, "of": frag or None,
+                        "text": proj.inline(util.normalize_space(item.text),
+                                            frag, live)})
+            continue
         sub = extend(pairs, "N", ordfrag(item.ordinal))
         item_id = proj.minter.mint(sub, item)
         eff = item_id or frag

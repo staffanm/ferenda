@@ -83,8 +83,18 @@ class Stycke:
 
 @dataclass
 class Lista:
-    kind: str  # "numrerad" | "bokstav" | "strecksats"
-    children: list[Listelement] = field(default_factory=list)
+    kind: str  # "numrerad" | "bokstav" | "romersk" | "strecksats"
+    children: list[Listelement | Listtext] = field(default_factory=list)
+
+
+@dataclass
+class Listtext:
+    # text in a list that is no item of it: the words after the last item that
+    # end the sentence the list sits in ("Den som 1. … 2. … ‖ döms till böter
+    # …", 1994:1738 10 kap. 1 §), words between two items that join the items
+    # above to the items below ("4. … ‖ samt minskas med ‖ 5. …", 2010:110
+    # 30 kap. 14 §), or the words that open a nested list
+    text: str
 
 
 @dataclass

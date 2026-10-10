@@ -21,7 +21,9 @@ from .text import runs_text
 # `redaktionell` is a retyped stycke (sfs/nf.py) and diffs exactly like one:
 # left out, a repealed paragraf's notice — and with it the paragraf's whole
 # visible content — vanishes from "jämför med tidigare lydelser"
-_LEAF = ("stycke", "punkt", "listelement", "upphavd", "moment", "redaktionell")
+# `listtext` is words in an SFS list that are no item of it (sfs/nf.py)
+_LEAF = ("stycke", "punkt", "listelement", "upphavd", "moment", "redaktionell",
+         "listtext")
 # ... and the EU-act artifact's own vocabulary (eurlex konsolidering pages
 # diff through the same view). `stycke` sits in both lists; an eurlex
 # `paragraph`/`point` is a container too (its stycken and points nest under

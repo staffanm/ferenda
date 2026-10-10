@@ -1,0 +1,29 @@
+<Forfattning>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Ansökan ska innehålla</str>
+      <Bokstavslista>
+        <Listelement id="P4S1Na" ordinal="a">
+          <str>uppgift 1,</str>
+        </Listelement><Listelement id="P4S1Nb" ordinal="b">
+          <str>uppgift 2,</str>
+        </Listelement><Listelement id="P4S1Nc" ordinal="c">
+          <str>uppgift 3,</str>
+        </Listelement><Listelement id="P4S1Nd" ordinal="d">
+          <str>uppgift 4,</str>
+        </Listelement><Listelement id="P4S1Ne" ordinal="e">
+          <str>uppgift 5,</str>
+        </Listelement><Listelement id="P4S1Nf" ordinal="f">
+          <str>uppgift 6,</str>
+        </Listelement><Listelement id="P4S1Ng" ordinal="g">
+          <str>uppgift 7,</str>
+        </Listelement><Listelement id="P4S1Nh" ordinal="h">
+          <str>uppgift 8,</str>
+        </Listelement><Listelement id="P4S1Ni" ordinal="i">
+          <str>uppgift 9,</str>
+        </Listelement>
+        <str>t. ex. kan en ansökan kompletteras senare.</str>
+      </Bokstavslista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

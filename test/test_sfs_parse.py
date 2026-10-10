@@ -41,6 +41,7 @@ from ferenda.sfs.reader import TextReader
 from ferenda.sfs.tokenizer import Tokenizer
 from ferenda.sfs.assembler import assemble
 from ferenda.sfs.nf import to_normalform
+from ferenda.lib import page
 from ferenda.lib.lagrum import LagrumParser, load_namedlaws
 from ferenda.lib.util import normalize_space
 
@@ -107,7 +108,12 @@ def rubrik_node(text, id=None):
 
 
 def flatten_list(elem, out):
+    """A list's items in document order; a <str> directly in the list is a
+    listtext, words in the list that are no item of it (sfs/nf.py)."""
     for item in elem:
+        if localname(item) == "str":
+            out.append({"type": "listtext", "text": inline_leaf(item).strip()})
+            continue
         if localname(item) != "Listelement":
             continue
         out.append({"type": "punkt", "id": item.get("id"),
@@ -212,6 +218,7 @@ def strip(nodes):
     text and nesting. Dropped keys:
 
     - beteckning, level: not encoded in the element serialization.
+    - of: the id a listtext's list sits under, which the nesting already shows.
     - id: the fixtures' fragment ids were minted by the old *test* driver,
       whose continuous-§ rule ('K' > 1) differs from the production rule
       ('K' >= 1) that nf.py and the golden corpus use -- so ids here
@@ -219,7 +226,7 @@ def strip(nodes):
       Id-minting is validated whole-document against the golden corpus.
     """
     for node in nodes:
-        for key in ("beteckning", "level", "id", "key"):
+        for key in ("beteckning", "level", "id", "key", "of"):
             node.pop(key, None)
         strip(node.get("children", []))
     return nodes
@@ -376,3 +383,65 @@ def test_sfs_links(txt):
     got = set(nf_links(nf["structure"], []))
     expected = set(fixture_links(etree.parse(str(xml)).getroot(), []))
     assert got == expected
+
+
+# --- text in a list on the page ---------------------------------------------
+
+TAIL_PAGE = """1 § Den som
+
+1. tillverkar sprit,
+
+2. förvärvar sprit som
+
+a) är olovligt tillverkad, eller
+
+b) är smugglad,
+
+och som saknar tillstånd, eller
+
+3. säljer sprit,
+
+döms till böter.
+"""
+
+
+class _NoContext:
+    """A rail with no context to show: `page.Rail` reads the catalog."""
+    data = {}
+
+    def add(self, node_id, label):
+        pass
+
+
+def render_first_stycke(text, paragraf=0):
+    reader = TextReader(text)
+    reader.autostrip = True
+    doc = assemble(Tokenizer(reader, BASEFILE))
+    stycke = to_normalform(doc, BASEFILE)["structure"][paragraf]["children"][0]
+    return page.render_node(stycke, page.Site(None, set()), BASEFILE,
+                            page.Toc(), _NoContext())
+
+
+def test_a_tail_renders_after_its_list_inside_the_holder():
+    """The words that end a list's sentence read after the list: inside the
+    item that holds a sub-list, after the stycke's own list at top level."""
+    html = render_first_stycke(TAIL_PAGE)
+    text = re.sub(r"<span class=\"num\">[^<]*</span>", "", html)
+    assert re.sub(r"<[^>]+>", " ", text).split() == (
+        "Den som tillverkar sprit, förvärvar sprit som är olovligt "
+        "tillverkad, eller är smugglad, och som saknar tillstånd, eller "
+        "säljer sprit, döms till böter.").split()
+    assert "</ol><p>och som saknar tillstånd, eller</p></li>" in html
+    assert html.endswith("säljer sprit,</li></ol><p>döms till böter.</p>")
+
+
+def test_text_between_items_splits_the_list_where_the_source_has_it():
+    """Words between two items stay between them; words that open a nested
+    list read before its first item, inside the item that holds it."""
+    text = (FIXTURES / "regression-text-mellan-listpunkter.txt").read_text(
+        encoding="iso-8859-1")
+    html = render_first_stycke(text)
+    assert ("expansionsfond,</li></ol><p>samt minskas med</p>"
+            '<ol class="punkter">') in html
+    html = render_first_stycke(text, paragraf=1)
+    assert ('i övrigt<p>i Danmark</p><ol class="punkter">') in html

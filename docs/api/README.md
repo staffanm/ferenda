@@ -862,6 +862,12 @@ runs. The distinctive top-level fields:
   (`id`, `ordinal`, `children`), `stycke` (`id`, `beteckning` like `"1 §"`,
   `text`, `children?`), `lista`/`punkt`, `tabell` → `rad` with `cells`,
   `upphavd`, `overgangsbestammelse`.
+- A stycke's list items are flat `punkt` children in document order; the
+  `punkt` id encodes the nesting (`K4P2S1N3Na` sits under `K4P2S1N3`). Text in
+  a list that is no item of it is a `listtext` (`id: null`, `of`, `text`)
+  among them: the words after the last item, words between two items, or the
+  words that open a nested list. `of` is the id of the node the list sits in
+  (the `punkt` that holds a nested list, or the stycke).
 - `amendments` = list of `{ uri, properties, forarbeten, content? }`, one per
   register row.
 - A versioned consolidation artifact adds a top-level `version` (e.g. `"2003:466"`).

@@ -1,0 +1,25 @@
+<Forfattning>
+  <Paragraf id="P14" ordinal="14">
+    <Stycke id="P14S1">
+      <str>Ursprungskriterier</str>
+      <Bokstavslista>
+        <Listelement id="P14S1Na" ordinal="a">
+          <str>varor som helt framställts i landet,</str>
+        </Listelement><Listelement id="P14S1Nb" ordinal="b">
+          <str>varor som framställts under förutsättning att:</str>
+          <Lista>
+            <Listelement id="P14S1NbNi" ordinal="i">
+              <str>materialen är ursprungsvaror,</str>
+            </Listelement><Listelement id="P14S1NbNii" ordinal="ii">
+              <str>bearbetningen är tillräcklig, och</str>
+            </Listelement><Listelement id="P14S1NbNiii" ordinal="iii">
+              <str>varorna transporteras direkt,</str>
+            </Listelement>
+          </Lista>
+        </Listelement><Listelement id="P14S1Nc" ordinal="c">
+          <str>varor som omfattas av bilagan.</str>
+        </Listelement>
+      </Bokstavslista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

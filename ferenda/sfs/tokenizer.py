@@ -25,7 +25,14 @@ re_SectionId = re.compile(r"^(\d+ ?\w?) \xa7[ \.]")
 re_SectionIdOld = re.compile(r"^\xa7 (\d+ ?\w?).")  # as used in eg 1810:0926
 re_NumberRightPara = re.compile(r"^(\d+)\) ").match
 re_DottedNumber = re.compile(r"^(\d+ ?\w?)\. ")
-re_Bokstavslista = re.compile(r"^(\w)\) ")
+# a letter or roman marker in either form, "b) " or "b. " -- which of the two
+# kinds a marker is, and whether a dotted one is a marker at all, is decided
+# against the markers before it (Tokenizer.id_of_bokstav_or_romersk)
+re_LetterMarker = re.compile(r"^([a-zåäö]{1,6}|[A-ZÅÄÖ])([.)]) ")
+re_Roman = re.compile(r"^x{0,3}(ix|iv|v?i{0,3})$")
+# the letter after each letter, in a letter list's order
+NEXT_LETTER = dict(zip("abcdefghijklmnopqrstuvwxyzåä", "bcdefghijklmnopqrstuvwxyzåäö",
+                       strict=True))
 re_Strecksatslista = re.compile(r"^(- |\x96 |– |--)")
 re_ElementId = re.compile(r"^(\d+) mom\.")  # historical "moment" subsections
 # this many consecutive chapter-shaped, content-less paragraphs are an
@@ -183,7 +190,7 @@ class StyckeEv:
 
 @dataclass
 class ListItemEv:
-    kind: str  # "numrerad" | "bokstav" | "strecksats"
+    kind: str  # "numrerad" | "bokstav" | "romersk" | "strecksats"
     text: str
     ordinal: str | None = None
 
@@ -206,6 +213,11 @@ class Tokenizer:
         self.saw_dash_toc = False  # a "N kap. - Title" TOC entry has been seen
         self.in_toc = False  # the last § announced a chapter listing
         self.headline_level = 0  # 0 = unknown, 1 = normal seen, 2 = in subs
+        # the latest letter and roman list markers in this paragraf: "i)",
+        # "v)" and "x)" are both letters and roman numerals, and the marker
+        # before them is what tells which (id_of_bokstav_or_romersk)
+        self.last_bokstav = None
+        self.last_romersk = None
 
     def preamble(self):
         """Consume leading blank lines and a document-level entry-into-force
@@ -280,8 +292,8 @@ class Tokenizer:
             return self.tok_listitem("numrerad")
         if self.is_strecksatslista():
             return self.tok_listitem("strecksats")
-        if self.is_bokstavslista():
-            return self.tok_listitem("bokstav")
+        if self.id_of_bokstav_or_romersk() is not None:
+            return self.tok_bokstav_or_romersk()
         if self.is_rubrik():
             return self.tok_rubrik()
         return StyckeEv(text=util.normalize_space(r.readparagraph()))
@@ -531,6 +543,7 @@ class Tokenizer:
         firstline = r.peekline()
         ordinal = self.id_of_paragraf(r.peekparagraph())
         self.current_section = ordinal
+        self.last_bokstav = self.last_romersk = None
         r.read(len(ordinal) + len(" \xa7 "))
 
         # really old laws split sections into "moment": "1 § 2 mom."
@@ -635,8 +648,45 @@ class Tokenizer:
             p = self.reader.peekline()
         return re_Strecksatslista.match(p) is not None
 
-    def is_bokstavslista(self):
-        return re_Bokstavslista.match(self.reader.peekline()) is not None
+    def id_of_bokstav_or_romersk(self):
+        """`(kind, ordinal)` of a letter or roman list marker opening the
+        line, or None. A letter list is "a) b) c)" or "a. b. c.", a roman one
+        "i) ii) iii)" or "i. ii.", and the two share the letters i, v and x.
+
+        - a single letter is a letter item when it starts a list ("a") or
+          continues the latest one ("i" after "h"); else "i" opens a roman
+          list and "v"/"x" continue one ("v" after "iv"). Other letters keep
+          the ")" form's old reading, a letter item.
+        - a dotted single letter out of that sequence is no marker: "l. The
+          consignment note" (1969:12) is an OCR'd "1.", and "t. ex." opens a
+          sentence. A capital letter is a letter item in the ")" form only.
+        - a longer roman numeral ("ii", "xxiv") is a roman item, and a doubled
+          letter ("aa)", "bb)") continues a letter list past z)."""
+        m = re_LetterMarker.match(self.reader.peekline())
+        if m is None:
+            return None
+        ordinal, delimiter = m.groups()
+        if len(ordinal) == 1:
+            if ordinal in ("a", NEXT_LETTER.get(self.last_bokstav)):
+                return "bokstav", ordinal
+            if (ordinal == "i" or
+                    (ordinal, self.last_romersk) in (("v", "iv"), ("x", "ix"))):
+                return "romersk", ordinal
+            return ("bokstav", ordinal) if delimiter == ")" else None
+        if re_Roman.match(ordinal):
+            return "romersk", ordinal
+        if delimiter == ")" and len(ordinal) == 2 and ordinal[0] == ordinal[1]:
+            return "bokstav", ordinal
+        return None
+
+    def tok_bokstav_or_romersk(self):
+        kind, ordinal = self.id_of_bokstav_or_romersk()
+        if kind == "bokstav":
+            self.last_bokstav = ordinal
+        else:
+            self.last_romersk = ordinal
+        text = re_LetterMarker.sub("", self.reader.readparagraph())
+        return ListItemEv(kind=kind, ordinal=ordinal, text=text)
 
     def tok_listitem(self, kind):
         if kind == "numrerad":
@@ -646,13 +696,6 @@ class Tokenizer:
             # golden corpus reflects)
             text = re_DottedNumber.sub("", self.reader.readparagraph())
             return ListItemEv(kind=kind, ordinal=ordinal, text=text)
-        elif kind == "bokstav":
-            m = re_Bokstavslista.match(self.reader.peekline())
-            assert m
-            ordinal = m.group(1)
-            text = re_Bokstavslista.sub("", self.reader.readparagraph())
-            return ListItemEv(kind=kind, ordinal=ordinal.replace(" ", ""),
-                              text=text)
         else:
             text = re_Strecksatslista.sub("", self.reader.readparagraph())
             return ListItemEv(kind=kind, ordinal=None, text=text)

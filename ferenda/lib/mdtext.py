@@ -211,6 +211,9 @@ def _block(n, depth, out):
     if t == "lista":
         _walk(children, depth, out)
         return
+    if t == "listtext":                     # sfs: words in a list, no item
+        out.append(body)
+        return
     if t in ("tabell", "table"):
         if body:                            # a förarbete table's caption
             out.append("*%s*" % body)

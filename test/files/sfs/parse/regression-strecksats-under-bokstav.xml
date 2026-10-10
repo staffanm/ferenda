@@ -1,0 +1,30 @@
+<Forfattning>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Kommunen ska med en detaljplan reglera bebyggelsemiljöns utformning för</str>
+      <NumreradLista>
+        <Listelement id="P2S1N1" ordinal="1">
+          <str>en ny sammanhållen bebyggelse,</str>
+        </Listelement><Listelement id="P2S1N2" ordinal="2">
+          <str>en åtgärd som omfattas av krav på bygglov,</str>
+          <Bokstavslista>
+            <Listelement id="P2S1N2Na" ordinal="a">
+              <str>om åtgärden innebär att ett område kan tas i anspråk för att anlägga</str>
+              <Strecksatslista>
+                <Listelement id="P2S1N2NaN1" ordinal="1">
+                  <str>ett industriområde,</str>
+                </Listelement><Listelement id="P2S1N2NaN2" ordinal="2">
+                  <str>en djurpark, och</str>
+                </Listelement>
+              </Strecksatslista>
+            </Listelement><Listelement id="P2S1N2Nb" ordinal="b">
+              <str>om åtgärden kan antas medföra en betydande miljöpåverkan,</str>
+            </Listelement>
+          </Bokstavslista>
+        </Listelement><Listelement id="P2S1N3" ordinal="3">
+          <str>ett nytt byggnadsverk.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>
