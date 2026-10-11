@@ -25,6 +25,7 @@ def test_term_uri_is_the_shared_mint():
 def test_paragraf_mode_triggers():
     assert b.paragraf_mode(["I denna lag avses med följande"]) == "normal"
     assert b.paragraf_mode(["I denna balk betyder ord"]) == "normal"
+    assert b.paragraf_mode(["I förordningen förstås med"]) == "normal"
     assert b.paragraf_mode(["Den som dödar, döms för mord till fängelse"]) == \
         "brottsrubricering"
     assert b.paragraf_mode(["För miljöbrott döms till böter"]) == "brottsrubricering"
@@ -82,6 +83,47 @@ def test_normal_disambiguates_embedded_sfs_colon():
     # inside "2018:218"
     assert b.defined_terms("personuppgift enligt lagen (2018:218) viss data",
                            "normal", "stycke") == ["personuppgift"]
+    # an older act writes a comma after the term
+    assert b.defined_terms("livsmedel, matvara eller annan vara som avses i "
+                           "lagen (1971:511)", "normal", "stycke") == ["livsmedel"]
+    # an entry led by an acronym is a term-list entry too
+    assert b.defined_terms("RA-förordningen förordningen (1984:795) om "
+                           "försöksverksamhet", "normal", "stycke") == [
+                               "RA-förordningen"]
+    # a colon after the SFS number is the delimiter, and the term keeps the
+    # act it names
+    assert b.defined_terms("förvaltare enligt lagen (1990:1342): den som",
+                           "normal", "stycke") == [
+                               "förvaltare enligt lagen (1990:1342)"]
+
+
+def test_a_change_note_colon_defines_nothing():
+    """A capitalised sentence whose only colon is in an SFS number is no
+    definition; it used to give its first word ("Regeringen", 1968:45 1 §)."""
+    assert b.defined_terms("Regeringen kan förordna, att från lagens "
+                           "tillämpning skall undantagas atomanläggning. Lag "
+                           "(1982:1275).", "normal", "stycke") == []
+    assert b.defined_terms("Vad som sägs i denna balk om mark gäller också "
+                           "annat utrymme. Lag (2009:180).", "normal",
+                           "stycke") == []
+
+
+def test_a_colon_inside_a_word_is_no_delimiter():
+    assert b.defined_terms("EU:s marknadskontrollförordning: Europaparlamentets "
+                           "och rådets förordning (EU) 2019/1020", "normal",
+                           "stycke") == ["EU:s marknadskontrollförordning"]
+
+
+def test_uttrycket_names_the_term():
+    assert b.defined_terms('uttrycket "livränta" ett fastställt belopp, som '
+                           "skall utbetalas periodiskt", "normal",
+                           "listelement") == ["livränta"]
+    # the entry names its term, and the list under it defines it (2006:807)
+    assert b.defined_terms("1. uttrycket offentlig kontroll", "normal",
+                           "listelement") == ["offentlig kontroll"]
+    # a capitalised sentence is no entry, also when it opens with the word
+    assert b.defined_terms("Begreppet hemvist används i den mening som anges "
+                           "i 3 §", "normal", "stycke") == []
 
 
 def test_brottsdef_and_alt():
@@ -172,6 +214,17 @@ def test_mid_sentence_parenthesis_must_read_as_a_term():
 def test_listelement_strips_prefix():
     assert b.defined_terms("1. antisladdsystem: ett system", "normal",
                            "listelement") == ["antisladdsystem"]
+
+
+def test_a_list_item_names_a_term_only_as_a_term_list_entry():
+    """A whole item is no term ("som arbetstagare,", 1980:749 2 §), nor is a
+    law's name ("lagen (2021:600) med …", 2021:988), nor an item in a
+    paragraf that only coins a term in running text."""
+    assert b.defined_terms("som arbetstagare,", "normal", "listelement") == []
+    assert b.defined_terms("lagen (2021:600) med kompletterande bestämmelser",
+                           "normal", "listelement") == []
+    assert b.defined_terms("konsument: en fysisk person", "loptext",
+                           "listelement") == []
 
 
 def test_tabellrad_header_is_not_a_term():

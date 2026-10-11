@@ -194,6 +194,20 @@ def _markable(term):
 
 # --- helpers for term extraction ---
 re_sfsid = re.compile(r'\((\d{4}:\d+)\)').search          # old re_SearchSfsId
+# an SFS number right after the first word makes that word a law's name
+# ("lagen (2021:600) med kompletterande bestämmelser …", 2021:988)
+re_sfsid_first = re.compile(r'\(\d{4}:\d+\)').match
+# the colon between a term and its definition stands before a space; one
+# inside a word is none ("EU:s", "lagen (1904:26 s. 1)", "Lag (1982:1275)")
+re_delimiter_colon = re.compile(r':(?=\s|$)').search
+# a term-list entry opens with a lowercase word or an acronym, a sentence with
+# a capitalised word
+re_term_entry = re.compile(r'[a-zåäö]|[A-ZÅÄÖ]{2}').match
+# the word an entry can name its term with ("uttrycket offentlig kontroll",
+# 2006:807 2 a §), and a term it writes in quotes after it
+re_term_word = re.compile(r'(?:uttrycket|uttrycken|termen|begreppet) ').match
+re_quoted_term = re.compile(r'["”“]([^"”“]+)["”“]').match
+re_item_end = re.compile(r'[,.;]$').search
 re_change_note = re.compile(r'(Lag|Förordning) \(\d{4}:\d+\)\.?$')
 re_list_prefixes = (re.compile(r'^(\-\-?|\x96) '),         # bullet
                     re.compile(r'^(\d+ ?\w?)\. '),        # dotted number
@@ -210,6 +224,40 @@ RE_FORMULA_TOKEN = re.compile(r"[*/=]")
 PREP_RE = re.compile(
     r"(av|i|för|om|till|på|med|vid|mot|enligt|under|över|genom|från|åt|hos"
     r"|inom|utan|per|à)\b", re.IGNORECASE)
+
+
+def _delimited_term(text):
+    """The term a term-list entry writes before its delimiter, or None. The
+    delimiter is usually ":", but a " - " dash can stand in for it. The colon
+    inside a word is never the delimiter. A lowercase entry that holds an
+    SFS number but no delimiter writes its term as the first word ("skolenhet
+    skolenhet enligt skolförordningen (1971:235)", 1982:39; "livsmedel,
+    matvara, … (1971:511)" with a comma after it), as does one led
+    by an acronym ("RA-förordningen förordningen (1984:795) …", 1986:1080); a
+    capitalised sentence there defines nothing ("Regeringen kan förordna, att
+    … Lag (1982:1275).", 1968:45 1 §). An entry can name its term with
+    "uttrycket": "uttrycket "livränta" ett fastställt belopp …", or
+    "uttrycket offentlig kontroll" over a list of what it means."""
+    named = re_term_word(text)
+    if named:
+        text = text[named.end():]
+        quoted = re_quoted_term(text)
+        if quoted:
+            return quoted.group(1)
+    colon = re_delimiter_colon(text)
+    dash = text.find(" - ")
+    if dash >= 0 and (colon is None or dash < colon.start()):
+        return text[:dash]
+    if colon is not None:
+        return text[:colon.start()]
+    if named:
+        # the entry names its term and nothing else; its definition is the
+        # list under it
+        return text if not re_item_end(text) else None
+    first, _, rest = text.partition(" ")
+    if re_term_entry(text) and re_sfsid(rest) and not re_sfsid_first(rest):
+        return first.rstrip(",")
+    return None
 
 
 def _strip_formula_prefix(term):
@@ -249,7 +297,7 @@ class Rules:
         assert set(modes) <= MODES, "unknown mode in %r" % (modes,)
         self.modes = frozenset(modes)
         self.trigger = re.compile(
-            r'^I (%s) (avses med|betyder|används följande)'
+            r'^I (%s) (avses med|förstås med|betyder|används följande)'
             % "|".join(re.escape(s) for s in scopes)).match
 
     def paragraf_mode(self, stycke_texts, in_appendix=False):
@@ -296,21 +344,9 @@ class Rules:
         term."""
         term = None
         # case 1: "antisladdsystem: ett tekniskt stödsystem" -- only in normal
-        # mode, and not on the announcing stycke itself. The delimiter is
-        # usually ":", but an embedded SFS number's colon or a " - " dash can
-        # mislead, so disambiguate.
+        # mode, and not on the announcing stycke itself
         if mode == "normal" and not self.trigger(text):
-            delimiter = ":"
-            if " - " in text:
-                if ":" in text and text.index(":") < text.index(" - "):
-                    delimiter = ":"
-                else:
-                    delimiter = " - "
-            m = re_sfsid(text)
-            if delimiter == ":" and m and m.start() < text.index(":"):
-                delimiter = " "
-            if delimiter in text:
-                term = text.split(delimiter)[0]
+            term = _delimited_term(text)
         # cases 2-5: brottsrubricering / löptext, checked whenever the source
         # enables the mode at all -- matching the old unconditional check
         checks = []
@@ -366,9 +402,13 @@ class Rules:
             terms = ([text] if text not in ("Beteckning", "Begrepp")
                      and not re_change_note.search(text) else [])
         elif kind == "listelement":
+            # an item names a term only in a term list, and only as a
+            # stycke does: a whole item is no term ("som arbetstagare,",
+            # 1980:749 2 §)
             for rx in re_list_prefixes:
                 text = rx.sub('', text)
-            terms = [text.split(":")[0]]
+            term = _delimited_term(text) if mode == "normal" else None
+            terms = [term] if term else []
         else:  # stycke
             terms = self._stycke_terms(text, mode, in_appendix)
         kept = []

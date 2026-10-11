@@ -1,0 +1,58 @@
+<Forfattning>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>I förordningen förstås med</str>
+    </Stycke>
+    <Stycke id="P3S2">
+      <str>allmän nyhetstidning: tidning av dagspresskaraktär som</str>
+      <NumreradLista>
+        <Listelement id="P3S2N1" ordinal="1">
+          <str>i huvudsak innehåller nyheter, och</str>
+        </Listelement>
+        <Listelement id="P3S2N2" ordinal="2">
+          <str>utkommer minst 24 gånger per kalenderår,</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+    <Stycke id="P3S3">
+      <str>tidskrift: periodisk publikation som utkommer med minst fyra nummer per kalenderår,</str>
+    </Stycke>
+    <Stycke id="P3S4">
+      <str>sida: det spaltutrymme som motsvaras av en sida i tabloidformat.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Förbindelseorgan är</str>
+      <NumreradLista>
+        <Listelement id="P4S1N1" ordinal="1">
+          <str>i Danmark socialministeriet, och</str>
+        </Listelement>
+        <Listelement id="P4S1N2" ordinal="2">
+          <str>i Norge socialdepartementet,</str>
+        </Listelement>
+        <str>i Sverige försäkringskassan,</str>
+        <str>i Finland social- och hälsovårdsministeriet.</str>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P5" ordinal="5">
+    <Stycke id="P5S1">
+      <str>I detta kapitel avses med</str>
+    </Stycke>
+    <Stycke id="P5S2">
+      <str>vrak:</str>
+      <NumreradLista>
+        <Listelement id="P5S2N1" ordinal="1">
+          <str>ett sjunket fartyg,</str>
+        </Listelement>
+        <Listelement id="P5S2N2" ordinal="2">
+          <str>en del av ett sjunket fartyg,</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+    <Stycke id="P5S3">
+      <str>skeppsbrott: en olycka till sjöss.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>
