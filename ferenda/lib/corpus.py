@@ -1323,9 +1323,8 @@ def _run_dirty_pages(sources, store, sides, expired):
     # a sidecar's owner is the artifact beside it: <stem>.versions.json -> <stem>.json
     owners = {str(Path(p[:-len(".versions.json")] + ".json").relative_to(root))
               for group in moved for p in group}
-    uris = {uri for (uri,) in con.execute(
-        "SELECT uri FROM documents WHERE path IN (%s)" % ",".join("?" * len(rebuilt)),
-        sorted(rebuilt))} if rebuilt else set()
+    uris = {uri for (uri,) in util.select_in(
+        con, "SELECT uri FROM documents WHERE path IN (%s)", sorted(rebuilt))}
     if not uris and not owners:  # the signature moved, but not through this run's parse
         con.close()
         return None
@@ -1336,14 +1335,11 @@ def _run_dirty_pages(sources, store, sides, expired):
         around.update(u for (u,) in con.execute(
             "SELECT to_root FROM links WHERE from_uri = ?", (uri,)))
     around -= uris
-    if owners:
-        around.update(uri for (uri,) in con.execute(
-            "SELECT uri FROM documents WHERE path IN (%s)" % ",".join("?" * len(owners)),
-            sorted(owners)))
+    around.update(uri for (uri,) in util.select_in(
+        con, "SELECT uri FROM documents WHERE path IN (%s)", sorted(owners)))
     only = set()
-    for uri, path in con.execute(
-            "SELECT uri, path FROM documents WHERE uri IN (%s)"
-            % ",".join("?" * len(uris | around)), sorted(uris | around)):
+    for uri, path in util.select_in(
+            con, "SELECT uri, path FROM documents WHERE uri IN (%s)", sorted(uris | around)):
         only.add(uri)
         if path:
             only.add(str(root / path))

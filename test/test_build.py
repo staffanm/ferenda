@@ -2514,6 +2514,20 @@ def test_run_dirty_pages_is_the_parsed_documents_and_their_neighbours(tmp_path, 
     assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") == {
         "https://lagen.nu/a", str(root / "syn" / "a.json"),
         "https://lagen.nu/b", str(root / "syn" / "b.json")}
+    # a run that parses more documents than SQLite binds variables in one
+    # statement reads them in batches: "too many SQL variables" ended a
+    # `lagen all rebuild` here
+    connect = catalog.connect
+
+    def one_variable(*a, **kw):
+        con = connect(*a, **kw)
+        con.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 1)
+        return con
+    monkeypatch.setattr(catalog, "connect", one_variable)
+    monkeypatch.setattr(util, "IN_BATCH", 1)
+    assert corpus._run_dirty_pages({"syn": src}, store, "S", "E") == {
+        "https://lagen.nu/a", str(root / "syn" / "a.json"),
+        "https://lagen.nu/b", str(root / "syn" / "b.json")}
     # c's version panel sidecar appeared since the records: c's own page, no neighbours
     sidecar = root / "syn" / "c.versions.json"
     sidecar.write_text("[]")
