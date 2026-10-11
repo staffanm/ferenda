@@ -33,16 +33,18 @@ from .nf import BEGREPP_RULES
 log = logging.getLogger(__name__)
 
 # a lowercase definition in a term-list paragraf: "konsument: en fysisk person
-# som ...". The term is a short phrase; one naming a stycke or a punkt
-# ("tredje stycket: 90 procent", 1989:1021 1 §) is a list item's own text
-re_Definition = re.compile(r"^(?P<term>[a-zåäö][^:]{0,80}): \S")
+# som ...", or a term alone over the list that defines it ("vrak: ‖ 1. …",
+# 1994:1009 9 kap. 1 §). The term is a short phrase; one naming a stycke or a
+# punkt ("tredje stycket: 90 procent", 1989:1021 1 §) is a list item's own text
+re_Definition = re.compile(r"^(?P<term>[a-zåäö][^:]{0,80}):(?: \S|$)")
 re_NotATerm = re.compile(r"stycke|punkt")
 
 # a list of one kind nests under the latest item of a list of another: a
 # letter list under a numbered item, a dash list or a roman list under a letter
 # item ("3. … a) … att anlägga - ett industriområde, …", 2010:900 4 kap. 2 §),
-# a letter list under a roman item. A letter item after a dash list closes the
-# dash list instead: its letters most often go on with the list above it
+# a letter list under a roman item. Any other new list nests only under an
+# item that does not end its sentence (Assembler nests): a letter list after a
+# dash list most often is a list of its own
 NESTS = {
     "numrerad": {"bokstav", "romersk", "strecksats"},
     "bokstav": {"romersk", "strecksats"},
@@ -52,8 +54,10 @@ NESTS = {
 
 # a list item that ends without punctuation or a joining word goes on in the
 # blocks after it ("2. Genom förordningen upphävs ‖ kungörelsen (1937:864) …,
-# ‖ kungörelsen (1963:456) …,", 1984:545 övergångsbestämmelser)
-re_ItemEnd = re.compile(r"(?:[,.;:]|\b(?:och|eller|samt))$")
+# ‖ kungörelsen (1963:456) …,", 1984:545 övergångsbestämmelser). A colon
+# announces what follows, so it ends nothing ("– företag som uppfyller mer än
+# ett av följande villkor: ‖ a) …", 1995:1554 1 kap. 3 §)
+re_ItemEnd = re.compile(r"(?:[,.;]|\b(?:och|eller|samt))$")
 
 
 def ends(text):
@@ -121,12 +125,19 @@ def assemble(tokens):
 
     def nests(ev):
         """Does this item open a list nested under the innermost list's latest
-        item (rather than go on with an open list, or close lists)?"""
-        return (lists and not any(lst.kind == ev.kind for lst in lists)
-                and ev.kind in NESTS[lists[-1].kind] and items(lists[-1]))
+        item (rather than go on with an open list, or close lists)? A list of
+        a kind that NESTS does not name nests under an item that does not end
+        its sentence ("(e) Bevisupptagning må vägras endast i följande fall:
+        ‖ (1) …", 1958:522 artikel 7)."""
+        if (not lists or any(lst.kind == ev.kind for lst in lists)
+                or not items(lists[-1])):
+            return False
+        return (ev.kind in NESTS[lists[-1].kind]
+                or not ends(items(lists[-1])[-1].text))
 
     def attach_listitem(ev, opening=None):
-        """`opening` is the words that open a nested list this item starts."""
+        """`opening` is the blocks of words that open a nested list this item
+        starts."""
         item = Listelement(ordinal=ev.ordinal, text=ev.text)
         if any(lst.kind == ev.kind for lst in lists):
             # the item goes on with an open list: close the lists inside it
@@ -138,12 +149,11 @@ def assemble(tokens):
             innermost.children.append(item)
             return
         while lists and not nests(ev):
-            assert opening is None, "only a nested list takes opening words"
+            assert not opening, "only a nested list takes opening words"
             lists.pop()  # the inner list is finished
         if lists:
             sub = Lista(kind=ev.kind)
-            if opening is not None:
-                sub.children.append(Listtext(opening))
+            sub.children.extend(Listtext(text) for text in opening or ())
             if ev.kind == "strecksats":
                 item.ordinal = "1"
             sub.children.append(item)
@@ -176,8 +186,11 @@ def assemble(tokens):
         its sentence are the entries of a list without markers, nested under
         that item. Else the blocks open the list nested under the item when
         the next item starts one, or they follow the item -- between two
-        items, or after the last one, ending the sentence. Returns the
-        opening words for the next item, if any."""
+        items, or after the last one, ending the sentence. Each block stays a
+        text of its own, as the source prints it ("i Nederländerna … ‖ i
+        Sverige …", 1983:22); a blank line in the middle of a sentence is an
+        error in the source, which a patch removes. Returns the blocks that
+        open the next item's nested list, if any."""
         last = lista.children[-1]
         if (len(blocks) > 1 and isinstance(last, Listelement)
                 and not ends(last.text)
@@ -187,8 +200,8 @@ def assemble(tokens):
                 for n, text in enumerate(blocks, 1)]))
             return None
         if isinstance(ev, t.ListItemEv) and nests(ev):
-            return " ".join(blocks)
-        lista.children.append(Listtext(" ".join(blocks)))
+            return blocks
+        lista.children.extend(Listtext(text) for text in blocks)
         return None
 
     def is_label(text):
@@ -198,7 +211,7 @@ def assemble(tokens):
         markarbeten ‖ 1. att …", 1983:55). It must not open a stycke of its
         own, or the stycken after it get the wrong number."""
         return (not lists and isinstance(stack[-1], Stycke)
-                and text[:1].islower() and not re_Definition.match(text)
+                and text[:1].islower() and not is_definition(text)
                 and not ends(text) and not ends(stack[-1].text))
 
     def place_label(text, ev):

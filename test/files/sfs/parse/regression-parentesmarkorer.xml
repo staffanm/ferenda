@@ -1,0 +1,75 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>Konventionen gäller inte</str>
+      <NumreradLista>
+        <Listelement id="P1S1N1" ordinal="1">
+          <str>transporter enligt en internationell postkonvention,</str>
+        </Listelement>
+        <Listelement id="P1S1N2" ordinal="2">
+          <str>transporter av</str>
+          <Bokstavslista>
+            <Listelement id="P1S1N2Na" ordinal="a">
+              <str>begravningsgods,</str>
+            </Listelement>
+            <Listelement id="P1S1N2Nb" ordinal="b">
+              <str>flyttgods.</str>
+            </Listelement>
+          </Bokstavslista>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Kommittén ska</str>
+      <NumreradLista>
+        <Listelement id="P2S1N1" ordinal="1">
+          <str>följa konventionens tillämpning,</str>
+        </Listelement>
+        <Listelement id="P2S1N2" ordinal="2">
+          <str>föreslå ändringar i konventionen.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Ersättning lämnas enligt följande.</str>
+      <NumreradLista>
+        <Listelement id="P3S1N1" ordinal="1">
+          <str>Ersättning lämnas för skada på gods.</str>
+        </Listelement>
+        <Listelement id="P3S1N2" ordinal="2">
+          <str></str>
+          <Bokstavslista>
+            <Listelement id="P3S1N2Na" ordinal="a">
+              <str>Om inte annat följer av (b), är beloppet högst 1 000 kronor.</str>
+            </Listelement>
+            <Listelement id="P3S1N2Nb" ordinal="b">
+              <str>Beloppet får höjas av kommittén.</str>
+            </Listelement>
+          </Bokstavslista>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Skatt tas ut på</str>
+      <Bokstavslista>
+        <Listelement id="P4S1Na" ordinal="a">
+          <str>inkomster som</str>
+          <RomerskLista>
+            <Listelement id="P4S1NaNi" ordinal="i">
+              <str>uppbärs i Sverige,</str>
+            </Listelement>
+            <Listelement id="P4S1NaNii" ordinal="ii">
+              <str>uppbärs utomlands.</str>
+            </Listelement>
+          </RomerskLista>
+        </Listelement>
+      </Bokstavslista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

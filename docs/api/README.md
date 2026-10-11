@@ -865,9 +865,10 @@ runs. The distinctive top-level fields:
 - A stycke's list items are flat `punkt` children in document order; the
   `punkt` id encodes the nesting (`K4P2S1N3Na` sits under `K4P2S1N3`). Text in
   a list that is no item of it is a `listtext` (`id: null`, `of`, `text`)
-  among them: the words after the last item, words between two items, or the
-  words that open a list. `of` is the id of the node the list sits in
-  (the `punkt` that holds a nested list, or the stycke). An entry that the
+  among them, one per block of the source: the words after the last item,
+  words between two items, or the words that open a list. `of` is the id of
+  the node the list sits in (the `punkt` that holds a nested list, or the
+  stycke). An entry that the
   source prints without a marker is a `punkt` with `ordinal: null`; its id
   still counts it (`K1P2S1N2N3` is the third entry under `K1P2S1N2`). A group
   label over items that start their count again ("i Danmark ‖ a) … b) … ‖ i

@@ -74,7 +74,7 @@ BROKEN = {
 }
 
 INLINE = {"str", "Link", "LinkSubject"}
-LISTS = {"NumreradLista", "Strecksatslista", "Bokstavslista", "Lista"}
+LISTS = {"NumreradLista", "Strecksatslista", "Bokstavslista", "RomerskLista", "Lista"}
 
 
 def localname(elem):
@@ -486,3 +486,58 @@ def test_entries_without_markers_nest_in_an_overgangsbestammelse():
         "förordningen om statsbidrag till driftkostnader för vissa "
         "lanthushållsskolor,",
         "förordningen om statsbidrag till vissa privatskolor."]
+
+
+def fixture_paragrafer(name):
+    """The paragrafer of a fixture's tree, for checks of the nesting that the
+    fixture comparison flattens away."""
+    reader = TextReader((FIXTURES / name).read_text(encoding="iso-8859-1"))
+    reader.autostrip = True
+    return assemble(Tokenizer(reader, BASEFILE)).children
+
+
+def test_a_list_nests_under_an_item_that_does_not_end_its_sentence():
+    """A list of a kind that does not nest by default nests under an item
+    that ends with ":" or without punctuation (1995:1554 1 kap. 3 §, 1958:522
+    artikel 7), and stands beside the list when the item ends its sentence
+    (shortened from those acts)."""
+    p1, p2, p3, _ = fixture_paragrafer("regression-lista-oavslutad-punkt.txt")
+    [dashes] = p1.children[0].children[0].children[0].children
+    [letters] = dashes.children[1].children
+    assert (dashes.kind, letters.kind) == ("strecksats", "bokstav")
+    assert [lst.kind for lst in p2.children[0].children] == [
+        "strecksats", "bokstav"]
+    [numbers] = p3.children[0].children[0].children[1].children
+    assert numbers.kind == "numrerad"
+
+
+def test_an_item_printed_with_its_first_subitem_holds_no_text():
+    """"2. (a) Om inte annat följer av (b), …" is item 2, and (a) is the first
+    item of the list under it (1973:1199 artikel 4); "(i)" after "(a)" is a
+    roman item under it."""
+    _, _, p3, p4 = fixture_paragrafer("regression-parentesmarkorer.txt")
+    item = p3.children[0].children[0].children[1]
+    assert item.text == ""
+    [letters] = item.children
+    assert [i.ordinal for i in letters.children] == ["a", "b"]
+    [romans] = p4.children[0].children[0].children[0].children
+    assert (romans.kind, [i.ordinal for i in romans.children]) == (
+        "romersk", ["i", "ii"])
+
+
+def test_an_item_printed_with_two_levels_of_subitems_keeps_them_in_order():
+    """"1. (a) (i) …" splits twice: item 1 and item (a) hold no text, and the
+    text belongs to item (i) of the list under (a)."""
+    reader = TextReader("1 § Skatt tas ut på\n\n1. (a) (i) inkomster i "
+                        "Sverige,\n\n(ii) inkomster utomlands,\n\n(b) annat.\n")
+    reader.autostrip = True
+    [paragraf] = assemble(Tokenizer(reader, BASEFILE)).children
+    [lista] = paragraf.children[0].children
+    [item] = lista.children
+    assert item.text == ""
+    [letters] = item.children
+    assert [(i.ordinal, i.text) for i in letters.children] == [
+        ("a", ""), ("b", "annat.")]
+    [romans] = letters.children[0].children
+    assert [(i.ordinal, i.text) for i in romans.children] == [
+        ("i", "inkomster i Sverige,"), ("ii", "inkomster utomlands,")]

@@ -25,15 +25,21 @@ re_SectionId = re.compile(r"^(\d+ ?\w?) \xa7[ \.]")
 re_SectionIdOld = re.compile(r"^\xa7 (\d+ ?\w?).")  # as used in eg 1810:0926
 re_NumberRightPara = re.compile(r"^(\d+)\) ").match
 re_DottedNumber = re.compile(r"^(\d+ ?\w?)\. ")
-# a letter or roman marker in either form, "b) " or "b. " -- which of the two
-# kinds a marker is, and whether a dotted one is a marker at all, is decided
-# against the markers before it (Tokenizer.id_of_bokstav_or_romersk)
-re_LetterMarker = re.compile(r"^([a-zåäö]{1,6}|[A-ZÅÄÖ])([.)]) ")
+# a number in parentheses, the treaty texts' form ("(1) This Convention shall
+# apply to taxes on income", 1997:918)
+re_NumberParen = re.compile(r"^\((\d+)\) ")
+# a letter or roman marker in any of its forms, "b) ", "(b) " or "b. " --
+# which of the two kinds a marker is, and whether a dotted one is a marker at
+# all, is decided against the markers before it
+# (Tokenizer.id_of_bokstav_or_romersk)
+re_LetterMarker = re.compile(r"^(\(?)([a-zåäö]{1,6}|[A-ZÅÄÖ])([.)]) ")
 re_Roman = re.compile(r"^x{0,3}(ix|iv|v?i{0,3})$")
 # the letter after each letter, in a letter list's order
 NEXT_LETTER = dict(zip("abcdefghijklmnopqrstuvwxyzåä", "bcdefghijklmnopqrstuvwxyzåäö",
                        strict=True))
-re_Strecksatslista = re.compile(r"^(- |\x96 |– |--)")
+# a dash item; a line of dashes only is a separator that marks left-out text
+# or rules off a table ("- - - - - - - -", 1955:469 övergångsbestämmelser)
+re_Strecksatslista = re.compile(r"^(- |\x96 |– |--)(?![-–\x96 ]*$)")
 re_ElementId = re.compile(r"^(\d+) mom\.")  # historical "moment" subsections
 # this many consecutive chapter-shaped, content-less paragraphs are an
 # (unannounced) in-body TOC, not real chapters (see Tokenizer._toc_run_ahead)
@@ -218,6 +224,10 @@ class Tokenizer:
         # before them is what tells which (id_of_bokstav_or_romersk)
         self.last_bokstav = None
         self.last_romersk = None
+        # the first items of nested lists that the source prints in the
+        # same block as the item they nest under (split_first_subitem),
+        # outermost first
+        self.queued = []
 
     def preamble(self):
         """Consume leading blank lines and a document-level entry-into-force
@@ -243,6 +253,8 @@ class Tokenizer:
         return event
 
     def next_event(self, in_numrerad=False):
+        if self.queued:
+            return self.queued.pop(0)
         r = self.reader
         while True:
             if r.eof():
@@ -640,7 +652,8 @@ class Tokenizer:
     def id_of_numrerad_lista(self, p=None):
         if not p:
             p = self.reader.peekline()
-        match = re_DottedNumber.match(p) or re_NumberRightPara(p)
+        match = (re_DottedNumber.match(p) or re_NumberRightPara(p)
+                 or re_NumberParen.match(p))
         return match.group(1).replace(" ", "") if match else None
 
     def is_strecksatslista(self, p=None):
@@ -648,24 +661,29 @@ class Tokenizer:
             p = self.reader.peekline()
         return re_Strecksatslista.match(p) is not None
 
-    def id_of_bokstav_or_romersk(self):
+    def id_of_bokstav_or_romersk(self, line=None):
         """`(kind, ordinal)` of a letter or roman list marker opening the
-        line, or None. A letter list is "a) b) c)" or "a. b. c.", a roman one
-        "i) ii) iii)" or "i. ii.", and the two share the letters i, v and x.
+        line, or None. A letter list is "a) b) c)", "(a) (b) (c)" or "a. b.
+        c.", a roman one "i) ii) iii)", "(i) (ii)" or "i. ii.", and the two
+        share the letters i, v and x. The "(a)" form reads as the "a)" form.
 
         - a single letter is a letter item when it starts a list ("a") or
           continues the latest one ("i" after "h"); else "i" opens a roman
           list and "v"/"x" continue one ("v" after "iv"). Other letters keep
           the ")" form's old reading, a letter item.
-        - a dotted single letter out of that sequence is no marker: "l. The
-          consignment note" (1969:12) is an OCR'd "1.", and "t. ex." opens a
-          sentence. A capital letter is a letter item in the ")" form only.
+        - a dotted single letter out of that sequence is no marker: "t. ex."
+          opens a sentence. A capital letter is a letter item in the ")" form
+          only.
         - a longer roman numeral ("ii", "xxiv") is a roman item, and a doubled
-          letter ("aa)", "bb)") continues a letter list past z)."""
-        m = re_LetterMarker.match(self.reader.peekline())
+          letter ("aa)", "bb)") continues a letter list past z).
+
+        `line` is the text to read the marker from, the next line if None."""
+        m = re_LetterMarker.match(self.reader.peekline() if line is None else line)
         if m is None:
             return None
-        ordinal, delimiter = m.groups()
+        paren, ordinal, delimiter = m.groups()
+        if paren and delimiter != ")":
+            return None
         if len(ordinal) == 1:
             if ordinal in ("a", NEXT_LETTER.get(self.last_bokstav)):
                 return "bokstav", ordinal
@@ -679,23 +697,41 @@ class Tokenizer:
             return "bokstav", ordinal
         return None
 
-    def tok_bokstav_or_romersk(self):
-        kind, ordinal = self.id_of_bokstav_or_romersk()
+    def tok_bokstav_or_romersk(self, text=None):
+        """`text` is the block to read the item from, the next one if None."""
+        kind, ordinal = self.id_of_bokstav_or_romersk(text)
         if kind == "bokstav":
             self.last_bokstav = ordinal
         else:
             self.last_romersk = ordinal
-        text = re_LetterMarker.sub("", self.reader.readparagraph())
-        return ListItemEv(kind=kind, ordinal=ordinal, text=text)
+        text = re_LetterMarker.sub(
+            "", self.reader.readparagraph() if text is None else text, count=1)
+        return self.split_first_subitem(
+            ListItemEv(kind=kind, ordinal=ordinal, text=text))
+
+    def split_first_subitem(self, item):
+        """An item whose text opens with the first marker of a nested list
+        holds no text of its own: "4. (a) Except as otherwise provided in
+        subparagraph (b) …" (1973:1199) is item 4, and (a) is the first item
+        of the list under it. The nested item waits in `queued`, ahead of the
+        items its own split queued ("1. (a) (i) …")."""
+        sub = self.id_of_bokstav_or_romersk(item.text)
+        if sub is None or sub[0] == item.kind or sub[1] not in ("a", "i"):
+            return item
+        self.queued.insert(0, self.tok_bokstav_or_romersk(item.text))
+        return ListItemEv(kind=item.kind, ordinal=item.ordinal, text="")
 
     def tok_listitem(self, kind):
         if kind == "numrerad":
             ordinal = self.id_of_numrerad_lista()
-            # NB: only the "1. " form is stripped from the text; the "1) "
-            # form is kept (faithful to the old parser, whose output the
-            # golden corpus reflects)
-            text = re_DottedNumber.sub("", self.reader.readparagraph())
-            return ListItemEv(kind=kind, ordinal=ordinal, text=text)
+            # NB: only the "1. " and "(1) " forms are stripped from the text;
+            # the "1) " form is kept (faithful to the old parser, whose output
+            # the golden corpus reflects)
+            para = self.reader.readparagraph()
+            marker = re_NumberParen if re_NumberParen.match(para) else re_DottedNumber
+            text = marker.sub("", para, count=1)
+            return self.split_first_subitem(
+                ListItemEv(kind=kind, ordinal=ordinal, text=text))
         else:
             text = re_Strecksatslista.sub("", self.reader.readparagraph())
             return ListItemEv(kind=kind, ordinal=None, text=text)

@@ -93,9 +93,10 @@ class Lista:
 
 @dataclass
 class Listtext:
-    # text in a list that is no item of it: the words after the last item that
-    # end the sentence the list sits in ("Den som 1. … 2. … ‖ döms till böter
-    # …", 1994:1738 10 kap. 1 §), words between two items that join the items
+    # text in a list that is no item of it, one per source block: the words
+    # after the last item that end the sentence the list sits in ("Den som 1.
+    # … 2. … ‖ döms till böter …", 1994:1738 10 kap. 1 §), words between two
+    # items that join the items
     # above to the items below ("4. … ‖ samt minskas med ‖ 5. …", 2010:110
     # 30 kap. 14 §), or the words that open a list ("lämnas med ‖ högst ‖
     # - 810 kronor …", 2022:81)

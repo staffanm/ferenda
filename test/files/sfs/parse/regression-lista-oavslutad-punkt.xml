@@ -1,0 +1,89 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>Med större företag avses</str>
+      <NumreradLista>
+        <Listelement id="P1S1N1" ordinal="1">
+          <str>företag som uppfyller följande villkor:</str>
+          <Strecksatslista>
+            <Listelement id="P1S1N1N1" ordinal="1">
+              <str>företag vars värdepapper är upptagna till handel, eller</str>
+            </Listelement>
+            <Listelement id="P1S1N1N2" ordinal="2">
+              <str>företag som uppfyller mer än ett av följande villkor:</str>
+              <Bokstavslista>
+                <Listelement id="P1S1N1N2Na" ordinal="a">
+                  <str>fler än 50 anställda,</str>
+                </Listelement>
+                <Listelement id="P1S1N1N2Nb" ordinal="b">
+                  <str>en balansomslutning över 40 miljoner kronor.</str>
+                </Listelement>
+              </Bokstavslista>
+            </Listelement>
+          </Strecksatslista>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Lagen gäller</str>
+      <Strecksatslista>
+        <Listelement id="P2S1N1" ordinal="1">
+          <str>fordon i trafik,</str>
+        </Listelement>
+        <Listelement id="P2S1N2" ordinal="2">
+          <str>fordon i yrkesmässig trafik.</str>
+        </Listelement>
+      </Strecksatslista>
+      <Bokstavslista>
+        <Listelement id="P2S1Na" ordinal="a">
+          <str>Med fordon avses motordrivna fordon.</str>
+        </Listelement>
+        <Listelement id="P2S1Nb" ordinal="b">
+          <str>Med trafik avses färd på väg.</str>
+        </Listelement>
+      </Bokstavslista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Bevisupptagning sker enligt följande.</str>
+      <Bokstavslista>
+        <Listelement id="P3S1Na" ordinal="a">
+          <str>Framställningen ska vara skriftlig.</str>
+        </Listelement>
+        <Listelement id="P3S1Nb" ordinal="b">
+          <str>Bevisupptagning får vägras endast i följande fall:</str>
+          <NumreradLista>
+            <Listelement id="P3S1NbN1" ordinal="1">
+              <str>om framställningens äkthet inte kan fastställas,</str>
+            </Listelement>
+            <Listelement id="P3S1NbN2" ordinal="2">
+              <str>om bevisupptagningen strider mot allmän ordning.</str>
+            </Listelement>
+          </NumreradLista>
+        </Listelement>
+      </Bokstavslista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Avgiften är</str>
+      <Strecksatslista>
+        <Listelement id="P4S1N1" ordinal="1">
+          <str>100 kronor för en enskild,</str>
+        </Listelement>
+        <Listelement id="P4S1N2" ordinal="2">
+          <str>200 kronor för ett bolag.</str>
+        </Listelement>
+      </Strecksatslista>
+    </Stycke>
+    <Stycke id="P4S2">
+      <str>- - - - - - - - - - - - - - - -</str>
+    </Stycke>
+    <Stycke id="P4S3">
+      <str>Avgiften betalas i förskott.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>
