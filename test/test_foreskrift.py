@@ -26,6 +26,7 @@ from ferenda.foreskrift.harvest import (
 # aliased: the tests below bind a local `ref` to each result, which would
 # otherwise shadow the imported function
 from ferenda.foreskrift.harvest import ref as _ref
+from ferenda.foreskrift.model import printed_designation
 from ferenda.foreskrift.parse import extract_publisher
 from ferenda.lib import compress, datasets, lagrum, net
 from ferenda.lib.harvest import guarded_enumerate, write_record
@@ -1018,7 +1019,6 @@ def test_every_registered_samling_cites_itself_the_way_it_is_printed():
     # `printed_designation` falls back to the slug in capitals, which is right
     # for the 40-odd samlingar whose slug is their designation and wrong for
     # the ones carrying a Swedish vowel: ELSÄK-FS was cited as "ELSAKFS".
-    from ferenda.foreskrift.model import printed_designation
     for fs, row in datasets.load_fs_series().items():
         designation = row.get("designation")
         if not designation:
@@ -1112,15 +1112,40 @@ def test_prvfs_enumerate_reads_a_number_printed_with_a_space_after_the_colon(mon
     # A1 prints one row as "1977: 1, M:1". The space alone dropped PRVFS
     # 1977:1, the act PRVFS 2023:1 names as the one it repeals. Avdelning C
     # (upphävda författningar) holds 107 more the harvest never visited.
+    # Avdelning A2 holds gällande ändringsförfattningar (PRVFS 2023:2).
+    a2_url = agencies.PRVFS.params["index_urls"][1]
     _pages(monkeypatch, {
         agencies.PRVFS.index_url:
             '<a href="/globalassets/dokument/om-prv/prvfs/77prvfs_m1.pdf">1977: 1, M:1</a>'
             '<a href="/avdelning-c/">Avdelning C - Upphävda författningar</a>',
+        a2_url:
+            '<a href="/globalassets/dokument/om-prv/prvfs/prvfs-2023-2.pdf">2023:2, M:12</a>',
         "https://www.prv.se/avdelning-c/":
             '<a href="/globalassets/dokument/om-prv/prvfs/prvfs2015-1.pdf">2015:1, P:64</a>'})
     refs = list(agencies.prvfs_enumerate(None, agencies.PRVFS))
     assert [(r.basefile, r.identifier) for r in refs] == [
-        ("prvfs/1977:1", "PRVFS 1977:1"), ("prvfs/2015:1", "PRVFS 2015:1")]
+        ("prvfs/1977:1", "PRVFS 1977:1"),
+        ("prvfs/2023:2", "PRVFS 2023:2"),
+        ("prvfs/2015:1", "PRVFS 2015:1")]
+
+
+def test_tfs_enumerate_attaches_sammanstalld_consolidations(monkeypatch):
+    # Tullverket publishes "Visa sammanställd" links (e.g. 2016002s.pdf -> TFS 2016:2) (#97),
+    # including consolidation-only documents that have no base row in the listing (e.g. 1996:21).
+    _pages(monkeypatch, {
+        agencies.TFS.index_url:
+            '<a rel="external" href="/download/18.a/2016002s.pdf">Visa sammanställd</a>'
+            '<a rel="external" href="/download/18.b/tfs2016_2.pdf">TFS 2016:2 Tullordning</a>'
+            '<a rel="external" href="/download/18.c/tfs2016_3.pdf">TFS 2016:3 Föreskrifter</a>'
+            '<a rel="external" href="/download/18.d/1996021s.pdf">Visa sammanställd</a>'})
+    refs = list(agencies.tfs_enumerate(None, agencies.TFS))
+    assert len(refs) == 3
+    assert refs[0].basefile == "tfs/2016:2"
+    assert refs[0].extra["consolidations"] == [{"url": "https://www.tullverket.se/download/18.a/2016002s.pdf"}]
+    assert refs[1].basefile == "tfs/2016:3"
+    assert "consolidations" not in refs[1].extra
+    assert refs[2].basefile == "tfs/1996:21"
+    assert refs[2].extra["consolidations"] == [{"url": "https://www.tullverket.se/download/18.d/1996021s.pdf"}]
 
 
 def test_last_designation_enumerate_reads_a_designation_only_the_filename_prints(monkeypatch):

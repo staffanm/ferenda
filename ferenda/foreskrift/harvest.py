@@ -30,6 +30,7 @@ config. New shapes are added only when an agency needs one
 
 import re
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -134,7 +135,7 @@ def fs_code(designation):
 _INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad"), None)
 _SPACES = dict.fromkeys(map(ord, "\u00a0\u2007\u202f"), " ")
 _DASHES = dict.fromkeys(map(ord, "\u2010\u2011\u2012\u2013\u2014\u2212"), "-")
-RE_COLON_SPACE = re.compile(r"(?<=\d):[ \t]+(?=\d)")
+RE_COLON_SPACE = re.compile(r"(?<=\d)[ \t]*:[ \t]+(?=\d)|(?<=\d)[ \t]+:[ \t]*(?=\d)")
 # a designation whose number is set with a hyphen rather than a colon
 # ("HSLF-FS 2023-3"). Anchored on the series suffix, and refused when more
 # digits follow, so a date ("HSLF-FS 2023-03-15") is left alone
@@ -151,7 +152,7 @@ def normalise(text):
     if not text:
         return text
     return RE_HYPHEN_NUMBER.sub(
-        r"\1:\2", RE_COLON_SPACE.sub(":", text.translate(_INVISIBLE)
+        r"\1:\2", RE_COLON_SPACE.sub(":", unicodedata.normalize("NFC", text).translate(_INVISIBLE)
                                      .translate(_SPACES).translate(_DASHES)))
 
 
@@ -921,8 +922,8 @@ def index_soups(session, agency, urls=None, *, method="GET", data=None,
             except requests.exceptions.RequestException as exc:
                 if optional and is_not_found(exc):
                     break                  # a year with no regulations -- no page
-                if len(queue) == 1 and not served:
-                    raise                  # the scope's only listing -- a real break
+                if (len(queue) == 1 or base == queue[0]) and not served:
+                    raise                  # the scope's only listing or primary entry -- a real break
                 yield Skip("%s: %r" % (url, exc))
                 break
             soup = BeautifulSoup(body, "html.parser")

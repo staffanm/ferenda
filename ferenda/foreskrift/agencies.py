@@ -533,13 +533,61 @@ STEMFS = Agency(
 )
 
 
+RE_TFS_CONSOLIDATION = re.compile(r"/(\d{4})(\d{3})s\.pdf", re.IGNORECASE)
+
+
+def tfs_enumerate(session, agency):
+    """One DocRef per TFS författning from the POST search result, with its
+    consolidations ("Visa sammanställd", e.g. 2016002s.pdf -> TFS 2016:2) attached."""
+    p = agency.params
+    seen = set()
+    refs = []
+    consolidations = {}
+
+    for item in harvest.index_soups(session, agency, urls=[agency.index_url],
+                                    method="POST", data=p.get("post_data")):
+        if isinstance(item, harvest.Skip):
+            yield item
+            continue
+        soup = item[1]
+        for a in soup.select(p["link_select"]):
+            href = a.get("href", "")
+            url = harvest.absolute(agency.base_url, href)
+            m = RE_TFS_CONSOLIDATION.search(href)
+            if m:
+                year, lop = m.group(1), str(int(m.group(2)))
+                basefile = "%s/%s:%s" % (agency.fs, year, lop)
+                if not any(c["url"] == url for c in consolidations.setdefault(basefile, [])):
+                    consolidations[basefile].append({"url": url})
+                continue
+            text = a.get_text(" ", strip=True)
+            docref = harvest.ref(agency, text, href, seen, title=text, direct=True)
+            if docref:
+                refs.append(docref)
+
+    for docref in refs:
+        if docref.basefile in consolidations:
+            docref.extra["consolidations"] = consolidations.pop(docref.basefile)
+        yield docref
+
+    for basefile, cons_list in consolidations.items():
+        year, lop = basefile.split("/")[1].split(":")
+        ident = "%s %s:%s" % (agency.fs.upper(), year, lop)
+        yield harvest.DocRef(
+            basefile=basefile, fs=None, identifier=ident,
+            url=cons_list[0]["url"], title=None,
+            extra={"consolidations": cons_list, "title": None,
+                   "source_url": agency.index_url},
+        )
+
+
 # indexed via POST ("show all" button) + DIRECT (anchor is the PDF)
 TFS = Agency(
     fs="tfs", name="Tullverket", publisher="Tullverket",
     base_url="https://www.tullverket.se",
     index_url="https://www.tullverket.se/omoss/dethargortullverket/verksamhetochorganisation/"
               "lagarochforeskrifter/sokitullverketsstyrdokument.4.7df61c5915510cfe9e7f3c1.html",
-    enumerate=indexed_enumerate, resolve=resolve_direct,
+    enumerate=tfs_enumerate, resolve=resolve_direct,
     params={"post_data": {"searchString": "( metadata.dokumenttyp:TFS )",
                           "sortval": "NrU", "step": "0.0", "next": "0.0",
                           "submit": "« Allt »"},
@@ -1278,7 +1326,8 @@ def prvfs_enumerate(session, agency):
             if docref:
                 yield docref
 
-    return harvest.index_refs(session, agency, page_refs)
+    urls = agency.params.get("index_urls", [agency.index_url])
+    return harvest.index_refs(session, agency, page_refs, urls=urls)
 
 
 PRVFS = Agency(
@@ -1288,6 +1337,14 @@ PRVFS = Agency(
     index_url="https://www.prv.se/sv/om-oss/var-verksamhet/styrdokument/"
               "prvs-forfattningssamling/avdelning-a1---gallande-grundforfattningar/",
     enumerate=prvfs_enumerate, resolve=resolve_direct,
+    params={
+        "index_urls": [
+            "https://www.prv.se/sv/om-oss/var-verksamhet/styrdokument/"
+            "prvs-forfattningssamling/avdelning-a1---gallande-grundforfattningar/",
+            "https://www.prv.se/sv/om-oss/var-verksamhet/styrdokument/"
+            "prvs-forfattningssamling/avdelning-a2---gallande-andringsforfattningar/",
+        ],
+    },
 )
 
 

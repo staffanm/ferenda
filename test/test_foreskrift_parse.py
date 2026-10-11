@@ -2562,3 +2562,154 @@ def test_clean_title_strips_a_listing_version_label():
         "SSMFS 2012:2 Strålsäkerhetsmyndighetens föreskrifter om riktmedel "
         "(ursprunglig version)", "SSMFS 2012:2") == (
         "Strålsäkerhetsmyndighetens föreskrifter om riktmedel")
+
+
+def test_andrar_target_accepts_en_dash_in_designation():
+    # RA-FS 2019:2 cites its target with an en-dash: "RA–FS 1991:1" (#82).
+    decl = ("Föreskrifter om ändring av Riksarkivets föreskrifter "
+            "RA–FS 1991:1 och allmänna råd om arkiv hos statliga myndigheter")
+    assert andrar_target(decl, "rafs", "https://lagen.nu/rafs/2019:2") == (
+        "https://lagen.nu/rafs/1991:1")
+
+
+def test_clean_title_strips_trailing_footnote_digits():
+    # KFMFS anchor text has footnote digits glued to the year ("20081", #64);
+    # Riksarkivet and others have footnote digits glued to words ("myndigheter1", #82).
+    assert clean_title(
+        "Kronofogdemyndighetens föreskrifter om bestämmande av förbehållsbelopp "
+        "vid utmätning av lön m.m. under år 20081", "KFMFS 2007:2") == (
+        "Kronofogdemyndighetens föreskrifter om bestämmande av förbehållsbelopp "
+        "vid utmätning av lön m.m. under år 2008")
+    assert clean_title(
+        "Föreskrifter om ändring av Riksarkivets föreskrifter (RA-FS 1991:1) "
+        "och allmänna råd om arkiv hos statliga myndigheter1", "RA-FS 2012:1") == (
+        "Föreskrifter om ändring av Riksarkivets föreskrifter (RA-FS 1991:1) "
+        "och allmänna råd om arkiv hos statliga myndigheter")
+
+
+def test_clean_title_strips_embedded_own_designation_and_publication_notice():
+    # RA-FS 1997:4 and 2002:1 legacy harvest rows embed own designation and
+    # "Utkom/inkom från trycket" in the title (#82).
+    t1 = ("Föreskrifter om ändring av Riksarkivets RA-FS 1997 :4 föreskrifter "
+          "(RA-FS 1991:1) och allmänna råd Utkom fråntrycket om arkiv hos "
+          "statliga myndigheter; den 29 januari 1993")
+    assert clean_title(t1, "RA-FS 1997:4") == (
+        "Föreskrifter om ändring av Riksarkivets föreskrifter (RA-FS 1991:1) "
+        "och allmänna råd om arkiv hos statliga myndigheter")
+    t2 = ("Föreskrifter om ändring i Riksarkivets föreskrifter RA-FS 2002:1 (1999:1) "
+          "och allmänna råd om gallring av handlingar inkom från trycket i statliga "
+          "myndigheters forskningsverksamhet; den l7 muj 2002")
+    assert clean_title(t2, "RA-FS 2002:1") == (
+        "Föreskrifter om ändring i Riksarkivets föreskrifter (1999:1) och allmänna "
+        "råd om gallring av handlingar i statliga myndigheters forskningsverksamhet")
+
+
+def test_unseparated_masthead_title_extraction():
+    # When a document has no separate body start (e.g. table-only or 1-page notice like DIFS 1999:1, #60),
+    # the title should still be extracted from m_blocks rather than dropping to None.
+    blocks = [
+        Block("tabell", "", 1, rows=[
+            ("Datainspektionens författningssamling",),
+            ("DIFS 1999:1 Datainspektionens föreskrifter om upphävande av inspektionens föreskrifter (DIFS 1988:2) om granskning av personregister; beslutade den 29 mars 1999.",),
+        ])
+    ]
+    start, separated = fp._body_start(blocks)
+    assert not separated
+    m_blocks = blocks[:start] if separated else blocks
+    assert fp.title_from_masthead(m_blocks, len(blocks)) == (
+        "Datainspektionens föreskrifter om upphävande av inspektionens föreskrifter (DIFS 1988:2) om granskning av personregister")
+
+
+def test_prvfs_margin_code_stripped_from_masthead_title():
+    # PRVFS 2013:1 prints margin code P:94 on page 1 only beside the title (#79).
+    # RE_MASTHEAD_BOILERPLATE must strip the margin code without touching parenthesised references.
+    blocks1 = [
+        Block("rubrik",
+              "föreskrifter P:94 om avgifter i PRV:s verksamhet som internationell "
+              "myndighet enligt konventionen om patentsamarbete; beslutade den 1 december 2013.", 1)
+    ]
+    assert fp.title_from_masthead(blocks1, 1) == (
+        "föreskrifter om avgifter i PRV:s verksamhet som internationell myndighet "
+        "enligt konventionen om patentsamarbete")
+
+    blocks2 = [
+        Block("rubrik",
+              "föreskrift om V:8 upphävande av föreskrift (PRVFS 1986:1, V:3) om "
+              "klassindelning; beslutade den 1 december 2011.", 1)
+    ]
+    assert fp.title_from_masthead(blocks2, 1) == (
+        "föreskrift om upphävande av föreskrift (PRVFS 1986:1, V:3) om klassindelning")
+
+
+def test_clean_title_rejects_index_row_fragments():
+    # PRVFS index listing rows contain entry codes and amendment descriptions (#79).
+    # When no prose remains, clean_title returns None so fallback to body title occurs.
+    assert clean_title("1994:4, M:9 Ändr. bilaga", "PRVFS 1994:4") is None
+    assert clean_title("1986:2, M:5 Ändr. Författningsrubrik och ingress", "PRVFS 1986:2") is None
+
+
+def test_clean_title_preserves_parallel_designations_and_date_stamps():
+    # Parallel designations in parentheses must not be stripped as own designation
+    assert clean_title(
+        "Föreskrifter om ändring i föreskrifterna (KAMFS 2012:1, TRAFAFS 2012:1) om behörighet",
+        "KAMFS 2012:1") == (
+        "Föreskrifter om ändring i föreskrifterna (KAMFS 2012:1, TRAFAFS 2012:1) om behörighet")
+    # Amendment targets after 'ändring i/av' must not be stripped
+    assert clean_title(
+        "Föreskrifter om ändring i MPRTFS 2016:1 om sändningsbeteckning",
+        "MPRTFS 2016:1") == (
+        "Föreskrifter om ändring i MPRTFS 2016:1 om sändningsbeteckning")
+    # Decomposed NFD characters in amendment phrases must normalize and preserve target
+    raw_mpr = "Fo\u0308reskrifter om a\u0308ndring i MPRTFS 2016:1 om presstöd (MPRTFS 2019:1) (PDF, 162 kb)"
+    assert clean_title(raw_mpr, "MPRTFS 2016:1") == (
+        "Föreskrifter om ändring i MPRTFS 2016:1 om presstöd (MPRTFS 2019:1)")
+    # Misprinted leading series prefix with matching number must be stripped
+    raw_hsls = (
+        "HSLS-FS 2017:25 Ändring i föreskrifterna (SOSFS 2004:11) om ansvar för remisser "
+        "för patienter inom hälso- och sjukvården, tandvården m.m.")
+    assert clean_title(raw_hsls, "HSLF-FS 2017:25") == (
+        "Ändring i föreskrifterna (SOSFS 2004:11) om ansvar för remisser "
+        "för patienter inom hälso- och sjukvården, tandvården m.m.")
+    # 8-digit date stamps such as 'Omtryck 20140618' must not lose digits to trailing footnote rule
+    assert clean_title(
+        "Skogsstyrelsens föreskrifter och allmänna råd (SKSFS 2011:2) om stöd till vissa åtgärder "
+        "inom skogsbruket Omtryck 20140618.pdf - 0,27 MB", "SKSFS 2014:3") == (
+        "Skogsstyrelsens föreskrifter och allmänna råd (SKSFS 2011:2) om stöd till vissa åtgärder "
+        "inom skogsbruket Omtryck 20140618")
+
+
+def test_cover_page_skipped_for_official_masthead():
+    # Documents such as AFS 2014:10 have a draft cover page on page 1 with AFS 2014:XX,
+    # and the official masthead with the actual title on page 2 (#45).
+    blocks = [
+        Block("stycke", "ARBETSMILJÖVERKET\nAFS 2014:XX\nDraft cover", 1),
+        Block("stycke", "Arbetsmiljöverkets författningssamling", 2),
+        Block("stycke", "Arbetsmiljöverkets föreskrifter om kemiska arbetsmiljörisker; beslutade den 25 mars 2014.", 2),
+        Block("paragraf", "1 § Dessa föreskrifter gäller.", 2, num="1"),
+    ]
+    m_blocks = blocks[:3]
+    m_page = next((b.page for b in m_blocks if fp.RE_MASTHEAD_LINE.search(b.text)), 1)
+    assert m_page == 2
+
+
+def test_repeal_list_with_more_than_99_items():
+    # BFS 2023:8 contains an enumerated list of 134 regulations to repeal (#44).
+    # Items 100+ must be split and extracted rather than dropped.
+    text = (
+        "Följande föreskrifter ska upphöra att gälla vid utgången av 2023: "
+        "98. Boverkets föreskrifter (BFS 1990:1) om ventilation "
+        "99. Boverkets föreskrifter (BFS 1990:2) om hissar "
+        "100. Boverkets föreskrifter (BFS 1990:3) om energi "
+        "101. Boverkets föreskrifter (BFS 1990:4) om brandskydd\n\n"
+    )
+    m = fp.RE_UPPHOR_LIST.search(text)
+    assert m is not None
+    obj = fp._repeal_object(m.group(1), whole=True)
+    targets = fp._repeal_targets(obj, "bfs")
+    assert targets == {
+        "https://lagen.nu/bfs/1990:1",
+        "https://lagen.nu/bfs/1990:2",
+        "https://lagen.nu/bfs/1990:3",
+        "https://lagen.nu/bfs/1990:4",
+    }
+

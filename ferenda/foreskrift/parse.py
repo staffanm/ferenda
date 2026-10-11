@@ -218,7 +218,7 @@ def ersatter_clauses(text):
 # föreskrifter (1993:21) …, 2. …", LIVSFS 2014:4) is not the sentence's end;
 # it becomes a dash item marker, which `_repeal_object` splits on
 # (not the tail of a designation: "SJVFS 2021:13.\nGodkänd" is a footnote's end)
-RE_ENUMERATOR = re.compile(r"(?<![:\d/])\b\d{1,2}\.\s+(?=[A-ZÅÄÖ(\d])")
+RE_ENUMERATOR = re.compile(r"(?<![:\d/])\b\d{1,3}\.\s+(?=[A-ZÅÄÖ(\d])")
 RE_SKALL_UPPHORA = re.compile(r"\bska(?:ll)?\s+([^.;]{0,300}?)\s+upphöra\s+att\s+gälla", re.DOTALL | re.I)
 # ("upphör gälla", SJVFS 2019:6, drops the "att")
 RE_UPPHOR_BEFORE = re.compile(r"([^;]{0,2500}?)\b(?:upphör|ska(?:ll)?\s+upphöra)\s+(?:att\s+)?gälla",
@@ -300,7 +300,7 @@ RE_UPPHOR_LIST = re.compile(
     # 2000:13) om …", RPSFS 2008:8)
     r"(?::|nämligen|enligt\s+följande\.|\.\s*\n)\s*(.{0,12000}?)"
     r"(?=\n\s*\n|Dessa\s+föreskrifter\s+träder|[_–]{5,}|$)", re.DOTALL | re.I)
-RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,2}\.|[a-zåäö][.)]|[−•–-])\s)")
+RE_UPPHOR_ITEM = re.compile(r"\s(?=(?:\d{1,3}\.|[a-zåäö][.)]|[−•–-])\s)")
 # the enumerated passive: "Genom författningen upphävs 1. Statens jordbruksverks
 # föreskrifter (SJVFS 1999:102) om …, 2. … (SJVFS 2002:98) om …" (SJVFS 2021:48,
 # twelve items; SJVFS 2026:8 has seventeen a)–q) items), read after
@@ -1286,8 +1286,8 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # leaving "Prenumerera … på" glued to the front of the title (FFFS 2001:8)
     r"|\bPrenumerera\b[^.\n]*?\bp[åa]\b"
     r"|\bTfn\b[\s\d-]*|\bSverige,"
-    r"|Publicerings?datum|Publicerade?(?:\s+den)?|\b[A-ZÅÄÖ]{2,}(?:-| )?FS\b|\b\d{4}:\d+\b"
-    r"|\bxx\b|\d{2}xx\b"
+    r"|Publicerings?datum|Publicerade?(?:\s+den)?|\b[A-ZÅÄÖ]+(?:-| )?FS\b|\b\d{4}:\d+\b"
+    r"|\bxx\b|\d{2}xx\b|\b[A-ZÅÄÖ]+\s+[xX]{2,}:[xX]{2,}\b|\b[xX]{4}:[xX]{2}\b"
     # the second column's ISO date ("Utkom från trycket 1998-01-26", the old
     # Livsmedelsverket masthead), which lands mid-title like the "den …" form
     r"|\b\d{4}-\d{2}-\d{2}\b"
@@ -1302,6 +1302,9 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # the code is gone. Keyed on the literal "FAP" and the code's own nnn-n
     # shape, so a real "EN 1090-1" in a title is untouched.
     r"|\bFAP\s+\d{3}-\d\b"
+    # Patent- och registreringsverkets internal margin codes ("P:94", "V:11",
+    # "M:10", "B:17", "O:1", "T:01"), printed on page 1 only beside the title
+    r"|\b(?-i:[A-Z]{1,2}:\d{1,3})\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?|\bnr\s+\d+"
     % "|".join(MONTHS), re.IGNORECASE)
 # a word the removal left doubled ("Kriminalvårdens
@@ -1334,7 +1337,7 @@ RE_MASTHEAD_COLUMN = re.compile(
 # class ate a lower-case word that belonged to the title ("… anskaffning av
 # utrustning i gymnasieskolan", SKOLFS 1992:1) -- 3 of the same 1,200.
 RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b"
-                          r"|(?-i:\s[A-ZÅÄÖ][\wåäöÅÄÖ-]+)?\s*\bföreskriver\d{0,2}\b"
+                          r"|(?-i:\s[A-ZÅÄÖ][\wåäöÅÄÖ-]+)?\s*\b(?:föreskriver\d{0,2}|meddelar)\b"
                           r"|\bÄndring\s+införd\b",
                           re.IGNORECASE)
 # the footnote marker the masthead sets on the title's last word, which the
@@ -1391,10 +1394,17 @@ RE_ROW_TITLE_END = re.compile(r";|\b(?:beslutad|beslutat)\w*\s+den\s+\d",
 # words that make a harvest "title" a role label, not a title
 RE_TITLE_BOILERPLATE = re.compile(
     r"\b(?:grundförfattning|ändringsförfattning|konsoliderad(?:\s+version)?|"
-    r"öppnas|nytt\s+fönster)\b", re.IGNORECASE)
+    r"öppnas|nytt\s+fönster)\b"
+    r"|\bÄndr\.(?:\s*(?:bilaga|författningsrubrik(?:\s+och\s+ingress)?|ingress|rubrik))?\b"
+    r"|\b(?-i:[A-Z]{1,2}:\d{1,3})\b", re.IGNORECASE)
 # a version label a listing appends to the title ("… (ursprunglig version)")
 RE_VERSION_LABEL = re.compile(
     r"\s*\((?:ursprunglig|konsoliderad|senaste)\s+version\)\s*$", re.IGNORECASE)
+RE_UTKOM_FRAN_TRYCKET = re.compile(
+    r"\s*\b(?:utkom|inkom|utkommit)\s+fr[åa]n\s*(?:trycket|mycket)\b"
+    r"(?:\s+(?:den\s+)?\d{1,2}\s+[a-zåäö]+(?:\s+\d{4})?)?\s*", re.IGNORECASE)
+RE_TRAILING_FOOTNOTE = re.compile(
+    r"(?<=\b(?:19|20)\d{2})\s+\d+$|(?<=\b(?:19|20)\d{2})\d{1}$|(?<=[a-zåäö]{3})\d{1,2}$")
 
 
 # A word the printed page broke across lines, rejoined by the extraction with
@@ -1472,14 +1482,21 @@ def _strip_own_designation(title, identifier):
     the front of every title it set that way."""
     own = RE_DESIGNATION.search(identifier)
     if own:
+        own_series = series_slug(own.group(1))
         number = (own.group(2), int(own.group(3)))
 
         def names_itself(m):
-            return (m.group(2), int(m.group(3))) == number
+            return series_slug(m.group(1)) == own_series and (m.group(2), int(m.group(3))) == number
 
+        # at the start of the title, an agency can misprint its own series prefix
+        # ("HSLS-FS 2017:25" against HSLF-FS 2017:25) -- the matching year and
+        # löpnummer confirm it is the document's own prefix
         printed = RE_DESIGNATION.match(title)
-        if printed and names_itself(printed):
+        if printed and (printed.group(2), int(printed.group(3))) == number:
             title = title[printed.end():].strip(" -–—:").strip()
+        bare_num = re.match(r"^(\d{4}):(\d+)\b", title)
+        if bare_num and (bare_num.group(1), int(bare_num.group(2))) == number:
+            title = title[bare_num.end():].strip(" -–—:").strip()
         # and the parenthesis at the end in which the listing files the
         # document under its role ("… (HSLF-FS 2021:64 GRUNDFÖRFATTNING)",
         # MFoF). The role is not part of the title, and the number beside it
@@ -1504,6 +1521,17 @@ def _strip_own_designation(title, identifier):
         if (last and last.end() == len(trailing) and names_itself(last)
                 and trailing[last.start() - 1:last.start()] != "("):
             title = trailing[:last.start()].strip(" -–—:|,")
+        # and an own designation embedded bare in the title ("Riksarkivets RA-FS 1997:4 föreskrifter")
+        for m in list(RE_DESIGNATION.finditer(title)):
+            if not names_itself(m):
+                continue
+            before = title[:m.start()]
+            if before.count("(") > before.count(")"):
+                continue
+            if re.search(r"\b(?:ändring\s+(?:i|av)|upphävande\s+av)\s*$", before, re.I):
+                continue
+            title = (before.rstrip() + " " + title[m.end():].lstrip()).strip(" -–—:|.,")
+            break
         return title
     return re.sub(r"^%s\s*[-–—:]*\s*" % re.escape(identifier), "", title).strip()
 
@@ -1515,6 +1543,7 @@ def clean_title(raw, identifier):
     text, which is file chrome rather than a title (F7). None sends the
     caller to the PDF's own rubric (title_from_body)."""
     t = join_wrapped(normalise(RE_TITLE_CHROME.sub("", raw or ""))).strip()
+    t = RE_UTKOM_FRAN_TRYCKET.sub(" ", t).strip()
     # a version label the listing appends to the title text, not part of it:
     # Strålsäkerhetsmyndigheten's rows read "… som innehåller tritium
     # (ursprunglig version)" / "(konsoliderad version)"
@@ -1528,11 +1557,14 @@ def clean_title(raw, identifier):
         t = t[:end.start()].strip()
     if identifier:
         t = _strip_own_designation(t, identifier)
+    t = RE_TRAILING_FOOTNOTE.sub("", t).strip()
     # what remains once designations, numbers and role words go: a title has
     # prose left, chrome does not
     probe = re.sub(r"[\d\s:/().,–—-]+", "",
                    RE_TITLE_BOILERPLATE.sub("", RE_FS_REF.sub("", t)))
-    return t if len(probe) >= 8 else None
+    if len(probe) < 8:
+        return None
+    return t
 
 
 TITLE_MAX = 320      # a subject longer than this is extraction running on
@@ -1836,7 +1868,7 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     blocks, notes = parse_body(_pages(path, patch_key), identifier)
     _repair_ocr(blocks)
     start, separated = _body_start(blocks)
-    m_blocks = blocks[:start]
+    m_blocks = blocks[:start] if separated else blocks
     # when a document has cover pages before the official masthead:
     m_page = next((b.page for b in m_blocks if RE_MASTHEAD_LINE.search(b.text)), 1)
     if m_page > 1:
@@ -2185,7 +2217,8 @@ def andrar_target(title, fs, self_uri):
     after the ändring phrase (a chained "… (ÅFS 2006:3) om ändring i … (ÅFS
     2005:5)" amends 2006:3, which in turn amends 2005:5); the record's own
     designation, when the title restates it, is never the target."""
-    m = RE_ANDRING.search(title or "")
+    title = normalise(title or "")
+    m = RE_ANDRING.search(title)
     if not m:
         # an omtryck restates the base's title, its designation in the place
         # the document's own would stand ("Statens jordbruksverks föreskrifter
