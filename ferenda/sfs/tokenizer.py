@@ -34,9 +34,9 @@ re_NumberParen = re.compile(r"^\((\d+)\) ")
 # (Tokenizer.id_of_bokstav_or_romersk)
 re_LetterMarker = re.compile(r"^(\(?)([a-zåäö]{1,6}|[A-ZÅÄÖ])([.)]) ")
 re_Roman = re.compile(r"^x{0,3}(ix|iv|v?i{0,3})$")
-# the letter after each letter, in a letter list's order
-NEXT_LETTER = dict(zip("abcdefghijklmnopqrstuvwxyzåä", "bcdefghijklmnopqrstuvwxyzåäö",
-                       strict=True))
+# a letter list's order, and the letter after each letter in it
+ALPHABET = "abcdefghijklmnopqrstuvwxyzåäö"
+NEXT_LETTER = dict(zip(ALPHABET[:-1], ALPHABET[1:], strict=True))
 # a dash item; a line of dashes only is a separator that marks left-out text
 # or rules off a table ("- - - - - - - -", 1955:469 övergångsbestämmelser)
 re_Strecksatslista = re.compile(r"^(- |\x96 |– |--)(?![-–\x96 ]*$)")
@@ -196,7 +196,7 @@ class StyckeEv:
 
 @dataclass
 class ListItemEv:
-    kind: str  # "numrerad" | "bokstav" | "romersk" | "strecksats"
+    kind: str  # "numrerad" | "bokstav" | "romersk" | "versal" | "strecksats"
     text: str
     ordinal: str | None = None
 
@@ -224,6 +224,9 @@ class Tokenizer:
         # before them is what tells which (id_of_bokstav_or_romersk)
         self.last_bokstav = None
         self.last_romersk = None
+        # the latest capital letter marker in this paragraf: a dotted capital
+        # is a marker only in sequence (id_of_bokstav_or_romersk)
+        self.last_versal = None
         # the first items of nested lists that the source prints in the
         # same block as the item they nest under (split_first_subitem),
         # outermost first
@@ -555,7 +558,7 @@ class Tokenizer:
         firstline = r.peekline()
         ordinal = self.id_of_paragraf(r.peekparagraph())
         self.current_section = ordinal
-        self.last_bokstav = self.last_romersk = None
+        self.last_bokstav = self.last_romersk = self.last_versal = None
         r.read(len(ordinal) + len(" \xa7 "))
 
         # really old laws split sections into "moment": "1 § 2 mom."
@@ -672,17 +675,31 @@ class Tokenizer:
           list and "v"/"x" continue one ("v" after "iv"). Other letters keep
           the ")" form's old reading, a letter item.
         - a dotted single letter out of that sequence is no marker: "t. ex."
-          opens a sentence. A capital letter is a letter item in the ")" form
-          only.
+          opens a sentence.
+        - a capital letter is an item of a list of its own kind, "versal", so
+          a letter list can nest under it ("A. i Nederländerna ‖ (a) för
+          vårdförmåner … ‖ B. i Sverige ‖ (a) …", 1983:22 bilaga 3 artikel
+          2). In the ")" form it always is. In the dotted form it is only in
+          sequence ("A", or the letter after the latest capital) and before a
+          lowercase word: "A. Allmänna bestämmelser" is a heading, and "E. von
+          Graffenried", out of sequence, a name.
         - a longer roman numeral ("ii", "xxiv") is a roman item, and a doubled
           letter ("aa)", "bb)") continues a letter list past z).
 
         `line` is the text to read the marker from, the next line if None."""
-        m = re_LetterMarker.match(self.reader.peekline() if line is None else line)
+        line = self.reader.peekline() if line is None else line
+        m = re_LetterMarker.match(line)
         if m is None:
             return None
         paren, ordinal, delimiter = m.groups()
         if paren and delimiter != ")":
+            return None
+        if ordinal.isupper():
+            if delimiter == ")" or (
+                    ordinal.lower() in ("a", NEXT_LETTER.get(
+                        (self.last_versal or "").lower()))
+                    and line[m.end():m.end() + 1].islower()):
+                return "versal", ordinal
             return None
         if len(ordinal) == 1:
             if ordinal in ("a", NEXT_LETTER.get(self.last_bokstav)):
@@ -702,8 +719,10 @@ class Tokenizer:
         kind, ordinal = self.id_of_bokstav_or_romersk(text)
         if kind == "bokstav":
             self.last_bokstav = ordinal
-        else:
+        elif kind == "romersk":
             self.last_romersk = ordinal
+        else:
+            self.last_versal = ordinal
         text = re_LetterMarker.sub(
             "", self.reader.readparagraph() if text is None else text, count=1)
         return self.split_first_subitem(

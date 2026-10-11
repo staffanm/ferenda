@@ -87,7 +87,8 @@ class Lista:
     # the group labels over items that start their count again ("i Danmark ‖
     # a) … ‖ i Finland ‖ a) …", 1983:163); its items are counted, as a
     # strecksats list's are
-    kind: str  # "numrerad" | "bokstav" | "romersk" | "strecksats" | "omarkerad"
+    # "versal" is a list with capital letter markers ("A.", "B)")
+    kind: str  # "numrerad" | "bokstav" | "romersk" | "versal" | "strecksats" | "omarkerad"
     children: list[Listelement | Listtext] = field(default_factory=list)
 
 

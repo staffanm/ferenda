@@ -1,0 +1,183 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>Förbindelseorgan enligt konventionen</str>
+      <NumreradLista>
+        <Listelement id="P1S1N1" ordinal="1">
+          <str>Förbindelseorgan enligt artikel 28 i konventionen är</str>
+          <VersalLista>
+            <Listelement id="P1S1N1NA" ordinal="A">
+              <str>i Nederländerna</str>
+              <Bokstavslista>
+                <Listelement id="P1S1N1NANa" ordinal="a">
+                  <str>för vårdförmåner vid sjukdom Ziekenfondsraad, Amstelveen,</str>
+                </Listelement>
+                <Listelement id="P1S1N1NANb" ordinal="b">
+                  <str>för övriga förmåner Gemeenschappelijk Administratiekantoor, Amsterdam,</str>
+                </Listelement>
+              </Bokstavslista>
+            </Listelement>
+            <Listelement id="P1S1N1NB" ordinal="B">
+              <str>i Sverige</str>
+              <Bokstavslista>
+                <Listelement id="P1S1N1NBNa" ordinal="a">
+                  <str>för arbetslöshetsförsäkring arbetsmarknadsstyrelsen, Solna,</str>
+                </Listelement>
+                <Listelement id="P1S1N1NBNb" ordinal="b">
+                  <str>för övriga förmåner riksförsäkringsverket, Stockholm.</str>
+                </Listelement>
+              </Bokstavslista>
+            </Listelement>
+          </VersalLista>
+        </Listelement>
+        <Listelement id="P1S1N2" ordinal="2">
+          <str>Förbindelseorganen har de uppgifter som anges i denna överenskommelse.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Vägmärken delas in i</str>
+      <VersalLista>
+        <Listelement id="P2S1NA" ordinal="A">
+          <str>varningsmärken,</str>
+        </Listelement>
+        <Listelement id="P2S1NB" ordinal="B">
+          <str>väjningspliktsmärken, och</str>
+        </Listelement>
+        <Listelement id="P2S1NC" ordinal="C">
+          <str>förbudsmärken.</str>
+        </Listelement>
+      </VersalLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Anvisningarna är indelade i avsnitt.</str>
+    </Stycke>
+    <Stycke id="P3S2">
+      <str>A. Allmänna bestämmelser</str>
+    </Stycke>
+    <Stycke id="P3S3">
+      <str>Bestämmelserna i detta avsnitt gäller alla ärenden.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Avtalet undertecknades i Bern.</str>
+    </Stycke>
+    <Stycke id="P4S2">
+      <str>E. von Graffenried undertecknade för förbundsrådet.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P5" ordinal="5">
+    <Stycke id="P5S1">
+      <str>Förfarandet för verifikation av enstaka objekt.</str>
+      <NumreradLista>
+        <Listelement id="P5S1N1" ordinal="1">
+          <str>Tillverkaren ska lämna in ansökan till ett anmält organ.</str>
+        </Listelement>
+        <Listelement id="P5S1N2" ordinal="2">
+          <str>Ansökan ska vara skriftlig.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+    <Stycke id="P5S2">
+      <str>Ansökan ska innehålla följande uppgifter:</str>
+      <Strecksatslista>
+        <Listelement id="P5S2N1" ordinal="1">
+          <str>tillverkarens namn och adress,</str>
+        </Listelement>
+        <Listelement id="P5S2N2" ordinal="2">
+          <str>en teknisk dokumentation i enlighet med nedanstående krav:</str>
+          <Bokstavslista>
+            <Listelement id="P5S2N2Na" ordinal="a">
+              <str>beskrivning av utrustningen,</str>
+            </Listelement>
+            <Listelement id="P5S2N2Nb" ordinal="b">
+              <str>en hänvisning till bullerdirektivet.</str>
+            </Listelement>
+          </Bokstavslista>
+        </Listelement>
+      </Strecksatslista>
+      <NumreradLista>
+        <Listelement id="P5S2N3" ordinal="3">
+          <str>Det anmälda organet ska:</str>
+          <Strecksatslista>
+            <Listelement id="P5S2N3N1" ordinal="1">
+              <str>undersöka utrustningen,</str>
+            </Listelement>
+            <Listelement id="P5S2N3N2" ordinal="2">
+              <str>utföra bullerprovningarna.</str>
+            </Listelement>
+          </Strecksatslista>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P6" ordinal="6">
+    <Stycke id="P6S1">
+      <str>Konventionen tillämpas enligt följande.</str>
+      <NumreradLista>
+        <Listelement id="P6S1N1" ordinal="1">
+          <str>Bestämmelserna i denna konvention skall tillämpas på:</str>
+          <VersalLista>
+            <Listelement id="P6S1N1NA" ordinal="A">
+              <str>i Turkiet</str>
+              <NumreradLista>
+                <Listelement id="P6S1N1NAN1" ordinal="1">
+                  <str>1) lagstiftningen om social trygghet,</str>
+                </Listelement>
+                <Listelement id="P6S1N1NAN2" ordinal="2">
+                  <str>2) lagstiftningen om särskilda system för social trygghet,</str>
+                </Listelement>
+              </NumreradLista>
+            </Listelement>
+            <Listelement id="P6S1N1NB" ordinal="B">
+              <str>i Sverige lagstiftningen om allmän försäkring.</str>
+            </Listelement>
+          </VersalLista>
+        </Listelement>
+        <Listelement id="P6S1N2" ordinal="2">
+          <str>Där ej annat följer skall konventionen tillämpas på lagstiftning som ändrar denna lagstiftning.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P7" ordinal="7">
+    <Stycke id="P7S1">
+      <str>Övergångsbestämmelser.</str>
+      <NumreradLista>
+        <Listelement id="P7S1N26" ordinal="26">
+          <str>Regeringen meddelar särskilda övergångsbestämmelser rörande</str>
+          <NumreradLista>
+            <Listelement id="P7S1N26N1" ordinal="1">
+              <str>lärare vid skola som byter huvudman, samt</str>
+            </Listelement>
+            <Listelement id="P7S1N26N2" ordinal="2">
+              <str>den som innehar tjänst som lärare vid lantbruksskola.</str>
+            </Listelement>
+          </NumreradLista>
+        </Listelement>
+        <Listelement id="P7S1N27" ordinal="27">
+          <str>Vid kommunens gymnasieskola skall inrättas ordinarie tjänster.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+    <Stycke id="P7S2">
+      <str>Organisationen ska årligen ta fram information om</str>
+      <NumreradLista>
+        <Listelement id="P7S2N3" ordinal="3">
+          <str>hur hushållen kan bidra till ökad materialåtervinning,</str>
+        </Listelement>
+        <Listelement id="P7S2N5" ordinal="5">
+          <str>hur utsortering ska ske på platser utomhus, och</str>
+        </Listelement>
+        <Listelement id="P7S2N4" ordinal="4">
+          <str>de återvinningsresultat som utsorteringen bidrar till.</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

@@ -10,6 +10,7 @@ leaf events attach at their natural level.
 import logging
 import re
 
+from ..lib import util
 from . import tokenizer as t
 from .model import (
     Avdelning,
@@ -38,17 +39,25 @@ log = logging.getLogger(__name__)
 # punkt ("tredje stycket: 90 procent", 1989:1021 1 §) is a list item's own text
 re_Definition = re.compile(r"^(?P<term>[a-zåäö][^:]{0,80}):(?: \S|$)")
 re_NotATerm = re.compile(r"stycke|punkt")
+re_NumberOrdinal = re.compile(r"(\d+)\s*(\w*)$")
+
+# the ordinal that starts the count of each kind of list (Assembler going_on)
+FIRST_ORDINAL = {"numrerad": "1", "bokstav": "a", "romersk": "i",
+                 "versal": "A"}
 
 # a list of one kind nests under the latest item of a list of another: a
 # letter list under a numbered item, a dash list or a roman list under a letter
 # item ("3. … a) … att anlägga - ett industriområde, …", 2010:900 4 kap. 2 §),
 # a letter list under a roman item. Any other new list nests only under an
 # item that does not end its sentence (Assembler nests): a letter list after a
-# dash list most often is a list of its own
+# dash list most often is a list of its own, and one after a capital letter
+# item can be the same list in another language ("aa) he shall be deemed … ‖
+# A) Han anses …", 1969:190)
 NESTS = {
     "numrerad": {"bokstav", "romersk", "strecksats"},
     "bokstav": {"romersk", "strecksats"},
     "romersk": {"bokstav", "strecksats"},
+    "versal": set(),
     "strecksats": set(),
 }
 
@@ -58,6 +67,19 @@ NESTS = {
 # announces what follows, so it ends nothing ("– företag som uppfyller mer än
 # ett av följande villkor: ‖ a) …", 1995:1554 1 kap. 3 §)
 re_ItemEnd = re.compile(r"(?:[,.;]|\b(?:och|eller|samt))$")
+
+
+def count(kind, ordinal):
+    """The place of a list item's ordinal in its list's count: "1 b" comes
+    after "1" and before "2", "ä" after "å", "aa" after "ö", and "iv" after
+    "iii"."""
+    if kind == "numrerad":
+        m = re_NumberOrdinal.match(ordinal)
+        assert m is not None, "a numbered item's ordinal is a number: %r" % ordinal
+        return int(m.group(1)), m.group(2)
+    if kind == "romersk":
+        return util.from_roman(ordinal), ""
+    return len(ordinal), [t.ALPHABET.index(c) for c in ordinal.lower()]
 
 
 def ends(text):
@@ -123,27 +145,59 @@ def assemble(tokens):
     def items(lista):
         return [c for c in lista.children if isinstance(c, Listelement)]
 
+    def last_item(item):
+        """The item that ends this item's sentence: the latest item of its
+        latest nested list, at any depth ("- en teknisk dokumentation i
+        enlighet med nedanstående krav: ‖ a) … ‖ e) en hänvisning till
+        bullerdirektivet." ends with e, 2001:1084 bilaga 4)."""
+        sublists = [c for c in item.children if isinstance(c, Lista) and items(c)]
+        return last_item(items(sublists[-1])[-1]) if sublists else item
+
+    def going_on(ev):
+        """The open list this item goes on with, if any: of the open lists of
+        its kind, the one whose latest item comes nearest before it in the
+        count, the innermost of equals. Point 27 after the nested "1. … 2. …"
+        under point 26 goes on with the outer list (1971:235). An item that
+        starts a count and comes before them all opens a list of its own: "1)
+        lagstiftningen …" under "A. i Turkiet" is no second point 1 of the
+        list that holds "A." (1981:208 artikel 2). Any other item out of
+        order goes on with the innermost list, as the source numbers it ("3.
+        … 5. … 4. …", 2022:1274 16 §). A dash item goes on with the
+        innermost dash list, and so does an item when a list of its kind that
+        opens with a group label is open, whose count starts again after
+        each label (group_labels)."""
+        candidates = [lst for lst in reversed(lists) if lst.kind == ev.kind]
+        if not candidates:
+            return None
+        if ev.kind == "strecksats" or any(
+                lst is lab for lst in candidates for lab in labelled):
+            return candidates[0]
+        place = count(ev.kind, ev.ordinal)
+        before = [lst for lst in candidates
+                  if count(ev.kind, items(lst)[-1].ordinal) < place]
+        if before:
+            return max(before, key=lambda lst: count(ev.kind, items(lst)[-1].ordinal))
+        return None if ev.ordinal == FIRST_ORDINAL[ev.kind] else candidates[0]
+
     def nests(ev):
         """Does this item open a list nested under the innermost list's latest
         item (rather than go on with an open list, or close lists)? A list of
         a kind that NESTS does not name nests under an item that does not end
         its sentence ("(e) Bevisupptagning må vägras endast i följande fall:
         ‖ (1) …", 1958:522 artikel 7)."""
-        if (not lists or any(lst.kind == ev.kind for lst in lists)
-                or not items(lists[-1])):
+        if not lists or going_on(ev) or not items(lists[-1]):
             return False
         return (ev.kind in NESTS[lists[-1].kind]
-                or not ends(items(lists[-1])[-1].text))
+                or not ends(last_item(items(lists[-1])[-1]).text))
 
     def attach_listitem(ev, opening=None):
         """`opening` is the blocks of words that open a nested list this item
         starts."""
         item = Listelement(ordinal=ev.ordinal, text=ev.text)
-        if any(lst.kind == ev.kind for lst in lists):
+        if (innermost := going_on(ev)) is not None:
             # the item goes on with an open list: close the lists inside it
-            while lists[-1].kind != ev.kind:
+            while lists[-1] is not innermost:
                 lists.pop()
-            innermost = lists[-1]
             if ev.kind == "strecksats":
                 item.ordinal = str(len(items(innermost)) + 1)
             innermost.children.append(item)

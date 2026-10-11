@@ -39,7 +39,7 @@ from ferenda.sfs import parse_sfs  # noqa: F401  (ensures package import)
 from ferenda.sfs.extract import sanitize_body
 from ferenda.sfs.reader import TextReader
 from ferenda.sfs.tokenizer import Tokenizer
-from ferenda.sfs.assembler import assemble
+from ferenda.sfs.assembler import assemble, count
 from ferenda.sfs.nf import to_normalform
 from ferenda.lib import page
 from ferenda.lib.lagrum import LagrumParser, load_namedlaws
@@ -74,7 +74,7 @@ BROKEN = {
 }
 
 INLINE = {"str", "Link", "LinkSubject"}
-LISTS = {"NumreradLista", "Strecksatslista", "Bokstavslista", "RomerskLista", "Lista"}
+LISTS = {"NumreradLista", "Strecksatslista", "Bokstavslista", "RomerskLista", "VersalLista", "Lista"}
 
 
 def localname(elem):
@@ -541,3 +541,63 @@ def test_an_item_printed_with_two_levels_of_subitems_keeps_them_in_order():
     [romans] = letters.children[0].children
     assert [(i.ordinal, i.text) for i in romans.children] == [
         ("i", "inkomster i Sverige,"), ("ii", "inkomster utomlands,")]
+
+
+def test_capital_letter_items_are_a_list_of_their_own_kind():
+    """"A. i Nederländerna ‖ (a) … ‖ B. i Sverige ‖ (a) …" is a list of capital
+    letter items under point 1, with a letter list under each, and point 2
+    goes on the numbered list (1983:22 bilaga 3 artikel 2)."""
+    p1, p2, *_ = fixture_paragrafer("regression-versaler.txt")
+    [numbered] = p1.children[0].children
+    assert [i.ordinal for i in numbered.children] == ["1", "2"]
+    [capitals] = numbered.children[0].children
+    assert (capitals.kind, [i.ordinal for i in capitals.children]) == (
+        "versal", ["A", "B"])
+    assert [[i.ordinal for i in item.children[0].children]
+            for item in capitals.children] == [["a", "b"], ["a", "b"]]
+    [vagmarken] = p2.children[0].children
+    assert (vagmarken.kind, [i.text for i in vagmarken.children]) == (
+        "versal", ["varningsmärken,", "väjningspliktsmärken, och",
+                   "förbudsmärken."])
+
+
+def test_a_list_does_not_nest_under_an_item_whose_nested_list_ended_it():
+    """"- en teknisk dokumentation … krav: ‖ a) … ‖ b) en hänvisning till
+    bullerdirektivet." ends with b, so point 3 after it nests under nothing,
+    and the dash list after point 3 nests under it (2001:1084 bilaga 4)."""
+    *_, p5, _, _ = fixture_paragrafer("regression-versaler.txt")
+    dashes, numbered = p5.children[1].children
+    assert [l.kind for l in dashes.children[1].children] == ["bokstav"]
+    assert (numbered.kind, [i.ordinal for i in numbered.children]) == (
+        "numrerad", ["3"])
+    assert [l.kind for l in numbered.children[0].children] == ["strecksats"]
+
+
+def test_an_item_goes_on_with_the_list_whose_count_it_continues():
+    """"1)" under "A. i Turkiet" starts a count, so it opens a list nested
+    under A, and point 2 after B goes on with the outer list (1981:208
+    artikel 2). Point 27 goes on with the list of point 26, not with the
+    nested "1. … 2. …" (1971:235). A point out of order stays in its list,
+    as the act prints it ("3. … 5. … 4. …", 2022:1274 16 §)."""
+    *_, p6, p7 = fixture_paragrafer("regression-versaler.txt")
+    [numbered] = p6.children[0].children
+    assert [i.ordinal for i in numbered.children] == ["1", "2"]
+    [capitals] = numbered.children[0].children
+    assert [i.ordinal for i in capitals.children] == ["A", "B"]
+    [turkiet] = capitals.children[0].children
+    assert (turkiet.kind, [i.ordinal for i in turkiet.children]) == (
+        "numrerad", ["1", "2"])
+    [outer] = p7.children[0].children
+    assert [i.ordinal for i in outer.children] == ["26", "27"]
+    assert [[i.ordinal for i in lst.children]
+            for lst in outer.children[0].children] == [["1", "2"]]
+    [misnumbered] = p7.children[1].children
+    assert [i.ordinal for i in misnumbered.children] == ["3", "5", "4"]
+
+
+def test_the_letter_count_follows_the_swedish_alphabet():
+    """"ä)" goes on after "å)" (2016:157), and "aa)" after "ö)"."""
+    assert count("bokstav", "å") < count("bokstav", "ä") < count("bokstav", "ö")
+    assert count("bokstav", "ö") < count("bokstav", "aa")
+    assert count("numrerad", "1") < count("numrerad", "1 b") < count("numrerad", "2")
+    assert count("romersk", "iii") < count("romersk", "iv")
