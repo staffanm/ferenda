@@ -1,11 +1,11 @@
 ---
 name: wrapup-session
-description: End-of-session ritual — full mechanical checks, conventions review with automatic triage-and-fix, doc-drift check, memory writes, then a commit plan that is executed once the user approves it. Use when the user says to wrap up, finish the session, or prepare the work for committing.
+description: End-of-session ritual — full mechanical checks, conventions review, second opinion and corpus blast-radius verification with a fresh subagent, doc-drift check, memory writes, then an approved commit plan. Use when the user says to wrap up, finish the session, or prepare the work for committing.
 ---
 
 # Wrapping up a session
 
-Run the phases in order; each phase gates the next. Phase 5 is the only
+Run the phases in order; each phase gates the next. Phase 6 is the only
 phase that changes git state, and only after the user approves the plan
 (rule:no-unrequested-git). The git-guard hook backs this up in two tiers:
 irreversible git (`push`, `reset`, `rebase`, …) is denied to everything
@@ -45,7 +45,7 @@ type on a new field. A MEDIUM finding that rewords the user's prose,
 rewraps a paragraph, or picks between defensible phrasings is "needs the
 user" no matter how obvious it looks (CLAUDE.md: don't fix what's not
 broken). Every MEDIUM fix applied is enumerated individually in the
-phase-6 report, because the user's single phase-5 approval otherwise
+phase-7 report, because the user's single phase-6 approval otherwise
 covers edits they never chose.
 
 - **Fix now** — the finding is real and the correct fix is unambiguous:
@@ -75,14 +75,48 @@ At most two fix-and-verify rounds: whatever still stands after the second
 round becomes "needs the user" and goes in the report. Say so explicitly
 if a round hit that ceiling.
 
-## 3. Documentation drift
+## 3. Second opinion & blast-radius verification
+
+A clean mechanical pass and a passing test suite do not prove that a parser
+or normaliser is free of regressions across the corpus. Unit tests only
+cover the examples the author thought to write.
+
+For any session that touches parsers, harvesters, metadata extraction, or
+shared library helpers: launch the fresh `second-opinion` subagent on the
+diff. The subagent reviews the changes with zero author context bias.
+
+1. **Inappropriate coupling:** Verify that helpers designed for one
+   representation (e.g. PDF two-column masthead interleaved cleaner) are
+   not inappropriately hooked into a different data source (e.g. web harvest
+   listing titles).
+2. **Blast radius on stored corpus data:** For parser/normaliser changes,
+   run the blast radius tool against real stored records:
+   ```
+   .venv/bin/python .claude/skills/second-opinion/scripts/diff_blast_radius.py \
+       --file <modified_file> \
+       --function <modified_function> \
+       --records "<glob_pattern>" \
+       --fields "<args>"
+   ```
+   Check that legitimate dates, designations, and words are not stripped,
+   and that the number of altered records matches the targeted defect.
+3. **Test integrity:** Inspect all new tests to ensure they do not merely
+   assert the buggy behavior, and that no tests were weakened
+   (rule:never-weaken-tests).
+
+Triage findings: any regression on real data or inappropriate coupling
+must be resolved before moving to the commit plan. When the session only
+touched documentation, comments, or chore edits with no parser or logic
+changes: state in one line why no second opinion is needed.
+
+## 4. Documentation drift
 
 If the session changed module layout, a vertical's status, pipeline
 phases, or CLI invocations: launch the `docs-sync` agent
 (rule:docs-follow-structure). Otherwise state in one line why no doc
 update is needed.
 
-## 4. Memory
+## 5. Memory
 
 Consider whether the session produced knowledge that belongs in
 persistent memory: user corrections and confirmed approaches (with the
@@ -91,7 +125,7 @@ facts learned the hard way. Do not save what the repo already records.
 Write the memory files, update the index, and tell the user what was
 saved.
 
-## 5. Commit plan and execution
+## 6. Commit plan and execution
 
 For a tangled tree — several logical changes mixed together, or a file
 that needs splitting across commits — launch the `commit-planner` agent.
@@ -120,11 +154,11 @@ hook fails, `commit-planner` stops and reports it verbatim — surface that
 failure and the resulting partially-committed state plainly; never retry
 with `--no-verify`.
 
-## 6. Report
+## 7. Report
 
 End with a compact summary: what the session accomplished, check status
 (green/failures + triage), conventions findings **fixed — with every
 MEDIUM fix listed individually — / dismissed as false positives / left
-for the user**, docs and memory updated, and the
+for the user**, second-opinion findings, docs and memory updated, and the
 commits made — or the plan still awaiting approval. The user should be
 able to read only this and know exactly where the tree stands.
