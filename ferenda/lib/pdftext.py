@@ -605,6 +605,31 @@ def only_furniture(pages):
     return not any(seen[run] == 1 for page in runs for run in page)
 
 
+# A one-page scan whose text layer is a line or two -- a page label, a stamped
+# diarienummer -- and whose page is an image: MIGRFS 2003:7 is a OneNote
+# printout that carries only "Allmänt sidan 2" over its scanned page. With one
+# page there is nothing for `only_furniture` to compare against, so the image is
+# the evidence. Over every one-page PDF in the downloaded tree, 148 carry at most
+# three lines and 5 of those lie over an image covering half the page or more,
+# all scans (2026-10-12).
+SCAN_STAMP_LINES = 3
+SCAN_COVER_MIN = 0.5   # of the page area
+
+
+def needs_ocr(pdf_path, pages):
+    """Whether `pages` (`pdf_pages` of `pdf_path`) holds no text of the
+    document's own: no lines at all, only what every page repeats
+    (:func:`only_furniture`), or a one-page scan's stamp."""
+    if not any(lines for _pageno, lines in pages) or only_furniture(pages):
+        return True
+    if len(pages) > 1 or len(pages[0][1]) > SCAN_STAMP_LINES:
+        return False
+    page = _image_xml(pdf_path).find("page")
+    area = int(page.get("width")) * int(page.get("height"))
+    return any(int(im.get("width") or 0) * int(im.get("height") or 0)
+               >= SCAN_COVER_MIN * area for im in page.findall("image"))
+
+
 def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
     """(pageno, [Line]) per page, OCR'ing first when the PDF has no readable
     text.
@@ -618,7 +643,7 @@ def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
     Emptiness is judged on *lines*, before `page_paragraphs`: a PDF that
     genuinely holds only a letterhead would OCR pointlessly if judged on the
     paragraphs left after stripping, and OCR is the expensive path. A layer
-    that holds only a stamp counts as empty too (:func:`only_furniture`).
+    that holds only a stamp counts as empty too (:func:`needs_ocr`).
 
     Shared by the three corpora that read pages this way and meet the same pair
     of failures: remissvar, the Konkurrensverket diarium's scanned decisions,
@@ -648,7 +673,7 @@ def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
             raise
         pdf_path = repair_pdf(pdf_path)
         pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
-    if any(lines for _pageno, lines in pages) and not only_furniture(pages):
+    if not needs_ocr(pdf_path, pages):
         return pages
     return ocr_text_pages(ocr_pdf(pdf_path, lang), lang, patch_key)
 
@@ -660,16 +685,22 @@ def pdf_images(pdf_path):
     the extracted PNGs beside its output, so it runs into a throwaway temp dir and
     only the coordinates survive. Used to recover content encoded as bitmaps rather
     than text (DV verdicts print their paragraph numbers as tiny margin images)."""
+    return [(int(page.get("number")), int(im.get("top")), int(im.get("left")),
+             int(im.get("width") or 0), int(im.get("height") or 0))
+            for page in _image_xml(pdf_path).findall("page")
+            for im in page.findall("image")]
+
+
+def _image_xml(pdf_path):
+    """`pdftohtml -xml` of `pdf_path` with its images kept, run in a throwaway
+    temp dir since pdftohtml writes the extracted PNGs beside its output."""
     with tempfile.TemporaryDirectory() as tmp:
         out = str(Path(tmp) / "out")
         subprocess.run(["pdftohtml", "-xml", "-nodrm", str(pdf_path), out],
                        capture_output=True, check=True)
         xml = (Path(tmp) / "out.xml").read_bytes()
-    root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
+    return etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
                                                  no_network=True))
-    return [(int(page.get("number")), int(im.get("top")), int(im.get("left")),
-             int(im.get("width") or 0), int(im.get("height") or 0))
-            for page in root.findall("page") for im in page.findall("image")]
 
 
 SPACE_MIN = 3         # horizontal gap between runs that means a real space

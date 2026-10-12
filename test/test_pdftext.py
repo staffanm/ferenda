@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 import brotli
 import pytest
+from lxml import etree
 
 from ferenda.lib import layout, pdftext
 from ferenda.lib.pdftext import (
@@ -1434,6 +1435,28 @@ def test_pages_with_ocr_ocrs_a_layer_that_is_only_a_stamp(monkeypatch, tmp_path)
     pages = pdftext.pages_with_ocr(str(tmp_path / "scan.pdf"))
     assert [l.text for _no, lines in pages for l in lines] == ["Beslut i ärendet"]
     assert calls[-1].endswith(".ocr.pdf")
+
+
+def test_needs_ocr_reads_a_one_page_label_over_a_scan_as_no_text(monkeypatch):
+    # MIGRFS 2003:7 is a OneNote printout: one scanned page whose only text
+    # object is the label "Allmänt sidan 2"
+    label = [(1, [_line("Allmänt sidan 2", 40)])]
+
+    def page_xml(image_w, image_h):
+        return etree.fromstring(
+            f'<pdf2xml><page number="1" width="893" height="1265">'
+            f'<image top="0" left="0" width="{image_w}" height="{image_h}"/>'
+            f'</page></pdf2xml>')
+
+    monkeypatch.setattr(pdftext, "_image_xml", lambda path: page_xml(700, 1000))
+    assert pdftext.needs_ocr("scan.pdf", label)
+    # a short one-page notice with no page image is the document's own text
+    monkeypatch.setattr(pdftext, "_image_xml", lambda path: page_xml(100, 60))
+    assert not pdftext.needs_ocr("notice.pdf", label)
+    # a page with text of its own is never sent to OCR, image or not
+    full = [(1, [_line(f"{n} § Text.", 40 + n) for n in range(1, 6)])]
+    monkeypatch.setattr(pdftext, "_image_xml", lambda path: pytest.fail("read"))
+    assert not pdftext.needs_ocr("full.pdf", full)
 
 
 # ---- the "§" a Swedish OCR cannot read ---------------------------------------

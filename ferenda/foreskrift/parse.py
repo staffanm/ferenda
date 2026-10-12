@@ -49,9 +49,9 @@ from ..lib.pdftext import (
     RE_KAP_MARK,
     RE_PARA_MARK,
     Para,
+    needs_ocr,
     ocr_pdf,
     ocr_text_pages,
-    only_furniture,
     page_paragraphs,
     pdf_pages,
     ruled_footnotes,
@@ -1862,15 +1862,15 @@ def _pages(path, patch_key=None, identifier=None, fs=None):
     no text layer at all (LIVSFS 2002:49, six documents) is OCRed first, and so
     is one whose layer is only a stamp -- MSB republishes its predecessors'
     regulations as copier scans with "[UPPHÄVD]" laid over the image, and that
-    stamp is the PDF's only text object (:func:`lib.pdftext.only_furniture`)."""
+    stamp is the PDF's only text object (:func:`lib.pdftext.needs_ocr`)."""
     agency = REGISTRY.get(fs)
     transform = agency.params.get("xml_transform") if agency else None
     kwargs = {"xml_transform": lambda x: transform(x, identifier)} if (transform and identifier) else {}
     pages = list(pdf_pages(path, patch_key, **kwargs))
-    if any(lines for _pageno, lines in pages) and not only_furniture(pages):
+    if not needs_ocr(path, pages):
         return pages
     pages = list(pdf_pages(path, patch_key, hidden=True, **kwargs))
-    if any(lines for _pageno, lines in pages) and not only_furniture(pages):
+    if not needs_ocr(path, pages):
         return pages
     return ocr_text_pages(ocr_pdf(path, "swe"), "swe", patch_key)
 

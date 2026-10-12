@@ -7,6 +7,8 @@ import shutil
 import sqlite3
 from pathlib import Path
 
+from lxml import etree
+
 from ferenda.foreskrift import parse as fp
 from ferenda.foreskrift import render as fs_render
 from ferenda.foreskrift import structure
@@ -30,7 +32,7 @@ from ferenda.foreskrift.parse import (
     title_from_masthead,
 )
 from ferenda.foreskrift.render import _andrad_genom, _konsoliderad_banner
-from ferenda.lib import catalog, datasets
+from ferenda.lib import catalog, datasets, pdftext
 from ferenda.lib.lagrum import sfs_parser
 from ferenda.lib.page import Site
 from ferenda.lib.pdftext import Line, Para
@@ -1083,6 +1085,10 @@ def test_pages_fall_back_to_the_hidden_ocr_layer(monkeypatch):
         calls.append(hidden)
         return [(1, [])] if not hidden else [(1, ["a line"])]
     monkeypatch.setattr(fp, "pdf_pages", fake_pdf_pages)
+    # the fake pages are one short line each; the page carries no image, so
+    # neither is a one-page scan's stamp (pdftext.needs_ocr)
+    monkeypatch.setattr(pdftext, "_image_xml", lambda path: etree.fromstring(
+        '<pdf2xml><page number="1" width="893" height="1265"/></pdf2xml>'))
     assert fp._pages("scan.pdf") == [(1, ["a line"])]
     assert calls == [False, True]
     calls.clear()
