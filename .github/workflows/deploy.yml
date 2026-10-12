@@ -256,8 +256,9 @@ jobs:
               || { echo "missing $header" >&2; exit 1; }
           done
           # other sites embed the public pages (exam.net, 2026-10-12)
-          echo "$headers" | grep -qiE '^X-Frame-Options:|frame-ancestors' \
-            && { echo "a framing header blocks embedding of public pages" >&2; exit 1; }
+          if echo "$headers" | grep -qiE '^X-Frame-Options:|frame-ancestors'; then
+            echo "a framing header blocks embedding of public pages" >&2; exit 1
+          fi
 
       # The pages link /style.css and /script.js by URL, and the serve reads them
       # from `generated/` -- a bind-mounted host tree, not the image. Without this
