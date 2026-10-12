@@ -51,6 +51,7 @@ from urllib.parse import quote, unquote
 
 import requests
 from bs4 import BeautifulSoup
+from lxml import etree  # ty: ignore[unresolved-import]
 
 from ..lib import compress, util
 from ..lib.errors import UpstreamChanged
@@ -278,6 +279,41 @@ BFS = Agency(
 # the architecture combination it exercises.
 # --------------------------------------------------------------------------
 
+def elsakfs_enumerate(session, agency):
+    seen = set()
+
+    def page_refs(soup):
+        for item in soup.select("div.list-item.regulation-item"):
+            a = item.select_one('a[href*="/foreskrifter/elsak-fs-"]')
+            if not a:
+                continue
+            text = a.get_text(" ", strip=True)
+            p = item.select_one("p.preamble")
+            title = None
+            if p:
+                p_text = p.get_text(" ", strip=True)
+                title = re.split(r"(?<=\.)\s+Ändringar\s+genom\b", p_text, flags=re.I)[0].rstrip(".")
+            docref = harvest.ref(agency, text, a.get("href", ""), seen, title=title)
+            if docref:
+                yield docref
+
+    return harvest.index_refs(session, agency, page_refs)
+
+
+def elsakfs_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
+    record = resolve_landing(session, agency, ref, root, delay=delay, log=log, rejects=rejects)
+    fs = ref.fs or agency.fs
+    if not record.get("title"):
+        landing_path = Path(root) / fs / (slug(ref.basefile) + ".html")
+        if compress.exists(landing_path):
+            soup = BeautifulSoup(compress.read_text(landing_path), "html.parser")
+            lw = soup.select_one("div.linkWrapper") or soup.select_one("p.preamble")
+            if lw:
+                record["title"] = lw.get_text(" ", strip=True)
+                write_record(record_path(root, fs, ref.basefile), record)
+    return record
+
+
 # indexed + landing + filename-classify (PDFs under /globalassets/foreskrifter/)
 ELSAKFS = Agency(
     fs="elsakfs", name="Elsäkerhetsverket", publisher="Elsäkerhetsverket",
@@ -287,9 +323,9 @@ ELSAKFS = Agency(
     designation="ELSÄK-FS",
     base_url="https://www.elsakerhetsverket.se",
     index_url="https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter-i-nummerordning/",
-    enumerate=indexed_enumerate, resolve=resolve_landing,
+    enumerate=elsakfs_enumerate, resolve=elsakfs_resolve,
     params={"link_select": 'div.list-item.regulation-item a[href*="/foreskrifter/elsak-fs-"]',
-            "pdf_select": 'a[href*="/globalassets/foreskrifter/elsak-fs"][href$=".pdf"]',
+            "pdf_select": 'a[href*="/globalassets/foreskrifter/elsak-fs"]',
             "classify": classify_href},
 )
 
@@ -1732,10 +1768,20 @@ def iaf_enumerate(session, agency):
     def page_refs(soup):
         for a in soup.find_all("a", href=True):
             href = util.href(a)
-            m = RE_IAF_BASE.search(href)
-            if not m:
-                continue
-            arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
+            title = a.get_text(" ", strip=True)
+            if href.lower().endswith(".pdf") or "/globalassets/" in href:
+                desig = harvest.own_designation(title)
+                if not desig:
+                    num_match = harvest.RE_FS_NUMBER.search(title)
+                    if not num_match:
+                        continue
+                    desig = (num_match.group(1), num_match.group(2), num_match.group(3))
+                arsutgava, lopnummer = desig[1], str(int(desig[2]))
+            else:
+                m = RE_IAF_BASE.search(href)
+                if not m:
+                    continue
+                arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
             basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
             if basefile in seen:
                 continue
@@ -1743,7 +1789,7 @@ def iaf_enumerate(session, agency):
             yield DocRef(basefile=basefile,
                          identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
                          url=harvest.absolute(agency.base_url, href),
-                         title=a.get_text(" ", strip=True))
+                         title=title)
 
     return harvest.index_refs(session, agency, page_refs)
 
@@ -2105,18 +2151,21 @@ RE_MDFFS_DESIG = re.compile(r"MDFFS\s*(\d{4}):(\d+)")
 RE_MDFFS_SEG = re.compile(r"/om-oss/forfattningssamling/([^/]+)/")
 
 
-def _mdffs_download_url(session, agency, href):
-    """The /download/ PDF URL a DIGG föreskrift sub-page hangs, or None when the
-    föreskrift is published inline as HTML instead."""
-    soup = BeautifulSoup(request(session, "GET", harvest.absolute(agency.base_url, href)).text,
-                         "html.parser")
+def _mdffs_page_details(session, agency, href):
+    """The /download/ PDF URL, real title, and HTML for a DIGG sub-page."""
+    resp = request(session, "GET", harvest.absolute(agency.base_url, href))
+    soup = BeautifulSoup(resp.text, "html.parser")
     a = soup.select_one('a[href*="/download/"]')
-    return harvest.absolute(agency.base_url, a["href"]) if a else None
+    pdf_url = harvest.absolute(agency.base_url, a["href"]) if a else None
+    h1 = soup.select_one("main h1") or soup.find("h1")
+    title = h1.get_text(" ", strip=True) if h1 else None
+    return pdf_url, title, resp.text
 
 
 def mdffs_enumerate(session, agency):
-    """One DocRef per DIGG grundförfattning, its amendment graph read from the
-    sub-pages the index groups under a shared parent slug."""
+    """One DocRef per DIGG grundförfattning and ändringsförfattning, its
+    amendment graph read from the sub-pages the index groups under a shared
+    parent slug."""
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     groups = defaultdict(list)
     for a in soup.find_all("a", href=True):
@@ -2138,21 +2187,73 @@ def mdffs_enumerate(session, agency):
             continue
         seen.add(basefile)
         amendments = []
+        amendment_refs = []
         for a in anchors:
             if a.get_text(" ", strip=True).startswith("Ändringsför"):
                 am = RE_MDFFS_DESIG.search(a.get_text(" ", strip=True))
-                amendments.append({"identifier": "MDFFS %s:%s" % (am.group(1), str(int(am.group(2))))
-                                   if am else None,
-                                   "url": harvest.absolute(agency.base_url, a["href"])})
+                if am:
+                    am_ars, am_lop = am.group(1), str(int(am.group(2)))
+                    am_ident = "%s %s:%s" % (agency.fs.upper(), am_ars, am_lop)
+                    am_url = harvest.absolute(agency.base_url, a["href"])
+                    amendments.append({"identifier": am_ident, "url": am_url})
+                    am_basefile = "%s/%s:%s" % (agency.fs, am_ars, am_lop)
+                    if am_basefile not in seen:
+                        seen.add(am_basefile)
+                        am_pdf, am_title, am_html = _mdffs_page_details(session, agency, a["href"])
+                        amendment_refs.append(
+                            DocRef(
+                                basefile=am_basefile,
+                                identifier=am_ident,
+                                url=am_url,
+                                title=am_title or a.get_text(" ", strip=True),
+                                extra={
+                                    "regulation_url": am_pdf,
+                                    "html": am_html if not am_pdf else None,
+                                    "consolidations": [],
+                                    "amendments": [],
+                                    "source_url": am_url,
+                                },
+                            )
+                        )
         grund_url = harvest.absolute(agency.base_url, grund["href"])
+        grund_pdf, grund_title, grund_html = _mdffs_page_details(session, agency, grund["href"])
         yield DocRef(
             basefile=basefile,
             identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
-            url=grund_url, title=grund.get_text(" ", strip=True),
-            extra={"regulation_url": _mdffs_download_url(session, agency, grund["href"]),
+            url=grund_url, title=grund_title or grund.get_text(" ", strip=True),
+            extra={"regulation_url": grund_pdf,
+                   "html": grund_html if not grund_pdf else None,
                    "consolidations": [], "amendments": amendments,
                    "source_url": grund_url})
+        yield from amendment_refs
         time.sleep(0.3)
+
+
+def mdffs_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
+    if not ref.extra.get("regulation_url"):
+        fs = ref.fs or agency.fs
+        html_text = ref.extra.get("html")
+        if not html_text:
+            resp = request(session, "GET", ref.extra.get("source_url") or ref.url)
+            html_text = resp.text
+        html_name = "%s.html" % slug(ref.basefile)
+        compress.write_download(Path(root) / fs / html_name, html_text)
+        record = {
+            "fs": fs,
+            "basefile": ref.basefile,
+            "identifier": ref.identifier,
+            "title": ref.title or ref.extra.get("title"),
+            "publisher": agency.publisher,
+            "url": ref.extra.get("source_url") or ref.url,
+            "files": {
+                "regulation": {"name": html_name, "url": ref.extra.get("source_url") or ref.url,
+                               "identifier": ref.identifier},
+                "consolidation": [], "amendment": [], "memo": [], "attachment": [],
+            },
+        }
+        write_record(record_path(root, fs, ref.basefile), record)
+        return record
+    return resolve_direct(session, agency, ref, root, delay=delay, log=log, rejects=rejects)
 
 
 MDFFS = Agency(
@@ -2160,7 +2261,7 @@ MDFFS = Agency(
     publisher="Myndigheten för digital förvaltning",
     base_url="https://www.digg.se",
     index_url="https://www.digg.se/om-oss/forfattningssamling",
-    enumerate=mdffs_enumerate, resolve=resolve_direct,
+    enumerate=mdffs_enumerate, resolve=mdffs_resolve,
 )
 
 
@@ -2500,6 +2601,54 @@ def scb_enumerate(session, agency):
     yield from newest_first(refs)
 
 
+def clean_scb_ghost_layers(xml_bytes, identifier):
+    """Remove older template masthead layers from SCB-FS PDFs that overlap on page 1 (#89)."""
+    root = etree.fromstring(xml_bytes, etree.XMLParser(recover=True, load_dtd=False, no_network=True))
+    page1 = root.find(".//page")
+    if page1 is None:
+        return xml_bytes
+    texts = page1.findall("text")
+    mastheads = []
+    for i, t in enumerate(texts):
+        top, left = int(t.get("top", 0)), int(t.get("left", 0))
+        txt = "".join(t.itertext()).strip()
+        if top < 260 and left > 450 and "SCB-FS" in txt:
+            m = re.search(r"SCB-FS\s*(\d{4}:\d+)", txt)
+            if m:
+                mastheads.append((i, m.group(1), top, left))
+    distinct_nums = set(m[1] for m in mastheads)
+    if len(distinct_nums) <= 1:
+        return xml_bytes
+    m_id = re.search(r"\b\d{4}:\d+\b", identifier or "")
+    if not m_id:
+        return xml_bytes
+    ident_num = m_id.group(0)
+    match_indices = [idx for idx, num, _, _ in mastheads if num == ident_num]
+    if not match_indices:
+        return xml_bytes
+    target_idx = match_indices[-1]
+    layer_start = 0
+    for i in range(target_idx - 1, -1, -1):
+        txt = "".join(texts[i].itertext()).strip()
+        if "Statistiska centralbyråns" in txt:
+            layer_start = i
+            break
+    layer_end = len(texts)
+    for idx, num, _, _ in mastheads:
+        if idx > target_idx and num != ident_num:
+            for j in range(idx - 1, target_idx, -1):
+                txt = "".join(texts[j].itertext()).strip()
+                if "Statistiska centralbyråns" in txt:
+                    layer_end = j
+                    break
+            break
+    for t in texts[:layer_start]:
+        page1.remove(t)
+    for t in texts[layer_end:]:
+        page1.remove(t)
+    return etree.tostring(root, encoding="utf-8")
+
+
 SCBFS = Agency(
     fs="scbfs", name="Statistiska centralbyrån", publisher="Statistiska centralbyrån",
     base_url="https://www.scb.se",
@@ -2515,7 +2664,9 @@ SCBFS = Agency(
             # links, every one of them extensionless; `fetch_pdf` sniffs the
             # magic bytes, so a link that is not a PDF costs a refused fetch.
             "pdf_select": 'a[href*="/contentassets/"]',
-            "classify": classify_single},
+            "classify": classify_single,
+            "xml_transform": clean_scb_ghost_layers,
+            "two_digit_repeals": True},
 )
 
 # indexed + landing + filename-classify. The register moved to
@@ -2580,8 +2731,8 @@ TVFS = Agency(
 # amendment's own number is the afsYYYY-N that is *not* the base's.
 # --------------------------------------------------------------------------
 
-# as RE_IAF_BASE: the slug, under the in-force listing or under the archive
-RE_AFS_BASE = re.compile(r"foreskrifter/afs-(\d{4})(\d+)/$")
+# the slug, under the in-force listing or under the archive
+RE_AFS_BASE = re.compile(r"afs-(\d{4})(\d+)")
 RE_AFS_NUM = re.compile(r"afs\s*(\d{4})[-_](\d+)", re.IGNORECASE)
 
 
@@ -2631,12 +2782,15 @@ def afs_enumerate(session, agency):
             if basefile in seen:
                 continue
             seen.add(basefile)
-            fused = m.group(1) + m.group(2)      # the slug fuses year+lopnummer
-            hist = harvest.absolute(agency.base_url,
-                            href.rstrip("/") + "/forfattningshistorik-afs-%s/" % fused)
+            if "/upphavda-foreskrifter/" in href:
+                url = harvest.absolute(agency.base_url, href)
+            else:
+                fused = m.group(1) + m.group(2)      # the slug fuses year+lopnummer
+                url = harvest.absolute(agency.base_url,
+                                href.rstrip("/") + "/forfattningshistorik-afs-%s/" % fused)
             yield DocRef(basefile=basefile,
                          identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
-                         url=hist, title=a.get_text(" ", strip=True))
+                         url=url, title=a.get_text(" ", strip=True))
 
     return harvest.index_refs(session, agency, page_refs)
 
@@ -3075,20 +3229,39 @@ FKFS = Agency(
 # PFS (Pensionsmyndigheten) -- indexed + DIRECT (the listing anchor is the PDF, an
 # AEM /content/dam/ file). The page mixes four series as flat PDFs: PFS (its own),
 # the predecessor RFFS + FKFS föreskrifter it administers, and PRS (rättsliga
-# ställningstaganden -- not författningar). PRS live under a different DAM folder
-# (…/rattsliga-stallningstaganden/) so the /foreskrifter/ href filter drops them;
-# RFFS/FKFS -- authoritatively harvested from Försäkringskassan's own register
-# (the FKFS agency) -- are dropped by skip_re on their "Riksförsäkringsverkets/
-# Försäkringskassans föreskrifter" link text, leaving PFS only.
+# ställningstaganden -- not författningar). PRS are dropped by skip_re;
+# predecessor RFFS and FKFS regulations are enumerated and routed to rffs and
+# fkfs via series_slug.
 # --------------------------------------------------------------------------
+
+def pfs_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
+    """PFS listing mixes PFS with predecessor RFFS and FKFS regulations.
+    FKFS's own register owns RFFS and FKFS; PFS must never overwrite an existing
+    record on disk (#78). Missing predecessor regulations dropped by FK are
+    downloaded with their historical publisher and clean title."""
+    fs = ref.fs or agency.fs
+    dest = record_path(root, fs, ref.basefile)
+    if fs in ("rffs", "fkfs") and compress.exists(dest):
+        return compress.read_json(dest)
+    if ref.title:
+        clean = re.sub(r"\s*\(\s*pdf\s*,\s*[\d.]+\s*[kKmM]?[bB]\s*\)", "", ref.title, flags=re.I).strip()
+        ref.title = clean
+        if ref.extra:
+            ref.extra["title"] = clean
+    publisher = {"rffs": "Riksförsäkringsverket", "fkfs": "Försäkringskassan"}.get(fs, agency.publisher)
+    target_agency = agency
+    if publisher != agency.publisher:
+        target_agency = replace(agency, publisher=publisher)
+    return resolve_direct(session, target_agency, ref, root, delay, log=log, rejects=rejects)
+
 
 PFS = Agency(
     fs="pfs", name="Pensionsmyndigheten", publisher="Pensionsmyndigheten",
     base_url="https://www.pensionsmyndigheten.se",
     index_url="https://www.pensionsmyndigheten.se/om-pensionsmyndigheten/allmanna-handlingar/lagar-och-regler",
-    enumerate=indexed_enumerate, resolve=resolve_direct,
+    enumerate=indexed_enumerate, resolve=pfs_resolve,
     params={"link_select": 'a[href*="reskrifter/"][href$=".pdf"]', "direct": True,
-            "skip_re": r"Riksförsäkringsverket|Försäkringskassan|\bRFFS\b|\bFKFS\b|\bPRS\b"},
+            "skip_re": r"\bPRS\b"},
 )
 
 

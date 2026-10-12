@@ -57,6 +57,7 @@ from ..lib.pdftext import (
     ruled_footnotes,
 )
 from ..lib.util import MONTHS, approximate_date, confine
+from .agencies import REGISTRY
 from .harvest import RE_DESIGNATION, normalise, series_slug
 from .model import Amendment, Block, Consolidation, Regulation, regulation_uri
 from .structure import RE_LEAD_PARA, nest
@@ -94,7 +95,7 @@ RE_FS_YEAR = re.compile(r"\b(\d{4}):\d")
 # masthead facts (best-effort; the layout that carries them is often mangled)
 RE_DATE = re.compile(r"den\s+(\d{1,2})\s+(%s)(?:\s+(\d{4}))?" % "|".join(MONTHS),
                      re.IGNORECASE)
-RE_BESLUTAD = re.compile(r"beslutad[e]?\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re.I)
+RE_BESLUTAD = re.compile(r"besluta[det]\w*\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re.I)
 RE_UTKOM = re.compile(r"Utkom\s+från\s+trycket.*?den\s+(\d{1,2})\s+(\w+)\s+(\d{4})",
                       re.IGNORECASE | re.DOTALL)
 RE_IKRAFT = re.compile(r"träder\s+i\s+kraft\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re.I)
@@ -221,7 +222,7 @@ def ersatter_clauses(text):
 RE_ENUMERATOR = re.compile(r"(?<![:\d/])\b\d{1,3}\.\s+(?=[A-ZÅÄÖ(\d])")
 RE_SKALL_UPPHORA = re.compile(r"\bska(?:ll)?\s+([^.;]{0,300}?)\s+upphöra\s+att\s+gälla", re.DOTALL | re.I)
 # ("upphör gälla", SJVFS 2019:6, drops the "att")
-RE_UPPHOR_BEFORE = re.compile(r"([^;]{0,2500}?)\b(?:upphör|ska(?:ll)?\s+upphöra)\s+(?:att\s+)?gälla",
+RE_UPPHOR_BEFORE = re.compile(r"([^;]{0,2500}?)\b(?:upphör[t]?|ska(?:ll)?\s+upphöra)(?:\s*\([^)]*\))?\s+(?:att\s+)?gälla",
                               re.DOTALL | re.I)
 # the same shape with "upphävs" for the verb, which RE_ERSATTER reads only
 # forwards: "Dessa föreskrifter träder i kraft den 1 juli 2006 då
@@ -237,11 +238,13 @@ RE_UPPHAVS_BEFORE = re.compile(
 # the last paragraf of the body, whose "23 §" then reads as a repeal of a
 # provision and drops the regulation the clause names (RIFS 2018:2)
 RE_SENTENCE_START = re.compile(r"(?<!saknr)(?<!\bnr)(?<!kap)(?<!m\.m)(?<!\s[a-zåäö])\.\s+(?=[A-ZÅÄÖ−])"
-                               r"|[_–]{5,}")
+                                r"|[_–]{5,}")
 # a repeal of a *provision* names one before the regulation: "att 17 § verkets
 # föreskrifter (LIVSFS 2005:20) … ska upphöra att gälla" (LIVSFS 2011:8),
 # "bilaga 2 till …", "övergångsbestämmelserna till …" -- the regulation stays
-RE_PROVISION = re.compile(r"\d+\s*§|§§|\bbilag|\bpunkt(?:en|erna)?\b|övergångsbestämmelse", re.I)
+RE_PROVISION = re.compile(
+    r"\d+\s*§|§§|\bbilag(?:a\s+(?:\d|[a-zåäö]\b|till|i|av)|an\b|orna\s+till\b)|\bpunkt(?:en|erna)?\b|övergångsbestämmelse",
+    re.I)
 # the amending formula's own "att": "i fråga om verkets föreskrifter (SJVFS
 # 2017:44) om …, dels att 3 § ska upphöra att gälla" (SJVFS 2024:4) repeals a
 # provision; the object is what the last such "att" introduces
@@ -268,6 +271,8 @@ def _repeal_object(segment, whole=False, tail=False):
         segment = RE_ATT_PROVISION.split(
             RE_SENTENCE_START.split(segment)[-1].rsplit(" då ", 1)[-1])[-1]
         segment = RE_FOOTNOTE_LINE.split(segment)[-1 if tail else 0]
+    if whole and not RE_UPPHOR_ITEM.search(segment) and re.search(r"\b[89]\d:\d+\b", segment):
+        return segment
     kept = []
     for i, item in enumerate(RE_UPPHOR_ITEM.split(segment)):
         item = cut_at_andring(item)
@@ -328,7 +333,7 @@ RE_UPPHORA = re.compile(r"\b(?:beslutar|föreskriver)\b.{0,200}?\batt\b(.*?)\bsk
 # step for all 58 SOSFS documents on the first two pages of which it stands --
 # SOSFS 2008:17 names two föreskrifter it repeals and recorded neither. A
 # document that *is* a förteckning prints the phrase as its own title.
-RE_FORTECKNING = re.compile(r"(?<!\ben\s)\bf[öo]\s?rteckning(?:en|ar)?\s+över\s+"
+RE_FORTECKNING = re.compile(r"(?<!\ben\s)(?<!\btill\s)(?<!\bsenaste\s)\bf[öo]\s?rteckning(?:en|ar)?\s+över\s+"
                             r"(?:gällande\s+)?(?:föreskrifter|författningar)"
                             r"|18\s*c\s*§\s*författningssamlingsförordningen", re.I)
 # noun form in a title ("föreskrift om upphävande av … (BOLFS 2006:1)")
@@ -468,7 +473,10 @@ def _series_by_possessive():
 
 RE_BARE_OWN_REF = re.compile(
     r"(?:föreskrift(?:en|er(?:na)?)(?:\s+och\s+allmänna\s+råd)?|kungörelsen?)"
-    r"[^()]*\((\d{4}):(\d+)\)")
+    r"(?![^();]{0,60}\b(?:förordning|lag|bemyndigande)\b)"
+    r"[^();]{0,60}?\((\d{4}):(\d+)\)")
+RE_FS_REF_REVERSED = re.compile(
+    r"\b([A-ZÅÄÖ]+(?:-| )?(?:FS|FA))\s*(\d{1,3})/((?:19|20)\d{2})\b")
 # One agency reinvented the citation: Migrationsverket numbers its own
 # föreskrifter the other way round, the lopnummer before the year.
 # "Migrationsverkets föreskrift (19/2010) med bemyndigande för Sveriges
@@ -844,9 +852,18 @@ def parse_body(pages, identifier):
 # metadata: the masthead facts the model carries
 # --------------------------------------------------------------------------
 
-def _first_date(rx, text):
+def _first_date(rx, text, target_year=None):
+    if target_year is not None:
+        for m in rx.finditer(text):
+            if int(m.group(3)) in (target_year, target_year - 1):
+                return _iso(*m.groups())
     m = rx.search(text)
     return _iso(*m.groups()) if m else None
+
+
+RE_WRAP_HYPHEN = re.compile(r"(\w)-\s+(?!och\b|eller\b|samt\b)([a-zåäö])")
+# font-extraction artifact in some PDFs where "fi"/"fl" ligatures carry an extra space
+RE_LIGATURE_SPLIT = re.compile(r"\b(fi|fl)\s+([a-zåäö]{3,})")
 
 
 def extract_publisher(masthead):
@@ -873,11 +890,11 @@ def extract_publisher(masthead):
         # issuer. The other samlingar are read as before, seam and all, because
         # their Utgivare line answers first and never reaches this pattern.
         m = RE_FS_TITLE.search(" ".join(RE_MASTHEAD_COLUMN.sub(" ", flat).split()))
-        return m.group(1).strip(" .,-") if m else None
+        return RE_WRAP_HYPHEN.sub(r"\1\2", m.group(1)).strip(" .,-") if m else None
     for rx in (RE_UTGIVARE, RE_FS_SERIES, RE_FS_TITLE):
         m = rx.search(flat)
         if m:
-            return m.group(1).strip(" .,-")
+            return RE_WRAP_HYPHEN.sub(r"\1\2", m.group(1)).strip(" .,-")
     return None
 
 
@@ -982,6 +999,8 @@ def _repeal_targets(target, fs):
     target = normalise(target)
     uris = {_ref_uri(_own_series_typo(f, fs), y, n)
             for f, y, n in RE_FS_REF.findall(target)}
+    uris |= {_ref_uri(_own_series_typo(f, fs), y, n)
+             for f, n, y in RE_FS_REF_REVERSED.findall(target)}
     if fs:
         # a bare "(1993:21)" right after "föreskrifter" names the document's own
         # series (RE_BARE_OWN_REF), as it does in an ändring title -- or its
@@ -1002,10 +1021,14 @@ def _repeal_targets(target, fs):
         if number_form == "lopnummer/arsutgava":
             uris |= {regulation_uri(_series_for_year(fs, int(y)), y, str(int(n)))
                      for n, y in RE_BARE_OWN_REF_REVERSED.findall(target)}
+        agency = REGISTRY.get(fs)
+        if agency and agency.params.get("two_digit_repeals") and re.search(r"\b[89]\d:\d+\b", target):
+            return {regulation_uri(fs, "19" + y2, str(int(n)))
+                    for y2, n in re.findall(r"\b([89]\d):(\d+)\b", target)}
     return uris
 
 
-def extract_metadata(text, declaration, parser, fs=None, repaired=None):
+def extract_metadata(text, declaration, parser, fs=None, repaired=None, identifier=None):
     """Best-effort masthead facts from the regulation's plain text. ``text`` is
     the whole document (ikraftträdande sits at the end, the rest up front);
     ``declaration`` is what the document says it *is*, per
@@ -1020,9 +1043,19 @@ def extract_metadata(text, declaration, parser, fs=None, repaired=None):
     all. The cleaned copy is not used for anything else, because the same
     cleaning can mangle a masthead whose running furniture is table debris
     (LVFS 2011:16), and the raw declaration still states the amendment."""
+    target_year = None
+    if identifier:
+        m = re.search(r"\b((?:19|20)\d{2}):\d+\b", identifier)
+        if m:
+            target_year = int(m.group(1))
+    if target_year is None and declaration:
+        m = re.search(r"\b((?:19|20)\d{2}):\d+\b", declaration)
+        if m:
+            target_year = int(m.group(1))
+
     meta = {
-        "beslutsdatum": _first_date(RE_BESLUTAD, text),
-        "utkomFranTryck": _first_date(RE_UTKOM, text),
+        "beslutsdatum": _first_date(RE_BESLUTAD, text, target_year),
+        "utkomFranTryck": _first_date(RE_UTKOM, text, target_year),
         "ikrafttradandedatum": ikrafttradande_date(text, declaration),
         "bemyndigande": [], "genomfor": [], "upphaver": [], "andrar": [],
     }
@@ -1305,6 +1338,7 @@ RE_MASTHEAD_BOILERPLATE = re.compile(
     # Patent- och registreringsverkets internal margin codes ("P:94", "V:11",
     # "M:10", "B:17", "O:1", "T:01"), printed on page 1 only beside the title
     r"|\b(?-i:[A-Z]{1,2}:\d{1,3})\b"
+    r"|\bden\s+(?:xx\s+)*(?:19|20)\d{2}\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?|\bnr\s+\d+"
     % "|".join(MONTHS), re.IGNORECASE)
 # a word the removal left doubled ("Kriminalvårdens
@@ -1321,6 +1355,7 @@ RE_TITLE_PARENS = re.compile(r"\([^()]{0,80}\)")
 # designation then named no regulation and lost the document its ändrar target)
 RE_MASTHEAD_COLUMN = re.compile(
     r"Utkom\s+från\s+trycket|Publicerings?datum|Publicerade?(?:\s+den)?|\bOmtryck\b"
+    r"|\bden\s+(?:xx\s+)*(?:19|20)\d{2}\b"
     r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?" % "|".join(MONTHS),
     re.IGNORECASE)
 # where the title stops: its own semicolon, or the clause that follows it --
@@ -1383,7 +1418,7 @@ def _states_a_subject(title):
 # is the same chrome where the row prints no file type at all ("115 kb
 # 2025-12-01", KBVFS 2025:1).
 RE_TITLE_CHROME = re.compile(
-    r"\s*[,(|]?\s*(?:pdf|\.pdf|\d+(?:[.,]\d+)?\s*[kKmM][bB]\b).*$",
+    r"\s*[,(|/]*\s*(?:pdf|\.pdf|\d+(?:[.,]\d+)?\s*[kKmM][bB]\b).*$",
     re.IGNORECASE | re.DOTALL)
 # What a listing row runs the title into: the printed sentence's own
 # semicolon, or the decision clause where the row prints one. The clause is
@@ -1394,7 +1429,7 @@ RE_ROW_TITLE_END = re.compile(r";|\b(?:beslutad|beslutat)\w*\s+den\s+\d",
 # words that make a harvest "title" a role label, not a title
 RE_TITLE_BOILERPLATE = re.compile(
     r"\b(?:grundförfattning|ändringsförfattning|konsoliderad(?:\s+version)?|"
-    r"öppnas|nytt\s+fönster)\b"
+    r"öppnas|nytt\s+fönster|omtryck(?:t|et)?)\b"
     r"|\bÄndr\.(?:\s*(?:bilaga|författningsrubrik(?:\s+och\s+ingress)?|ingress|rubrik))?\b"
     r"|\b(?-i:[A-Z]{1,2}:\d{1,3})\b", re.IGNORECASE)
 # a version label a listing appends to the title ("… (ursprunglig version)")
@@ -1416,9 +1451,6 @@ RE_TRAILING_FOOTNOTE = re.compile(
 # scopes published titles with a word broken in half, and the broken word hid
 # the designation beside it: KKVFS 2020:3's "före- skrifter (2020:2)" matched
 # no amendment target.
-RE_WRAP_HYPHEN = re.compile(r"(\w)-\s+(?!och\b|eller\b|samt\b)([a-zåäö])")
-# font-extraction artifact in some PDFs where "fi"/"fl" ligatures carry an extra space
-RE_LIGATURE_SPLIT = re.compile(r"\b(fi|fl)\s+([a-zåäö]{3,})")
 #: a running header is a line, not a sentence
 FURNITURE_MAX = 60
 
@@ -1542,7 +1574,9 @@ def clean_title(raw, identifier):
     'Grundförfattning (MDFFS 2019:1)') -- many harvests hand us the PDF link's
     text, which is file chrome rather than a title (F7). None sends the
     caller to the PDF's own rubric (title_from_body)."""
-    t = join_wrapped(normalise(RE_TITLE_CHROME.sub("", raw or ""))).strip()
+    if not raw:
+        return None
+    t = join_wrapped(normalise(RE_TITLE_CHROME.sub("", raw))).strip()
     t = RE_UTKOM_FRAN_TRYCKET.sub(" ", t).strip()
     # a version label the listing appends to the title text, not part of it:
     # Strålsäkerhetsmyndigheten's rows read "… som innehåller tritium
@@ -1558,6 +1592,8 @@ def clean_title(raw, identifier):
     if identifier:
         t = _strip_own_designation(t, identifier)
     t = RE_TRAILING_FOOTNOTE.sub("", t).strip()
+    if re.match(r"^doc\s+[a-zåäö]+/\d+:\d+$", t, re.I):
+        return None
     # what remains once designations, numbers and role words go: a title has
     # prose left, chrome does not
     probe = re.sub(r"[\d\s:/().,–—-]+", "",
@@ -1818,7 +1854,7 @@ def _masthead_title(masthead, *, printed_stop):
     return None
 
 
-def _pages(path, patch_key=None):
+def _pages(path, patch_key=None, identifier=None, fs=None):
     """The PDF's pages of text, from its visible text layer -- or, when that
     layer is empty, from the hidden one: a scanned föreskrift (SLVFS 1996-2000,
     188 documents) carries its text only as an invisible OCR layer behind the
@@ -1827,10 +1863,13 @@ def _pages(path, patch_key=None):
     is one whose layer is only a stamp -- MSB republishes its predecessors'
     regulations as copier scans with "[UPPHÄVD]" laid over the image, and that
     stamp is the PDF's only text object (:func:`lib.pdftext.only_furniture`)."""
-    pages = list(pdf_pages(path, patch_key))
+    agency = REGISTRY.get(fs)
+    transform = agency.params.get("xml_transform") if agency else None
+    kwargs = {"xml_transform": lambda x: transform(x, identifier)} if (transform and identifier) else {}
+    pages = list(pdf_pages(path, patch_key, **kwargs))
     if any(lines for _pageno, lines in pages) and not only_furniture(pages):
         return pages
-    pages = list(pdf_pages(path, patch_key, hidden=True))
+    pages = list(pdf_pages(path, patch_key, hidden=True, **kwargs))
     if any(lines for _pageno, lines in pages) and not only_furniture(pages):
         return pages
     return ocr_text_pages(ocr_pdf(path, "swe"), "swe", patch_key)
@@ -1865,7 +1904,7 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     from the whole text (the masthead up front, ikraftträdande at the end); the
     structure is built from the operative body only, the masthead dropped.
     `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
-    blocks, notes = parse_body(_pages(path, patch_key), identifier)
+    blocks, notes = parse_body(_pages(path, patch_key, identifier=identifier, fs=fs), identifier)
     _repair_ocr(blocks)
     start, separated = _body_start(blocks)
     m_blocks = blocks[:start] if separated else blocks
@@ -1882,7 +1921,8 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
                             role_declaration(masthead, harvest_title), parser,
                             fs=fs,
                             repaired=role_declaration(clean_masthead(m_blocks, len(m_blocks)),
-                                                      harvest_title))
+                                                      harvest_title),
+                            identifier=identifier)
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
     meta["publisher"] = extract_publisher(masthead or _full_text(blocks))
@@ -2260,6 +2300,34 @@ def body_path(root, fs, entry):
                                 "%s/%s" % (fs, entry["name"]), str(root))
 
 
+def parse_regulation_html(html_text, identifier, parser, fs=None, harvest_title=None):
+    """Parse an inline HTML regulation (e.g. MDFFS 2025:1..3 published without PDF)."""
+    soup = BeautifulSoup(html_text, "html.parser")
+    content = soup.select_one("article") or soup.select_one("main") or soup
+    for unwanted in content.select("aside, nav, footer, form, script, style, .feedback, .page-metadata"):
+        unwanted.decompose()
+    h1 = content.find("h1")
+    title = h1.get_text(" ", strip=True) if h1 else harvest_title
+
+    heading_sizes = {"h1": 20, "h2": 16, "h3": 14, "h4": 12}
+    paras = []
+    for el in content.find_all(["h1", "h2", "h3", "h4", "p", "li"]):
+        txt = el.get_text(" ", strip=True)
+        if not txt or txt.startswith("Senast uppdaterad"):
+            continue
+        size = heading_sizes.get(el.name, 10)
+        paras.append(Para(txt, size=size, bold=bool(size > 10)))
+
+    blocks = classify(paras, pageno=1)
+    _rank_rubriker(blocks, 0)
+    full_text = "\n".join(b.text for b in blocks)
+    decl = role_declaration(full_text, harvest_title or title)
+    meta = extract_metadata(full_text, decl, parser, fs=fs, identifier=identifier)
+    cleaned = clean_title(title, identifier) if title else None
+    meta["title"] = cleaned or title
+    return _structure(blocks, parser), meta, []
+
+
 def parse_record(record, root):
     """A harvested record (``<slug>.json``) -> a parsed :class:`Regulation`.
     The regulation body comes from the downloaded ``regulation`` PDF -- when a
@@ -2283,9 +2351,16 @@ def parse_record(record, root):
     reg_file = files.get("regulation") or None
     structure, notes = [], []
     if reg_file:
-        structure, meta, notes = parse_pdf(
-            body_path(root, fs, reg_file), record["identifier"], parser,
-            ("foreskrift", basefile), record.get("title"), fs=fs)
+        p = body_path(root, fs, reg_file)
+        if reg_file["name"].endswith((".html", ".html.br")):
+            html_text = compress.read_text(p)
+            structure, meta, notes = parse_regulation_html(
+                html_text, record["identifier"], parser, fs=fs,
+                harvest_title=record.get("title"))
+        else:
+            structure, meta, notes = parse_pdf(
+                p, record["identifier"], parser,
+                ("foreskrift", basefile), record.get("title"), fs=fs)
     else:
         # A record with no PDF still declares what it is in its harvest title,
         # and a repeal notice's title names the regulation it repeals
@@ -2294,7 +2369,7 @@ def parse_record(record, root):
         # already mints 294 of the 301 SKOLFS repeal notices; only the seven
         # whose PDF never arrived recorded nothing.
         meta = extract_metadata("", role_declaration("", record.get("title")),
-                                parser, fs=fs)
+                                parser, fs=fs, identifier=record.get("identifier"))
 
     # the PDF masthead is the authoritative issuer; the harvest label (the current
     # custodian agency) is only the fallback when the PDF names none

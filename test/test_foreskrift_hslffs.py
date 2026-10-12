@@ -10,8 +10,8 @@ that is what the number-reading has to survive.
 
 import json
 import types
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -424,6 +424,14 @@ def test_tlv_yields_the_base_act_and_every_amendment_in_its_panel():
     # the panels carry TLV's two closed predecessor samlingar as well
     assert refs["tlvfs/2009:3"].identifier == "TLVFS 2009:3"
     assert refs["lfnfs/2003:1"].identifier == "LFNFS 2003:1"
+    # lopnummer misprints corrected via filename slug
+    assert "hslffs/2018:30" in refs
+    assert "hslffs/2018:3" not in refs
+    assert "hslffs/2023:35" in refs
+    assert "hslffs/2023:25" not in refs
+    # predecessor base act does not inherit mismatched panel heading
+    assert not refs["lfnfs/2003:1"].title.startswith("TLV:s föreskrifter")
+    assert refs["lfnfs/2003:1"].title.startswith("LFNFS 2003:1")
 
 
 def test_a_tlv_file_under_no_role_heading_stops_the_harvest():

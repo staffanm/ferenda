@@ -1037,7 +1037,8 @@ def _pages(monkeypatch, pages, asked=None):
     def fake_request(_session, _method, url, **_kwargs):
         if asked is not None:
             asked.append(url)
-        return SimpleNamespace(text=pages[url])
+        txt = pages[url]
+        return SimpleNamespace(text=txt, content=txt.encode("utf-8"))
 
     monkeypatch.setattr(agencies, "request", fake_request)
     monkeypatch.setattr(harvest, "request", fake_request)
@@ -1267,11 +1268,15 @@ def test_afs_iaf_and_myh_enumerate_read_their_archive_of_repealed_regulations(mo
             '<a href="/publikationer/foreskrifter/afs-20231/">Systematiskt arbetsmiljöarbete</a>'
             '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/">Upphävda föreskrifter</a>',
         "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/":
+            '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/arbetsanpassning-afs-20205-foreskrifter/">'
+            'Arbetsanpassning (AFS 2020:5)</a>'
             '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/afs-20011/">'
             'Systematiskt arbetsmiljöarbete (AFS 2001:1)</a>'})
     refs = list(agencies.afs_enumerate(None, agencies.AFS))
-    assert [r.identifier for r in refs] == ["AFS 2023:1", "AFS 2001:1"]
-    assert refs[1].url.endswith("/afs-20011/forfattningshistorik-afs-20011/")
+    assert [r.identifier for r in refs] == ["AFS 2023:1", "AFS 2020:5", "AFS 2001:1"]
+    assert refs[0].url.endswith("/afs-20231/forfattningshistorik-afs-20231/")
+    assert refs[1].url == "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/arbetsanpassning-afs-20205-foreskrifter/"
+    assert refs[2].url == "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/afs-20011/"
 
     _pages(monkeypatch, {
         agencies.IAFFS.index_url:
@@ -1279,9 +1284,11 @@ def test_afs_iaf_and_myh_enumerate_read_their_archive_of_repealed_regulations(mo
             '<a href="/lag-ratt/foreskrifter/upphavda-foreskrifter/">Upphävda föreskrifter</a>',
         "https://www.iaf.se/lag-ratt/foreskrifter/upphavda-foreskrifter/":
             '<a href="/lag-ratt/foreskrifter/upphavda-foreskrifter/iaffs-20183/">'
-            'IAFFS 2018:3</a>'})
+            'IAFFS 2018:3</a>'
+            '<a href="/globalassets/dokument/foreskrifter/iaffs-2025-2.pdf">'
+            'IAFFS 2025:2 (Ändringsföreskrifter) (pdf)</a>'})
     assert [r.identifier for r in agencies.iaf_enumerate(None, agencies.IAFFS)] == [
-        "IAFFS 2025:3", "IAFFS 2018:3"]
+        "IAFFS 2025:3", "IAFFS 2018:3", "IAFFS 2025:2"]
 
     _pages(monkeypatch, {
         agencies.MYHFS.index_url:
@@ -1292,6 +1299,176 @@ def test_afs_iaf_and_myh_enumerate_read_their_archive_of_repealed_regulations(mo
             '<a href="https://assets.myh.se/docs/myhfs-2014-1.pdf">MYHFS 2014:1</a>'})
     assert [r.identifier for r in agencies.myh_enumerate(None, agencies.MYHFS)] == [
         "MYHFS 2026:5", "MYHFS 2024:1", "MYHFS 2014:1"]
+
+
+def test_mdffs_enumerate_yields_grund_and_amendments(monkeypatch):
+    _pages(monkeypatch, {
+        agencies.MDFFS.index_url:
+            '<a href="/om-oss/forfattningssamling/mdffs-20191/grundforfattning/">'
+            'Grundförfattning (MDFFS 2019:1)</a>'
+            '<a href="/om-oss/forfattningssamling/mdffs-20191/andringsforfattning-mdffs-20201/">'
+            'Ändringsförfattning (MDFFS 2020:1)</a>',
+        "https://www.digg.se/om-oss/forfattningssamling/mdffs-20191/grundforfattning/":
+            '<a href="/download/18.1/MDFFS_2019_1.pdf">Ladda ner</a>',
+        "https://www.digg.se/om-oss/forfattningssamling/mdffs-20191/andringsforfattning-mdffs-20201/":
+            '<a href="/download/18.2/MDFFS_2020_1.pdf">Ladda ner</a>',
+    })
+    refs = list(agencies.mdffs_enumerate(None, agencies.MDFFS))
+    assert len(refs) == 2
+    assert refs[0].identifier == "MDFFS 2019:1"
+    assert refs[0].extra["regulation_url"] == "https://www.digg.se/download/18.1/MDFFS_2019_1.pdf"
+    assert refs[0].extra["amendments"] == [{
+        "identifier": "MDFFS 2020:1",
+        "url": "https://www.digg.se/om-oss/forfattningssamling/mdffs-20191/andringsforfattning-mdffs-20201/",
+    }]
+    assert refs[1].identifier == "MDFFS 2020:1"
+    assert refs[1].extra["regulation_url"] == "https://www.digg.se/download/18.2/MDFFS_2020_1.pdf"
+
+
+def test_mdffs_enumerate_and_resolve_html_only(monkeypatch, tmp_path):
+    index_html = (
+        '<a href="/om-oss/forfattningssamling/mdffs-20251/grundforfattning/">'
+        'Grundförfattning (MDFFS 2025:1)</a>'
+    )
+    subpage_html = (
+        '<main>'
+        '  <h1>Myndigheten för digital förvaltnings föreskrifter om e-legitimation</h1>'
+        '  <p>1 § Dessa föreskrifter innehåller krav.</p>'
+        '</main>'
+    )
+    _pages(monkeypatch, {
+        agencies.MDFFS.index_url: index_html,
+        "https://www.digg.se/om-oss/forfattningssamling/mdffs-20251/grundforfattning/": subpage_html,
+    })
+    refs = list(agencies.mdffs_enumerate(None, agencies.MDFFS))
+    assert len(refs) == 1
+    assert refs[0].identifier == "MDFFS 2025:1"
+    assert refs[0].extra["regulation_url"] is None
+    assert refs[0].title == "Myndigheten för digital förvaltnings föreskrifter om e-legitimation"
+
+    record = agencies.mdffs_resolve(None, agencies.MDFFS, refs[0], tmp_path)
+    assert record["files"]["regulation"]["name"] == "mdffs-2025-1.html"
+    assert record["title"] == "Myndigheten för digital förvaltnings föreskrifter om e-legitimation"
+    html_file = tmp_path / "mdffs" / "mdffs-2025-1.html"
+    assert compress.exists(html_file)
+    assert "e-legitimation" in compress.read_text(html_file)
+
+    reg = parse.parse_record(record, tmp_path)
+    assert len(reg.structure) > 0
+    assert reg.title == "Myndigheten för digital förvaltnings föreskrifter om e-legitimation"
+
+
+def test_parse_regulation_html():
+    html = (
+        '<article>'
+        '  <h1>Myndigheten för digital förvaltnings föreskrifter om e-legitimation</h1>'
+        '  <h2>Inledande bestämmelser</h2>'
+        '  <p>1 § Dessa föreskrifter gäller för tillhandahållare.</p>'
+        '  <aside><div class="feedback">Ditt svar hjälper oss</div></aside>'
+        '  <p class="meta">Senast uppdaterad: 2025-02-01</p>'
+        '</article>'
+    )
+    parser = lagrum.sfs_parser("foreskrift", parse.PARSE_TYPES)
+    structure, meta, notes = parse.parse_regulation_html(
+        html, "MDFFS 2025:1", parser, fs="mdffs",
+        harvest_title="Myndigheten för digital förvaltnings föreskrifter om e-legitimation")
+    assert meta["title"] == "Myndigheten för digital förvaltnings föreskrifter om e-legitimation"
+    assert len(structure) == 3
+    assert structure[0]["type"] == "rubrik" and structure[0]["level"] == 1
+    assert structure[1]["type"] == "rubrik" and structure[1]["level"] == 2
+    assert structure[2]["type"] == "paragraf" and structure[2]["ordinal"] == "1"
+
+
+def test_elsakfs_enumerate_and_resolve(monkeypatch, tmp_path):
+    index_html = (
+        '<div class="list-item regulation-item">'
+        '  <a href="/om-oss/lag-och-ratt/foreskrifter-i-nummerordning/foreskrifter/elsak-fs-2021-7/">'
+        '    ELSÄK-FS 2021:7'
+        '  </a>'
+        '  <p class="preamble">'
+        '    Elsäkerhetsverkets föreskrifter om anläggningar. Ändringar genom ELSÄK-FS 2022:1.'
+        '  </p>'
+        '</div>'
+        '<div class="list-item regulation-item">'
+        '  <a href="/om-oss/lag-och-ratt/foreskrifter-i-nummerordning/foreskrifter/elsak-fs-2021-8/">'
+        '    ELSÄK-FS 2021:8'
+        '  </a>'
+        '</div>'
+    )
+    landing_2021_8 = (
+        '<html><body>'
+        '  <div class="linkWrapper">Elsäkerhetsverkets föreskrifter om skyltning</div>'
+        '  <a href="/globalassets/foreskrifter/elsak-fs-2021-8">Ladda ner</a>'
+        '</body></html>'
+    )
+    _pages(monkeypatch, {
+        agencies.ELSAKFS.index_url: index_html,
+        "https://www.elsakerhetsverket.se/om-oss/lag-och-ratt/foreskrifter-i-nummerordning/foreskrifter/elsak-fs-2021-8/": landing_2021_8,
+    })
+    refs = list(agencies.elsakfs_enumerate(None, agencies.ELSAKFS))
+    assert len(refs) == 2
+    assert refs[0].identifier == "ELSÄK-FS 2021:7"
+    assert refs[0].title == "Elsäkerhetsverkets föreskrifter om anläggningar"
+    assert refs[1].identifier == "ELSÄK-FS 2021:8"
+    assert refs[1].title is None
+
+    monkeypatch.setattr(harvest, "fetch_pdf", lambda *args, **kwargs: "elsakfs-2021-8-regulation.pdf")
+    record = agencies.elsakfs_resolve(None, agencies.ELSAKFS, refs[1], tmp_path)
+    assert record["title"] == "Elsäkerhetsverkets föreskrifter om skyltning"
+
+
+def test_pfs_enumerates_predecessors_and_skips_prs(monkeypatch):
+    _pages(monkeypatch, {
+        agencies.PFS.index_url:
+            '<a href="/content/dam/foreskrifter/pfs-2023-1.pdf">PFS 2023:1</a>'
+            '<a href="/content/dam/foreskrifter/rffs-1998-1.pdf">Riksförsäkringsverkets föreskrifter (RFFS 1998:1)</a>'
+            '<a href="/content/dam/foreskrifter/fkfs-2005-2.pdf">Försäkringskassans föreskrifter (FKFS 2005:2)</a>'
+            '<a href="/content/dam/foreskrifter/prs-2020-1.pdf">PRS 2020:1</a>',
+    })
+    refs = list(agencies.indexed_enumerate(None, agencies.PFS))
+    assert [r.identifier for r in refs] == ["PFS 2023:1", "RFFS 1998:1", "FKFS 2005:2"]
+    assert refs[0].basefile == "pfs/2023:1"
+    assert refs[1].basefile == "rffs/1998:1"
+    assert refs[2].basefile == "fkfs/2005:2"
+
+
+def test_pfs_resolve_preserves_existing_predecessor_record(tmp_path):
+    existing = {
+        "fs": "rffs",
+        "basefile": "rffs/1998:1",
+        "identifier": "RFFS 1998:1",
+        "title": "Försäkringskassans titel",
+        "publisher": "Försäkringskassan",
+        "url": "https://lagrummet.forsakringskassan.se/foreskrifter/dokument?id=123",
+        "files": {"regulation": {"name": "rffs-1998-1-regulation.pdf"},
+                  "consolidation": [{"name": "rffs-1998-1-consolidation-0.pdf"}]},
+    }
+    rec_path = harvest.record_path(tmp_path, "rffs", "rffs/1998:1")
+    compress.write_json(rec_path, existing)
+
+    ref = agencies.DocRef(
+        basefile="rffs/1998:1", fs="rffs", identifier="RFFS 1998:1",
+        url="https://www.pensionsmyndigheten.se/1998_1.pdf",
+        title="RFFS 1998:1 (pdf, 13kB)",
+        extra={"regulation_url": "https://www.pensionsmyndigheten.se/1998_1.pdf",
+               "title": "RFFS 1998:1 (pdf, 13kB)"})
+    result = agencies.pfs_resolve(None, agencies.PFS, ref, tmp_path)
+    assert result["publisher"] == "Försäkringskassan"
+    assert result["title"] == "Försäkringskassans titel"
+    assert len(result["files"]["consolidation"]) == 1
+
+
+def test_pfs_resolve_downloads_missing_predecessor_with_correct_publisher(monkeypatch, tmp_path):
+    monkeypatch.setattr(harvest, "fetch_pdf", lambda *args, **kwargs: "rffs-2000-5-regulation.pdf")
+    ref = agencies.DocRef(
+        basefile="rffs/2000:5", fs="rffs", identifier="RFFS 2000:5",
+        url="https://www.pensionsmyndigheten.se/2000_5.pdf",
+        title="Premiepensionsmyndighetens föreskrifter (RFFS 2000:5) om val (pdf, 13kB)",
+        extra={"regulation_url": "https://www.pensionsmyndigheten.se/2000_5.pdf",
+               "title": "Premiepensionsmyndighetens föreskrifter (RFFS 2000:5) om val (pdf, 13kB)"})
+    result = agencies.pfs_resolve(None, agencies.PFS, ref, tmp_path)
+    assert result["publisher"] == "Riksförsäkringsverket"
+    assert result["title"] == "Premiepensionsmyndighetens föreskrifter (RFFS 2000:5) om val"
 
 
 def test_stemfs_link_select_includes_amendment_column():

@@ -55,6 +55,7 @@ from .harvest import (
     absolute,
     direct_docref,
     fetch_pdf,
+    filename,
     newest_first,
 )
 
@@ -685,16 +686,23 @@ def tlv_enumerate(session, agency):
             if not found:
                 raise ValueError("%s: %s names no number under %r in %r"
                                  % (agency.scope, url, role, panel_title))
+            desig, arsutgava, lopnummer = found[0], found[1], found[2]
+            slugm = harvest.RE_SLUG_NUMBER.search(filename(url))
+            if (slugm and slugm.group(1) == arsutgava
+                    and str(int(slugm.group(2))) != lopnummer):
+                lopnummer = str(int(slugm.group(2)))
             grund = bool(RE_GRUNDFORESKRIFT.match(role))
+            panel_desig = numbered(panel_title)
+            panel_matches = bool(panel_desig and samling(panel_desig[0]) == samling(desig))
             # the panel heading is the base act's title; every other file in the
             # panel is a different document, so it keeps its own link text (which
             # `parse.clean_title` reads as chrome and replaces with the PDF's
             # own rubric)
-            title = panel_title if grund else plain(el.get_text(" ", strip=True))
-            ref = file_docref(agency, found[0], found[1], found[2], url,
+            title = panel_title if (grund and panel_matches) else plain(el.get_text(" ", strip=True))
+            ref = file_docref(agency, desig, arsutgava, lopnummer, url,
                               seen, title=title)
             if grund:
-                base = "%s/%s:%s" % (samling(found[0]), found[1], found[2])
+                base = "%s/%s:%s" % (samling(desig), arsutgava, lopnummer)
             if ref:
                 refs[ref.basefile] = ref
         if konsoliderade and base is None:

@@ -10,6 +10,7 @@ from pathlib import Path
 from ferenda.foreskrift import parse as fp
 from ferenda.foreskrift import render as fs_render
 from ferenda.foreskrift import structure
+from ferenda.foreskrift.agencies import clean_scb_ghost_layers
 from ferenda.foreskrift.model import Block, printed_designation
 from ferenda.foreskrift.parse import (
     PARSE_TYPES,
@@ -2712,4 +2713,100 @@ def test_repeal_list_with_more_than_99_items():
         "https://lagen.nu/bfs/1990:3",
         "https://lagen.nu/bfs/1990:4",
     }
+
+
+def test_clean_title_handles_long_repeal_notices_and_om_prefixes():
+    # Long titles (>500 chars) without decision clauses must not be dropped as None (e.g. RA-MS repeal notices)
+    long_title = (
+        "Riksarkivets föreskrifter om upphävande av myndighetsspecifika föreskrifter om återlämnande, "
+        "gallring, överlämnande, införlivande, arkivredovisning, utlån och sammanfogning av handlingar hos "
+        "Arbetsmiljöverket, Chalmers tekniska högskola, civila statliga myndigheter, Datainspektionen, "
+        "Domstolsverket, Högskolan på Gotland, Linköpings Universitet, länsstyrelserna, myndigheter "
+        "anslutna till SLÖR (statligt löneuträkningssystem), Skellefteå tingsrätt, Statens maskinprovningar, "
+        "Statens meteorologisk-hydrografiska anstalt, Statens arbetsgivarverk, Statens naturvårdsverk, "
+        "Statens Trygghetsnämnd, Statens vattenfallsverk, Statens växtsortnämnd, Statskontoret"
+    )
+    assert len(long_title) > 500
+    cleaned = clean_title(long_title, "RA-MS 2014:12")
+    assert cleaned == long_title
+
+    # Titles starting with 'Om ...' or 'om ...' must be preserved, not dropped
+    assert clean_title("FFS 2019:4 Om folkrätt.", "FFS 2019:4") == "Om folkrätt."
+    assert clean_title("FFS 2017:1 Om upphävande av FFS 1987:24.", "FFS 2017:1") == "Om upphävande av FFS 1987:24."
+
+    # Listing rows running into decision clauses are cleanly cut at the clause
+    raw_migr = (
+        "Migrationsverkets föreskrifter med bemyndigande för Sveriges ambassad i Canberra beslutade "
+        "den 13 augusti 2004. Sverige har ingått avtal med Australien och Nya Zeeland..."
+    )
+    assert clean_title(raw_migr, "MIGRFS 2004:2") == (
+        "Migrationsverkets föreskrifter med bemyndigande för Sveriges ambassad i Canberra"
+    )
+
+
+def test_scb_ghost_overlay_cleaned():
+    # Synthetic XML with two SCB-FS mastheads (2023:22 ghost, 2024:1 target)
+    xml_input = b"""<pdf2xml>
+<page number="1" top="0" left="0" height="1000" width="700">
+<text top="36" left="169">Statistiska centralbyr\xc3\xa5ns</text>
+<text top="62" left="169">f\xc3\xb6rfattningssamling</text>
+<text top="158" left="516">SCB-FS 2023:22</text>
+<text top="188" left="516">den 14 december 2023</text>
+<text top="229" left="100">om upph\xc3\xa4vande av (SCB-FS 2016:18)</text>
+<text top="289" left="100">beslutade den 12 december 2023.</text>
+<text top="36" left="169">Statistiska centralbyr\xc3\xa5ns</text>
+<text top="62" left="169">f\xc3\xb6rfattningssamling</text>
+<text top="171" left="516">SCB-FS 2024:1</text>
+<text top="201" left="516">den 18 januari 2024</text>
+<text top="228" left="100">Tillk\xc3\xa4nnagivande</text>
+<text top="279" left="100">beslutat den 16 januari 2024.</text>
+</page>
+</pdf2xml>"""
+    cleaned = clean_scb_ghost_layers(xml_input, "SCB-FS 2024:1")
+    assert b"SCB-FS 2024:1" in cleaned
+    assert b"SCB-FS 2023:22" not in cleaned
+    assert b"den 18 januari 2024" in cleaned
+    assert b"den 14 december 2023" not in cleaned
+
+
+def test_scb_2digit_repeal_table():
+    target = (
+        "SCB-FS Föreskrifter om ändring av Statistiska centralbyråns föreskrifter "
+        "(1993:10) om uppgifter till statistik om byggproduktion 95:14 "
+        "Föreskrifter om ändring av (SCB-FS1995:6) 96:4 "
+        "Företagens resultat 93:18 Industrins struktur 93:2 "
+        "-”- -”- 95:6 -”- -”- 96:26 Löner för arbetare 95:24 "
+        "Löner privat sektor 99:12 Yrken för anställda 99:15"
+    )
+    uris = _repeal_targets(target, "scbfs")
+    assert uris == {
+        "https://lagen.nu/scbfs/1995:14",
+        "https://lagen.nu/scbfs/1996:4",
+        "https://lagen.nu/scbfs/1993:18",
+        "https://lagen.nu/scbfs/1993:2",
+        "https://lagen.nu/scbfs/1995:6",
+        "https://lagen.nu/scbfs/1996:26",
+        "https://lagen.nu/scbfs/1995:24",
+        "https://lagen.nu/scbfs/1999:12",
+        "https://lagen.nu/scbfs/1999:15",
+    }
+
+
+def test_masthead_title_strips_interleaved_date_column_fragment():
+    blocks = [
+        Block("rubrik", "HSLF-FS Föreskrifter 2023:35", 1),
+        Block("rubrik", "om ändring i Tandvårds- och läkemedelsförmåns-", 1),
+        Block("rubrik", "verkets föreskrifter och allmänna råd den 2023", 1),
+        Block("rubrik", "(TLVFS 2014:9) om prissättning av vissa äldre Omtryck", 1),
+        Block("rubrik", "läkemedel;", 1),
+        Block("stycke", "beslutade den 4 september 2023.", 1),
+    ]
+    title = title_from_masthead(blocks, 5)
+    assert title == (
+        "Föreskrifter om ändring i Tandvårds- och läkemedelsförmånsverkets "
+        "föreskrifter och allmänna råd (TLVFS 2014:9) om prissättning av vissa "
+        "äldre läkemedel"
+    )
+
+
 
