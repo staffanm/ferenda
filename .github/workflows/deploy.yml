@@ -251,10 +251,13 @@ jobs:
           # the headers the vhost is supposed to add (docker/nginx/*.conf)
           headers="$(curl -sSI --resolve lagen.nu:443:127.0.0.1 https://lagen.nu/)"
           for header in Strict-Transport-Security X-Content-Type-Options \
-                        Content-Security-Policy X-Frame-Options; do
+                        Content-Security-Policy; do
             echo "$headers" | grep -qi "^$header:" \
               || { echo "missing $header" >&2; exit 1; }
           done
+          # other sites embed the public pages (exam.net, 2026-10-12)
+          echo "$headers" | grep -qiE '^X-Frame-Options:|frame-ancestors' \
+            && { echo "a framing header blocks embedding of public pages" >&2; exit 1; }
 
       # The pages link /style.css and /script.js by URL, and the serve reads them
       # from `generated/` -- a bind-mounted host tree, not the image. Without this
