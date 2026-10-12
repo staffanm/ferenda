@@ -94,6 +94,34 @@ def test_a_toc_that_opens_on_the_masthead_page_keeps_the_masthead():
     assert page_paragraphs(lines[3:], "SJVFS 2015:50", 2) == []
 
 
+def test_dotted_price_table_is_not_skipped_as_toc():
+    # LMFS fee tables: lines with dotted leaders ending in 'kr' or 'Offert'
+    # followed by an ikraftträdande clause are body text, not a table of contents
+    lines = [_line("Per ändrad referens ......................... 10 kr", 100),
+             _line("Bemannad support .................... 2 500 kr", 120),
+             _line("Över 10 000 pantbrev ........................ Offert", 140),
+             _line("Underhåll ................................... 500 kr", 160),
+             _line("Jourhavande ................................. 1 000 kr", 180),
+             _line("Dessa föreskrifter träder i kraft den 1 januari 2022.", 200)]
+    paras = page_paragraphs(lines, "LMFS 2021:5", 37)
+    joined = " ".join(p.text for p in paras)
+    assert "Dessa föreskrifter träder i kraft" in joined
+    assert "Per ändrad referens" in joined
+
+
+def test_toc_dotted_line_with_currency_in_chapter_title_is_skipped_as_toc():
+    # A TOC entry that mentions a currency word before the dotted leader
+    # must still be identified as a TOC dotted line and dropped
+    lines = [_line("Innehållsförteckning", 50),
+             _line("1 kap. Allmänna bestämmelser ....................... 3", 80),
+             _line("2 kap. Avgifter i euro och andra valutor ............ 6", 100),
+             _line("3 kap. Priser i sek för särskild kontroll ........... 8", 120),
+             _line("4 kap. Undantag .................................... 12", 140),
+             _line("5 kap. Övergångsbestämmelser ....................... 15", 160)]
+    paras = page_paragraphs(lines, "TESTFS 2022:1", 2)
+    assert paras == []
+
+
 PAGE_XML = (b"<pdf2xml>"
             b"<page number='1' width='744' height='1200'>"
             b"<text top='10' left='5' height='10'>first page</text></page>"

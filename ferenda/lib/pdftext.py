@@ -45,6 +45,16 @@ from .errors import SkipDocument
 from .util import normalize_space, write_atomic
 
 RE_DOTS = re.compile(r"\.{4,}")                       # TOC dotted leaders
+RE_PRICE_TRAIL = re.compile(r"\b(?:kr|sek|euro|€|offert|se\s+ovan)\b", re.I)
+
+
+def _is_toc_dot_line(text):
+    dots = list(RE_DOTS.finditer(text))
+    if not dots:
+        return False
+    return not any(RE_PRICE_TRAIL.search(text[m.end():]) for m in dots)
+
+
 RE_TOC_HEADING = re.compile(r"\s*innehåll(?:sförteckning)?\s*$", re.I)
 # "2 kap. ...", a bare centered "2 kap." and a lettered "2 a kap."
 RE_KAP_MARK = re.compile(r"^(\d+(?:\s?[a-z])?)\s*kap\.(?:\s|$)")
@@ -427,7 +437,7 @@ def pdf_layout_text_bytes(pdf_bytes):
     return _pdftotext_stdin(pdf_bytes, "-layout").decode("utf-8")
 
 
-def pdf_pages(pdf_path, patch_key=None, hidden=False):
+def pdf_pages(pdf_path, patch_key=None, hidden=False, xml_transform=None):
     """(pageno, [Line]) per page via `pdftohtml -xml`. Each <text> fragment is
     one font run carrying <b>/<i>; fragments on the same baseline are one visual
     line, bold/italic when all their runs are. `patch_key=(source, basefile)`
@@ -441,6 +451,8 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
         source, basefile = patch_key
         xml = patch.apply(source, basefile,
                           xml.decode("utf-8", "replace")).encode("utf-8")
+    if xml_transform is not None:
+        xml = xml_transform(xml)
     # pdftohtml emits occasionally malformed XML (overlapping <b>/<i>, stray &),
     # so parse leniently rather than abort the document
     root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
@@ -1733,11 +1745,11 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
     or a running footer stops being glued to the prose) and some of it wrong (a
     line of a quoted block, breaking a sentence). Neither is validated for them,
     so they keep the segmentation they had."""
-    if sum(RE_DOTS.search(l.text) is not None for l in lines) >= 5:
+    if sum(_is_toc_dot_line(l.text) for l in lines) >= 5:
         # the table of contents may open on the masthead page (SJVFS 2015:50
         # prints title, preamble and "Innehållsförteckning" on page 1): keep
         # what precedes its heading, or its first dotted line
-        first_dots = next(i for i, l in enumerate(lines) if RE_DOTS.search(l.text))
+        first_dots = next(i for i, l in enumerate(lines) if _is_toc_dot_line(l.text))
         lines = lines[:next((i for i, l in enumerate(lines[:first_dots])
                              if RE_TOC_HEADING.match(l.text)), first_dots)]
         if not lines:
@@ -1797,7 +1809,7 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
                 if not re.search(r"[A-Za-zÅÄÖåäö]", residue):
                     raw = residue
         text, spans = _normalized_with_spans(raw, spans)
-        if text and not is_page_number(text, pageno) and not RE_DOTS.search(text):
+        if text and not is_page_number(text, pageno) and not _is_toc_dot_line(text):
             first_headed = first_headed or (stripped and not kept)
             kept.append(replace(l, text=text, spans=spans))
     page_body = line_body_size(kept)
