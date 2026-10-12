@@ -92,7 +92,7 @@ diff. The subagent reviews the changes with zero author context bias.
 2. **Blast radius on stored corpus data:** For parser/normaliser changes,
    run the blast radius tool against real stored records:
    ```
-   .venv/bin/python .claude/skills/second-opinion/scripts/diff_blast_radius.py \
+   uv run python .agents/skills/second-opinion/scripts/diff_blast_radius.py \
        --file <modified_file> \
        --function <modified_function> \
        --records "<glob_pattern>" \

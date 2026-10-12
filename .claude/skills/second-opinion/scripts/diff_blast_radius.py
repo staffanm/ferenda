@@ -6,6 +6,7 @@ stored data (harvest JSON, artifact JSON) to catch regressions before wrapup.
 """
 
 import argparse
+import dataclasses
 import glob
 import importlib
 import importlib.util
@@ -28,6 +29,11 @@ except ImportError:
 
 RE_DATE = re.compile(r"\b(?:19|20)\d{2}(?:-\d{2}-\d{2})?\b")
 RE_DESIGNATION = re.compile(r"\b[A-ZÅÄÖ]+(?:-| )?FS\s+\d{4}:\d+\b")
+RE_CHROME = re.compile(
+    r"\b(?:dela\s+sidan|facebook|twitter|linkedin|skriv\s+ut|status:\s*upphävda|"
+    r"till\s+toppen|webbplatsen|cookies|tillgänglighetsredogörelse|hoppa\s+till\s+innehåll)\b",
+    re.I
+)
 
 
 def load_head_module(rel_path):
@@ -84,7 +90,43 @@ def read_record(path):
     return json.loads(text)
 
 
-def compare_records(target_file, function_name, glob_pattern, field_names, limit=0, max_diffs=20):
+def to_dict_or_scalar(val):
+    """Convert dataclasses or models to a dict for structured comparison."""
+    if hasattr(val, "to_artifact"):
+        return val.to_artifact()
+    if dataclasses.is_dataclass(val):
+        return dataclasses.asdict(val)
+    return val
+
+
+def find_chrome_in_structure(struct):
+    """Find any web chrome phrases that leaked into parsed structure nodes."""
+    matches = []
+
+    def check(nodes):
+        for n in nodes or []:
+            if isinstance(n, dict):
+                text = n.get("text")
+                if isinstance(text, str):
+                    m = RE_CHROME.search(text)
+                    if m:
+                        matches.append(m.group(0))
+                elif isinstance(text, list):
+                    # Interleaved text/citation runs
+                    for run in text:
+                        if isinstance(run, str):
+                            m = RE_CHROME.search(run)
+                            if m:
+                                matches.append(m.group(0))
+                check(n.get("children"))
+
+    check(struct)
+    return matches
+
+
+def compare_records(target_file, function_name, glob_pattern, field_names,
+                    limit=0, max_diffs=20, record_arg=False, root=None,
+                    scopes=None):
     """Compare HEAD vs working tree function across matched records."""
     head_mod = load_head_module(target_file)
     work_mod = load_work_module(target_file)
@@ -93,6 +135,10 @@ def compare_records(target_file, function_name, glob_pattern, field_names, limit
     work_fn = getattr(work_mod, function_name)
 
     files = sorted(glob.glob(glob_pattern))
+    if scopes:
+        scope_set = set(scopes)
+        files = [f for f in files if any(f"/{s}/" in f or f"/{s}-" in f for s in scope_set)]
+
     if limit > 0:
         files = files[:limit]
 
@@ -103,6 +149,11 @@ def compare_records(target_file, function_name, glob_pattern, field_names, limit
     dropped_dates = 0
     dropped_designations = 0
     became_empty = 0
+    dropped_repeals = 0
+    gained_repeals = 0
+    structure_became_empty = 0
+    structure_empty_to_nonempty = 0
+    chrome_leaks = 0
     errors = 0
 
     for path in files:
@@ -112,41 +163,114 @@ def compare_records(target_file, function_name, glob_pattern, field_names, limit
             errors += 1
             continue
 
-        args = [record.get(f) for f in field_names]
+        if record_arg:
+            args = [record]
+            if root is not None:
+                args.append(root)
+        else:
+            args = [record.get(f) for f in field_names]
 
         try:
-            head_val = head_fn(*args)
-            work_val = work_fn(*args)
-        except (TypeError, ValueError, AttributeError, KeyError):
+            head_raw = head_fn(*args)
+            work_raw = work_fn(*args)
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OSError, json.JSONDecodeError, RuntimeError):
             errors += 1
             continue
+
+        head_val = to_dict_or_scalar(head_raw)
+        work_val = to_dict_or_scalar(work_raw)
 
         if head_val == work_val:
             identical += 1
             continue
 
-        h_norm = " ".join((head_val or "").split())
-        w_norm = " ".join((work_val or "").split())
+        ident = record.get("identifier") or record.get("basefile") or path
+
+        # Structured dict/model comparisons
+        if isinstance(head_val, dict) or isinstance(work_val, dict):
+            h_dict = head_val if isinstance(head_val, dict) else {}
+            w_dict = work_val if isinstance(work_val, dict) else {}
+
+            h_meta = h_dict.get("metadata") or {}
+            w_meta = w_dict.get("metadata") or {}
+
+            # Check repeals
+            h_upp = h_meta.get("upphaver") or h_dict.get("upphaver") or []
+            w_upp = w_meta.get("upphaver") or w_dict.get("upphaver") or []
+            if len(h_upp) > 0 and len(w_upp) == 0:
+                dropped_repeals += 1
+            elif len(h_upp) == 0 and len(w_upp) > 0:
+                gained_repeals += 1
+
+            # Check titles
+            h_title = h_meta.get("title") or h_dict.get("title")
+            w_title = w_meta.get("title") or w_dict.get("title")
+            if h_title and not w_title:
+                became_empty += 1
+
+            # Check structure nodes
+            h_struct = h_dict.get("structure") or []
+            w_struct = w_dict.get("structure") or []
+            if len(h_struct) > 0 and len(w_struct) == 0:
+                structure_became_empty += 1
+            elif len(h_struct) == 0 and len(w_struct) > 0:
+                structure_empty_to_nonempty += 1
+
+            # Check for leaked chrome in structure
+            leaks = find_chrome_in_structure(w_struct)
+            if leaks:
+                chrome_leaks += 1
+
+            # Check dates
+            h_beslut = h_meta.get("beslutsdatum")
+            w_beslut = w_meta.get("beslutsdatum")
+            h_ikraft = h_meta.get("ikrafttradandedatum")
+            w_ikraft = w_meta.get("ikrafttradandedatum")
+            h_utkom = h_meta.get("utkomFranTryck")
+            w_utkom = w_meta.get("utkomFranTryck")
+
+            diff_summary = {
+                "title": (h_title, w_title) if h_title != w_title else None,
+                "upphaver": (h_upp, w_upp) if h_upp != w_upp else None,
+                "beslutsdatum": (h_beslut, w_beslut) if h_beslut != w_beslut else None,
+                "ikrafttradandedatum": (h_ikraft, w_ikraft) if h_ikraft != w_ikraft else None,
+                "utkomFranTryck": (h_utkom, w_utkom) if h_utkom != w_utkom else None,
+                "structure_len": (len(h_struct), len(w_struct)) if len(h_struct) != len(w_struct) else None,
+                "chrome_leaks": leaks or None,
+            }
+            for mk in (set(h_meta) | set(w_meta)):
+                if mk not in diff_summary and h_meta.get(mk) != w_meta.get(mk):
+                    diff_summary[mk] = (h_meta.get(mk), w_meta.get(mk))
+
+            content_changes.append((ident, args[0] if not record_arg else path, diff_summary, None))
+            continue
+
+        # String comparisons
+        h_str = str(head_val) if head_val is not None else ""
+        w_str = str(work_val) if work_val is not None else ""
+
+        h_norm = " ".join(h_str.split())
+        w_norm = " ".join(w_str.split())
 
         if h_norm == w_norm:
             whitespace_only += 1
             continue
 
-        # Content changed
         if head_val and not work_val:
             became_empty += 1
+
         if head_val and work_val:
-            h_dates = set(RE_DATE.findall(head_val))
-            w_dates = set(RE_DATE.findall(work_val))
+            h_dates = set(RE_DATE.findall(h_str))
+            w_dates = set(RE_DATE.findall(w_str))
             if h_dates - w_dates:
                 dropped_dates += 1
 
-            h_desigs = set(RE_DESIGNATION.findall(head_val))
-            w_desigs = set(RE_DESIGNATION.findall(work_val))
+            h_desigs = set(RE_DESIGNATION.findall(h_str))
+            w_desigs = set(RE_DESIGNATION.findall(w_str))
             if h_desigs - w_desigs:
                 dropped_designations += 1
 
-        content_changes.append((record.get("identifier") or path, args[0], head_val, work_val))
+        content_changes.append((ident, args[0], head_val, work_val))
 
     print(f"Total files evaluated:    {total}")
     print(f"Identical results:        {identical}")
@@ -157,16 +281,30 @@ def compare_records(target_file, function_name, glob_pattern, field_names, limit
     print(f"  - Dropped dates:        {dropped_dates}")
     print(f"  - Dropped designations: {dropped_designations}")
     print(f"  - Became empty / None:  {became_empty}")
+    if dropped_repeals or gained_repeals:
+        print(f"  - Dropped repeals:      {dropped_repeals}")
+        print(f"  - Gained repeals:       {gained_repeals}")
+    if structure_became_empty or structure_empty_to_nonempty:
+        print(f"  - Structure empty -> body: {structure_empty_to_nonempty}")
+        print(f"  - Structure body -> empty: {structure_became_empty}")
+    if chrome_leaks:
+        print(f"  - Chrome leaks in body: {chrome_leaks}")
 
     if content_changes:
         sample_count = min(len(content_changes), max_diffs)
         print(f"\nSample of content changes ({sample_count} of {len(content_changes)}):")
         for ident, raw, h, w in content_changes[:sample_count]:
             print(f"\n[{ident}]")
-            if raw and raw != h:
-                print(f"  RAW:  {raw}")
-            print(f"  HEAD: {h}")
-            print(f"  WORK: {w}")
+            if isinstance(h, dict) and w is None:
+                # Structured summary
+                for key, val in h.items():
+                    if val is not None:
+                        print(f"  {key}: {val[0]!r} -> {val[1]!r}")
+            else:
+                if raw and raw != h:
+                    print(f"  RAW:  {raw}")
+                print(f"  HEAD: {h}")
+                print(f"  WORK: {w}")
 
     return len(content_changes)
 
@@ -177,12 +315,18 @@ def main():
     parser.add_argument("--function", required=True, help="Function name to evaluate")
     parser.add_argument("--records", required=True, help="Glob pattern for record files")
     parser.add_argument("--fields", default="title,identifier", help="Comma-separated field names for args")
+    parser.add_argument("--record-arg", action="store_true", help="Pass the entire record dict as first argument")
+    parser.add_argument("--root", default=None, help="Optional root directory passed as second argument with --record-arg")
+    parser.add_argument("--scopes", default=None, help="Comma-separated scopes to filter records by (e.g. tfs,elsakfs)")
     parser.add_argument("--limit", type=int, default=0, help="Max records to test (0 = all)")
     parser.add_argument("--max-diffs", type=int, default=20, help="Max diff samples to print")
     args = parser.parse_args()
 
     fields = [f.strip() for f in args.fields.split(",") if f.strip()]
-    compare_records(args.file, args.function, args.records, fields, args.limit, args.max_diffs)
+    scopes = [s.strip() for s in args.scopes.split(",") if s.strip()] if args.scopes else None
+    compare_records(args.file, args.function, args.records, fields,
+                    limit=args.limit, max_diffs=args.max_diffs,
+                    record_arg=args.record_arg, root=args.root, scopes=scopes)
 
 
 if __name__ == "__main__":
