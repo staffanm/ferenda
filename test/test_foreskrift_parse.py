@@ -447,6 +447,10 @@ def test_bare_ref_before_the_series_began_names_the_predecessor():
     assert fp._series_for_year("dfs", 2003) == "dfs"
     assert fp._series_for_year("livsfs", 2002) == "livsfs"
     assert fp._series_for_year("slvfs", 1993) == "slvfs"
+    # Statens invandrarverk became Migrationsverket on 2000-01-01; MIGRFS 2003:7
+    # repeals "föreskrifterna (1998:15)", which is SIVFS 1998:15
+    assert fp._series_for_year("migrfs", 1998) == "sivfs"
+    assert fp._series_for_year("migrfs", 2000) == "migrfs"
     text = "Genom dessa föreskrifter upphävs Livsmedelsverkets föreskrifter (1993:21) om näringsvärdesdeklaration."
     meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES), fs="livsfs")
     assert _uris(meta["upphaver"]) == ["https://lagen.nu/slvfs/1993:21"]
