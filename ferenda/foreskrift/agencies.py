@@ -2732,8 +2732,8 @@ TVFS = Agency(
 # --------------------------------------------------------------------------
 
 # the slug, under the in-force listing or under the archive
-RE_AFS_BASE = re.compile(r"afs-(\d{4})(\d+)")
-RE_AFS_NUM = re.compile(r"afs\s*(\d{4})[-_](\d+)", re.IGNORECASE)
+RE_AFS_BASE = re.compile(r"afs-(\d{4})-?(\d+)|(\d{4})-(\d+)-foreskrift", re.IGNORECASE)
+RE_AFS_NUM = re.compile(r"afs[-_\s]*(\d{4})[-_](\d+)", re.IGNORECASE)
 
 
 def afs_classify(a, fs, base_ars, base_lop):
@@ -2774,18 +2774,22 @@ def afs_enumerate(session, agency):
     def page_refs(soup):
         for a in soup.find_all("a", href=True):
             href = util.href(a)
-            m = RE_AFS_BASE.search(href)
-            if not m:
+            if "/foreskrifter/" not in href:
                 continue
-            arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
+            matches = list(RE_AFS_BASE.finditer(href))
+            if not matches:
+                continue
+            m = matches[-1]
+            arsutgava = m.group(1) or m.group(3)
+            lopnummer = str(int(m.group(2) or m.group(4)))
             basefile = "%s/%s:%s" % (agency.fs, arsutgava, lopnummer)
             if basefile in seen:
                 continue
             seen.add(basefile)
-            if "/upphavda-foreskrifter/" in href:
+            if "/upphavda-foreskrifter/" in href or "upphavande" in href:
                 url = harvest.absolute(agency.base_url, href)
             else:
-                fused = m.group(1) + m.group(2)      # the slug fuses year+lopnummer
+                fused = arsutgava + lopnummer      # the slug fuses year+lopnummer
                 url = harvest.absolute(agency.base_url,
                                 href.rstrip("/") + "/forfattningshistorik-afs-%s/" % fused)
             yield DocRef(basefile=basefile,

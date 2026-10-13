@@ -2687,20 +2687,37 @@ def test_clean_title_preserves_parallel_designations_and_date_stamps():
         "inom skogsbruket Omtryck 20140618.pdf - 0,27 MB", "SKSFS 2014:3") == (
         "Skogsstyrelsens föreskrifter och allmänna råd (SKSFS 2011:2) om stöd till vissa åtgärder "
         "inom skogsbruket Omtryck 20140618")
+    # Own designation embedded after amendment phrase followed by title type is stripped (AFS 2022:4)
+    raw_afs_2022_4 = (
+        "Arbetsmiljöverkets föreskrifter om ändring i AFS 2022:4 "
+        "Arbetsmiljöverkets föreskrifter och allmänna råd (AFS 2011:19) om kemiska arbetsmiljörisker")
+    assert clean_title(raw_afs_2022_4, "AFS 2022:4") == (
+        "Arbetsmiljöverkets föreskrifter om ändring i "
+        "Arbetsmiljöverkets föreskrifter och allmänna råd (AFS 2011:19) om kemiska arbetsmiljörisker")
+    # Titles with draft placeholders or duplicated words return None to fall back to PDF rubric
+    assert clean_title(
+        "Arbetsmiljöverkets föreskrifter föreskrifter om om ändring ändring ii "
+        "Arbetsmiljöverkets Arbetsmiljöverkets Arbetsmiljöverkets föreskrifter (AFS xxxx:xx) "
+        "om föreskrifter (AFS 2010:1) om berg- och gruvarbete", "AFS 2014:10") is None
+    assert clean_title(
+        "Arbetsmiljöverkets föreskrifter om ändring i Arbetsmiljöverkets föreskrifter (AFS xxxx:xx) "
+        "om Arbetsmiljöverkets föreskrifter (AFS 1995:5)", "AFS 2014:12") is None
 
 
-def test_cover_page_skipped_for_official_masthead():
+def test_cover_page_skipped_for_official_masthead(monkeypatch):
     # Documents such as AFS 2014:10 have a draft cover page on page 1 with AFS 2014:XX,
     # and the official masthead with the actual title on page 2 (#45).
-    blocks = [
-        Block("stycke", "ARBETSMILJÖVERKET\nAFS 2014:XX\nDraft cover", 1),
+    mock_blocks = [
+        Block("stycke", "ARBETSMILJÖVERKET\nArbetsmiljöverkets författningssamling\nAFS 2014:XX\nDraft cover", 1),
         Block("stycke", "Arbetsmiljöverkets författningssamling", 2),
-        Block("stycke", "Arbetsmiljöverkets föreskrifter om kemiska arbetsmiljörisker; beslutade den 25 mars 2014.", 2),
+        Block("rubrik", "Arbetsmiljöverkets föreskrifter om kemiska arbetsmiljörisker;", 2),
+        Block("stycke", "beslutade den 25 mars 2014.", 2),
         Block("paragraf", "1 § Dessa föreskrifter gäller.", 2, num="1"),
     ]
-    m_blocks = blocks[:3]
-    m_page = next((b.page for b in m_blocks if fp.RE_MASTHEAD_LINE.search(b.text)), 1)
-    assert m_page == 2
+    monkeypatch.setattr(fp, "parse_body", lambda pages, identifier: (mock_blocks, []))
+    monkeypatch.setattr(fp, "_pages", lambda *a, **kw: [])
+    ast, meta, _ = fp.parse_pdf("dummy.pdf", "AFS 2014:10", sfs_parser("foreskrift", PARSE_TYPES), fs="afs")
+    assert meta["title"] == "Arbetsmiljöverkets föreskrifter om kemiska arbetsmiljörisker"
 
 
 def test_repeal_list_with_more_than_99_items():
@@ -2817,6 +2834,18 @@ def test_masthead_title_strips_interleaved_date_column_fragment():
         "föreskrifter och allmänna råd (TLVFS 2014:9) om prissättning av vissa "
         "äldre läkemedel"
     )
+
+
+def test_masthead_title_preserves_beslutade_av():
+    # AFS 2010:2: "beslutade av" must not be treated as the end of the title
+    blocks = [
+        Block("rubrik", "AFS 2010:2", 1),
+        Block("rubrik", "Förordning om upphävande av vissa föreskrifter beslutade av Arbetarskyddsstyrelsen;", 1),
+        Block("stycke", "beslutad den 17 februari 2010.", 1),
+    ]
+    title = title_from_masthead(blocks, 2)
+    assert title == "Förordning om upphävande av vissa föreskrifter beslutade av Arbetarskyddsstyrelsen"
+
 
 
 

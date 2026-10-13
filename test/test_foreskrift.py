@@ -1271,12 +1271,21 @@ def test_afs_iaf_and_myh_enumerate_read_their_archive_of_repealed_regulations(mo
             '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/arbetsanpassning-afs-20205-foreskrifter/">'
             'Arbetsanpassning (AFS 2020:5)</a>'
             '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/afs-20011/">'
-            'Systematiskt arbetsmiljöarbete (AFS 2001:1)</a>'})
+            'Systematiskt arbetsmiljöarbete (AFS 2001:1)</a>'
+            '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/kemiska-arbetsmiljorisker-2011-19-foreskrifter/">'
+            'Kemiska arbetsmiljörisker (AFS 2011:19)</a>'
+            '<a href="/publikationer/foreskrifter/upphavda-foreskrifter/enkla-tryckkarl-omtryckt-i-afs-199453-afs-199341-foreskrifter/">'
+            'Enkla tryckkärl (AFS 1993:41)</a>'
+            '<a href="/publikationer/foreskrifter/upphavande-av-arbetarskyddsstyrelsens-allmanna-rad-afs-20156-om-arbete-med-kvicksilver-och-amalgam-inom-tandvarden/">'
+            'Kvicksilver och amalgam (AFS 2015:6)</a>'})
     refs = list(agencies.afs_enumerate(None, agencies.AFS))
-    assert [r.identifier for r in refs] == ["AFS 2023:1", "AFS 2020:5", "AFS 2001:1"]
+    assert [r.identifier for r in refs] == ["AFS 2023:1", "AFS 2020:5", "AFS 2001:1", "AFS 2011:19", "AFS 1993:41", "AFS 2015:6"]
     assert refs[0].url.endswith("/afs-20231/forfattningshistorik-afs-20231/")
     assert refs[1].url == "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/arbetsanpassning-afs-20205-foreskrifter/"
     assert refs[2].url == "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/afs-20011/"
+    assert refs[3].url == "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/kemiska-arbetsmiljorisker-2011-19-foreskrifter/"
+    assert refs[4].url == "https://www.av.se/publikationer/foreskrifter/upphavda-foreskrifter/enkla-tryckkarl-omtryckt-i-afs-199453-afs-199341-foreskrifter/"
+    assert refs[5].url == "https://www.av.se/publikationer/foreskrifter/upphavande-av-arbetarskyddsstyrelsens-allmanna-rad-afs-20156-om-arbete-med-kvicksilver-och-amalgam-inom-tandvarden/"
 
     _pages(monkeypatch, {
         agencies.IAFFS.index_url:

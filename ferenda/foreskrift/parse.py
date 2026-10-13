@@ -1371,7 +1371,7 @@ RE_MASTHEAD_COLUMN = re.compile(
 # sampled titles and lost three of them altogether. Folded to any letter, the
 # class ate a lower-case word that belonged to the title ("… anskaffning av
 # utrustning i gymnasieskolan", SKOLFS 1992:1) -- 3 of the same 1,200.
-RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b"
+RE_TITLE_END = re.compile(r";|\b(?:beslutad|beslutade|beslutat)(?!\s+av\b)\b|\butfärdad\w*\b"
                           r"|(?-i:\s[A-ZÅÄÖ][\wåäöÅÄÖ-]+)?\s*\b(?:föreskriver\d{0,2}|meddelar)\b"
                           r"|\bÄndring\s+införd\b",
                           re.IGNORECASE)
@@ -1561,7 +1561,8 @@ def _strip_own_designation(title, identifier):
             if before.count("(") > before.count(")"):
                 continue
             if re.search(r"\b(?:ändring\s+(?:i|av)|upphävande\s+av)\s*$", before, re.I):
-                continue
+                if not RE_TITLE_TYPE.search(title[m.end():]):
+                    continue
             title = (before.rstrip() + " " + title[m.end():].lstrip()).strip(" -–—:|.,")
             break
         return title
@@ -1592,6 +1593,8 @@ def clean_title(raw, identifier):
     if identifier:
         t = _strip_own_designation(t, identifier)
     t = RE_TRAILING_FOOTNOTE.sub("", t).strip()
+    if re.search(r"\b\d{4}:[xX]{1,2}\b|\b[xX]{4,}:|\b([a-zåäö]{3,})\s+\1\b", t, re.I):
+        return None
     if re.match(r"^doc\s+[a-zåäö]+/\d+:\d+$", t, re.I):
         return None
     # what remains once designations, numbers and role words go: a title has
@@ -1909,7 +1912,8 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None, fs=N
     start, separated = _body_start(blocks)
     m_blocks = blocks[:start] if separated else blocks
     # when a document has cover pages before the official masthead:
-    m_page = next((b.page for b in m_blocks if RE_MASTHEAD_LINE.search(b.text)), 1)
+    draft_pages = {b.page for b in m_blocks if re.search(r"\b\d{4}:X{1,2}\b|\bX{4,}:", b.text, re.I)}
+    m_page = next((b.page for b in m_blocks if b.page not in draft_pages and RE_MASTHEAD_LINE.search(b.text)), 1)
     if m_page > 1:
         m_blocks = [b for b in m_blocks if b.page >= m_page]
     masthead = _repair_ocr_text(_full_text(m_blocks))
