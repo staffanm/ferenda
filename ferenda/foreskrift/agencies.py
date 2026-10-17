@@ -2829,7 +2829,8 @@ RE_TS_ROW = re.compile(r"RuleNumber=(\d{4}):(\d+)&(?:amp;)?ruleprefix=([A-Za-zÅ
 # underscore *or* a hyphen, and marks the konsoliderad text "…113k" or "…113_k".
 # Reading only the underscore form lost 136 of 2,450 linked PDFs, and a document
 # whose only regulation link is hyphenated lost its whole content (#104).
-RE_TS_PDF = re.compile(r"([a-zåäö]+)[ _](\d{4})[-_ ](\d+)_?(k)?\.pdf$", re.IGNORECASE)
+# TSFS 2010:3 also has a space before the extension, preserved in its URL.
+RE_TS_PDF = re.compile(r"([a-zåäö]+)[ _](\d{4})[-_ ](\d+)_?(k)?[ \t]*\.pdf$", re.IGNORECASE)
 
 
 def ts_classify(a, fs, base_ars, base_lop):
