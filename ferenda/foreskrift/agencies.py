@@ -3135,7 +3135,9 @@ AFFS = Agency(
 # --------------------------------------------------------------------------
 # AGVFS (Arbetsgivarverket) -- indexed + landing + single-PDF. The listing
 # anchors carry the designation in their text ("AGVFS 2026:3 B3 …") and link to a
-# landing that hangs the one regulation PDF.
+# landing that hangs the one regulation PDF. The same list carries six
+# regulations from the predecessor SAVFS series under their own designation.
+# Its seventh SAVFS entry announces a series split, rather than a regulation.
 #
 # CAVEAT: Arbetsgivarverket numbers its samling "YYYY:N Xn" (a subseries letter +
 # counter, e.g. "AgVFS 2010:2 A2" and "AgVFS 2010:2 A3" -- two *distinct*
@@ -3151,7 +3153,9 @@ AGVFS = Agency(
     index_url="https://www.arbetsgivarverket.se/avtal-och-skrifter?category=32",
     enumerate=indexed_enumerate, resolve=resolve_landing,
     designation="AgVFS",
-    params={"link_select": 'a[href*="/avtal-och-skrifter/agvfs/agvfs-"]',
+    params={"link_select": 'a[href*="/avtal-och-skrifter/agvfs/agvfs-"], '
+                           'a[href*="/avtal-och-skrifter/agvfs/savfs-"]',
+            "skip_re": r"SAVFS delas upp på två serier",
             "index_urls": [
                 "https://www.arbetsgivarverket.se/avtal-och-skrifter?category=32",
                 "https://www.arbetsgivarverket.se/avtal-och-skrifter?category=32&page=2",
