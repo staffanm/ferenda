@@ -7,17 +7,17 @@ Two detectors, because a PDF prints two unrelated kinds of table:
   columns hold amounts, years and rates. Prose that merely happens to break into
   wide-gapped runs fails that test and stays prose.
 * :func:`split_two_column` -- a **two-column prose table**, which is what a
-  föreskrift's ordförklaringar table is: a bold "Begrepp / Betydelse" header row,
-  then a term in the left column and a sentence-long definition in the right.
+  föreskrift's ordförklaringar table is: a term in the left column and a
+  sentence-long definition in the right, sometimes under a bold header row.
   Numeric evidence would reject it, so this one keys on the layout instead: two
-  columns and two only, a wide gutter, and a left column of short terms.
+  columns and two only, short terms, and a wide gutter or italic term column.
 
 `merge_continued` joins a table that continues across a page break (its repeated
 header dropped) for either detector.
 
-Both are deliberately conservative: a region must hold at least MIN_ROWS
-consecutive multi-cell lines agreeing on column start positions before it is
-believed. Prose runs abut (their gaps are kerning, far below CELL_GAP), TOC
+Both are deliberately conservative: a region needs at least three rows agreeing
+on column start positions, or two rows with italic terms and regular definitions.
+Prose runs abut (their gaps are kerning, far below CELL_GAP), TOC
 dot-leader lines and page-margin markers are excluded, so a false table over
 running text costs more evidence than a page ever offers.
 """
@@ -256,12 +256,30 @@ def _two_col_cells(line, left, right):
 
 def _two_col_start(lines, i):
     """The (left, right) column positions a two-column region starting at
-    `lines[i]` would use, or None: the line splits into exactly two cells with a
-    gutter between them, and its left cell is short enough to be a term."""
+    `lines[i]` would use, or None: two cells separated by a wide gutter or an
+    italic term followed by a regular definition beyond a one-em gutter."""
+    # TSFS definitions set italic terms beside regular definitions with a
+    # narrow gutter. Their font boundary is the column boundary; gap-splitting
+    # would merge both cells ("ackrediterad fordonsverkstad ...").
+    italic = _italic_term_columns(lines[i])
+    if italic:
+        return italic
     cells = _line_cells(lines[i])
     if len(cells) != 2 or cells[1][0] - cells[0][1] < GUTTER:
         return None
     return None if len(cells[0][2]) > TERM_MAX else (cells[0][0], cells[1][0])
+
+
+def _italic_term_columns(line):
+    """Column starts where a short italic term precedes regular definition text."""
+    runs = sorted(line.runs, key=lambda r: r.left)
+    split = next((i for i, r in enumerate(runs) if not r.italic), len(runs))
+    if (not 0 < split <= TERM_RUNS or split == len(runs)
+            or any(r.italic for r in runs[split:])
+            or len(join_runs(runs[:split])[0].strip()) > TERM_MAX
+            or runs[split].left - runs[split - 1].right < (line.size or COL_TOL)):
+        return None
+    return runs[0].left, runs[split].left
 
 
 def _new_row(line, prev):
@@ -280,7 +298,7 @@ def split_two_column(lines):
     in the left column, its definition wrapping in the right.
 
     A region runs while every line places into the two columns the opening line
-    fixed, and is believed once it holds TWO_COL_ROWS rows. It ends at the first
+    fixed, and needs TWO_COL_ROWS rows, or two with italic terms. It ends at the first
     line that reaches only the left column at a row-opening step -- which is what
     stops it running on into the body text below, whose margin sits within
     COL_TOL of the term column. `th` is True when the opening line is bold (a
@@ -289,7 +307,7 @@ def split_two_column(lines):
     i = 0
     while i < len(lines):
         cols = _two_col_start(lines, i)
-        rows, j = [], i
+        rows, j, italic_rows = [], i, 0
         while cols and j < len(lines) and not RE_DOTS.search(lines[j].text):
             placed = _two_col_cells(lines[j], *cols)
             if placed is None:
@@ -298,6 +316,7 @@ def split_two_column(lines):
                 if not placed[1]:       # a term with no definition beside it:
                     break               # body text at the term column's margin
                 rows.append(placed)
+                italic_rows += _italic_term_columns(lines[j]) == cols
             else:
                 # `dehyphenate`, not a plain space: a cell wraps like any other
                 # prose and the reflow closes the soft hyphen ("Jord-\nbruks-
@@ -307,7 +326,9 @@ def split_two_column(lines):
                 rows[-1] = tuple(dehyphenate(a, b).strip()
                                  for a, b in zip(rows[-1], placed, strict=True))
             j += 1
-        if len(rows) >= TWO_COL_ROWS:
+        # A short page may hold only two definitions. Require the explicit
+        # term/definition font distinction on both rows before accepting it.
+        if len(rows) >= TWO_COL_ROWS or (len(rows) >= 2 and italic_rows == len(rows)):
             if plain:
                 out.append(("lines", plain, None))
                 plain = []
