@@ -2332,7 +2332,7 @@ MYHFS = Agency(
 # --------------------------------------------------------------------------
 
 RE_REPEAL_NOTICE = re.compile(
-    r"^(?:F[öo]reskrifter|F[öo]rordning)\s+om\s+upph[äa]vande\b", re.I)
+    r"^(?:F[öo]reskrifter|F[öo]rordning|Beslut)\s+om\s+upph[äa]vande\b", re.I)
 
 
 def skolfs_enumerate(session, agency):
