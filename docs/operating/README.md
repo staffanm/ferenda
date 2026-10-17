@@ -791,6 +791,10 @@ Measured: `lagen foreskrift download stafs` without `--force` makes one HTTP
 request, sees 5 items, and never fetches the archive URL. That one scope's
 archive alone holds 206 documents.
 
+Arbetsförmedlingen's `affs` scope also queues its “Upphävda” search filter after
+the current AFFS and AMSFS records. Use `lagen foreskrift download affs --deep`
+to collect missing archive records without fetching held documents again.
+
 `--force` walks the whole listing instead of stopping short. A full sweep of
 all 80 non-browser scopes took 55 minutes. The cost is a network fetch per
 document, not a reparse: `compress.write_download` leaves an unchanged file
