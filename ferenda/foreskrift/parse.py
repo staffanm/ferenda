@@ -49,6 +49,7 @@ from ..lib.pdftext import (
     RE_KAP_MARK,
     RE_PARA_MARK,
     Para,
+    is_page_number,
     needs_ocr,
     ocr_pdf,
     ocr_text_pages,
@@ -820,6 +821,30 @@ def _ingress_start(blocks, body_start):
     return body_start
 
 
+def _page_body_lines(lines, identifier, pageno):
+    """Remove the separate chapter header and footer before reading tables.
+
+    AFS sets ``Kapitel N`` or ``Bilaga N`` immediately below its own running
+    identifier. Both lines use the same small type. A footer outside the body
+    can otherwise join the last definition cell before ``page_paragraphs``
+    gets a chance to remove it.
+    """
+    if len(lines) >= 2:
+        head, label = lines[:2]
+        if (head.text.strip() == identifier
+                and re.fullmatch(r"(?:Kapitel|Bilaga)\s+\d+[a-z]?", label.text.strip())
+                and head.size and label.size == head.size
+                and 0 < label.top - head.top <= 2 * head.size):
+            lines = [head, *lines[2:]]
+    if len(lines) >= 2:
+        previous, footer = lines[-2:]
+        if (is_page_number(footer.text, pageno)
+                and footer.top - (previous.bottom or previous.top + previous.size)
+                > 2 * max(previous.size, footer.size)):
+            lines = lines[:-1]
+    return lines
+
+
 def parse_body(pages, identifier):
     """All blocks of a föreskrift, page by page, masthead included (the caller
     reads metadata from the masthead, then drops it via :func:`_body_start`),
@@ -833,7 +858,7 @@ def parse_body(pages, identifier):
     the bullet lists and allmänna råd the reflow glues into one stycke."""
     blocks, notes = [], []
     for pageno, lines in pages:
-        body_lines, page_notes = ruled_footnotes(lines)
+        body_lines, page_notes = ruled_footnotes(_page_body_lines(lines, identifier, pageno))
         notes += page_notes
         for kind, th_or_lines, rows in tabell.split_two_column(body_lines):
             if kind == "tabell":
