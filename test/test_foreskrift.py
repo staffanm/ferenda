@@ -1310,6 +1310,68 @@ def test_afs_iaf_and_myh_enumerate_read_their_archive_of_repealed_regulations(mo
         "MYHFS 2026:5", "MYHFS 2024:1", "MYHFS 2014:1"]
 
 
+def test_afs_enumerates_amendment_pdfs_before_the_old_base(monkeypatch):
+    page = Path("test/files/foreskrift/afs-index-amendments.html").read_text()
+    _pages(monkeypatch, {agencies.AFS.index_url: page})
+    refs = list(agencies.afs_enumerate(None, agencies.AFS))
+    assert [r.identifier for r in refs] == [
+        "AFS 2025:8", "AFS 2025:7", "AFS 2025:6", "AFS 2025:5",
+        "AFS 2025:3", "AFS 2025:1", "AFS 2024:4", "AFS 2024:3",
+        "AFS 2024:2", "AFS 2024:1", "AFS 2023:1"]
+    assert refs[0].basefile == "afs/2025:8"
+    assert refs[0].url.endswith("/risker-vid-vissa-typer-av-arbeten-afs2025-8-andring-i-afs2023-13.pdf")
+    # The older filenames put the amended base first. It is not the PDF's
+    # own designation: AFS 2024:3 must not become another AFS 2023:10.
+    assert refs[7].url.endswith("/risker-i-arbetsmiljon-andring-i-afs2023-10-afs2024-3.pdf")
+    assert refs[-1].url.endswith("/afs-20231/forfattningshistorik-afs-20231/")
+
+
+def test_afs_incremental_harvest_downloads_an_amendment_as_its_own_document(tmp_path, monkeypatch):
+    page = Path("test/files/foreskrift/afs-index-amendments.html").read_text()
+    asked = []
+    _pages(monkeypatch, {agencies.AFS.index_url: page})
+    refs = list(agencies.afs_enumerate(None, agencies.AFS))
+    pdf = b"%PDF-1.4 AFS 2025:8"
+
+    def request(_session, _method, url, **_kwargs):
+        asked.append(url)
+        if url == agencies.AFS.index_url:
+            return SimpleNamespace(text=page, content=page.encode())
+        assert url == refs[0].url
+        return SimpleNamespace(content=pdf)
+
+    monkeypatch.setattr(harvest, "request", request)
+    monkeypatch.setattr(harvest, "set_deadline", lambda *_args: None)
+    # The site already holds the base and all amendments except AFS 2025:8.
+    # Their records must not prevent discovery of that separate instrument.
+    for ref in refs[1:]:
+        write_record(record_path(tmp_path, "afs", ref.basefile), {
+            "identifier": ref.identifier})
+    harvest.HarvestWatermark(tmp_path / "afs" / ".watermark.json").save("2026-10-17")
+
+    result = harvest._harvest_session(agencies.AFS, tmp_path, None, False, False,
+                                      None, None, 0, lambda _msg: None)
+    assert result[1] == 1
+    stored = record_path(tmp_path, "afs", "afs/2025:8")
+    record = compress.read_json(stored)
+    assert record["identifier"] == "AFS 2025:8"
+    assert record["files"]["regulation"] == {
+        "identifier": "AFS 2025:8", "url": refs[0].url,
+        "name": "afs-2025-8-regulation.pdf"}
+    assert compress.read_bytes(tmp_path / "afs" / "afs-2025-8-regulation.pdf") == pdf
+    assert asked == [agencies.AFS.index_url, refs[0].url]
+    assert not compress.read_json(tmp_path / "afs" / ".watermark.json")["dirty"]
+
+    # A second incremental run makes no PDF requests and leaves its timestamp.
+    stamp = compress.stat(stored).st_mtime_ns
+    asked.clear()
+    result = harvest._harvest_session(agencies.AFS, tmp_path, None, False, False,
+                                      None, None, 0, lambda _msg: None)
+    assert result[1] == 0
+    assert asked == [agencies.AFS.index_url]
+    assert compress.stat(stored).st_mtime_ns == stamp
+
+
 def test_mdffs_enumerate_yields_grund_and_amendments(monkeypatch):
     _pages(monkeypatch, {
         agencies.MDFFS.index_url:
