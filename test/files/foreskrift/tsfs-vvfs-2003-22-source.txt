@@ -1,0 +1,6 @@
+Source: https://www.transportstyrelsen.se/sv/om-oss/dina-rattigheter-lagar-och-regler/forfattningssamling/sok-ts-foreskrifter/details?RuleNumber=2010%3A3&ruleprefix=TSFS
+Fetched: 2026-10-17
+The authority resolves this amendment to its VVFS 2003:22 family page.
+Unmodified main element; navigation and footer removed.
+TSFS 2010:3 points to /TSFS/TSFS 2010_3 .pdf (space before extension).
+PDF verified HTTP 200, application/pdf, 66378 bytes.
