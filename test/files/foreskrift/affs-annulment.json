@@ -1,0 +1,654 @@
+{
+  "message": "Success",
+  "data": [
+    {
+      "lastPublishDate": 1729082520418.0,
+      "lastModifiedDate": 1729082520232.0,
+      "displayName": "AFFS 2024:3",
+      "publishDate": 1729081866389.0,
+      "description": "Upphävande av (AFFS 2019:1) om underlag för beräkning av stödbelopp.",
+      "creationDate": 1729070004328.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20243"
+    },
+    {
+      "lastPublishDate": 1729082594656.0,
+      "lastModifiedDate": 1729082580661.0,
+      "displayName": "AFFS  2024:2",
+      "publishDate": 1715689700438.0,
+      "description": "Upphävande av (AFFS 2011:3) för tillämpningen av lagen (2010:197) om etableringsinsatser för vissa nyanlända invandrare.",
+      "creationDate": 1715688192457.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs--20242"
+    },
+    {
+      "lastPublishDate": 1729082755223.0,
+      "lastModifiedDate": 1729082755045.0,
+      "displayName": "AFFS  2024:1",
+      "publishDate": 1707142294045.0,
+      "description": " Upphävande av (AFFS 2022:2) om tillämpningen av förordningen om statsbidrag  till arbetstagarorganisationer för kostnader för  att ge in yttranden till Arbetsförmedlingen inför  arbetsplatsförlagda program och insatser.",
+      "creationDate": 1707140813703.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs--20241"
+    },
+    {
+      "lastPublishDate": 1729082854477.0,
+      "lastModifiedDate": 1729082854265.0,
+      "displayName": "AFFS 2022:1",
+      "publishDate": 1667917349479.0,
+      "description": "Upphävande av (AFFS 2014:1) om individuella handlingsplaner.",
+      "creationDate": 1667904494774.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20221"
+    },
+    {
+      "lastPublishDate": 1781183746622.0,
+      "lastModifiedDate": 1781183746421.0,
+      "displayName": "AFFS 2018:1",
+      "publishDate": 1551267911952.0,
+      "description": "Upphävande av (AFFS 2010:7) om stöd för nystartsjobb.",
+      "creationDate": 1551265032579.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20181"
+    },
+    {
+      "lastPublishDate": 1718368965047.0,
+      "lastModifiedDate": 1758107285426.0,
+      "displayName": "AFFS 2017:3",
+      "publishDate": 1552997704521.0,
+      "description": "Upphävande av (AFFS 2010:4) om etableringsplan.",
+      "creationDate": 1552997346807.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20173"
+    },
+    {
+      "lastPublishDate": 1718370516131.0,
+      "lastModifiedDate": 1718370515835.0,
+      "displayName": "AFFS 2017:2",
+      "publishDate": 1552997963751.0,
+      "description": "Upphävande av (AFFS 2010:3) om etableringsersättning.",
+      "creationDate": 1552997739320.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20172"
+    },
+    {
+      "lastPublishDate": 1720533567017.0,
+      "lastModifiedDate": 1720533546931.0,
+      "displayName": "AFFS 2017:1",
+      "publishDate": 1552998104803.0,
+      "description": "Upphävande av (AFFS 2015:2), särskilda insatser för personer med funktionshinder som medför nedsatt arbetsförmåga, tillämpning av förordning (2000:630).",
+      "creationDate": 1552997985425.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20171"
+    },
+    {
+      "lastPublishDate": 1760522188601.0,
+      "lastModifiedDate": 1760522188334.0,
+      "displayName": "AFFS 2016:2",
+      "publishDate": 1552395848665.0,
+      "description": "Upphävande av (AFFS 2010:9)  tillämpningen av förordningen (2000:634) om arbetsmarknadspolitiska program.",
+      "creationDate": 1552390602495.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20162"
+    },
+    {
+      "lastPublishDate": 1774528089262.0,
+      "lastModifiedDate": 1774528089061.0,
+      "displayName": "AFFS 2015:3",
+      "publishDate": 1552468215679.0,
+      "description": "Upphävande av (AMSFS 2007:13) administrativa föreskrifter om handläggning av jobb- och utvecklingsgarantin.",
+      "creationDate": 1552468086154.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20153"
+    },
+    {
+      "lastPublishDate": 1774527915933.0,
+      "lastModifiedDate": 1774527915627.0,
+      "displayName": "AFFS 2013:1",
+      "publishDate": 1552468797661.0,
+      "description": "Upphävande av vissa av Arbetsmarknadsstyrelsens administrativa föreskrifter och allmänna råd.",
+      "creationDate": 1552468621692.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20131"
+    },
+    {
+      "lastPublishDate": 1774528550975.0,
+      "lastModifiedDate": 1774528550805.0,
+      "displayName": "AFFS 2012:7",
+      "publishDate": 1552468958542.0,
+      "description": "Upphävande av vissa av Arbetsmarknadsstyrelsens föreskrifter och administrativa föreskrifter.",
+      "creationDate": 1552468838902.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20127"
+    },
+    {
+      "lastPublishDate": 1774528347651.0,
+      "lastModifiedDate": 1774528347514.0,
+      "displayName": "AFFS 2012:6",
+      "publishDate": 1552482360259.0,
+      "description": "Upphävande av (AMSFS 2003:1) allmänna råd om tillämpningen av förordningen (1996:1100) om aktivitetsstöd.",
+      "creationDate": 1552482187451.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20126"
+    },
+    {
+      "lastPublishDate": 1774527359594.0,
+      "lastModifiedDate": 1774527359376.0,
+      "displayName": "AFFS 2012:5",
+      "publishDate": 1552482497773.0,
+      "description": "Upphävande av (AMSFS 2001:4) allmänna råd om tillämpningen av förordningen (1997:1275) om anställningsstöd.",
+      "creationDate": 1552482377411.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20125"
+    },
+    {
+      "lastPublishDate": 1774527219634.0,
+      "lastModifiedDate": 1774527219399.0,
+      "displayName": "AFFS 2012:4",
+      "publishDate": 1552482669296.0,
+      "description": "Upphävande av (AMSFS 2001:2), allmänna råd om tillämpningen av förordningen (2000:634) om arbetsmarknadspolitiska program.",
+      "creationDate": 1552482563769.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20124"
+    },
+    {
+      "lastPublishDate": 1774527061008.0,
+      "lastModifiedDate": 1774527060724.0,
+      "displayName": "AFFS 2012:3",
+      "publishDate": 1552483027565.0,
+      "description": "Upphävande av AMS allmänna råd om byggplanering.",
+      "creationDate": 1552482889586.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20123"
+    },
+    {
+      "lastPublishDate": 1774526889182.0,
+      "lastModifiedDate": 1774526888900.0,
+      "displayName": "AFFS 2012:2",
+      "publishDate": 1552483174341.0,
+      "description": "Upphävande av (AMSFS 2006:14) administrativa föreskrifter om tillämpning av förordningen (2006:396) om försöksverksamhet med särskilda arbetsmarknadspolitiska insatser för nyanlända invandrare.",
+      "creationDate": 1552483051920.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20122"
+    },
+    {
+      "lastPublishDate": 1774526714867.0,
+      "lastModifiedDate": 1774526714601.0,
+      "displayName": "AFFS 2011:9",
+      "publishDate": 1552483322835.0,
+      "description": "Upphävande av (AMSFS 2006:31) administrativa föreskrifter om handläggningen av ärenden om stöd för nystartsjobb.",
+      "creationDate": 1552483202367.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20119"
+    },
+    {
+      "lastPublishDate": 1774526567542.0,
+      "lastModifiedDate": 1774526567271.0,
+      "displayName": "AFFS 2011:8",
+      "publishDate": 1552483483886.0,
+      "description": "Upphävande av (AFFS 2008:3) administrativa föreskrifter för intern styrning och kontroll.",
+      "creationDate": 1552483350085.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20118"
+    },
+    {
+      "lastPublishDate": 1774526358349.0,
+      "lastModifiedDate": 1774526358092.0,
+      "displayName": "AFFS 2011:7",
+      "publishDate": 1552483627958.0,
+      "description": "Upphävande av (AMSFS 2007:30), administrativa föreskrifter om stöd till arbetsgivare i samband med rekrytering av arbetskraft.",
+      "creationDate": 1552483526639.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20117"
+    },
+    {
+      "lastPublishDate": 1774526197723.0,
+      "lastModifiedDate": 1774526197521.0,
+      "displayName": "AFFS 2011:6",
+      "publishDate": 1552483755320.0,
+      "description": "Upphävande av (AMSFS 2006:32) allmänna råd om tillämpningen av förordningen (2006:1481) om stöd för nystartsjobb.",
+      "creationDate": 1552483657303.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20116"
+    },
+    {
+      "lastPublishDate": 1774525963036.0,
+      "lastModifiedDate": 1774525962767.0,
+      "displayName": "AFFS 2011:2",
+      "publishDate": 1552483891072.0,
+      "description": "Upphävande av (AMSFS 2005:16), administrativa föreskrifter om handläggning av ärenden rörande arbetssökande som beviljats eller ansöker om intyg E 303.",
+      "creationDate": 1552483786956.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20112"
+    },
+    {
+      "lastPublishDate": 1774525786235.0,
+      "lastModifiedDate": 1774525785939.0,
+      "displayName": "AFFS 2011:1",
+      "publishDate": 1552484173229.0,
+      "description": "Upphävande av (AMSFS 2005:10) allmänna råd för tillämpningen av förordningen (1999:594) om flyttningsbidrag.",
+      "creationDate": 1552484068511.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20111"
+    },
+    {
+      "lastPublishDate": 1774525624954.0,
+      "lastModifiedDate": 1774525624752.0,
+      "displayName": "AFFS 2010:8",
+      "publishDate": 1552553026522.0,
+      "description": "Upphävande av (AMSFS 2006:30) om tillämpning av förordningen (2006:1481) om stöd för nystartsjobb.",
+      "creationDate": 1552552819142.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20108"
+    },
+    {
+      "lastPublishDate": 1774520835194.0,
+      "lastModifiedDate": 1774520834861.0,
+      "displayName": "AFFS 2010:6",
+      "publishDate": 1552553147801.0,
+      "description": "Upphävande av (AMSFS 2004:9) om handläggningen av statsbidrag till arbetslöshetskassor.",
+      "creationDate": 1552553052308.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20106"
+    },
+    {
+      "lastPublishDate": 1774520226579.0,
+      "lastModifiedDate": 1774520226347.0,
+      "displayName": "AFFS 2010:1",
+      "publishDate": 1552553288618.0,
+      "description": "Upphävande av (AMSFS 2002:2) allmänna råd om tillämpningen av lagen (1974:13) om vissa anställningsfrämjande åtgärder.",
+      "creationDate": 1552553171114.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20101"
+    },
+    {
+      "lastPublishDate": 1774519959899.0,
+      "lastModifiedDate": 1774519959531.0,
+      "displayName": "AFFS 2009:8",
+      "publishDate": 1552553513710.0,
+      "description": "Upphävande av (AFFS 2008:8) administrativa föreskrifter om uppgiftsfördelning i det systematiska arbetsmiljöarbetet vid Arbetsförmedlingen.",
+      "creationDate": 1552553417361.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20098"
+    },
+    {
+      "lastPublishDate": 1773827921219.0,
+      "lastModifiedDate": 1773827920914.0,
+      "displayName": "AFFS 2009:5",
+      "publishDate": 1552553755125.0,
+      "description": "Upphävande av (AMSFS 2002:10) allmänna råd om tillämpningen av  (AMSFS 2002:7) om tillgänglighet till Arbetsmarknadsverkets service.",
+      "creationDate": 1552553554910.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20095"
+    },
+    {
+      "lastPublishDate": 1773827691102.0,
+      "lastModifiedDate": 1773827690800.0,
+      "displayName": "AFFS 2009:4",
+      "publishDate": 1552559198157.0,
+      "description": "Upphävande av (AMSFS 2002:7) om tillgänglighet till Arbetsmarknadsverkets service.",
+      "creationDate": 1552559061443.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20094"
+    },
+    {
+      "lastPublishDate": 1773827383348.0,
+      "lastModifiedDate": 1773827292863.0,
+      "displayName": "AFFS 2009:3",
+      "publishDate": 1552563243385.0,
+      "description": "Upphävande av (AMSFS 2004:10) om kvotberäkning och arbetsmarknadsbedömning i ärenden om säsongsarbetstillstånd.",
+      "creationDate": 1552563125919.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20093"
+    },
+    {
+      "lastPublishDate": 1773839722278.0,
+      "lastModifiedDate": 1773839721895.0,
+      "displayName": "AFFS 2008:7",
+      "publishDate": 1552563426156.0,
+      "description": "Upphävande av allmänna råd för tillämpningen av det Nordiska samarbetet inom yrkesinriktad rehabilitering och särskilt anordnad arbetsmarknadsutbildning.",
+      "creationDate": 1552563312739.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20087"
+    },
+    {
+      "lastPublishDate": 1773828236421.0,
+      "lastModifiedDate": 1773828236037.0,
+      "displayName": "AFFS 2008:6",
+      "publishDate": 1552563888240.0,
+      "description": "Upphävande av föreskrifter för länsarbetsnämnderna för tillämpningen av överenskommelsen angående det Nordiska samarbetet inom den yrkesinriktade rehabiliteringen och den särskilt anordnade arbetsmarknadsutbildningen.",
+      "creationDate": 1552563490509.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/affs-20086"
+    },
+    {
+      "lastPublishDate": 1760521401131.0,
+      "lastModifiedDate": 1760521400865.0,
+      "displayName": "AMSFS 2007:45",
+      "publishDate": 1552564034501.0,
+      "description": "Upphävande av AMS allmänna råd om tillämpningen av förvaltningslagen (1986:223)",
+      "creationDate": 1552563915137.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200745"
+    },
+    {
+      "lastPublishDate": 1773839466408.0,
+      "lastModifiedDate": 1773839466129.0,
+      "displayName": "AMSFS 2007:44",
+      "publishDate": 1552564191489.0,
+      "description": "Upphävande av AMS allmänna råd om offentlighet och sekretess.",
+      "creationDate": 1552564098267.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200744"
+    },
+    {
+      "lastPublishDate": 1773839304977.0,
+      "lastModifiedDate": 1773839304725.0,
+      "displayName": "AMSFS 2007:43",
+      "publishDate": 1552564314277.0,
+      "description": "Upphävande av AMS föreskrifter för länsarbetsnämnderna om verksamhetsplanering, prognosverksamhet och statistik.",
+      "creationDate": 1552564217269.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200743"
+    },
+    {
+      "lastPublishDate": 1773838979142.0,
+      "lastModifiedDate": 1773838964402.0,
+      "displayName": "AMSFS 2007:33",
+      "publishDate": 1552564461059.0,
+      "description": "Upphävande av (AMSFS 2003:10) allmänna råd om tillämpningen av lagen (1976:157) om skyldighet för arbetsgivare att anmäla ledig plats till den offentliga arbetsförmedlingen.",
+      "creationDate": 1552564350486.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200733"
+    },
+    {
+      "lastPublishDate": 1773834899824.0,
+      "lastModifiedDate": 1773834899545.0,
+      "displayName": "AMSFS 2007:26",
+      "publishDate": 1552564674917.0,
+      "description": "Upphävande av (AMSFS 2004:6) administrativa föreskrifter om arbetsförmedlingens organisation.",
+      "creationDate": 1552564485822.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200726"
+    },
+    {
+      "lastPublishDate": 1792151377404.0,
+      "lastModifiedDate": 1773834693935.0,
+      "displayName": "AMSFS 2007:25",
+      "publishDate": 1552564909839.0,
+      "description": "Upphävande av (AMSFS 2003:9) administrativa föreskrifter för länsarbetsnämnderna om lediga platser.",
+      "creationDate": 1552564709717.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200725"
+    },
+    {
+      "lastPublishDate": 1773834536681.0,
+      "lastModifiedDate": 1773834536492.0,
+      "displayName": "AMSFS 2007:15",
+      "publishDate": 1552565198537.0,
+      "description": "Upphävande av (AMSFS 2000:4) om tillämpningen av förordningen (2000:634) om arbetsmarknadspolitiska program.",
+      "creationDate": 1552565088676.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200715"
+    },
+    {
+      "lastPublishDate": 1760521631661.0,
+      "lastModifiedDate": 1760521631441.0,
+      "displayName": "AMSFS 2007:14",
+      "publishDate": 1552565307605.0,
+      "description": "Upphävande av (AMSFS 1994:17) om ersättning för vissa uppdrag i Arbetsmarknadsverkets verksamhet.",
+      "creationDate": 1552565220103.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200714"
+    },
+    {
+      "lastPublishDate": 1773828881602.0,
+      "lastModifiedDate": 1773828881377.0,
+      "displayName": "AMSFS 2007:12",
+      "publishDate": 1631091375572.0,
+      "description": "Upphävd genom (AFFS 2021:1),behandling av personuppgifter i den arbetsmarknadspolitiska verksamheten",
+      "creationDate": 1631089389117.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200712"
+    },
+    {
+      "lastPublishDate": 1760521587996.0,
+      "lastModifiedDate": 1758099373132.0,
+      "displayName": "AMSFS 2007:11",
+      "publishDate": 1552567689623.0,
+      "description": "Upphävande av (AMSFS 2006:3) om insatser för arbetslösa akademiker.",
+      "creationDate": 1552567488759.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200711"
+    },
+    {
+      "lastPublishDate": 1758025837217.0,
+      "lastModifiedDate": 1758025837005.0,
+      "displayName": "AMSFS 2007:7",
+      "publishDate": 1552568379807.0,
+      "description": "Upphävande av (AMSFS 2004:12) allmänna råd om tillämpningen av förordningen (2001:1300) om friår.",
+      "creationDate": 1552568221538.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20077"
+    },
+    {
+      "lastPublishDate": 1758098326818.0,
+      "lastModifiedDate": 1758098326558.0,
+      "displayName": "AMSFS 2007:6",
+      "publishDate": 1552568535804.0,
+      "description": "Upphävande av (AMSFS 2004:13) administrativa föreskrifter för handläggningen av ärenden angående friår.",
+      "creationDate": 1552568425473.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20076"
+    },
+    {
+      "lastPublishDate": 1758099087465.0,
+      "lastModifiedDate": 1758099087230.0,
+      "displayName": "AMSFS 2007:4",
+      "publishDate": 1552568700146.0,
+      "description": "Upphävande av AMS allmänna råd för tillämpning av avgiftsförordningen.",
+      "creationDate": 1552568560434.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20074"
+    },
+    {
+      "lastPublishDate": 1758099220922.0,
+      "lastModifiedDate": 1758099220721.0,
+      "displayName": "AMSFS 2007:3",
+      "publishDate": 1552568827076.0,
+      "description": "Upphävande av AMS föreskrifter för länsarbetsnämnderna om uttagande av avgifter och ersättning för tillhandahållna varor och tjänster.",
+      "creationDate": 1552568723329.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20073"
+    },
+    {
+      "lastPublishDate": 1758099504594.0,
+      "lastModifiedDate": 1758099504390.0,
+      "displayName": "AMSFS 2006:29",
+      "publishDate": 1552568997928.0,
+      "description": "Upphävande av AMS allmänna råd om diarieföring.",
+      "creationDate": 1552568867577.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200629"
+    },
+    {
+      "lastPublishDate": 1758099622402.0,
+      "lastModifiedDate": 1758099622173.0,
+      "displayName": "AMSFS 2006:23",
+      "publishDate": 1552569151590.0,
+      "description": "Upphävande av AMS allmänna råd om tillämpningen av förordningen (2000:628) om den arbetsmarknadspolitiska verksamheten.",
+      "creationDate": 1552569024912.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200623"
+    },
+    {
+      "lastPublishDate": 1758099821269.0,
+      "lastModifiedDate": 1758099821044.0,
+      "displayName": "AMSFS 2006:20",
+      "publishDate": 1552569290848.0,
+      "description": "Upphävande av (AMSFS 1997:12) för funktionen arbetskraft om beredskapsförberedelser och krigsplanläggning.",
+      "creationDate": 1552569174963.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200620"
+    },
+    {
+      "lastPublishDate": 1758099943166.0,
+      "lastModifiedDate": 1758099942968.0,
+      "displayName": "AMSFS 2006:19",
+      "publishDate": 1552569415871.0,
+      "description": "Upphävande av (AMSFS 1996:20) om frivillig försvarsverksamhet inom den civila delen av totalförsvaret.",
+      "creationDate": 1552569321001.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200619"
+    },
+    {
+      "lastPublishDate": 1758100135143.0,
+      "lastModifiedDate": 1758100134928.0,
+      "displayName": "AMSFS 2006:18",
+      "publishDate": 1552569543057.0,
+      "description": "Upphävande av (AMSFS 1998:4) om förmåner till frivilliga.",
+      "creationDate": 1552569438725.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200618"
+    },
+    {
+      "lastPublishDate": 1758100252184.0,
+      "lastModifiedDate": 1758100251833.0,
+      "displayName": "AMSFS 2006:17",
+      "publishDate": 1552569664891.0,
+      "description": "Upphävande av (AMSFS 1998:5) om förmåner till instruktörer vid frivillig försvarsutbildning.",
+      "creationDate": 1552569567444.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200617"
+    },
+    {
+      "lastPublishDate": 1758100366741.0,
+      "lastModifiedDate": 1758100366515.0,
+      "displayName": "AMSFS 2006:16",
+      "publishDate": 1552569794295.0,
+      "description": "Upphävande av AMS allmänna råd om jämställdhet mellan kvinnor och män i arbetslivet.",
+      "creationDate": 1552569692267.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200616"
+    },
+    {
+      "lastPublishDate": 1758100791724.0,
+      "lastModifiedDate": 1758100791448.0,
+      "displayName": "AMSFS 2006:15",
+      "publishDate": 1552569886925.0,
+      "description": "Upphävande av AMS föreskrifter för länsarbetsnämnderna om jämställdhet mellan kvinnor och män i arbetslivet.",
+      "creationDate": 1552569827167.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200615"
+    },
+    {
+      "lastPublishDate": 1758100927911.0,
+      "lastModifiedDate": 1758100927669.0,
+      "displayName": "AMSFS 2006:12",
+      "publishDate": 1552571425535.0,
+      "description": "Upphävande av (AMSFS 2001:9) administrativa föreskrifter för verksamheten inom arbetslivstjänster.",
+      "creationDate": 1552570536109.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200612"
+    },
+    {
+      "lastPublishDate": 1758101046770.0,
+      "lastModifiedDate": 1758101046569.0,
+      "displayName": "AMSFS 2006:11",
+      "publishDate": 1552571853329.0,
+      "description": "Upphävande av (AMSFS 2001:8) allmänna råd för verksamheten inom arbetslivstjänster.",
+      "creationDate": 1552571758628.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200611"
+    },
+    {
+      "lastPublishDate": 1758101268126.0,
+      "lastModifiedDate": 1758101267875.0,
+      "displayName": "AMSFS 2004:8",
+      "publishDate": 1552899937520.0,
+      "description": "Upphävande av vissa av AMS föreskrifter.",
+      "creationDate": 1552899790792.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20048"
+    },
+    {
+      "lastPublishDate": 1758105708965.0,
+      "lastModifiedDate": 1758105708722.0,
+      "displayName": "AMSFS 2004:7",
+      "publishDate": 1552900089528.0,
+      "description": "Upphävande av vissa av AMS föreskrifter.",
+      "creationDate": 1552899952192.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20047"
+    },
+    {
+      "lastPublishDate": 1758105861243.0,
+      "lastModifiedDate": 1758105861026.0,
+      "displayName": "AMSFS 2004:3",
+      "publishDate": 1552900260853.0,
+      "description": "Upphävande av (AMSFS 2001:24) administrativa föreskrifter om handläggningen av ärenden enligt förordningen (2001:626) om stöd till utbildning av anställda.",
+      "creationDate": 1552900148720.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20043"
+    },
+    {
+      "lastPublishDate": 1758106030880.0,
+      "lastModifiedDate": 1758106030696.0,
+      "displayName": "AMSFS 2004:1",
+      "publishDate": 1552900439676.0,
+      "description": "Upphävande av (AMSFS 2001:23) om tillämpningen av förordningen (2001:626) om stöd till utbildning av anställda.",
+      "creationDate": 1552900295081.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20041"
+    },
+    {
+      "lastPublishDate": 1758106334043.0,
+      "lastModifiedDate": 1758106333828.0,
+      "displayName": "AMSFS 2003:14",
+      "publishDate": 1552902080648.0,
+      "description": "Upphävande av AMS allmänna råd om tillämpningen av förordningen (2000:628) om den arbetsmarknadspolitiska verksamheten m.m.",
+      "creationDate": 1552900543858.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200314"
+    },
+    {
+      "lastPublishDate": 1758106440657.0,
+      "lastModifiedDate": 1758106440373.0,
+      "displayName": "AMSFS 2003:13",
+      "publishDate": 1552902252223.0,
+      "description": "Upphävande av vissa allmänna råd i Arbetsmarknadsverkets totalförsvarsverksamhet.",
+      "creationDate": 1552902106106.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200313"
+    },
+    {
+      "lastPublishDate": 1758106144989.0,
+      "lastModifiedDate": 1758106144774.0,
+      "displayName": "AMSFS 2003:3",
+      "publishDate": 1552902568597.0,
+      "description": "Upphävande av AMS föreskrifter och allmänna råd på det personaladministrativa området.",
+      "creationDate": 1552902412861.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20033"
+    },
+    {
+      "lastPublishDate": 1773838747831.0,
+      "lastModifiedDate": 1773838747591.0,
+      "displayName": "AMSFS 2002:11",
+      "publishDate": 1631087088717.0,
+      "description": "Upphävd genom (AFFS 2021:1),behandling av personuppgifter i den arbetsmarknadspolitiska verksamheten",
+      "creationDate": 1585165299270.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200211"
+    },
+    {
+      "lastPublishDate": 1760521572034.0,
+      "lastModifiedDate": 1758106454450.0,
+      "displayName": "AMSFS 2002:6",
+      "publishDate": 1552902739939.0,
+      "description": "Upphävande av AMS föreskrifter för länsarbetsnämnderna om verksamheten inom arbetsmarknadsinstitut.",
+      "creationDate": 1552902602619.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20026"
+    },
+    {
+      "lastPublishDate": 1760521528347.0,
+      "lastModifiedDate": 1758106476275.0,
+      "displayName": "AMSFS 2002:1",
+      "publishDate": 1552902903373.0,
+      "description": "Upphävande av AMS allmänna råd om tillämpningen av datalagen.",
+      "creationDate": 1552902767450.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-20021"
+    },
+    {
+      "lastPublishDate": 1758106572214.0,
+      "lastModifiedDate": 1758106571940.0,
+      "displayName": "AMSFS 2001:22",
+      "publishDate": 1552903174267.0,
+      "description": "Upphävande av AMS allmänna råd om bidragshantering.",
+      "creationDate": 1552902998688.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200122"
+    },
+    {
+      "lastPublishDate": 1758106686299.0,
+      "lastModifiedDate": 1758106686049.0,
+      "displayName": "AMSFS 2001:16",
+      "publishDate": 1552903427748.0,
+      "description": "Upphävande av AMS föreskrifter för länsarbetsnämnderna om AMV:s civofunktion.",
+      "creationDate": 1552903280467.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200116"
+    },
+    {
+      "lastPublishDate": 1758106865390.0,
+      "lastModifiedDate": 1758106865198.0,
+      "displayName": "AMSFS 2001:14",
+      "publishDate": 1552903683111.0,
+      "description": "Upphävande av (AMSFS 1994:15) om avgifter för arbetslivstjänster.",
+      "creationDate": 1552903525810.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200114"
+    },
+    {
+      "lastPublishDate": 1760521506552.0,
+      "lastModifiedDate": 1760521506352.0,
+      "displayName": "AMSFS 2000:12",
+      "publishDate": 1552903844286.0,
+      "description": "Upphävande av (AMSFS 1998:10) om tillämpningen av förordningen (1998:345) om aktivare användning av arbetslöshetsersättningen.",
+      "creationDate": 1552903710606.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200012"
+    },
+    {
+      "lastPublishDate": 1758107157737.0,
+      "lastModifiedDate": 1758107157514.0,
+      "displayName": "AMSFS 2000:11",
+      "publishDate": 1552904098067.0,
+      "description": "Upphävande av (AMSFS 1994:4) om bidrag för miljöförbättringar i bostäder för permanent bruk.",
+      "creationDate": 1552903941457.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-200011"
+    },
+    {
+      "lastPublishDate": 1773838402474.0,
+      "lastModifiedDate": 1773838402155.0,
+      "displayName": "AMSFS 1997:8",
+      "publishDate": 1552904261950.0,
+      "description": "Upphävande av (AMSFS 1987:3) om arkivbildningsplan för arbetsmarknadsinstituten.",
+      "creationDate": 1552904125492.0,
+      "URI": "/om-oss/var-verksamhet/styrning-och-resultat/forfattningssamling-affs/upphavanden/amsfs-19978"
+    }
+  ],
+  "success": true
+}
