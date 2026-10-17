@@ -1112,11 +1112,14 @@ def extract_metadata(text, declaration, parser, fs=None, repaired=None, identifi
                 # den 1 juli 2006 då Kammarkollegiets föreskrifter (KAMFS
                 # 1998:1) … upphävs", KAMFS 2006:1). Read the object alone, the
                 # guard saw no date in that form and could never fire for it.
-                if _reprinted(RE_SENTENCE_START.split(text[:m.end()])[-1],
-                              meta["ikrafttradandedatum"]):
+                sentence = RE_SENTENCE_START.split(text[:m.end()])[-1]
+                if _reprinted(sentence, meta["ikrafttradandedatum"]):
                     continue
                 clauses.append((_repeal_object(m.group(1), tail=True),
-                                m.group(1) + " "
+                                # The backward match may span 2,500 chars.
+                                # Only this sentence dates the repeal: older
+                                # dates can belong to a preceding EU citation.
+                                sentence + " "
                                 + text[m.end():m.end() + REPEAL_DATE_WINDOW]))
         # and the enumerated list forms, whose object is the list itself. The
         # date is read from the whole match: a list announces one date for
