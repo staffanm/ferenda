@@ -15,7 +15,10 @@ The 1990:3 PDF, its landing page, and the second register page are frozen
 fixtures under `test/files/foreskrift/`. The tests cover discovery, storage,
 citations, canonical document URLs, and browse succession.
 
-Run `lagen foreskrift download agvfs --deep` to fetch missing older records.
+`lagen foreskrift download agvfs` includes both AGVFS and SAVFS by default.
+A first harvest reaches all listed records. For an existing corpus, use
+`lagen foreskrift download agvfs --deep` once to fetch older gaps beyond the
+incremental watermark. This shared backfill option skips documents already held.
 The change does not reconstruct the complete historical SAVFS collection.
 It adds the six regulations that the official register currently publishes.
 The existing AGVFS subseries-number collision remains outside this change.

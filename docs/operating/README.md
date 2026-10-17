@@ -536,7 +536,7 @@ after the publisher, not the samling.
 ```sh
 lagen foreskrift download fffs         # one agency, one författningssamling
 lagen foreskrift download stkfa        # STKFA plus current predecessor ESVFA
-lagen foreskrift download agvfs --deep # AGVFS plus predecessor SAVFS; fetch missing older records
+lagen foreskrift download agvfs        # AGVFS plus predecessor SAVFS
 lagen foreskrift download hslffs-ivo   # one of HSLF-FS's six publishing sites
 lagen foreskrift download hslffs-sos --only hslffs/2025:25    # one document
 ```
@@ -550,8 +550,11 @@ TLVFS and LFNFS. `lagen foreskrift -h` lists every scope.
 The `agvfs` scope also reads the six SAVFS regulations on Arbetsgivarverket's
 second listing page. It keeps their `savfs/` identifiers and lists them under
 AGVFS in the browse view. It excludes the SAVFS 1986:11 series announcement.
-Run the command with `--deep` once to fetch these older records behind an
-existing harvest watermark. Parse and publish them through the usual pipeline.
+Both series are included by default, including on a first harvest. For an
+existing corpus, run `lagen foreskrift download agvfs --deep` once to fetch
+missing older records beyond the incremental watermark. `--deep` is the shared
+backfill option; it walks the whole listing and skips documents already held.
+Parse and publish new records through the usual pipeline.
 
 Beyond those standard actions, a source can define **source-specific actions**
 that do something meaningful only for that source. For example, `lagen sfs
