@@ -546,11 +546,6 @@ took over, and those documents keep their own designation — Socialstyrelsen's
 SOSFS, Folkhälsomyndighetens FoHMFS and FHIFS, Läkemedelsverkets LVFS, TLV:s
 TLVFS and LFNFS. `lagen foreskrift -h` lists every scope.
 
-FI keeps repealed base regulations in its search register, outside the current
-förteckning. Run `lagen foreskrift download fffs --deep` to fill those historical
-gaps. This reaches the register without downloading held documents again.
-Ordinary incremental runs can stop before reaching that second listing.
-
 Beyond those standard actions, a source can define **source-specific actions**
 that do something meaningful only for that source. For example, `lagen sfs
 versions` builds a statute's historical consolidations.
@@ -814,6 +809,11 @@ not just the missing archive entries. `full` implies `deep` in `walk`, so
 `--force` still reaches the archive; `--deep` is `--force` without the
 re-fetch of what is already held. Whether to move the monthly cron line from
 `--force` to `--deep` is an operational decision, not made here.
+
+FI keeps repealed base regulations in its search register, outside the current
+förteckning. Run `lagen foreskrift download fffs --deep` to fill those historical
+gaps. This reaches the register without downloading held documents again.
+Ordinary incremental runs can stop before reaching that second listing.
 
 Exposing `deep` for foreskrift is one case of a general gap. `lib.harvest.walk`
 has had a `deep` mode for a while: it walks a whole listing but fetches only
