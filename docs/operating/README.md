@@ -546,6 +546,11 @@ took over, and those documents keep their own designation — Socialstyrelsen's
 SOSFS, Folkhälsomyndighetens FoHMFS and FHIFS, Läkemedelsverkets LVFS, TLV:s
 TLVFS and LFNFS. `lagen foreskrift -h` lists every scope.
 
+FI keeps repealed base regulations in its search register, outside the current
+förteckning. Run `lagen foreskrift download fffs --deep` to fill those historical
+gaps. This reaches the register without downloading held documents again.
+Ordinary incremental runs can stop before reaching that second listing.
+
 Beyond those standard actions, a source can define **source-specific actions**
 that do something meaningful only for that source. For example, `lagen sfs
 versions` builds a statute's historical consolidations.

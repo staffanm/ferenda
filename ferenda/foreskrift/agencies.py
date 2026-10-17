@@ -17,7 +17,7 @@ generic enumerate shapes (``indexed``/``paginated``/``json``) plus a
 ``resolve`` (``resolve_landing`` / ``resolve_direct``) and a classify; the
 representative spread:
 
-  * **FFFS** (Finansinspektionen) -- a single HTML förteckning; bespoke
+  * **FFFS** (Finansinspektionen) -- current and repealed HTML registers; bespoke
     ``fi_enumerate`` (its rows carry the year+lopnummer fused in the detail URL).
   * **SSMFS** (Strålsäkerhetsmyndigheten) -- ``paginated_enumerate`` (`?page=N`),
     landing pages, text-classified files (PDFs served without a `.pdf` suffix).
@@ -105,6 +105,9 @@ def row_designation(text, arsutgava, lopnummer):
 # not by a clean "FFFS YYYY:N" string, so the generic indexed_enumerate can't
 # read it. The base detail page hangs the whole family (original + konsoliderad
 # + every amendment), resolved by the shared resolve_landing (text-classified).
+# Repealed bases remain in the search register, behind its "Upphävd" filter,
+# but disappear from the current förteckning. Read that listing second, so a
+# first/--deep/--force walk reaches them without extending an incremental run.
 # --------------------------------------------------------------------------
 
 # the base detail URL fuses year+lopnummer, either bare (/sok-fffs/2024/20245/)
@@ -119,7 +122,8 @@ RE_FI_BARE_LINK = re.compile(r"^\s*(\d{4}):(\d+)\s*$")
 
 
 def fi_enumerate(session, agency):
-    """One DocRef per distinct *base* regulation from FI's single förteckning.
+    """One DocRef per distinct *base* regulation from FI's current förteckning
+    and its search register of repealed grundförfattningar.
 
     The number comes from the detail URL, the only clean number on the row; the
     samling from the designation the row prints for that number, so the
@@ -130,36 +134,40 @@ def fi_enumerate(session, agency):
     pass by its bare-number "YYYY:N" link. That pass routes to FFFS and fires
     only for a number the first pass did not place -- every predecessor-series
     act (BFFS) uses a numeric detail URL and so is placed there, never here."""
-    soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     numbers = set()
-    for a in soup.find_all("a", href=True):
-        m = RE_FI_BASE.search(util.href(a))
-        if not m:
-            continue
-        arsutgava, lopnummer = m.group(1), str(int(m.group(3)))
-        designation = row_designation(a.get_text(" ", strip=True), arsutgava, lopnummer)
-        fs = harvest.series_slug(designation) if designation else agency.fs
-        basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
-        numbers.add("%s:%s" % (arsutgava, lopnummer))
-        if basefile in seen:
-            continue
-        seen.add(basefile)
-        yield DocRef(basefile=basefile, fs=fs if fs != agency.fs else None,
-                     identifier="%s %s:%s" % (designation or agency.fs.upper(),
-                                              arsutgava, lopnummer),
-                     url=harvest.absolute(agency.base_url, a["href"]))
-    for a in soup.find_all("a", href=True):
-        m = RE_FI_BARE_LINK.match(a.get_text(" ", strip=True))
-        if not m or "/sok-fffs/" not in util.href(a):
-            continue
-        arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
-        if "%s:%s" % (arsutgava, lopnummer) in numbers:
-            continue
-        numbers.add("%s:%s" % (arsutgava, lopnummer))
-        yield DocRef(basefile="%s/%s:%s" % (agency.fs, arsutgava, lopnummer),
-                     identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
-                     url=harvest.absolute(agency.base_url, a["href"]))
+
+    def page_refs(soup):
+        for a in soup.find_all("a", href=True):
+            m = RE_FI_BASE.search(util.href(a))
+            if not m:
+                continue
+            arsutgava, lopnummer = m.group(1), str(int(m.group(3)))
+            designation = row_designation(a.get_text(" ", strip=True), arsutgava, lopnummer)
+            fs = harvest.series_slug(designation) if designation else agency.fs
+            basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
+            numbers.add("%s:%s" % (arsutgava, lopnummer))
+            if basefile in seen:
+                continue
+            seen.add(basefile)
+            yield DocRef(basefile=basefile, fs=fs if fs != agency.fs else None,
+                         identifier="%s %s:%s" % (designation or agency.fs.upper(),
+                                                  arsutgava, lopnummer),
+                         url=harvest.absolute(agency.base_url, a["href"]))
+        for a in soup.find_all("a", href=True):
+            m = RE_FI_BARE_LINK.match(a.get_text(" ", strip=True))
+            if not m or "/sok-fffs/" not in util.href(a):
+                continue
+            arsutgava, lopnummer = m.group(1), str(int(m.group(2)))
+            if "%s:%s" % (arsutgava, lopnummer) in numbers:
+                continue
+            numbers.add("%s:%s" % (arsutgava, lopnummer))
+            yield DocRef(basefile="%s/%s:%s" % (agency.fs, arsutgava, lopnummer),
+                         identifier="%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer),
+                         url=harvest.absolute(agency.base_url, a["href"]))
+
+    yield from harvest.index_refs(session, agency, page_refs,
+                                  urls=[agency.index_url, agency.params["archive_url"]])
 
 
 FFFS = Agency(
@@ -167,6 +175,14 @@ FFFS = Agency(
     base_url="https://www.fi.se",
     index_url="https://www.fi.se/sv/vara-register/fffs/forteckning-fffs/",
     enumerate=fi_enumerate, resolve=resolve_landing,
+    # These are the official search form's type and status fields. Both
+    # unchecked boxes need explicit false values: omission restores defaults.
+    # Archive discovery uses the explicit query: a repeal's detail page can
+    # otherwise match the shared "upphävande" archive-link heuristic.
+    params={"no_archive": True,
+            "archive_url": "https://www.fi.se/sv/vara-register/fffs/sok-fffs/index"
+            "?grundforfattning=true&andringsforfattning=false&active=false"
+            "&canceled=true&categoryId=0&year=&number=&freeText="},
 )
 
 SSMFS = Agency(
