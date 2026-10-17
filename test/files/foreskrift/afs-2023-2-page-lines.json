@@ -1,0 +1,2072 @@
+{
+  "source_url": "https://www.av.se/globalassets/filer/publikationer/foreskrifter/planering-och-organisering-av-arbetsmiljoarbete-grundlaggande-skyldigheter-for-dig-med-arbetsgivaransvar-afs2023-2.pdf",
+  "sha256": "ec8a54ff09c436ffa5e6fe913c43e8c540f856b5a53b8e2737628d18214066c3",
+  "extractor": "Poppler pdftohtml 26.09.0 via ferenda.lib.pdftext.pdf_pages",
+  "pages": [
+    {
+      "page": 10,
+      "lines": [
+        {
+          "text": "AFS 2023:2",
+          "top": 47,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 51,
+              "right": 124,
+              "text": "AFS 2023:2",
+              "bold": true,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              10,
+              "b"
+            ]
+          ],
+          "bottom": 65
+        },
+        {
+          "text": "Kapitel 1",
+          "top": 65,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 51,
+              "right": 116,
+              "text": "Kapitel 1 ",
+              "bold": false,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 83
+        },
+        {
+          "text": "Systematiskt arbetsmiljöarbete",
+          "top": 114,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 21,
+          "runs": [
+            {
+              "left": 51,
+              "right": 318,
+              "text": "Systematiskt arbetsmiljöarbete",
+              "bold": true,
+              "italic": false,
+              "size": 21,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              30,
+              "b"
+            ]
+          ],
+          "bottom": 139
+        },
+        {
+          "text": "2 § I arbetsmiljölagen (1977:1160) och i Arbetsmiljöverkets föreskrifter",
+          "top": 147,
+          "bold": false,
+          "lead_bold": true,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 78,
+              "text": "2 § ",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            },
+            {
+              "left": 89,
+              "right": 571,
+              "text": "I arbetsmiljölagen (1977:1160) och i Arbetsmiljöverkets föreskrifter ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              4,
+              "b"
+            ]
+          ],
+          "bottom": 167
+        },
+        {
+          "text": "och allmänna råd (AFS 2023:1) om systematiskt arbetsmiljöarbete",
+          "top": 166,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 526,
+              "text": "och allmänna råd (AFS 2023:1) om systematiskt arbetsmiljöarbete ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 186
+        },
+        {
+          "text": "– grundläggande skyldigheter för dig med arbetsgivaransvar finns",
+          "top": 186,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 537,
+              "text": "– grundläggande skyldigheter för dig med arbetsgivaransvar finns ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 206
+        },
+        {
+          "text": "grundläggande bestämmelser om hur arbetsgivaren ska organisera,",
+          "top": 205,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 543,
+              "text": "grundläggande bestämmelser om hur arbetsgivaren ska organisera, ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 225
+        },
+        {
+          "text": "genomföra och följa upp sitt arbetsmiljöarbete för att förebygga risker för",
+          "top": 225,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 582,
+              "text": "genomföra och följa upp sitt arbetsmiljöarbete för att förebygga risker för ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 245
+        },
+        {
+          "text": "ohälsa och olycksfall i arbetet och uppnå en tillfredställande arbetsmiljö.",
+          "top": 244,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 576,
+              "text": "ohälsa och olycksfall i arbetet och uppnå en tillfredställande arbetsmiljö. ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 264
+        },
+        {
+          "text": "Vidare framgår vilka som ska medverka i arbetet.",
+          "top": 264,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 407,
+              "text": "Vidare framgår vilka som ska medverka i arbetet.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 284
+        },
+        {
+          "text": "I dessa föreskrifter finns bestämmelser med preciserade krav för det",
+          "top": 303,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 545,
+              "text": "I dessa föreskrifter finns bestämmelser med preciserade krav för det ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 323
+        },
+        {
+          "text": "systematiska arbetsmiljöarbetet som kan gälla undersökningar av",
+          "top": 322,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 529,
+              "text": "systematiska arbetsmiljöarbetet som kan gälla undersökningar av ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 342
+        },
+        {
+          "text": "arbetsmiljön, bedömningar av risker och åtgärder som ska vidtas. Det finns",
+          "top": 342,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 597,
+              "text": "arbetsmiljön, bedömningar av risker och åtgärder som ska vidtas. Det finns ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 362
+        },
+        {
+          "text": "också preciseringar som kan gälla särskilda krav på kunskaper eller hur vissa",
+          "top": 361,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 611,
+              "text": "också preciseringar som kan gälla särskilda krav på kunskaper eller hur vissa ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 381
+        },
+        {
+          "text": "arbetsmiljöuppgifter ska fördelas.",
+          "top": 381,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 51,
+              "right": 299,
+              "text": "arbetsmiljöuppgifter ska fördelas. ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 401
+        },
+        {
+          "text": "Rådets direktiv 94/33/EG av den 22 juni 1994 om skydd av minderåriga i arbetslivet i",
+          "top": 795,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 562,
+              "text": "Rådets direktiv 94/33/EG av den 22 juni 1994 om skydd av minderåriga i arbetslivet i ",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 812
+        },
+        {
+          "text": "lydelsen enligt Europaparlamentets och rådets förordning (EU) 2019/1243 av den 20 juni 2019,",
+          "top": 810,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 611,
+              "text": "lydelsen enligt Europaparlamentets och rådets förordning (EU) 2019/1243 av den 20 juni 2019, ",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 827
+        },
+        {
+          "text": "Rådets rekommendation 2003/134/EG av den 18 februari 2003 om förbättring av skyddet",
+          "top": 834,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 593,
+              "text": "Rådets rekommendation 2003/134/EG av den 18 februari 2003 om förbättring av skyddet ",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 851
+        },
+        {
+          "text": "för egenföretagares hälsa och säkerhet i arbetet, och",
+          "top": 849,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 362,
+              "text": "för egenföretagares hälsa och säkerhet i arbetet, och ",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 866
+        },
+        {
+          "text": "Europaparlamentets och rådets direktiv 2004/37/EG av den 29 april 2004 om skydd",
+          "top": 873,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 559,
+              "text": "Europaparlamentets och rådets direktiv 2004/37/EG av den 29 april 2004 om skydd ",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 890
+        },
+        {
+          "text": "för arbetstagare mot risker vid exponering för carcinogener eller mutagena ämnen i",
+          "top": 888,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 555,
+              "text": "för arbetstagare mot risker vid exponering för carcinogener eller mutagena ämnen i ",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 905
+        },
+        {
+          "text": "arbetet (sjätte särdirektivet enligt artikel 16.1 i rådets direktiv 89/391/EEG) i lydelsen",
+          "top": 903,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 567,
+              "text": "arbetet (sjätte särdirektivet enligt artikel 16.1 i rådets direktiv 89/391/EEG) i lydelsen ",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 920
+        },
+        {
+          "text": "enligt Europaparlamentets och rådets förordning (EU) 2019/1243 av den 20 juni 2019.",
+          "top": 918,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 14,
+          "runs": [
+            {
+              "left": 51,
+              "right": 561,
+              "text": "enligt Europaparlamentets och rådets förordning (EU) 2019/1243 av den 20 juni 2019.",
+              "bold": false,
+              "italic": false,
+              "size": 14,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 935
+        },
+        {
+          "text": "10",
+          "top": 963,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 51,
+              "right": 69,
+              "text": "10",
+              "bold": false,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 981
+        }
+      ]
+    },
+    {
+      "page": 11,
+      "lines": [
+        {
+          "text": "AFS 2023:2",
+          "top": 47,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 577,
+              "right": 650,
+              "text": "AFS 2023:2",
+              "bold": true,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              10,
+              "b"
+            ]
+          ],
+          "bottom": 65
+        },
+        {
+          "text": "Kapitel 2",
+          "top": 65,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 590,
+              "right": 650,
+              "text": "Kapitel 2",
+              "bold": false,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 83
+        },
+        {
+          "text": "2 kap. Organisatorisk och social arbetsmiljö",
+          "top": 113,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 24,
+          "runs": [
+            {
+              "left": 94,
+              "right": 533,
+              "text": "2 kap. Organisatorisk och social arbetsmiljö",
+              "bold": true,
+              "italic": false,
+              "size": 24,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              44,
+              "b"
+            ]
+          ],
+          "bottom": 142
+        },
+        {
+          "text": "Då gäller föreskrifterna",
+          "top": 165,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 21,
+          "runs": [
+            {
+              "left": 94,
+              "right": 295,
+              "text": "Då gäller föreskrifterna",
+              "bold": true,
+              "italic": false,
+              "size": 21,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              24,
+              "b"
+            ]
+          ],
+          "bottom": 190
+        },
+        {
+          "text": "1 § Bestämmelserna i detta kapitel reglerar all verksamhet där arbetstagare",
+          "top": 199,
+          "bold": false,
+          "lead_bold": true,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 94,
+              "right": 121,
+              "text": "1 § ",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            },
+            {
+              "left": 131,
+              "right": 649,
+              "text": "Bestämmelserna i detta kapitel reglerar all verksamhet där arbetstagare ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              4,
+              "b"
+            ]
+          ],
+          "bottom": 219
+        },
+        {
+          "text": "utför arbete för arbetsgivares räkning.",
+          "top": 218,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 94,
+              "right": 369,
+              "text": "utför arbete för arbetsgivares räkning.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 238
+        },
+        {
+          "text": "Vem föreskrifterna riktar sig till",
+          "top": 258,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 21,
+          "runs": [
+            {
+              "left": 94,
+              "right": 366,
+              "text": "Vem föreskrifterna riktar sig till",
+              "bold": true,
+              "italic": false,
+              "size": 21,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              34,
+              "b"
+            ]
+          ],
+          "bottom": 283
+        },
+        {
+          "text": "2 § Arbetsgivaren ansvarar för att bestämmelserna i detta kapitel följs. Den",
+          "top": 292,
+          "bold": false,
+          "lead_bold": true,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 94,
+              "right": 121,
+              "text": "2 § ",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            },
+            {
+              "left": 131,
+              "right": 649,
+              "text": "Arbetsgivaren ansvarar för att bestämmelserna i detta kapitel följs. Den ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              4,
+              "b"
+            ]
+          ],
+          "bottom": 312
+        },
+        {
+          "text": "som hyr in arbetskraft likställs med arbetsgivare i detta kapitel.",
+          "top": 311,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 94,
+              "right": 549,
+              "text": "som hyr in arbetskraft likställs med arbetsgivare i detta kapitel.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 331
+        },
+        {
+          "text": "Vid tillämpning av bestämmelserna i detta kapitel ska med arbetstagare inte",
+          "top": 350,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 94,
+              "right": 647,
+              "text": "Vid tillämpning av bestämmelserna i detta kapitel ska med arbetstagare inte ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 370
+        },
+        {
+          "text": "likställas den som",
+          "top": 370,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 94,
+              "right": 223,
+              "text": "likställas den som",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 390
+        },
+        {
+          "text": "1. genomgår utbildning,",
+          "top": 394,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 132,
+              "right": 321,
+              "text": "1. genomgår utbildning,",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 414
+        },
+        {
+          "text": "2. under vård i anstalt utför anvisat arbete, eller",
+          "top": 418,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 132,
+              "right": 488,
+              "text": "2. under vård i anstalt utför anvisat arbete, eller",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 438
+        },
+        {
+          "text": "3. tjänstgör enligt lagen (1994:1809) om totalförsvarsplikt och annan",
+          "top": 442,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 132,
+              "right": 637,
+              "text": "3. tjänstgör enligt lagen (1994:1809) om totalförsvarsplikt och annan ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 462
+        },
+        {
+          "text": "som fullgör i lag föreskriven tjänstgöring eller som deltar i frivillig",
+          "top": 461,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 162,
+              "right": 643,
+              "text": "som fullgör i lag föreskriven tjänstgöring eller som deltar i frivillig ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 481
+        },
+        {
+          "text": "utbildning för verksamhet inom totalförsvaret.",
+          "top": 481,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 162,
+              "right": 500,
+              "text": "utbildning för verksamhet inom totalförsvaret.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [],
+          "bottom": 501
+        },
+        {
+          "text": "Definitioner",
+          "top": 521,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 21,
+          "runs": [
+            {
+              "left": 94,
+              "right": 193,
+              "text": "Definitioner",
+              "bold": true,
+              "italic": false,
+              "size": 21,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              12,
+              "b"
+            ]
+          ],
+          "bottom": 546
+        },
+        {
+          "text": "3 § I detta kapitel har följande begrepp dessa betydelser.",
+          "top": 554,
+          "bold": false,
+          "lead_bold": true,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 94,
+              "right": 121,
+              "text": "3 § ",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            },
+            {
+              "left": 131,
+              "right": 511,
+              "text": "I detta kapitel har följande begrepp dessa betydelser.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "bookantiqua"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              4,
+              "b"
+            ]
+          ],
+          "bottom": 575
+        },
+        {
+          "text": "Begrepp Betydelse",
+          "top": 596,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 105,
+              "right": 161,
+              "text": "Begrepp",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 383,
+              "right": 449,
+              "text": "Betydelse",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              7,
+              "b"
+            ],
+            [
+              8,
+              17,
+              "b"
+            ]
+          ],
+          "bottom": 616
+        },
+        {
+          "text": "Krav i arbetet De delar av arbetet som fordrar",
+          "top": 629,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 105,
+              "right": 202,
+              "text": "Krav i arbetet",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 383,
+              "right": 611,
+              "text": "De delar av arbetet som fordrar ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 649
+        },
+        {
+          "text": "upprepade ansträngningar.",
+          "top": 649,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 580,
+              "text": "upprepade ansträngningar. ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 669
+        },
+        {
+          "text": "Kraven kan exempelvis omfatta",
+          "top": 668,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 606,
+              "text": "Kraven kan exempelvis omfatta ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 688
+        },
+        {
+          "text": "arbetsmängd, svårighetsgrad,",
+          "top": 688,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 592,
+              "text": "arbetsmängd, svårighetsgrad, ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 708
+        },
+        {
+          "text": "tidsgräns, fysiska och sociala",
+          "top": 707,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 590,
+              "text": "tidsgräns, fysiska och sociala ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 727
+        },
+        {
+          "text": "förhållanden. Kraven kan vara av",
+          "top": 727,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 615,
+              "text": "förhållanden. Kraven kan vara av ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 747
+        },
+        {
+          "text": "kognitiv, emotionell och fysisk natur.",
+          "top": 746,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 637,
+              "text": "kognitiv, emotionell och fysisk natur.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 766
+        },
+        {
+          "text": "Kränkande särbehandling Handlingar som riktas mot en eller",
+          "top": 780,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 105,
+              "right": 288,
+              "text": "Kränkande särbehandling",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 383,
+              "right": 637,
+              "text": "Handlingar som riktas mot en eller ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 800
+        },
+        {
+          "text": "flera arbetstagare på ett kränkande",
+          "top": 799,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 638,
+              "text": "flera arbetstagare på ett kränkande ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 819
+        },
+        {
+          "text": "sätt och som kan leda till ohälsa",
+          "top": 819,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 621,
+              "text": "sätt och som kan leda till ohälsa ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 839
+        },
+        {
+          "text": "eller att arbetstagare ställs utanför",
+          "top": 838,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 635,
+              "text": "eller att arbetstagare ställs utanför ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 858
+        },
+        {
+          "text": "arbetsplatsens gemenskap.",
+          "top": 858,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 383,
+              "right": 577,
+              "text": "arbetsplatsens gemenskap.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 878
+        },
+        {
+          "text": "11",
+          "top": 964,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 632,
+              "right": 650,
+              "text": "11",
+              "bold": false,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 982
+        }
+      ]
+    },
+    {
+      "page": 12,
+      "lines": [
+        {
+          "text": "AFS 2023:2",
+          "top": 47,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 51,
+              "right": 124,
+              "text": "AFS 2023:2",
+              "bold": true,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              10,
+              "b"
+            ]
+          ],
+          "bottom": 65
+        },
+        {
+          "text": "Kapitel 2",
+          "top": 65,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 51,
+              "right": 111,
+              "text": "Kapitel 2",
+              "bold": false,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 83
+        },
+        {
+          "text": "Begrepp Betydelse",
+          "top": 127,
+          "bold": true,
+          "lead_bold": true,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 63,
+              "right": 119,
+              "text": "Begrepp",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 340,
+              "right": 406,
+              "text": "Betydelse",
+              "bold": true,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [
+            [
+              0,
+              7,
+              "b"
+            ],
+            [
+              8,
+              17,
+              "b"
+            ]
+          ],
+          "bottom": 147
+        },
+        {
+          "text": "Ohälsosam arbetsbelastning När kraven i arbetet mer än",
+          "top": 160,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 63,
+              "right": 264,
+              "text": "Ohälsosam arbetsbelastning",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 340,
+              "right": 543,
+              "text": "När kraven i arbetet mer än ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 180
+        },
+        {
+          "text": "tillfälligt överskrider resurserna.",
+          "top": 180,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 573,
+              "text": "tillfälligt överskrider resurserna. ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 200
+        },
+        {
+          "text": "Denna obalans blir ohälsosam om",
+          "top": 199,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 587,
+              "text": "Denna obalans blir ohälsosam om ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 219
+        },
+        {
+          "text": "den är långvarig och möjligheterna",
+          "top": 219,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 593,
+              "text": "den är långvarig och möjligheterna ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 239
+        },
+        {
+          "text": "till återhämtning är otillräckliga.",
+          "top": 238,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 572,
+              "text": "till återhämtning är otillräckliga.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 258
+        },
+        {
+          "text": "Organisatorisk arbetsmiljö Villkor och förutsättningar för",
+          "top": 271,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 63,
+              "right": 250,
+              "text": "Organisatorisk arbetsmiljö",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 340,
+              "right": 555,
+              "text": "Villkor och förutsättningar för ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 291
+        },
+        {
+          "text": "arbetet som inkluderar",
+          "top": 291,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 502,
+              "text": "arbetet som inkluderar",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 311
+        },
+        {
+          "text": "1. ledning och styrning,",
+          "top": 319,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 510,
+              "text": "1. ledning och styrning,",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 339
+        },
+        {
+          "text": "2. kommunikation,",
+          "top": 343,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 475,
+              "text": "2. kommunikation,",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 363
+        },
+        {
+          "text": "3. delaktighet,",
+          "top": 367,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 444,
+              "text": "3. delaktighet,",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 387
+        },
+        {
+          "text": "4. handlingsutrymme,",
+          "top": 391,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 497,
+              "text": "4. handlingsutrymme,",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 411
+        },
+        {
+          "text": "5. fördelning av arbetsuppgifter, och",
+          "top": 415,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 596,
+              "text": "5. fördelning av arbetsuppgifter, och",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 435
+        },
+        {
+          "text": "6. krav, resurser och ansvar.",
+          "top": 439,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 540,
+              "text": "6. krav, resurser och ansvar.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 459
+        },
+        {
+          "text": "Resurser för arbetet Det i arbetet som bidrar till att",
+          "top": 472,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 63,
+              "right": 205,
+              "text": "Resurser för arbetet",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 340,
+              "right": 560,
+              "text": "Det i arbetet som bidrar till att",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 492
+        },
+        {
+          "text": "1. uppnå mål för arbetet, eller",
+          "top": 501,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 557,
+              "text": "1. uppnå mål för arbetet, eller",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 521
+        },
+        {
+          "text": "2. hantera krav i arbetet.",
+          "top": 525,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 518,
+              "text": "2. hantera krav i arbetet.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 545
+        },
+        {
+          "text": "Resurser kan vara arbetsmetoder",
+          "top": 558,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 580,
+              "text": "Resurser kan vara arbetsmetoder ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 578
+        },
+        {
+          "text": "och arbetsredskap, kompetens och",
+          "top": 577,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 594,
+              "text": "och arbetsredskap, kompetens och ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 597
+        },
+        {
+          "text": "bemanning, rimliga och tydliga",
+          "top": 597,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 568,
+              "text": "bemanning, rimliga och tydliga ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 617
+        },
+        {
+          "text": "mål, återkoppling på arbetsinsats,",
+          "top": 616,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 589,
+              "text": "mål, återkoppling på arbetsinsats, ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 636
+        },
+        {
+          "text": "möjligheter till kontroll i arbetet,",
+          "top": 636,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 579,
+              "text": "möjligheter till kontroll i arbetet, ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 656
+        },
+        {
+          "text": "socialt stöd från chefer och",
+          "top": 655,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 541,
+              "text": "socialt stöd från chefer och ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 675
+        },
+        {
+          "text": "kollegor, samt möjligheter till",
+          "top": 675,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 555,
+              "text": "kollegor, samt möjligheter till ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 695
+        },
+        {
+          "text": "återhämtning.",
+          "top": 694,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 440,
+              "text": "återhämtning.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 714
+        },
+        {
+          "text": "Social arbetsmiljö Villkor och förutsättningar för",
+          "top": 728,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 63,
+              "right": 192,
+              "text": "Social arbetsmiljö",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            },
+            {
+              "left": 340,
+              "right": 555,
+              "text": "Villkor och förutsättningar för ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 748
+        },
+        {
+          "text": "arbetet som inkluderar socialt",
+          "top": 747,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 559,
+              "text": "arbetet som inkluderar socialt ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 767
+        },
+        {
+          "text": "samspel, samarbete och socialt",
+          "top": 767,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 570,
+              "text": "samspel, samarbete och socialt ",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 787
+        },
+        {
+          "text": "stöd från chefer och kollegor.",
+          "top": 786,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 17,
+          "runs": [
+            {
+              "left": 340,
+              "right": 549,
+              "text": "stöd från chefer och kollegor.",
+              "bold": false,
+              "italic": false,
+              "size": 17,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 806
+        },
+        {
+          "text": "12",
+          "top": 963,
+          "bold": false,
+          "lead_bold": false,
+          "italic": false,
+          "size": 15,
+          "runs": [
+            {
+              "left": 51,
+              "right": 69,
+              "text": "12",
+              "bold": false,
+              "italic": false,
+              "size": 15,
+              "font": "tradegothicltstd"
+            }
+          ],
+          "spans": [],
+          "bottom": 981
+        }
+      ]
+    }
+  ]
+}
