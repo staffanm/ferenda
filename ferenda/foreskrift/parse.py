@@ -770,7 +770,15 @@ def _body_start(blocks):
             return i + 1, True
     for i, b in enumerate(blocks):
         if RE_BESLUTAD_LINE.search(b.text):
-            return i + 1, True
+            # A date-only masthead line ends here. A notice instead states
+            # what was decided after the date (ÅFS 2010:1), sometimes in the
+            # only paragraph the page prints. Keep that substantive sentence.
+            decision = RE_BESLUTAD.search(b.text)
+            tail = b.text[decision.end():].strip(" .;") if decision else ""
+            # The publication-date column can follow the decision date in
+            # the same block. That second date is still masthead furniture.
+            return (i if RE_HAS_LETTER.search(tail) and not RE_DATE.fullmatch(tail)
+                    else i + 1), True
     return 0, False
 
 
@@ -813,6 +821,12 @@ def _ingress_start(blocks, body_start):
     here separates them from the title, so they return `body_start` (no ingress)
     rather than publishing the title as a preamble stycke.
     """
+    # A decision sentence with prose after its date starts the body itself.
+    # Its preceding title can contain an interleaved publication-date column,
+    # so walking back from it would take that title for an ingress.
+    if body_start < len(blocks) and blocks[body_start].kind not in ("kapitel", "paragraf") \
+            and RE_BESLUTAD_LINE.search(blocks[body_start].text):
+        return body_start
     for i in range(body_start - 1, -1, -1):
         if RE_MASTHEAD_LINE.search(blocks[i].text) or blocks[i].kind == "rubrik" \
                 or blocks[i].text.rstrip().endswith(";"):
