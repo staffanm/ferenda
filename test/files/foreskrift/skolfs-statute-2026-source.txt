@@ -1,0 +1,6 @@
+Source: https://skolfs.skolverket.se/api/statute?year=2026
+Fetched: 2026-10-17
+Unmodified official API response, 71 search hits.
+SKOLFS 2026:70 is an ANDRINGSFORFATTNING titled Beslut om upphävande.
+Its official PDF confirms the repeal of SKOLFS 2012:98:
+https://skolfs.skolverket.se/api/document/ANDRINGSFORFATTNING/2026:70/pdf
