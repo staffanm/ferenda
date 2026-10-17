@@ -1546,7 +1546,7 @@ def test_fi_enumerate_routes_the_bankinspektionen_act_off_the_rows_own_words(mon
     # the number is the detail URL's, the only clean number on the row; the
     # samling is what the row prints for that number. FI's förteckning still
     # carries one Bankinspektionen act, published as "FFFS 1991:15".
-    _pages(monkeypatch, {agencies.FFFS.index_url: (
+    _pages(monkeypatch, {agencies.FFFS.params["archive_url"]: "", agencies.FFFS.index_url: (
         '<a href="/sv/vara-register/fffs/sok-fffs/1991/199115/">'
         'BFFS 1991:15 om kapitaltäckning</a>'
         '<a href="/sv/vara-register/fffs/sok-fffs/2013/20139/">'
@@ -1877,8 +1877,8 @@ def test_fi_enumerate_reaches_slug_urls_and_bare_number_links(monkeypatch):
         'ändring i (FFFS 2023:22)</a>'
         '<a href="/sok-fffs/1991/199115/">Bankinspektionens föreskrifter '
         '(BFFS 1991:15) om bankrörelse</a>')
-    monkeypatch.setattr(agencies, "request",
-                        lambda *_a, **_kw: SimpleNamespace(text=html))
+    _pages(monkeypatch, {agencies.FFFS.index_url: html,
+                         agencies.FFFS.params["archive_url"]: ""})
     refs = {(r.identifier, r.basefile) for r in agencies.fi_enumerate(None, REGISTRY["fffs"])}
     assert ("FFFS 2020:5", "fffs/2020:5") in refs
     assert ("FFFS 2024:20", "fffs/2024:20") in refs      # the fffs-<fused> slug
