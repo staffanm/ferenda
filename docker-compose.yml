@@ -542,7 +542,14 @@ services:
     # disagree -- exactly what happened before 2026-08-19, when the tag said 5
     # and the volume had been serving 5.1.2 since 2024. Bump this deliberately,
     # and follow the upgrade steps in the volume comment.
-    image: matomo:5.12.0
+    #
+    # Built locally from docker/matomo (the official Dockerfile for 5.12.0)
+    # because Docker Hub does not rebuild old Matomo tags with PHP security
+    # fixes. Rebuild with --pull when PHP 8.4 gets a security release. Go back
+    # to the official image when upgrading Matomo to a tag that Hub rebuilds.
+    image: lagen-matomo:5.12.0
+    build:
+      context: docker/matomo
     profiles: [prod]
     volumes:
       # Matomo's application tree. NAMED -- it used to be an anonymous volume,
