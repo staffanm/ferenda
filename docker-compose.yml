@@ -396,6 +396,44 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+
+  # --- prod: read-only rsync daemon for bulk corpus reusers -----------------
+  # Exposes `artifact/` and `downloaded/` (and nothing else under data_root)
+  # over TCP 873 (`rsync://<user>@lagen.nu/artifact/...`), gated by individual
+  # `username:password` credentials in ~/wds/ferenda/rsyncd.secrets (see
+  # rsyncd.secrets.example). No SSH is involved: rsyncd speaks its own wire
+  # protocol with a challenge-response handshake, and the container runs as
+  # unprivileged `nobody` (65534:65534) on a read-only rootfs with all
+  # capabilities dropped. Credentials gate the NFS metadata IOPS (walking
+  # 500k+ files) rather than data secrecy.
+  #
+  # Before first `up -d`: `cp rsyncd.secrets.example rsyncd.secrets && chmod 600 rsyncd.secrets`
+  # in ~/wds/ferenda on the host (an absent file would be created as a
+  # directory by Docker's bind-mount). After editing credentials:
+  # `docker compose --profile prod restart rsync`.
+  rsync:
+    build:
+      context: docker/rsync
+    container_name: lagen-rsync
+    profiles: [prod]
+    ports:
+      - "873:1873"
+    read_only: true
+    tmpfs:
+      - /tmp:size=1m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /mnt/forstor/ferenda/artifact:/data/artifact:ro
+      - /mnt/forstor/ferenda/downloaded:/data/downloaded:ro
+      - /home/staffan/wds/ferenda/rsyncd.secrets:/etc/rsyncd.secrets:ro
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+
   ferenda-legacy:
     # The legacy lagen.nu application. Its code is NOT in this repository any
     # more -- it lives on the `legacy` branch, checked out on the host at

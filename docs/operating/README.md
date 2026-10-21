@@ -283,11 +283,14 @@ download → parse → relate → index → dump → generate
   (`catalog.sqlite`): documents, the citation-link graph, fragment snippets.
   Corpus-level, rebuildable.
 - **index** — push the corpus into OpenSearch for full-text search.
-- **dump** — write the NDJSON bulk export (`dumps/<source>.ndjson.gz`).
+- **dump** — write the NDJSON bulk export (`dumps/<source>.ndjson.gz`, plus
+  `sfs-versions.ndjson.gz` and `eurlex-versions.ndjson.gz` for the archived
+  historical consolidations).
   Documents new to the dump are appended as one more gzip member (a reader
   sees one stream); a document that changed in place or vanished, a code
   change or `--force` rewrite the file, so no uri appears twice. The
-  artifacts a dump holds are recorded beside it (`.records`), and the
+  artifacts a dump holds are recorded under `.build/<dump>.records` (out of
+  the public `/dumps/` directory), and the
   rewrite reads artifacts across the run's jobs: forarbete's 97,274 took
   2151 s serially on 2026-09-07, 22 ms of NFS round trip each.
 - **generate** — render static, interlinked HTML into `generated/`.
@@ -691,14 +694,16 @@ host only.
 | invocation | services | use |
 |---|---|---|
 | `docker compose -f docker-compose.dev.yml up -d` | `opensearch` | dev — run `lagen all serve` from the working tree |
-| `docker compose --profile prod up -d` | all nine | prod |
+| `docker compose --profile prod up -d` | all ten | prod |
 
 The prod project holds two applications. `ferenda` is the rebuilt site, built
 on the box from this checkout. `ferenda-legacy` is the old application: its
 code is the `legacy` branch, checked out at `~/wds/ferenda-legacy` and
 bind-mounted in, and its image is a pre-built tag on the host. Beside them run
-`fuseki` and `mediawiki` (legacy), `matomo` and `db` (analytics), and the
-shared `nginx` and `certbot`.
+`fuseki` and `mediawiki` (legacy), `matomo` and `db` (analytics), the
+shared `nginx` and `certbot`, and a read-only `rsync` daemon on TCP 873 exposing
+`artifact/` and `downloaded/` to authenticated reusers (`~/wds/ferenda/rsyncd.secrets`,
+see `rsyncd.secrets.example`).
 
 Which hostname reaches which application is nginx's business, and it changes at
 the September cutover — see [`cutover.md`](cutover.md). `matomo` is the one

@@ -657,58 +657,84 @@ def _report_index_errors(name, errors):
               % (name, len(reasons) - INDEX_ERROR_SAMPLES))
 
 
+def _dump_targets(source):
+    """The `(file_stem, step_kind, lister)` targets `cmd_dump` writes for
+    `source`: its main `<name>.ndjson.gz` dump, plus `<name>-versions.ndjson.gz`
+    when the source keeps historical consolidations (`version_artifacts`).
+    `step_kind` is `"dump"` for the main dump and `"dump-versions"` for the
+    companion, so both keep their own fingerprint gate and ledger segment while
+    recording under the real source name (`source.name`) on `/ops`."""
+    if source.artifacts is None:
+        return ()
+    targets = [(source.name, "dump", source.artifacts)]
+    if source.version_artifacts is not None:
+        targets.append(("%s-versions" % source.name, "dump-versions",
+                        source.version_artifacts))
+    return targets
+
+
+def _dump_one(store, source_name, stem, kind, lister, jobs):
+    out = DUMPS / ("%s.ndjson.gz" % stem)
+    dump.migrate_records(out)
+    util.checking("%s dump" % stem)
+    paths = lister()
+    records = freshness.stat_records(paths, label="%s dump" % stem, jobs=jobs)
+    wm = freshness.fingerprint_of(records)
+    if out.exists() and freshness.up_to_date(store, kind, source_name, wm, DUMP_CODE):
+        print("dump %s: up to date (%d artifacts unchanged) -- skipped"
+              % (stem, len(paths)))
+        freshness._emit_segment(kind, source_name, 0.0, total=len(paths), ran=0,
+                                skipped_fresh=len(paths), status="skipped")
+        return False
+
+    def progress(seen, total, stem=stem):
+        util.status(seen, total, "dump %s" % stem)
+    t0 = time.perf_counter()
+    # documents new to the dump are appended as one more gzip member;
+    # a document that changed in place or vanished, a code change or
+    # --force rewrite the file, so no uri ever appears twice
+    new = (None if protocol.RUN.force or not out.exists()
+           or freshness.code_changed(store, kind, source_name, DUMP_CODE)
+           else dump.appendable(dump.read_records(out), records))
+    if new:
+        lines = dump.append_to_dump(new, out, progress=progress, jobs=jobs)
+        what = "%d new document(s) appended" % lines
+    else:
+        lines = dump.dump_source(paths, out, progress=progress, jobs=jobs)
+        what = "%d documents" % lines
+    dump.write_records(out, records)
+    freshness._emit_segment(kind, source_name, time.perf_counter() - t0,
+                            total=len(paths), ran=lines, status="ok")
+    freshness.record_step(store, kind, source_name, wm, DUMP_CODE)
+    sys.stderr.write("\n")
+    print("dump %s: %s -> %s" % (stem, what, out))
+    return True
+
+
 def cmd_dump(sources, names, jobs=1):
     """Write a gzipped NDJSON bulk dump per named source -- every artifact, one
     compact JSON per line, byte-equivalent to the on-disk artifact (the citation
-    graph is already inline, so each line is self-contained). The machine-
-    readable corpus export that replaces the retired RDF/Fuseki dumps. `jobs`
-    processes share the stat pass that gates each source."""
+    graph is already inline, so each line is self-contained), plus a companion
+    `<source>-versions.ndjson.gz` for sources that keep historical consolidations
+    (sfs, eurlex). The machine-readable corpus export that replaces the retired
+    RDF/Fuseki dumps. `jobs` processes share the stat pass that gates each
+    source."""
     if protocol.RUN.dry_run:
-        _plan_artifact_verb("dump", sources, names,
-                            lambda name: DUMPS / ("%s.ndjson.gz" % name))
+        for name in names:
+            for stem, _kind, lister in _dump_targets(sources[name]):
+                print("dump %s: would read %d artifact(s) -> %s"
+                      % (stem, len(lister()), DUMPS / ("%s.ndjson.gz" % stem)))
         return
     DUMPS.mkdir(parents=True, exist_ok=True)
     store = freshness.load_fingerprints()
     dirty = False
     for name in names:
-        source = sources[name]
-        if source.artifacts is None:
+        targets = _dump_targets(sources[name])
+        if not targets:
             continue
-        out = DUMPS / ("%s.ndjson.gz" % name)
         with util.step("%s dump" % name):
-            util.checking("%s dump" % name)
-            paths = source.artifacts()
-            records = freshness.stat_records(paths, label="%s dump" % name, jobs=jobs)
-            wm = freshness.fingerprint_of(records)
-            if out.exists() and freshness.up_to_date(store, "dump", name, wm, DUMP_CODE):
-                print("dump %s: up to date (%d artifacts unchanged) -- skipped"
-                      % (name, len(paths)))
-                freshness._emit_segment("dump", name, 0.0, total=len(paths), ran=0,
-                              skipped_fresh=len(paths), status="skipped")
-                continue
-
-            def progress(seen, total, name=name):
-                util.status(seen, total, "dump %s" % name)
-            t0 = time.perf_counter()
-            # documents new to the dump are appended as one more gzip member;
-            # a document that changed in place or vanished, a code change or
-            # --force rewrite the file, so no uri ever appears twice
-            new = (None if protocol.RUN.force or not out.exists()
-                   or freshness.code_changed(store, "dump", name, DUMP_CODE)
-                   else dump.appendable(dump.read_records(out), records))
-            if new:
-                lines = dump.append_to_dump(new, out, progress=progress, jobs=jobs)
-                what = "%d new document(s) appended" % lines
-            else:
-                lines = dump.dump_source(paths, out, progress=progress, jobs=jobs)
-                what = "%d documents" % lines
-            dump.write_records(out, records)
-            freshness._emit_segment("dump", name, time.perf_counter() - t0, total=len(paths),
-                          ran=lines, status="ok")
-            freshness.record_step(store, "dump", name, wm, DUMP_CODE)
-            dirty = True
-            sys.stderr.write("\n")
-            print("dump %s: %s -> %s" % (name, what, out))
+            for stem, kind, lister in targets:
+                dirty |= _dump_one(store, name, stem, kind, lister, jobs)
     if dirty:
         freshness.save_fingerprints(store)
 

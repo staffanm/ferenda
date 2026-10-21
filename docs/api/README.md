@@ -781,10 +781,12 @@ building [paraTEXT](../../paratext/README.md) against this surface.
 For reprocessing the whole corpus, use the NDJSON dumps rather than paging the
 API.
 
-**`GET /api/v1/dumps`** lists them (one per source):
+**`GET /api/v1/dumps`** lists them (one per source, plus `sfs-versions.ndjson.gz`
+and `eurlex-versions.ndjson.gz` for the archived historical consolidations):
 
 ```jsonc
-[ { "source": "sfs", "file": "sfs.ndjson.gz", "bytes": 12345678 }, … ]
+[ { "source": "sfs", "file": "sfs.ndjson.gz", "bytes": 12345678 },
+  { "source": "sfs-versions", "file": "sfs-versions.ndjson.gz", "bytes": 34567890 }, … ]
 ```
 
 The endpoint reports each dump's `source`, `file` name and size. The dump

@@ -3,11 +3,12 @@
 import gzip
 import json
 
-from ferenda.lib import dump
+from ferenda.lib import dump, freshness, layout
 
 
 def _artifact(tmp_path, name, obj):
     p = tmp_path / name
+    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(obj, indent=2, ensure_ascii=False))   # pretty on disk
     return p
 
@@ -64,12 +65,15 @@ def _records(paths):
     return [(str(p), p.stat().st_size, p.stat().st_mtime_ns) for p in paths]
 
 
-def test_new_documents_append_as_a_member_and_changes_force_a_rewrite(tmp_path):
+def test_new_documents_append_as_a_member_and_changes_force_a_rewrite(tmp_path, monkeypatch):
+    monkeypatch.setattr(dump, "RECORDS_DIR", tmp_path / ".build")
     a = _artifact(tmp_path, "a.json", {"uri": "a"})
     b = _artifact(tmp_path, "b.json", {"uri": "b"})
-    out = tmp_path / "forarbete.ndjson.gz"
+    out = tmp_path / "dumps" / "forarbete.ndjson.gz"
     dump.dump_source([a, b], out)
     dump.write_records(out, _records([a, b]))
+    assert dump.records_path(out) == tmp_path / ".build" / "forarbete.ndjson.gz.records"
+    assert not (tmp_path / "dumps" / "forarbete.ndjson.gz.records").exists()
     assert dump.read_records(out) == _records([a, b])
     # a document the dump has not seen: appendable
     c = _artifact(tmp_path, "c.json", {"uri": "c"})
@@ -87,3 +91,47 @@ def test_new_documents_append_as_a_member_and_changes_force_a_rewrite(tmp_path):
     assert dump.appendable(None, _records([a, b, c])) is None
     # nothing new and nothing changed: nothing to append
     assert dump.appendable(_records([a, b, c]), _records([a, b, c])) == []
+
+
+def test_legacy_records_beside_dump_migrate_into_build_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(dump, "RECORDS_DIR", tmp_path / ".build")
+    a = _artifact(tmp_path, "a.json", {"uri": "a"})
+    out = tmp_path / "dumps" / "sfs.ndjson.gz"
+    out.parent.mkdir(parents=True)
+    legacy = out.with_name("sfs.ndjson.gz.records")
+    freshness.write_stat_records(legacy, _records([a]))
+
+    assert dump.read_records(out) == _records([a])
+    assert not legacy.exists()
+    assert (tmp_path / ".build" / "sfs.ndjson.gz.records").exists()
+
+
+def test_version_artifacts_reads_sidecars_and_skips_unindexed_files(tmp_path, monkeypatch):
+    art_root = tmp_path / "artifact"
+    monkeypatch.setattr(layout, "ARTIFACT", art_root)
+    monkeypatch.setattr(layout, "SFS_ARTIFACT", art_root / "sfs")
+
+    # SFS: one indexed version, plus an unreferenced mislabeled file in archive/
+    v1 = layout.sfs_version_artifact("1998:204", "2003:466")
+    _artifact(v1.parent, v1.name, {"uri": "https://lagen.nu/1998:204/konsolidering/2003:466"})
+    orphan = layout.sfs_version_artifact("1998:204", "1998:204")
+    _artifact(orphan.parent, orphan.name, {"uri": "orphan"})
+    sc_sfs = layout.sfs_versions_sidecar("1998:204")
+    _artifact(sc_sfs.parent, sc_sfs.name, {
+        "versions": [{"version": "2003:466",
+                      "uri": "https://lagen.nu/1998:204/konsolidering/2003:466"}],
+        "skipped": []})
+
+    # EUR-Lex: one indexed version, plus a statute with an empty sidecar and no archive
+    ev1 = layout.eurlex_version_artifact("32016R0679", "2018-05-25")
+    _artifact(ev1.parent, ev1.name, {"uri": "https://lagen.nu/celex/32016R0679/konsolidering/2018-05-25"})
+    sc_eur = layout.eurlex_versions_sidecar("32016R0679")
+    _artifact(sc_eur.parent, sc_eur.name, {
+        "versions": [{"version": "2018-05-25",
+                      "uri": "https://lagen.nu/celex/32016R0679/konsolidering/2018-05-25"}],
+        "skipped": []})
+    sc_empty = layout.eurlex_versions_sidecar("32020R0001")
+    _artifact(sc_empty.parent, sc_empty.name, {"versions": [], "skipped": []})
+
+    assert layout.version_artifacts("sfs") == [v1]
+    assert layout.version_artifacts("eurlex") == [ev1]

@@ -15,7 +15,10 @@ import os
 import shutil
 from pathlib import Path
 
+from .. import config
 from . import compress, freshness, util
+
+RECORDS_DIR = config.DATA / ".build"
 
 # artifacts one read job takes: at 13-44 ms an artifact on the production NFS
 # mount a job is a few seconds, and the progress line moves (relate's HASH_CHUNK)
@@ -108,21 +111,40 @@ def append_to_dump(artifact_paths, out_path, progress=None, jobs=1):
 
 
 def records_path(out_path):
-    """The stat records of the artifacts a dump holds, beside it: one
-    ``path\tsize\tmtime_ns`` line per artifact, gzipped. What tells the next
-    run which changed artifacts are new (appendable) and which replaced or
+    """The stat records of the artifacts a dump holds, under ``DATA/.build/``:
+    one ``path\tsize\tmtime_ns`` line per artifact, gzipped. Kept in `.build/`
+    rather than beside the file in `dumps/` so the public `/dumps/` autoindex
+    serves only dumps, never internal build state or host paths. What tells the
+    next run which changed artifacts are new (appendable) and which replaced or
     vanished (a rewrite)."""
     out_path = Path(out_path)
-    return out_path.with_name(out_path.name + ".records")
+    return RECORDS_DIR / (out_path.name + ".records")
+
+
+def migrate_records(out_path):
+    """Relocate a pre-2026-10-21 `.records` file sitting beside `out_path` in
+    `dumps/` into `RECORDS_DIR` (rule:relocate-dont-regenerate) so the public
+    directory is cleaned even when the dump itself is up to date and skipped."""
+    out_path = Path(out_path)
+    target = records_path(out_path)
+    legacy = out_path.with_name(out_path.name + ".records")
+    if legacy != target and legacy.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            os.replace(legacy, target)
+        else:
+            legacy.unlink()
 
 
 def write_records(out_path, records):
+    migrate_records(out_path)
     freshness.write_stat_records(records_path(out_path), records)
 
 
 def read_records(out_path):
     """The recorded stat records, or None when the dump has none (a dump
     written before records were kept, or none at all)."""
+    migrate_records(out_path)
     return freshness.read_stat_records(records_path(out_path))
 
 

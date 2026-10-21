@@ -624,6 +624,7 @@ SOURCES: tuple[Source, ...] = (Source("eurlex", lambda: download.list_basefiles(
    intermediate=(eurlex_intermediate,
                  "Formex XML (pre-Formex acts: the OJ HTML)"),
    artifacts=functools.partial(layout.artifacts, "eurlex"),
+   version_artifacts=functools.partial(layout.version_artifacts, "eurlex"),
    pinpoints=".+",
    extra_pages=eurlex_extra_pages, relate_cross=eurlex_relate_cross,
    cross_code=(HERE / "correspond.py",),

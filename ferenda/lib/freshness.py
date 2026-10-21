@@ -226,6 +226,8 @@ def write_stat_records(path, records):
     are new, changed or gone (`changed_stat_records`) without the previous
     run's memory: the dumps keep one per source, generate one for the
     own-page sidecars."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt", encoding="utf-8") as fh:
         for p, size, mtime_ns in records:
             fh.write("%s\t%d\t%d\n" % (p, size, mtime_ns))

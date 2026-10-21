@@ -148,6 +148,9 @@ class Source:
     # the published-artifact lister: what relate/index/dump/generate read.
     # None = the source catalogues no documents (remisser, site, stats)
     artifacts: Callable[[], list[Path]] | None = None
+    # historical-consolidation artifact lister (sfs, eurlex): written by dump
+    # to `<name>-versions.ndjson.gz` beside the main `<name>.ndjson.gz`
+    version_artifacts: Callable[[], list[Path]] | None = None
     searchable: bool = True               # False: relate the source but hold no
                                           # search units for it (kommentar, lawreview)
     # which of a document's anchors a citation can name, as a regex the whole

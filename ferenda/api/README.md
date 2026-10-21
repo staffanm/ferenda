@@ -989,8 +989,8 @@ JSON-artefakt per rad — radvis identisk med artefakten på disk. Citeringsgraf
 ligger redan inbäddad i varje artefakt, så varje rad är fristående.
 
 ```sh
-lagen all dump                 # skriver site/data/dumps/<källa>.ndjson.gz
-lagen sfs dump                 # bara en källa
+lagen all dump                 # skriver site/data/dumps/<källa>.ndjson.gz (+ <källa>-versions.ndjson.gz för sfs och eurlex)
+lagen sfs dump                 # bara en källa (sfs.ndjson.gz + sfs-versions.ndjson.gz)
 ```
 
 Läs en dump:

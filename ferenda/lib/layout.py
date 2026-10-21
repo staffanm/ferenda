@@ -18,6 +18,7 @@ Centralising these rules here -- instead of the ~10 scattered helpers in build.p
 and render.py -- keeps the layout conventions in one reviewable place.
 """
 
+import json
 import re
 from pathlib import Path
 from urllib.parse import quote, unquote
@@ -603,6 +604,13 @@ def eurlex_sidecar_basefile(path: Path) -> str:
     return path.name[:-len(".versions.json")].replace("_", "/")
 
 
+def sfs_sidecar_basefile(path: Path) -> str:
+    """Inverse of sfs_versions_sidecar: the statute basefile a sidecar file
+    describes (the {y}/{n} path segments, slug-decoded)."""
+    return "%s:%s" % (path.parent.name,
+                      path.name[:-len(".versions.json")].replace("_", " "))
+
+
 # --------------------------------------------------------------------------
 # versions, per source -- the one dispatch the version-history consumers (the
 # renderer's compare panel, /api/v1/document/versions, /document/diff) go
@@ -610,11 +618,11 @@ def eurlex_sidecar_basefile(path: Path) -> str:
 # of the sfs plumbing in each consumer.
 # --------------------------------------------------------------------------
 
-# source -> (versions sidecar, version artifact, version sort key)
+# source -> (versions sidecar, version artifact, version sort key, sidecar basefile)
 _VERSIONED = {"sfs": (sfs_versions_sidecar, sfs_version_artifact,
-                      sfs_version_key),
+                      sfs_version_key, sfs_sidecar_basefile),
               "eurlex": (eurlex_versions_sidecar, eurlex_version_artifact,
-                         lambda version: version)}
+                         lambda version: version, eurlex_sidecar_basefile)}
 
 VERSIONED_SOURCES = tuple(_VERSIONED)
 
@@ -640,6 +648,33 @@ def version_key(source: str, version: str):
     dispatchers: a third versioned source must choose its ordering here,
     not inherit string sorting silently."""
     return _versioned(source, 2)(version)
+
+
+def sidecar_basefile(source: str, path: Path) -> str:
+    return _versioned(source, 3)(path)
+
+
+def version_artifacts(source: str) -> list[Path]:
+    """Every published historical-consolidation artifact of `source`, sorted --
+    the versions-stage counterpart of `artifacts` (for `<source>-versions.ndjson.gz`).
+    Read from the `.versions.json` sidecars of the documents that have an
+    `archive/*/*/.versions` tree, so SkipDocument placeholders and superseded
+    mislabeled files in `archive/` are excluded without opening the empty
+    sidecars of documents that have no archived history."""
+    root = artifact_dir(source)
+    arch = root / "archive"
+    v_art = _versioned(source, 1)
+    sc_bf = _versioned(source, 3)
+    paths = []
+    for vd in arch.glob("*/*/.versions"):
+        rel = vd.parent.relative_to(arch)
+        sc = (root / rel).with_name(rel.name + ".versions.json")
+        if not sc.exists():
+            continue
+        bf = sc_bf(sc)
+        for e in json.loads(sc.read_text())["versions"]:
+            paths.append(v_art(bf, e["version"]))
+    return sorted(paths)
 
 
 def foreskrift_grund_artifact(basefile: str) -> Path:
@@ -669,13 +704,6 @@ def foreskrift_grund_pages():
                      str(path),
                      "%s %s:%s i ursprunglig lydelse" % (fs.upper(), year, nr)))
     return rows
-
-
-def sfs_sidecar_basefile(path: Path) -> str:
-    """Inverse of sfs_versions_sidecar: the statute basefile a sidecar file
-    describes (the {y}/{n} path segments, slug-decoded)."""
-    return "%s:%s" % (path.parent.name,
-                      path.name[:-len(".versions.json")].replace("_", " "))
 
 
 def _fa_year(slug: str) -> str:

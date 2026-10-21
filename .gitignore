@@ -32,6 +32,7 @@ __pycache__/
 /.claude/scheduled_tasks.lock
 /.claude/projects/
 /.env
+/rsyncd.secrets
 /mediawiki-db-backup-230502/
 /mediawiki-html-backup-230502/
 # Local MediaWiki SQLite source for the one-time markdown migration (not tracked;

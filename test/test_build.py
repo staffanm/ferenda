@@ -35,6 +35,7 @@ from ferenda.lib import (
     catalog,
     compress,
     corpus,
+    dump,
     freshness,
     layout,
     runlog,
@@ -1036,6 +1037,7 @@ def wire(monkeypatch, tmp_path):
         monkeypatch.setattr(freshness, "MANIFEST", bd / "manifest.json")
         monkeypatch.setattr(freshness, "MANIFEST_DB", bd / "manifest.sqlite")
         monkeypatch.setattr(freshness, "FINGERPRINTS", bd / "fingerprints.json")
+        monkeypatch.setattr(dump, "RECORDS_DIR", bd)
         monkeypatch.setattr(freshness, "_MANIFEST_CACHE", None)
         monkeypatch.setattr(freshness, "_FINGERPRINTS_CACHE", None)
         monkeypatch.setattr(freshness, "RUN_ID", None)
@@ -1495,6 +1497,7 @@ def test_cmd_dump_announces_one_step_per_source(monkeypatch, tmp_path):
     monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "fingerprints.json")
     monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(corpus, "DUMPS", tmp_path / "dumps")
+    monkeypatch.setattr(dump, "RECORDS_DIR", tmp_path / ".build")
     sources = {}
     for name in ("one", "two"):
         art = tmp_path / ("%s.json" % name)
@@ -2551,26 +2554,37 @@ def test_cmd_dump_appends_new_documents_and_rewrites_on_change(monkeypatch, tmp_
     monkeypatch.setattr(freshness, "_FINGERPRINTS_CACHE", None)
     monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(corpus, "DUMPS", tmp_path / "dumps")
+    monkeypatch.setattr(dump, "RECORDS_DIR", tmp_path / ".build")
     monkeypatch.setattr(freshness, "RUN_ID", None)     # files change outside a stage here
     arts = [tmp_path / "a.json", tmp_path / "b.json"]
-    for p in arts:
+    varts = [tmp_path / "v1.json"]
+    for p in arts + varts:
         p.write_text(json.dumps({"uri": p.stem}))
-    sources = {"syn": Source("syn", lambda: [], {}, artifacts=lambda: list(arts))}
+    sources = {"syn": Source("syn", lambda: [], {},
+                             artifacts=lambda: list(arts),
+                             version_artifacts=lambda: list(varts))}
     out = tmp_path / "dumps" / "syn.ndjson.gz"
+    vout = tmp_path / "dumps" / "syn-versions.ndjson.gz"
 
-    def uris():
-        with gzip.open(out, "rt", encoding="utf-8") as fh:
+    def uris(path=out):
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
             return [json.loads(line)["uri"] for line in fh.read().splitlines()]
 
     corpus.cmd_dump(sources, ["syn"])
-    assert uris() == ["a", "b"] and "2 documents" in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert uris() == ["a", "b"] and "dump syn: 2 documents" in printed
+    assert uris(vout) == ["v1"] and "dump syn-versions: 1 documents" in printed
+    assert (tmp_path / ".build" / "syn.ndjson.gz.records").exists()
+    assert (tmp_path / ".build" / "syn-versions.ndjson.gz.records").exists()
     c = tmp_path / "c.json"
     c.write_text(json.dumps({"uri": "c"}))
     arts.append(c)
-    corpus.cmd_dump(sources, ["syn"])                     # new document: appended
-    assert uris() == ["a", "b", "c"] and "1 new document(s) appended" in capsys.readouterr().out
+    corpus.cmd_dump(sources, ["syn"])                     # new document: appended; versions skipped
+    printed = capsys.readouterr().out
+    assert uris() == ["a", "b", "c"] and "1 new document(s) appended" in printed
+    assert "dump syn-versions: up to date (1 artifacts unchanged) -- skipped" in printed
     arts[1].write_text(json.dumps({"uri": "b", "v": 2}))  # changed in place: rewritten
     corpus.cmd_dump(sources, ["syn"])
-    assert uris() == ["a", "b", "c"] and "3 documents" in capsys.readouterr().out
+    assert uris() == ["a", "b", "c"] and "dump syn: 3 documents" in capsys.readouterr().out
     corpus.cmd_dump(sources, ["syn"])                     # unchanged: skipped
-    assert "skipped" in capsys.readouterr().out
+    assert "dump syn: up to date" in capsys.readouterr().out
