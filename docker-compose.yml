@@ -556,10 +556,11 @@ services:
       #
       # This volume also SHADOWS the image's code, and the entrypoint seeds it
       # only `if [ ! -e matomo.php ]`. So pulling a newer image upgrades
-      # nothing on its own. An upgrade is three steps: repopulate this volume
+      # nothing on its own. An upgrade is four steps: repopulate this volume
       # from the new image's /usr/src/matomo, put config/config.ini.php and
-      # misc/DBIP-City.mmdb back, then run `console core:update` for the
-      # database migration.
+      # misc/DBIP-City.mmdb back, run `console core:update` for the database
+      # migration, then `console core:create-security-files`. The tarball has
+      # no .htaccess files, so without that last step tmp/ is public.
       - matomo-app:/var/www/html
     environment:
       # These seed the installer only; once `config/config.ini.php` exists in
