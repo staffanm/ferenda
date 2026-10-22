@@ -73,6 +73,7 @@
   "rpsfs": {"designation": "RPSFS", "title": "Rikspolisstyrelsens författningssamling", "successor": "pmfs"},
   "rsfs": {"designation": "RSFS", "title": "Riksskatteverkets författningssamling", "successor": "skvfs"},
   "rtvfs": {"designation": "RTVFS", "title": "Radio- och TV-verkets författningssamling", "successor": "mrtvfs"},
+  "savfs": {"designation": "SAVFS", "title": "Statens arbetsgivarverks författningssamling", "successor": "agvfs"},
   "scbfs": {"designation": "SCB-FS", "title": "Statistiska centralbyråns författningssamling"},
   "sgufs": {"designation": "SGU-FS", "title": "Sveriges geologiska undersöknings författningssamling"},
   "sifs": {"designation": "SIFS", "title": "Spelinspektionens författningssamling"},
