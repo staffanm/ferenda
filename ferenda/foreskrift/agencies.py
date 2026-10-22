@@ -2726,6 +2726,9 @@ TVFS = Agency(
 # 2025-01-01: the 67 old häften were replaced by 15 new grundföreskrifter
 # AFS 2023:1..15 (all dated 2023, in force 2025), so the in-force register is
 # exactly those 15 base links (afs-YYYYN, year+lopnummer fused in the slug).
+# The same listing also links current amendments directly as PDFs. They must
+# be enumerated before the old bases, or the incremental watermark stops the
+# walk before it can discover a new amendment.
 # The hist subpage hangs the base PDF, its konsoliderad version and every
 # ändringsföreskrift (afsYYYY-N filenames), classified by afs_classify -- the
 # amendment's own number is the afsYYYY-N that is *not* the base's.
@@ -2757,8 +2760,8 @@ def afs_classify(a, fs, base_ars, base_lop):
 
 
 def afs_enumerate(session, agency):
-    """One DocRef per AFS grundföreskrift, its url pointed at the
-    författningshistorik subpage (where the PDFs live).
+    """Current amendments as direct PDFs, followed by AFS grundföreskrifter
+    whose URLs point at the författningshistorik subpage (where the PDFs live).
 
     Arbetsmiljöverket replaced its whole samling on 2025-01-01: AFS 2023:1..15
     repeal 71 older regulations, which the agency moved to the archive the
@@ -2772,6 +2775,16 @@ def afs_enumerate(session, agency):
     seen = set()
 
     def page_refs(soup):
+        amendments = []
+        for a in soup.select('a[href$=".pdf"]'):
+            text = a.get_text(" ", strip=True)
+            own = harvest.own_designation(harvest.normalise(text))
+            if own is None or own[0] != "AFS":
+                continue
+            docref = harvest.ref(agency, text, util.href(a), seen, title=text, direct=True)
+            if docref:
+                amendments.append(docref)
+        yield from newest_first(amendments)
         for a in soup.find_all("a", href=True):
             href = util.href(a)
             if "/foreskrifter/" not in href:
