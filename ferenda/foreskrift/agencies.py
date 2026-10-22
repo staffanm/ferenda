@@ -57,6 +57,7 @@ from ..lib import compress, util
 from ..lib.errors import UpstreamChanged
 from ..lib.harvest import Skip, write_record
 from ..lib.net import BROWSER_UA, Transport, is_not_found, request
+from ..lib.stage import POLITENESS
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
 from . import harvest, hslffs, mtfs, skvfs, statskontoret
@@ -3105,6 +3106,8 @@ TRVFS = Agency(
 # ("AFFS 2025:1", predecessor "AMSFS 1996:7" from Arbetsmarknadsstyrelsen) and
 # landing URI out of the embedded JSON. fs_from_designation keeps AMSFS under its
 # own samling. Each landing hangs the one regulation PDF (classify_single).
+# The Upphävda tab loads a second list through the app's public JSON endpoint.
+# Queue it after the current records, like the other agencies' archive pages.
 # --------------------------------------------------------------------------
 
 RE_AFFS_ENTRY = re.compile(
@@ -3112,15 +3115,41 @@ RE_AFFS_ENTRY = re.compile(
 
 
 def affs_enumerate(session, agency):
-    """One DocRef per författning from AFFS's embedded register JSON."""
+    """Current AFFS/AMSFS records, then the app's repealed regulations.
+
+    A caught-up incremental walk stops among the current records. First,
+    ``--deep`` and ``--force`` walks reach the archive request that follows.
+    The page and portlet IDs are read from the page, as Sitevision's own
+    ``getStandaloneUrl`` does, rather than fixed to one app deployment.
+    """
     page = request(session, "GET", agency.index_url).text
+    time.sleep(POLITENESS)
     seen = set()
+    current = []
     for name, uri, description in RE_AFFS_ENTRY.findall(page):
         # the displayName occasionally carries a stray space ("AFFS 2025: 2")
         docref = harvest.ref(agency, name.replace(": ", ":"), uri, seen)
         if docref:
             docref.title = description or None
-            yield docref
+            current.append(docref)
+    yield from newest_first(current)
+
+    app = BeautifulSoup(page, "html.parser").select_one(
+        ".sv-sv-start-webapp-sok-forfattningssamlingar")
+    page_id = re.search(r"\bpageId:\s*'([^']+)'", page)
+    assert app is not None and page_id is not None, "AFFS search app is missing"
+    portlet_id = str(app["id"]).removeprefix("svid").replace("_", ".", 1)
+    archived = request(session, "POST", harvest.absolute(agency.base_url,
+        "/appresource/%s/%s/getNewItems" % (page_id.group(1), portlet_id)),
+        json={"searchValue": "", "filterList": "annulment", "sortOrder": False}).json()["data"]
+    time.sleep(POLITENESS)
+    refs = []
+    for entry in archived:
+        docref = harvest.ref(agency, entry["displayName"].replace(": ", ":"),
+                            entry["URI"], seen, title=entry["description"] or None)
+        if docref:
+            refs.append(docref)
+    yield from newest_first(refs)
 
 
 AFFS = Agency(
