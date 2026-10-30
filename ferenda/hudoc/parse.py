@@ -4,12 +4,11 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress, patch
 from ..lib.errors import SkipDocument
 from ..lib.lagrum import merge_refs
 from ..lib.util import normalize_space
 from . import citations, summaries, treaties
-from .download import body_path, record_path
+from .download import read_document
 from .model import Block, HudocCase, record_date
 
 RE_NUMBERED = re.compile(r"^(\d+)\.\s+(.*)$", re.DOTALL)
@@ -168,9 +167,7 @@ def _refs(text, basefile, root):
 
 
 def parse(basefile, root):
-    record = compress.read_json(record_path(root, basefile))
-    html = patch.apply("hudoc", basefile,
-                       compress.read_text(body_path(root, basefile)))
+    record, html = read_document(root, basefile)
     return parse_record(record, html,
                         summaries.read_sidecar(root, basefile)).to_artifact(
         refs_for=lambda text: _refs(text, basefile, root))

@@ -60,10 +60,18 @@ redaction and republish the personal data it removes — silently. The ops
 dashboard reports the content checkout's unpushed/dirty state, because nothing
 pushes it automatically.
 
-The six folkrätt sources — `hudoc`, `coe`, `icrc`, `untc`, `icc`, `icj` — apply a patch
-at parse time the same way (`patch.apply` on the stored record/HTML text for
-`hudoc`/`icrc`/`untc`, a `patch_key` threaded into `lib.pdftext.pdf_pages` for the
-PDF-bodied `coe`/`icc`/`icj`), but none sets `Source.intermediate` on its registration, so
+`hudoc` patches the **record and the body as one JSON document**
+(`hudoc.download.intermediate`), for the same reason as `dv`: the applicant's
+name sits in `docname` as well as in the running text. Every reader of the
+record goes through the patch, including `hudoc.citations.index`, so a redacted
+name also leaves the `casenames.json` snapshot at the next `lagen hudoc
+casenames`. A redaction must also reach any document that cites the case by
+name: patch the citing document too.
+
+The other five folkrätt sources — `coe`, `icrc`, `untc`, `icc`, `icj` — apply a patch
+at parse time the same way (`patch.apply` on the stored text for `icrc`/`untc`,
+a `patch_key` threaded into `lib.pdftext.pdf_pages` for the PDF-bodied
+`coe`/`icc`/`icj`), but none sets `Source.intermediate` on its registration, so
 `mkpatch`/the web editor cannot generate a pristine intermediate to diff against
 for them — only a hand-written diff against the stored source text applies.
 

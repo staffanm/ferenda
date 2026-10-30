@@ -122,6 +122,9 @@ SOURCES: tuple[Source, ...] = (Source(
     render=render.render,
     artifacts=functools.partial(layout.artifacts, "hudoc"),
     actions={"casenames": hudoc_casenames},
+    intermediate=(functools.partial(download.intermediate,
+                                    layout.HUDOC_DOWNLOADED),
+                  "HUDOC record and body as JSON"),
     harvest=hudoc_harvest, origin=origin(download.BASE),
     scopes=frozenset(download.COLLECTIONS),
     notes="download flags: --lang ENG[,FRE], --only <HUDOC-itemid>, --limit N\n"

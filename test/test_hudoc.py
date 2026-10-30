@@ -15,7 +15,7 @@ from ferenda.hudoc import (
     treaties,
 )
 from ferenda.hudoc import render as hudoc_render
-from ferenda.lib import catalog, catalog_rows, coe, facets, layout, page
+from ferenda.lib import catalog, catalog_rows, coe, facets, layout, page, patch
 from ferenda.lib.errors import SkipDocument
 from ferenda.wiki import parse as wiki_parse
 
@@ -574,6 +574,47 @@ def test_the_documents_own_identity_never_links(tmp_path):
     citations = _corpus(tmp_path)
     assert citations.refs("KEENAN v. THE UNITED KINGDOM Application "
                           "no. 27229/95", "001-1", tmp_path) == []
+    citations.index.cache_clear()
+
+
+def test_a_decision_and_a_judgment_sharing_a_name_part_by_the_printed_date(tmp_path):
+    """Two cases named alike and no date beside the name: the sole judgment
+    would win, although the number and the date printed after it name the
+    decision."""
+    _record(tmp_path, "001-7", "A.B. v. ESTONIA", "11111/11",
+            "CASELAW;DECISIONS;ADMISSIBILITY;ENG", "2012-06-26T00:00:00")
+    _record(tmp_path, "001-8", "CASE OF A.B. v. ESTONIA", "22222/22",
+            "CASELAW;JUDGMENTS;CHAMBER;ENG", "2018-10-23T00:00:00")
+    citations.index.cache_clear()
+    refs = citations.refs("(see A.B. v. Estonia (dec.), no. 11111/11, §§ 53 "
+                          "and 55, 26 June 2012)", "001-9", tmp_path)
+    assert [(r.text, r.uri[-5:]) for r in refs] \
+        == [("A.B. v. Estonia", "001-7"), ("11111/11", "001-7")]
+    citations.index.cache_clear()
+
+
+def test_a_redaction_reaches_the_title_and_the_citation_index(tmp_path, monkeypatch):
+    """A party's name sits in `docname` as well as in the body. A patch that
+    reached only the body would leave the name in the page title and in the
+    committed case-name snapshot."""
+    monkeypatch.setattr(layout, "PATCHES", tmp_path / "patches")
+    (tmp_path / "patches").mkdir()
+    _record(tmp_path, "001-7", "SMITH v. ESTONIA", "11111/11",
+            "CASELAW;DECISIONS;ADMISSIBILITY;ENG", "2012-06-26T00:00:00")
+    download.body_path(tmp_path, "001-7").write_text(
+        "<div><p>THE FACTS</p><p>1. Lodged by Mr Smith.</p></div>",
+        encoding="utf-8")
+    pristine = download.intermediate(tmp_path, "001-7")
+    patch.create_patch("hudoc", "001-7", pristine,
+                       pristine.replace("SMITH", "A.B.").replace("Smith", "A.B."),
+                       "Avidentifierad part", obfuscated=True)
+    citations.index.cache_clear()
+
+    record, html = download.read_document(tmp_path, "001-7")
+    assert record["docname"] == "A.B. v. ESTONIA"
+    assert "Smith" not in html
+    assert ("a b", "estonia", "") in citations.index(tmp_path)[1]
+    assert ("smith", "estonia", "") not in citations.index(tmp_path)[1]
     citations.index.cache_clear()
 
 

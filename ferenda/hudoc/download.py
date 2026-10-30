@@ -39,6 +39,7 @@ no common date order -- and the first collection's date stop would end the walk
 before the second was reached.
 """
 
+import json
 import sys
 import time
 from collections import deque
@@ -46,7 +47,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
-from ..lib import compress, util
+from ..lib import compress, markup, patch, util
 from ..lib.harvest import (
     HarvestWatermark,
     ItemKey,
@@ -83,6 +84,42 @@ def record_path(root, itemid):
 
 def body_path(root, itemid):
     return flat_path(root, itemid, ".html")
+
+
+def intermediate(root, basefile):
+    """The text a hudoc patch is diffed against: the record and the body as one
+    JSON document, pretty-printed one field per line, with the body split into
+    one block element per line.
+
+    The *whole record*, not just the body, for the reason dv's is
+    (`dv.parse.record_intermediate`): the applicant's name sits in `docname` as
+    well as in the running text, and a redaction reaching one of them leaves the
+    other to be found. The body's newlines cannot reach `parse_body`, which
+    flattens each paragraph on its own."""
+    return json.dumps({"record": compress.read_json(record_path(root, basefile)),
+                       "body": markup.block_lines(compress.read_text(
+                           body_path(root, basefile))).split("\n")},
+                      indent=2, ensure_ascii=False, sort_keys=True)
+
+
+def read_document(root, basefile):
+    """A document's `(record, html)` as every reader must see them: with any
+    patch applied. Only a patched document goes through `intermediate`, so the
+    common path stays untouched."""
+    if not patch.has_patch("hudoc", basefile):
+        return (compress.read_json(record_path(root, basefile)),
+                compress.read_text(body_path(root, basefile)))
+    patched = json.loads(patch.apply("hudoc", basefile,
+                                     intermediate(root, basefile)))
+    return patched["record"], "\n".join(patched["body"])
+
+
+def read_record(root, basefile):
+    """`read_document`'s record alone, for a walk over the whole corpus: the
+    body is read only when a patch needs it."""
+    if patch.has_patch("hudoc", basefile):
+        return read_document(root, basefile)[0]
+    return compress.read_json(record_path(root, basefile))
 
 
 # the harvested collections, each its own download scope and its own watermark.

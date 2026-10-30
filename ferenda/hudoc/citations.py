@@ -32,10 +32,10 @@ import functools
 import re
 from pathlib import Path
 
-from ..lib import compress
 from ..lib.emdref import fold_party_name, pick
 from ..lib.lagrum import ECHR_BASE, Ref, merge_refs
 from ..lib.util import normalize_space
+from .download import read_record
 from .model import document_kind, record_date
 
 PREDICATE = "dcterms:references"
@@ -43,6 +43,9 @@ PREDICATE = "dcterms:references"
 RE_APPNO_LIST = re.compile(
     r"\b[Nn]os?\.\s*(\d{3,5}/\d{2}(?:(?:\s*(?:,|and)\s*)\d{3,5}/\d{2})*)")
 RE_APPNO = re.compile(r"\d{3,5}/\d{2}")
+# what stands between a case's name and its number: "[GC], no. 3455/05",
+# "(dec.), no. 37038/09"
+RE_BEFORE_APPNO = re.compile(r"\s*(?:\[GC\]|\(dec\.\))?,?\s*(?=[Nn]os?\.)")
 # a date printed within the citation's own apparatus ("no. 59548/00, § 80,
 # 17 January 2008"): reaches past pinpoints and reporter cites, but never
 # a sentence boundary
@@ -77,7 +80,7 @@ def index(root):
     for path in sorted(Path(root).glob("001-*.json*")):
         if ".json" not in path.name:
             continue
-        record = compress.read_json(path)
+        record = read_record(root, path.name.split(".")[0])
         entry = (document_kind(record.get("documentcollectionid2")),
                  record_date(record), record["itemid"])
         appnos = [no.strip() for no in (record.get("appno") or "").split(";")
@@ -102,6 +105,17 @@ def _near_date(text, pos):
         return None
     return "%04d-%02d-%02d" % (int(m.group(3)), MONTHS[m.group(2)],
                                int(m.group(1)))
+
+
+def _name_date(text, end):
+    """The date printed with a named citation, reading past the number that
+    usually precedes it. The name alone cannot tell apart two cases that share
+    it: "M.T. v. Estonia (dec.), no. 37038/09, §§ 53 and 55, 26 June 2012" is
+    not the judgment of 2018, which `pick` would otherwise take as the sole
+    judgment."""
+    lead = RE_BEFORE_APPNO.match(text, end)
+    number = lead and RE_APPNO_LIST.match(text, lead.end())
+    return _near_date(text, number.end() if number else end)
 
 
 def _appno_refs(text, own, by_no, own_appnos):
@@ -162,7 +176,7 @@ def _name_refs(text, own, by_name, respondents, own_key):
             end = m.end() + resp
             while not text[end - 1].isalnum():
                 end -= 1
-        picked = pick(by_name[key], _near_date(text, end),
+        picked = pick(by_name[key], _name_date(text, end),
                       judgment_key="judgment", exclude=own)
         if picked is None:
             continue
